@@ -51,8 +51,7 @@ function SearchResults() {
       <header className="sticky top-0 bg-white border-b border-[#F3F4F6] px-4 py-3 z-10">
         <div className="max-w-4xl mx-auto flex items-center gap-3">
           <a href="/" className="text-xl font-bold shrink-0">
-            <span className="text-[#E8272A]">Catch</span>
-            <span className="text-[#0A0A0A]"> Comics</span>
+            <img src="/logo.png" alt="Catch Comics" className="h-8 w-auto" />
           </a>
           <form onSubmit={handleSearch} className="flex-1">
             <div className="relative flex items-center">

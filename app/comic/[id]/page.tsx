@@ -16,10 +16,7 @@ interface ComicDetail {
 interface PriceResult {
   seller: string
   condition: string
-  price: string
-  currency: string
   url: string
-  flag: string
 }
 
 function ComicPage() {
@@ -34,7 +31,7 @@ function ComicPage() {
 
   useEffect(() => {
     if (!id) return
-    fetch(`/api/comic/${id}`)
+    fetch('/api/comic/' + id)
       .then(res => res.json())
       .then(data => {
         setComic(data.comic)
@@ -45,39 +42,20 @@ function ComicPage() {
 
   useEffect(() => {
     if (!comic) return
-    const amazonBase = market === 'uk'
-      ? 'https://www.amazon.co.uk/s?k='
-      : 'https://www.amazon.com/s?k='
-    const amazonTag = market === 'uk' ? 'catchcomics-21' : 'catchcomics-us'
     const searchTerm = encodeURIComponent(comic.name + ' comic')
+    const amazonTag = market === 'uk' ? 'catchcomics-21' : 'catchcomics-us'
+    const amazonUrl = market === 'uk'
+      ? 'https://www.amazon.co.uk/s?k=' + searchTerm + '&tag=' + amazonTag
+      : 'https://www.amazon.com/s?k=' + searchTerm + '&tag=' + amazonTag
+    const ebayUrl = market === 'uk'
+      ? 'https://www.ebay.co.uk/sch/i.html?_nkw=' + searchTerm
+      : 'https://www.ebay.com/sch/i.html?_nkw=' + searchTerm
+    const abebooksUrl = 'https://www.abebooks.co.uk/servlet/SearchResults?kn=' + encodeURIComponent(comic.name)
 
     setPrices([
-      {
-        seller: 'Amazon',
-        condition: 'New',
-        price: 'View on Amazon',
-        currency: market === 'uk' ? '£' : '$',
-        url: amazonBase + searchTerm + '&tag=' + amazonTag,
-        flag: market === 'uk' ? '🇬🇧' : '🇺🇸'
-      },
-      {
-        seller: 'eBay',
-        condition: 'New & Used',
-        price: 'View on eBay',
-        currency: market === 'uk' ? '£' : '$',
-        url: market === 'uk'
-          ? 'https://www.ebay.co.uk/sch/i.html?_nkw=' + encodeURIComponent(comic.name + ' comic')
-          : 'https://www.ebay.com/sch/i.html?_nkw=' + encodeURIComponent(comic.name + ' comic'),
-        flag: market === 'uk' ? '🇬🇧' : '🇺🇸'
-      },
-      {
-        seller: 'AbeBooks',
-        condition: 'New & Used',
-        price: 'View on AbeBooks',
-        currency: market === 'uk' ? '£' : '$',
-        url: 'https://www.abebooks.co.uk/servlet/SearchResults?kn=' + encodeURIComponent(comic.name),
-        flag: market === 'uk' ? '🇬🇧' : '🇺🇸'
-      }
+      { seller: 'Amazon', condition: 'New', url: amazonUrl },
+      { seller: 'eBay', condition: 'New & Used', url: ebayUrl },
+      { seller: 'AbeBooks', condition: 'New & Used', url: abebooksUrl }
     ])
   }, [comic, market])
 
@@ -100,12 +78,10 @@ function ComicPage() {
   return (
     <main className="min-h-screen bg-white">
 
-      {/* Header */}
       <header className="sticky top-0 bg-white border-b border-[#F3F4F6] px-4 py-3 z-10">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <a href="/" className="text-xl font-bold shrink-0">
-            <span className="text-[#E8272A]">Catch</span>
-            <span className="text-[#0A0A0A]"> Comics</span>
+          <a href="/">
+            <img src="/logo.png" alt="Catch Comics" className="h-8 w-auto" />
           </a>
           <button
             onClick={() => router.back()}
@@ -118,7 +94,6 @@ function ComicPage() {
 
       <div className="max-w-4xl mx-auto px-4 py-8">
 
-        {/* Comic Details */}
         <div className="flex gap-6 mb-8">
           {comic.image?.medium_url && (
             <img
@@ -141,35 +116,27 @@ function ComicPage() {
           </div>
         </div>
 
-        {/* Market Selector */}
         <div className="flex items-center gap-2 mb-6">
           <p className="text-sm font-medium text-[#0A0A0A]">Show prices for:</p>
           <button
             onClick={() => setMarket('uk')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-              market === 'uk'
-                ? 'bg-[#E8272A] text-white'
-                : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#E5E7EB]'
-            }`}
+            className={'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all border-2 ' + (market === 'uk' ? 'border-[#E8272A] text-[#E8272A] bg-white' : 'border-[#E5E7EB] text-[#6B7280] bg-white hover:border-[#E8272A] hover:text-[#E8272A]')}
           >
-            🇬🇧 UK
+            <img src="https://flagcdn.com/w40/gb.png" alt="UK" className="w-7 h-auto rounded-sm" />
+            UK
           </button>
           <button
             onClick={() => setMarket('us')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-              market === 'us'
-                ? 'bg-[#E8272A] text-white'
-                : 'bg-[#F3F4F6] text-[#6B7280] hover:bg-[#E5E7EB]'
-            }`}
+            className={'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all border-2 ' + (market === 'us' ? 'border-[#E8272A] text-[#E8272A] bg-white' : 'border-[#E5E7EB] text-[#6B7280] bg-white hover:border-[#E8272A] hover:text-[#E8272A]')}
           >
-            🇺🇸 US
+            <img src="https://flagcdn.com/w40/us.png" alt="US" className="w-7 h-auto rounded-sm" />
+            US
           </button>
         </div>
 
-        {/* Price Results */}
         <div className="space-y-3">
           <h2 className="text-base font-semibold text-[#0A0A0A]">
-            Where to buy — {market === 'uk' ? '🇬🇧 UK' : '🇺🇸 US'}
+            Where to buy — {market === 'uk' ? 'UK' : 'US'}
           </h2>
           {prices.map((price, i) => (
             <div
