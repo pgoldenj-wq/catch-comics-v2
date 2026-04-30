@@ -5,6 +5,20 @@ import { useRouter } from 'next/navigation';
 import SearchBar from '../components/SearchBar';
 
 type HoverZone = 'left' | 'right' | null;
+
+const DEAL_FALLBACKS: Record<number, string> = {
+  796:    'https://covers.openlibrary.org/b/isbn/1401232590-L.jpg',
+  2127:   'https://covers.openlibrary.org/b/isbn/0785115609-L.jpg',
+  31022:  'https://covers.openlibrary.org/b/isbn/1569319014-L.jpg',
+  46568:  'https://covers.openlibrary.org/b/isbn/1607066017-L.jpg',
+  111792: 'https://covers.openlibrary.org/b/isbn/1974717747-L.jpg',
+  2133:   'https://covers.openlibrary.org/b/isbn/0785140425-L.jpg',
+  18166:  'https://covers.openlibrary.org/b/isbn/1582406723-L.jpg',
+  17993:  'https://covers.openlibrary.org/b/isbn/1582402869-L.jpg',
+  18836:  'https://covers.openlibrary.org/b/isbn/1569319006-L.jpg',
+  72157:  'https://covers.openlibrary.org/b/isbn/1593070942-L.jpg',
+}
+
 const TOP_DEALS = [
   { id: 796,    title: 'Batman',             publisher: 'DC Comics',    discount: '-15%' },
   { id: 2127,   title: 'Amazing Spider-Man', publisher: 'Marvel',       discount: '-20%' },
@@ -33,16 +47,18 @@ export default function Home() {
   const CARD_W = 148;
   const SET_W = TOP_DEALS.length * CARD_W;
 
-  // Fetch deal covers from Comic Vine
+  // Fetch deal covers from Comic Vine — staggered to avoid rate limiting
   useEffect(() => {
-    TOP_DEALS.forEach((deal) => {
-      fetch(`/api/comic/${deal.id}`)
-        .then(r => r.json())
-        .then(d => {
-          const img = d.comic?.image?.medium_url || d.comic?.image?.original_url;
-          if (img) setDealCovers(prev => ({ ...prev, [deal.id]: img }));
-        })
-        .catch(() => {});
+    TOP_DEALS.forEach((deal, index) => {
+      setTimeout(() => {
+        fetch(`/api/comic/${deal.id}`)
+          .then(r => r.json())
+          .then(d => {
+            const img = d.comic?.image?.medium_url || d.comic?.image?.original_url;
+            if (img) setDealCovers(prev => ({ ...prev, [deal.id]: img }));
+          })
+          .catch(() => {});
+      }, index * 150);
     });
   }, []);
 
@@ -244,9 +260,12 @@ export default function Home() {
                 onClick={() => router.push(`/comic/${deal.id}?region=${region}`)}
                 style={{ flexShrink: 0, width: '136px', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
                 <div style={{ width: '136px', height: '194px', borderRadius: '10px', overflow: 'hidden', background: '#1a1a2e', position: 'relative', boxShadow: '0 4px 16px rgba(0,0,0,0.1)', marginBottom: '8px' }}>
-                  {dealCovers[deal.id] && (
-                    <img src={dealCovers[deal.id]} alt={deal.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  )}
+                  <img
+                    src={dealCovers[deal.id] || DEAL_FALLBACKS[deal.id] || ''}
+                    alt={deal.title}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
                   <div style={{ position: 'absolute', top: '8px', left: '8px', background: '#E8272A', color: '#fff', fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '5px' }}>{deal.discount}</div>
                   <div className="deal-overlay" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(3px)', padding: '6px 8px', opacity: 0, transition: 'opacity 0.2s', textAlign: 'center' }}>
                     <span style={{ fontSize: '10px', color: '#fff', fontWeight: 600 }}>Compare prices</span>

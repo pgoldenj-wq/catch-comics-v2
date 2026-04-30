@@ -23,9 +23,8 @@ export async function GET(
 
     const data = await response.json()
 
-    return NextResponse.json({
-      comic: data.results || null
-    })
+    const comic = (data.results && !Array.isArray(data.results)) ? data.results : null
+    return NextResponse.json({ comic })
 
   } catch (error) {
     return NextResponse.json(
