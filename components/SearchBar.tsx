@@ -18,7 +18,7 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
   const [query, setQuery] = useState(initialQuery);
   const [suggestions, setSuggestions] = useState<SuggestionTerm[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const debounceRef = useRef<NodeJS.Timeout>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const fromPropRef = useRef(false);
   const router = useRouter();
