@@ -3,6 +3,7 @@
 import { useSearchParams } from 'next/navigation'
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
+import SearchBar from '@/components/SearchBar'
 
 interface ComicResult {
   id: number
@@ -10,7 +11,6 @@ interface ComicResult {
   image: { medium_url: string; original_url: string }
   start_year: string
   publisher: { name: string }
-  description: string
 }
 
 function SearchResults() {
@@ -21,13 +21,14 @@ function SearchResults() {
   const [results, setResults] = useState<ComicResult[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [searchInput, setSearchInput] = useState(query)
   const [region, setRegion] = useState<'uk' | 'us'>(regionParam || 'uk')
+  const [didYouMean, setDidYouMean] = useState<string | null>(null)
 
   useEffect(() => {
     if (!query) return
     setLoading(true)
     setError('')
+    setDidYouMean(null)
     fetch(`/api/search?q=${encodeURIComponent(query)}`)
       .then(res => res.json())
       .then(data => {
@@ -35,155 +36,141 @@ function SearchResults() {
         else setResults(data.results || [])
         setLoading(false)
       })
-      .catch(() => {
-        setError('Something went wrong. Please try again.')
-        setLoading(false)
-      })
+      .catch(() => { setError('Something went wrong.'); setLoading(false) })
   }, [query])
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (searchInput.trim()) {
-      router.push(`/search?q=${encodeURIComponent(searchInput.trim())}&region=${region}`)
-    }
-  }
+  // Comic-aware spelling correction — fires after results load
+  useEffect(() => {
+    if (!query || loading) return
+    // Always run correction — even with results, a suggestion can help
+    fetch(`/api/autocomplete?q=${encodeURIComponent(query)}&mode=correct`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.correction && d.correction.toLowerCase() !== query.toLowerCase()) {
+          setDidYouMean(d.correction)
+        }
+      })
+      .catch(() => {})
+  }, [query, loading])
 
   const switchRegion = (r: 'uk' | 'us') => {
     setRegion(r)
     router.push(`/search?q=${encodeURIComponent(query)}&region=${r}`)
   }
 
+  const UKFlag = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 30" width="24" height="12" aria-label="UK flag">
+      <path d="M0 0v30h60V0z" fill="#012169"/>
+      <path d="M0 0l60 30m0-30L0 30" stroke="#fff" strokeWidth="6"/>
+      <path d="M0 0l60 30m0-30L0 30" stroke="#C8102E" strokeWidth="4"/>
+      <path d="M30 0v30M0 15h60" stroke="#fff" strokeWidth="10"/>
+      <path d="M30 0v30M0 15h60" stroke="#C8102E" strokeWidth="6"/>
+    </svg>
+  )
+  const USFlag = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 30" width="24" height="12" aria-label="US flag">
+      <rect width="60" height="30" fill="#B22234"/>
+      <path d="M0 3.46h60M0 6.92h60M0 10.38h60M0 13.85h60M0 17.31h60M0 20.77h60M0 24.23h60" stroke="#fff" strokeWidth="2.31"/>
+      <rect width="24" height="16.15" fill="#3C3B6E"/>
+      <g fill="#fff">{[...Array(5)].map((_, row) => [...Array(row%2===0?6:5)].map((_, col) => <circle key={`${row}-${col}`} cx={row%2===0?2+col*4:4+col*4} cy={2+row*3} r="0.9"/>))}</g>
+    </svg>
+  )
+
   return (
-    <main className="min-h-screen bg-white font-sans">
+    <main className="min-h-screen font-sans" style={{ background: '#F8F8F6' }}>
 
-      {/* NAV */}
-      <nav className="sticky top-0 z-20 bg-[#0A0A0A] border-b-2 border-[#E8272A] px-4 py-0 h-14 flex items-center gap-4">
-        <a href="/" className="shrink-0">
-          <img src="/logo.png" alt="Catch Comics" className="h-7 w-auto" />
-        </a>
-
-        <form onSubmit={handleSearch} className="flex-1 flex items-center bg-white rounded-full pl-4 pr-1.5 py-1 max-w-xl">
-          <svg className="w-3.5 h-3.5 text-gray-400 shrink-0 mr-2" fill="none" viewBox="0 0 24 24">
-            <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
-            <path d="M16.5 16.5L21 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-          </svg>
-          <input
-            type="text"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search any comic, graphic novel or manga..."
-            className="flex-1 bg-transparent text-[#0A0A0A] text-sm outline-none placeholder:text-gray-400 py-1.5"
-          />
-          <button
-            type="submit"
-            className="w-8 h-8 rounded-full bg-[#0A0A0A] flex items-center justify-center shrink-0 hover:bg-[#E8272A] transition-colors"
-          >
-            <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24">
-              <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-        </form>
-
-        <div className="flex items-center gap-1.5 shrink-0">
-          <button
-            onClick={() => switchRegion('uk')}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
-              region === 'uk' ? 'bg-white/10 text-white border-white/30' : 'text-white/40 border-white/10'
-            }`}
-          >
-            🇬🇧 UK
-          </button>
-          <button
-            onClick={() => switchRegion('us')}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
-              region === 'us' ? 'bg-white/10 text-white border-white/30' : 'text-white/40 border-white/10'
-            }`}
-          >
-            🇺🇸 US
-          </button>
+      {/* HEADER — matches homepage */}
+      <header style={{ background: '#fff', borderBottom: '1px solid #F0F0F0', position: 'sticky', top: 0, zIndex: 20 }}>
+        <div className="max-w-6xl mx-auto px-8 h-20 flex items-center gap-4">
+          <a href="/" className="shrink-0">
+            <img src="/logo.png" alt="Catch Comics" className="h-12 w-auto" />
+          </a>
+          <div className="flex-1" style={{ maxWidth: '520px' }}>
+            <SearchBar region={region} variant="header" initialQuery={query} />
+          </div>
+          <div className="flex items-center gap-3 ml-auto shrink-0">
+            <button onClick={() => switchRegion('uk')}
+              className="flex items-center gap-2.5 pl-2 pr-4 py-1.5 rounded-full border-2 transition-all"
+              style={{ borderColor: region === 'uk' ? '#0A0A0A' : '#E5E7EB', background: region === 'uk' ? '#0A0A0A' : '#fff' }}>
+              <span className="flex items-center justify-center rounded-full overflow-hidden shrink-0" style={{ width: '32px', height: '32px', background: '#f3f4f6' }}><UKFlag /></span>
+              <span className="text-sm font-medium" style={{ color: region === 'uk' ? '#fff' : '#6B7280' }}>United Kingdom</span>
+            </button>
+            <button onClick={() => switchRegion('us')}
+              className="flex items-center gap-2.5 pl-2 pr-4 py-1.5 rounded-full border-2 transition-all"
+              style={{ borderColor: region === 'us' ? '#0A0A0A' : '#E5E7EB', background: region === 'us' ? '#0A0A0A' : '#fff' }}>
+              <span className="flex items-center justify-center rounded-full overflow-hidden shrink-0" style={{ width: '32px', height: '32px', background: '#f3f4f6' }}><USFlag /></span>
+              <span className="text-sm font-medium" style={{ color: region === 'us' ? '#fff' : '#6B7280' }}>United States</span>
+            </button>
+          </div>
         </div>
-      </nav>
+      </header>
 
-      {/* RESULTS */}
-      <div className="max-w-3xl mx-auto px-4 py-5">
+      <div className="max-w-3xl mx-auto px-4 py-6">
 
         {!loading && !error && (
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-sm text-gray-500">
-              <span className="font-medium text-[#0A0A0A]">{results.length} results</span> for "{query}"
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm" style={{ color: '#6B7280' }}>
+              <span className="font-medium" style={{ color: '#0A0A0A' }}>{results.length} results</span> for "{query}"
             </p>
-            <div className="text-xs text-gray-400">Sorted by relevance</div>
+            <div style={{ fontSize: '12px', color: '#9CA3AF' }}>Sorted by relevance</div>
           </div>
         )}
 
-        {/* SKELETON */}
+        {/* DID YOU MEAN — shows for both zero results and potential better matches */}
+        {didYouMean && !loading && (
+          <div className="mb-4 px-4 py-3 rounded-xl text-sm" style={{ background: '#fff', border: '1px solid #F0F0F0', color: '#6B7280' }}>
+            Did you mean{' '}
+            <button onClick={() => router.push(`/search?q=${encodeURIComponent(didYouMean)}&region=${region}`)}
+              style={{ fontWeight: 600, color: '#E8272A', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+              {didYouMean}
+            </button>?
+          </div>
+        )}
+
         {loading && (
           <div className="space-y-2">
             {[...Array(6)].map((_, i) => (
-              <div key={i} className="flex gap-3 p-3 border border-gray-100 rounded-xl animate-pulse">
-                <div className="w-12 h-16 bg-gray-100 rounded-md shrink-0" />
+              <div key={i} className="flex gap-3 p-3 rounded-xl animate-pulse" style={{ border: '1px solid #F3F4F6' }}>
+                <div className="w-12 h-16 rounded-md shrink-0" style={{ background: '#F3F4F6' }} />
                 <div className="flex-1 space-y-2 py-1">
-                  <div className="h-3.5 bg-gray-100 rounded w-3/4" />
-                  <div className="h-3 bg-gray-100 rounded w-1/2" />
-                  <div className="h-3 bg-gray-100 rounded w-1/4" />
+                  <div className="h-3.5 rounded w-3/4" style={{ background: '#F3F4F6' }} />
+                  <div className="h-3 rounded w-1/2" style={{ background: '#F3F4F6' }} />
                 </div>
-                <div className="w-16 h-8 bg-gray-100 rounded-full self-center shrink-0" />
               </div>
             ))}
           </div>
         )}
 
-        {error && (
-          <div className="text-center py-16">
-            <p className="text-gray-500">{error}</p>
-          </div>
-        )}
+        {error && <div className="text-center py-16" style={{ color: '#6B7280' }}>{error}</div>}
 
         {!loading && !error && results.length > 0 && (
-          <div className="divide-y divide-gray-100">
+          <div style={{ borderTop: '1px solid #F0F0F0' }}>
             {results.map((comic) => (
-              <div
-                key={comic.id}
+              <div key={comic.id}
                 onClick={() => router.push(`/comic/${comic.id}?region=${region}`)}
-                className="flex items-center gap-3 py-3.5 cursor-pointer group"
-              >
-                {/* COVER */}
-                <div className="shrink-0 w-11 h-16 rounded-md overflow-hidden bg-gray-100 border border-gray-200">
-                  {comic.image?.medium_url ? (
-                    <img
-                      src={comic.image.medium_url}
-                      alt={comic.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <span className="text-gray-400 text-lg font-medium">
-                        {comic.name.charAt(0)}
-                      </span>
-                    </div>
-                  )}
+                className="flex items-center gap-3 py-4 cursor-pointer"
+                style={{ borderBottom: '1px solid #F0F0F0' }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#FAFAFA')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                <div className="shrink-0 rounded-md overflow-hidden" style={{ width: '44px', height: '62px', background: '#F3F4F6', border: '1px solid #EBEBEB' }}>
+                  {comic.image?.medium_url
+                    ? <img src={comic.image.medium_url} alt={comic.name} className="w-full h-full object-cover" />
+                    : <div className="w-full h-full flex items-center justify-center"><span style={{ color: '#9CA3AF', fontSize: '16px', fontWeight: 500 }}>{comic.name.charAt(0)}</span></div>
+                  }
                 </div>
-
-                {/* INFO */}
                 <div className="flex-1 min-w-0">
-                  <h2 className="text-sm font-medium text-[#0A0A0A] truncate group-hover:text-[#E8272A] transition-colors">
-                    {comic.name}
-                  </h2>
-                  <p className="text-xs text-gray-400 mt-0.5">
+                  <h2 className="text-sm font-medium truncate" style={{ color: '#0A0A0A' }}>{comic.name}</h2>
+                  <p className="text-xs mt-0.5" style={{ color: '#9CA3AF' }}>
                     {[comic.publisher?.name, comic.start_year].filter(Boolean).join(' · ')}
                   </p>
-                  <span className="inline-block mt-1.5 text-[10px] font-medium px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full">
+                  <span className="inline-block mt-1.5 text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: '#F3F4F6', color: '#6B7280', fontSize: '10px' }}>
                     Comic Series
                   </span>
                 </div>
-
-                {/* PRICE CTA */}
                 <div className="shrink-0 text-right">
-                  <div className="text-[10px] text-gray-400 mb-0.5 uppercase tracking-wide">Compare</div>
-                  <div className="text-sm font-medium text-[#E8272A] group-hover:underline">
-                    Find prices →
-                  </div>
-                  <div className="text-[10px] text-gray-400 mt-0.5">3 stores</div>
+                  <div style={{ fontSize: '10px', color: '#9CA3AF', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '2px' }}>Compare</div>
+                  <div style={{ fontSize: '13px', fontWeight: 500, color: '#E8272A' }}>Find prices →</div>
+                  <div style={{ fontSize: '10px', color: '#9CA3AF', marginTop: '2px' }}>3 stores</div>
                 </div>
               </div>
             ))}
@@ -192,8 +179,8 @@ function SearchResults() {
 
         {!loading && !error && results.length === 0 && (
           <div className="text-center py-16">
-            <p className="text-[#0A0A0A] font-medium mb-2">No results for "{query}"</p>
-            <p className="text-sm text-gray-500">Try searching by series name, character, or publisher</p>
+            <p className="font-medium mb-2" style={{ color: '#0A0A0A' }}>No results for "{query}"</p>
+            <p className="text-sm" style={{ color: '#6B7280' }}>Try searching by series name, character, or publisher</p>
           </div>
         )}
       </div>
@@ -204,8 +191,8 @@ function SearchResults() {
 export default function SearchPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <p className="text-gray-400 text-sm">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center font-sans" style={{ background: '#F8F8F6' }}>
+        <p style={{ color: '#9CA3AF', fontSize: '14px' }}>Loading...</p>
       </div>
     }>
       <SearchResults />
