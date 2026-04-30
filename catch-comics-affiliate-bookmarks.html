@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Catch Comics — Affiliate &amp; API Onboarding Dashboard</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;background:#f8f8f6;color:#111;}
+code{background:#f3f4f6;padding:1px 5px;border-radius:4px;font-family:monospace;font-size:11px;}
+/* Warning */
+.warning{background:#7f1d1d;color:#fff;padding:14px 24px;border-bottom:3px solid #b91c1c;}
+.warning .w-title{font-size:14px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:8px;}
+.warning p{font-size:12px;line-height:1.6;max-width:900px;}
+/* Header */
+.hdr{background:#0a0a0a;color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+.hdr h1{font-size:16px;font-weight:700;}
+.hdr .sub{font-size:11px;color:#9ca3af;margin-top:2px;}
+.hdr .date{font-size:11px;color:#6b7280;}
+/* Stats */
+.stats{display:flex;gap:12px;padding:12px 24px;background:#fff;border-bottom:1px solid #e5e7eb;flex-wrap:wrap;align-items:center;}
+.stat{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:8px 14px;text-align:center;min-width:80px;}
+.stat .n{font-size:22px;font-weight:700;display:block;line-height:1.1;}
+.stat .l{font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;}
+.stat.red .n{color:#dc2626;}
+.stat.amber .n{color:#d97706;}
+.stat.green .n{color:#059669;}
+/* Batches */
+.batches{padding:12px 24px;background:#fff;border-bottom:1px solid #e5e7eb;}
+.batches h3{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;margin-bottom:8px;}
+.batches .note{font-size:11px;color:#9ca3af;margin-top:6px;}
+.batch-row{display:flex;flex-wrap:wrap;gap:6px;}
+.btn-batch{background:#0a0a0a;color:#fff;border:none;border-radius:6px;padding:6px 13px;font-size:11px;cursor:pointer;font-weight:600;line-height:1.3;}
+.btn-batch:hover{background:#e8272a;}
+.btn-batch small{display:block;font-weight:400;opacity:.7;font-size:10px;}
+/* Filters */
+.filters{padding:10px 24px;background:#f9fafb;border-bottom:1px solid #e5e7eb;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.filters label{font-size:12px;color:#374151;display:flex;align-items:center;gap:5px;}
+.filters select,.filters input{font-size:12px;padding:4px 8px;border:1px solid #d1d5db;border-radius:5px;background:#fff;}
+.btn-sm{font-size:11px;padding:4px 10px;border:1px solid #d1d5db;border-radius:5px;background:#fff;cursor:pointer;}
+.btn-sm:hover{background:#f3f4f6;}
+.fc{font-size:11px;color:#9ca3af;margin-left:4px;}
+/* Table */
+.tw{overflow-x:auto;padding:16px 24px 32px;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+thead tr{position:sticky;top:0;z-index:10;}
+th{background:#0a0a0a;color:#fff;padding:8px 10px;text-align:left;font-weight:600;white-space:nowrap;font-size:11px;}
+td{padding:7px 10px;border-bottom:1px solid #f0f0f0;vertical-align:top;}
+tr:hover td{background:#fafafa !important;}
+tr.now td{background:#fff7f7;}
+tr.now td:first-child{border-left:3px solid #e8272a;}
+tr.soon td{background:#fffdf5;}
+tr.soon td:first-child{border-left:3px solid #f59e0b;}
+tr.later td:first-child{border-left:3px solid #e5e7eb;}
+/* Badges */
+.badge{display:inline-block;padding:2px 7px;border-radius:99px;font-size:10px;font-weight:600;white-space:nowrap;}
+.b-now{background:#fee2e2;color:#b91c1c;}
+.b-soon{background:#fef3c7;color:#92400e;}
+.b-later{background:#f3f4f6;color:#6b7280;}
+.b-free{background:#d1fae5;color:#065f46;}
+.b-cost{background:#fef3c7;color:#92400e;}
+.b-paid{background:#fee2e2;color:#b91c1c;}
+.b-unknown{background:#f3f4f6;color:#6b7280;}
+.b-type{background:#ede9fe;color:#5b21b6;}
+/* Links */
+.lnk{display:inline-block;padding:3px 8px;background:#0a0a0a;color:#fff;border-radius:4px;font-size:10px;text-decoration:none;margin:2px 2px 2px 0;white-space:nowrap;font-weight:500;}
+.lnk:hover{background:#e8272a;}
+.lnk.sec{background:#6b7280;}
+.lnk.sec:hover{background:#374151;}
+.lnk.srch{background:#2563eb;}
+.lnk.srch:hover{background:#1d4ed8;}
+/* Status */
+.status-sel{width:140px;font-size:11px;padding:3px 5px;border:1px solid #d1d5db;border-radius:4px;background:#fff;}
+.status-sel.applied{border-color:#2563eb;background:#eff6ff;}
+.status-sel.approved{border-color:#059669;background:#ecfdf5;}
+.status-sel.rejected{border-color:#dc2626;background:#fef2f2;}
+.status-sel.followup{border-color:#d97706;background:#fffbeb;}
+/* Notes */
+.notes-ta{width:180px;font-size:11px;padding:3px 5px;border:1px solid #d1d5db;border-radius:4px;resize:vertical;min-height:40px;font-family:inherit;}
+/* Misc */
+.num{color:#9ca3af;font-weight:700;font-size:11px;}
+.rname{font-weight:600;color:#111;font-size:12px;}
+.grp-hdr td{background:#0a0a0a !important;color:#fff;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:6px 10px;}
+</style>
+</head>
+<body>
+
+<div class="warning">
+  <div class="w-title">⚠️ SECURITY REMINDER — Read every session before opening any affiliate pages</div>
+  <p>
+    <strong>Never paste passwords, API keys, client secrets, affiliate IDs, or access tokens into Claude.</strong>
+    Store all secrets in <code>.env.local</code> only and never commit that file to GitHub.
+    Claude can help you plan and write integration code, but you must personally handle all credentials, 2FA, payments, and legal agreements.
+    Claude will stop and wait for your approval whenever a task requires a login, credential, or legal sign-off.
+  </p>
+</div>
+
+<div class="hdr">
+  <div>
+    <h1>Catch Comics — Affiliate &amp; API Onboarding Dashboard</h1>
+    <div class="sub">100 UK comic, manga &amp; graphic novel retailers · Standalone local planning file · Open directly in browser</div>
+  </div>
+  <div class="date">Updated: 2026-04-30</div>
+</div>
+
+<div class="stats" id="stats">
+  <div class="stat"><span class="n" id="s-total">100</span><span class="l">Total</span></div>
+  <div class="stat red"><span class="n" id="s-now">—</span><span class="l">Apply now</span></div>
+  <div class="stat amber"><span class="n" id="s-soon">—</span><span class="l">Apply soon</span></div>
+  <div class="stat"><span class="n" id="s-later">—</span><span class="l">Later</span></div>
+  <div class="stat green"><span class="n" id="s-approved">—</span><span class="l">Approved</span></div>
+  <div class="stat"><span class="n" id="s-applied">—</span><span class="l">Applied</span></div>
+  <div class="stat"><span class="n" id="s-ns">—</span><span class="l">Not started</span></div>
+</div>
+
+<div class="batches">
+  <h3>Open affiliate pages by batch — up to 10 tabs at once</h3>
+  <div class="batch-row" id="batchBtns"></div>
+  <div class="note">Allow pop-ups in your browser for batch opening to work. Each button opens only the primary affiliate/API link for each item in that batch.</div>
+</div>
+
+<div class="filters">
+  <label>MVP:
+    <select id="fMvp" onchange="render()">
+      <option value="">All</option>
+      <option value="now">Now</option>
+      <option value="soon">Soon</option>
+      <option value="later">Later</option>
+    </select>
+  </label>
+  <label>Status:
+    <select id="fStatus" onchange="render()">
+      <option value="">All</option>
+      <option value="Not started">Not started</option>
+      <option value="Applied">Applied</option>
+      <option value="Approved">Approved</option>
+      <option value="Rejected">Rejected</option>
+      <option value="Needs follow-up">Needs follow-up</option>
+    </select>
+  </label>
+  <label>Cost:
+    <select id="fCost" onchange="render()">
+      <option value="">All</option>
+      <option value="Free">Free</option>
+      <option value="Possible cost">Possible cost</option>
+      <option value="Paid">Paid</option>
+      <option value="Unknown">Unknown</option>
+    </select>
+  </label>
+  <label>Batch:
+    <select id="fBatch" onchange="render()">
+      <option value="">All</option>
+      <option value="1">Batch 1 (1–10)</option>
+      <option value="2">Batch 2 (11–20)</option>
+      <option value="3">Batch 3 (21–30)</option>
+      <option value="4">Batch 4 (31–40)</option>
+      <option value="5">Batch 5 (41–50)</option>
+      <option value="6">Batch 6 (51–60)</option>
+      <option value="7">Batch 7 (61–70)</option>
+      <option value="8">Batch 8 (71–80)</option>
+      <option value="9">Batch 9 (81–90)</option>
+      <option value="10">Batch 10 (91–100)</option>
+    </select>
+  </label>
+  <button class="btn-sm" onclick="clearFilters()">Clear filters</button>
+  <span class="fc" id="fCount"></span>
+</div>
+
+<div class="tw">
+  <table>
+    <thead>
+      <tr>
+        <th style="width:36px">#</th>
+        <th style="min-width:180px">Retailer / Platform</th>
+        <th style="min-width:130px">Type</th>
+        <th style="min-width:160px">Access Route</th>
+        <th style="min-width:100px">Cost</th>
+        <th style="min-width:70px">MVP</th>
+        <th style="min-width:200px">Links</th>
+        <th style="min-width:145px">Status</th>
+        <th style="min-width:185px">Notes</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+
+<script>
+// ─── DATA ──────────────────────────────────────────────────────────────────────
+// route values: affiliate network or method
+// cost: "Free" | "Possible cost" | "Paid" | "Unknown"
+// mvp: "now" | "soon" | "later"
+// links: [{l: label, u: url, t: "aff"|"api"|"srch"}]
+// notes: string (pre-filled guidance; user can edit and save)
+
+const BATCH_LABELS = [
+  "Major Marketplaces + Top Comic Shops",
+  "Indie UK Comic Shops",
+  "General Bookshops + Entertainment",
+  "Second-hand, Auction & C2C",
+  "Charity, Discount & Specialist Bookshops",
+  "Publishers (Big 6 + imprints)",
+  "Indie Comics Publishers",
+  "Anime / Manga / Japan Retailers",
+  "TCG / Collectibles / Games Shops",
+  "eBay Stores, Niche & Placeholder"
+];
+
+const DATA = [
+// ── BATCH 1: Major Marketplaces + Top Comic Shops ─────────────────────────────
+{id:1,  name:"Amazon UK",                     type:"Marketplace",             route:"Amazon Associates + PA-API",          cost:"Free",          mvp:"now",
+ links:[{l:"Associates",u:"https://affiliate-program.amazon.co.uk/",t:"aff"},{l:"PA-API docs",u:"https://webservices.amazon.com/paapiv5/docs/en_US/index.html",t:"api"}],
+ notes:"Highest-priority. Associates is near-instant. PA-API unlocks after 3 qualifying sales in 180 days."},
+
+{id:2,  name:"eBay UK",                       type:"Marketplace",             route:"eBay Partner Network + API",          cost:"Free",          mvp:"now",
+ links:[{l:"Partner Network",u:"https://partnernetwork.ebay.co.uk/",t:"aff"},{l:"Developer",u:"https://developer.ebay.com/",t:"api"}],
+ notes:"Essential for second-hand comics and collectibles. Finding API is generous free tier."},
+
+{id:3,  name:"AbeBooks UK",                   type:"Marketplace / Second-hand",route:"Amazon Associates (AbeBooks = Amazon)", cost:"Free",         mvp:"now",
+ links:[{l:"Associates",u:"https://affiliate-program.amazon.co.uk/",t:"aff"},{l:"AbeBooks affiliate info",u:"https://www.google.com/search?q=AbeBooks+UK+affiliate+programme+Amazon",t:"srch"}],
+ notes:"Amazon-owned. Verify that standard Amazon Associates deep links work for AbeBooks."},
+
+{id:4,  name:"World of Books",                type:"Second-hand books",       route:"Direct affiliate / Awin",             cost:"Free",          mvp:"now",
+ links:[{l:"Affiliate page",u:"https://www.worldofbooks.com/en-gb/pages/affiliates",t:"aff"},{l:"Verify on Awin",u:"https://www.google.com/search?q=World+of+Books+Awin+affiliate+programme",t:"srch"}],
+ notes:"Large UK used-book stock. Excellent for back-catalogue GNs and manga. Verify current network."},
+
+{id:5,  name:"AwesomeBooks",                  type:"Second-hand books",       route:"Awin affiliate",                      cost:"Free",          mvp:"now",
+ links:[{l:"Affiliate search",u:"https://www.google.com/search?q=AwesomeBooks+affiliate+programme+UK+Awin",t:"srch"}],
+ notes:"Large secondhand book retailer. Awin likely. Good comic/manga back catalogue."},
+
+{id:6,  name:"Waterstones",                   type:"Bookshop",                route:"Awin affiliate",                      cost:"Free",          mvp:"now",
+ links:[{l:"Affiliate page",u:"https://www.google.com/search?q=Waterstones+affiliate+programme+UK",t:"srch"},{l:"Awin signup",u:"https://www.awin.com/gb/publishers/",t:"aff"}],
+ notes:"UK's largest bookshop. Strong comic, GN and manga selection. Awin is standard route."},
+
+{id:7,  name:"WHSmith",                       type:"Bookshop / Stationery",   route:"Awin affiliate",                      cost:"Free",          mvp:"now",
+ links:[{l:"Affiliate search",u:"https://www.google.com/search?q=WHSmith+affiliate+programme+UK+Awin",t:"srch"},{l:"Awin signup",u:"https://www.awin.com/gb/publishers/",t:"aff"}],
+ notes:"Mass-market. Mainstream comics and manga. Find via Awin advertiser directory."},
+
+{id:8,  name:"Blackwell's",                   type:"Bookshop",                route:"Awin / direct affiliate",             cost:"Free",          mvp:"soon",
+ links:[{l:"Affiliate search",u:"https://www.google.com/search?q=Blackwells+bookshop+affiliate+programme+UK",t:"srch"}],
+ notes:"Academic and general bookshop. Solid GN range. Verify if programme is still active."},
+
+{id:9,  name:"Forbidden Planet",              type:"Comic shop / Marketplace", route:"Direct contact / possible affiliate", cost:"Unknown",       mvp:"now",
+ links:[{l:"Contact",u:"https://forbiddenplanet.com/contact/",t:"aff"},{l:"Affiliate search",u:"https://www.google.com/search?q=Forbidden+Planet+affiliate+programme+API+UK",t:"srch"}],
+ notes:"UK's biggest specialist comic retailer. Very high priority. Likely needs direct partnership email."},
+
+{id:10, name:"SciFier / FP International",    type:"Comic shop",              route:"Direct contact",                      cost:"Unknown",       mvp:"soon",
+ links:[{l:"Affiliate search",u:"https://www.google.com/search?q=SciFier+Forbidden+Planet+International+affiliate+API",t:"srch"}],
+ notes:"Separate entity from Forbidden Planet Ltd. Based in Belfast. Investigate independently."},
+
+// ── BATCH 2: Indie UK Comic Shops ─────────────────────────────────────────────
+{id:11, name:"Reed Comics",                   type:"Comic shop",              route:"Direct contact",                      cost:"Free / unknown",mvp:"soon",
+ links:[{l:"Find affiliate page",u:"https://www.google.com/search?q=Reed+Comics+UK+affiliate+API+partnership",t:"srch"}],
+ notes:"London-based specialist. Direct email approach best. Ask about product feed."},
+
+{id:12, name:"Gosh! Comics",                  type:"Comic shop",              route:"Direct contact",                      cost:"Free / unknown",mvp:"soon",
+ links:[{l:"Find affiliate page",u:"https://www.google.com/search?q=Gosh+Comics+London+affiliate+partnership",t:"srch"}],
+ notes:"Well-respected London shop. Strong indie and alt selection."},
+
+{id:13, name:"Travelling Man",                type:"Comic shop",              route:"Direct contact",                      cost:"Free / unknown",mvp:"later",
+ links:[{l:"Find affiliate page",u:"https://www.google.com/search?q=Travelling+Man+comic+shop+UK+affiliate",t:"srch"}],
+ notes:"Northern England chain (Leeds, Newcastle, Edinburgh etc). Multiple locations."},
+
+{id:14, name:"Page 45",                       type:"Comic shop",              route:"Direct contact",                      cost:"Free / unknown",mvp:"later",
+ links:[{l:"Find affiliate page",u:"https://www.google.com/search?q=Page+45+Nottingham+comic+shop+affiliate+API",t:"srch"}],
+ notes:"Nottingham. Known for quality indie selection and active online shop. Worth contacting."},
+
+{id:15, name:"OK Comics",                     type:"Comic shop",              route:"Direct contact",                      cost:"Free / unknown",mvp:"later",
+ links:[{l:"Find affiliate page",u:"https://www.google.com/search?q=OK+Comics+Leeds+affiliate+partnership",t:"srch"}],
+ notes:"Leeds-based independent."},
+
+{id:16, name:"Ace Comics",                    type:"Comic shop",              route:"Direct contact / eBay",               cost:"Free",          mvp:"later",
+ links:[{l:"Find affiliate page",u:"https://www.google.com/search?q=Ace+Comics+Scotland+affiliate+API",t:"srch"},{l:"eBay Partner Network",u:"https://partnernetwork.ebay.co.uk/",t:"aff"}],
+ notes:"Scottish comic shop. Has eBay store — use eBay PN for that separately."},
+
+{id:17, name:"Mega City Comics",              type:"Comic shop",              route:"Direct contact",                      cost:"Free / unknown",mvp:"later",
+ links:[{l:"Find affiliate page",u:"https://www.google.com/search?q=Mega+City+Comics+London+affiliate",t:"srch"}],
+ notes:"London. Camden-based."},
+
+{id:18, name:"Close Encounters",              type:"Comic shop",              route:"Direct contact",                      cost:"Free / unknown",mvp:"later",
+ links:[{l:"Find affiliate page",u:"https://www.google.com/search?q=Close+Encounters+comic+shop+UK+affiliate",t:"srch"}],
+ notes:"Verify current trading status before contacting."},
+
+{id:19, name:"The Unreality Store",           type:"Comic shop",              route:"Direct contact",                      cost:"Free / unknown",mvp:"later",
+ links:[{l:"Find affiliate page",u:"https://www.google.com/search?q=The+Unreality+Store+UK+comic+shop+affiliate",t:"srch"}],
+ notes:"Verify still trading."},
+
+{id:20, name:"Comics Bugle",                  type:"Comic shop",              route:"Direct contact",                      cost:"Free / unknown",mvp:"later",
+ links:[{l:"Find affiliate page",u:"https://www.google.com/search?q=Comics+Bugle+UK+affiliate+partnership",t:"srch"}],
+ notes:"Verify trading status before pursuing."},
+
+// ── BATCH 3: General Bookshops + Entertainment ────────────────────────────────
+{id:21, name:"Hive",                          type:"Bookshop / Indie network", route:"Affiliate (direct or Awin)",          cost:"Free",          mvp:"soon",
+ links:[{l:"Affiliate search",u:"https://www.google.com/search?q=Hive.co.uk+affiliate+programme+UK",t:"srch"}],
+ notes:"Supports local bookshops. Popular alternative to Amazon. Good for Catch Comics values story."},
+
+{id:22, name:"Wordery",                       type:"Bookshop",                route:"Awin affiliate",                      cost:"Free",          mvp:"soon",
+ links:[{l:"Affiliate search",u:"https://www.google.com/search?q=Wordery+affiliate+programme+Awin+UK",t:"srch"},{l:"Awin signup",u:"https://www.awin.com/gb/publishers/",t:"aff"}],
+ notes:"Competitive pricing. Often cheap on manga volumes."},
+
+{id:23, name:"Speedyhen",                     type:"Bookshop",                route:"Awin affiliate",                      cost:"Free",          mvp:"soon",
+ links:[{l:"Affiliate search",u:"https://www.google.com/search?q=Speedyhen+affiliate+programme+UK+Awin",t:"srch"}],
+ notes:"Good value. Frequently competitive on manga. Check Awin advertiser directory."},
+
+{id:24, name:"Books2Door",                    type:"Bookshop",                route:"Awin / direct affiliate",             cost:"Free",          mvp:"soon",
+ links:[{l:"Affiliate search",u:"https://www.google.com/search?q=Books2Door+affiliate+programme+UK",t:"srch"}],
+ notes:"Verify they carry comics/manga volumes before prioritising."},
+
+{id:25, name:"Bookshop.org UK",               type:"Indie bookshop / Platform", route:"Direct affiliate (own programme)",   cost:"Free",          mvp:"now",
+ links:[{l:"Affiliate programme",u:"https://uk.bookshop.org/pages/affiliate",t:"aff"}],
+ notes:"Simple to join. Supports indie bookshops. Great for brand alignment. Apply today — fastest approval."},
+
+{id:26, name:"Foyles",                        type:"Bookshop",                route:"Awin affiliate",                      cost:"Free",          mvp:"soon",
+ links:[{l:"Affiliate search",u:"https://www.google.com/search?q=Foyles+bookshop+affiliate+programme+Awin+UK",t:"srch"}],
+ notes:"London flagship + online. Excellent graphic novel section."},
+
+{id:27, name:"The Works",                     type:"Discount bookshop",       route:"Awin / direct affiliate",             cost:"Free",          mvp:"soon",
+ links:[{l:"Affiliate search",u:"https://www.google.com/search?q=The+Works+UK+affiliate+programme+Awin",t:"srch"}],
+ notes:"Discount retailer. Good for cheap manga volumes. Often has clearance stock."},
+
+{id:28, name:"HMV",                           type:"Entertainment / Collectibles", route:"Awin / direct affiliate",        cost:"Free",          mvp:"later",
+ links:[{l:"Affiliate search",u:"https://www.google.com/search?q=HMV+UK+affiliate+programme",t:"srch"}],
+ notes:"Carries manga, GNs, collectibles. Verify affiliate programme is active."},
+
+{id:29, name:"GAME",                          type:"Entertainment / Collectibles", route:"Awin / direct affiliate",        cost:"Free",          mvp:"later",
+ links:[{l:"Affiliate search",u:"https://www.google.com/search?q=GAME+UK+affiliate+programme+Awin",t:"srch"}],
+ notes:"Carries some manga and collectibles. Low comics volume."},
+
+{id:30, name:"Zavvi",                         type:"Entertainment / Anime / Manga", route:"Awin affiliate",               cost:"Free",          mvp:"soon",
+ links:[{l:"Affiliate search",u:"https://www.google.com/search?q=Zavvi+affiliate+programme+Awin+UK",t:"srch"},{l:"Awin signup",u:"https://www.awin.com/gb/publishers/",t:"aff"}],
+ notes:"Good range of manga, anime collectibles and steelbooks. Likely on Awin — find via advertiser search."},
+
+// ── BATCH 4: Second-hand, Auction & C2C Platforms ─────────────────────────────
+{id:31, name:"Vinted UK",                     type:"C2C / Second-hand",       route:"No affiliate / API available",        cost:"N/A",           mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Vinted+UK+affiliate+API+programme",t:"srch"}],
+ notes:"Fashion-focused C2C. No meaningful affiliate or API for comics price comparison. Skip for now."},
+
+{id:32, name:"Facebook Marketplace",          type:"C2C Marketplace",         route:"No public API for price comparison",  cost:"N/A",           mvp:"later",
+ links:[{l:"Meta dev docs",u:"https://developers.facebook.com/docs/",t:"api"}],
+ notes:"No practical affiliate or API route for comparison. Not suitable for integration."},
+
+{id:33, name:"Etsy UK",                       type:"Indie / Handmade / Collectibles", route:"Awin affiliate + Etsy API",  cost:"Free",          mvp:"soon",
+ links:[{l:"Etsy API",u:"https://www.etsy.com/developers/",t:"api"},{l:"Awin affiliate",u:"https://www.awin.com/gb/publishers/",t:"aff"},{l:"Etsy affiliate search",u:"https://www.google.com/search?q=Etsy+UK+affiliate+programme+Awin",t:"srch"}],
+ notes:"Good for vintage/rare/signed comics. API needs app approval. Awin affiliate is separate route."},
+
+{id:34, name:"Depop",                         type:"C2C / Second-hand",       route:"No standard affiliate / limited API", cost:"Unknown",      mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Depop+affiliate+API+partner+programme",t:"srch"}],
+ notes:"Fashion-primary. Some comics/manga listed but no easy integration. Low priority."},
+
+{id:35, name:"Gumtree",                       type:"Classifieds",             route:"No affiliate / API",                  cost:"N/A",           mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Gumtree+UK+affiliate+API",t:"srch"}],
+ notes:"Classifieds. No useful integration route. Not worth pursuing."},
+
+{id:36, name:"Preloved",                      type:"Classifieds",             route:"Contact / unknown",                   cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Preloved.co.uk+affiliate+API+programme",t:"srch"}],
+ notes:"UK classifieds. Low priority."},
+
+{id:37, name:"Catawiki",                      type:"Auction / Collectibles",  route:"Possible affiliate — investigate",    cost:"Unknown",       mvp:"later",
+ links:[{l:"Affiliate search",u:"https://www.google.com/search?q=Catawiki+affiliate+programme+UK",t:"srch"}],
+ notes:"European auction site. Comics and collectibles category. May have affiliate programme."},
+
+{id:38, name:"Whatnot",                       type:"Live Auction / Collectibles", route:"No standard affiliate for UK",    cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Whatnot+UK+affiliate+API+partner",t:"srch"}],
+ notes:"US-origin live auction app. UK presence growing. No standard affiliate currently."},
+
+{id:39, name:"The Saleroom",                  type:"Auction",                 route:"Direct contact",                      cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=The+Saleroom+affiliate+API+partner+UK",t:"srch"}],
+ notes:"UK auction aggregator. Comics appear occasionally. Low priority."},
+
+{id:40, name:"Easy Live Auction",             type:"Auction",                 route:"Direct contact",                      cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Easy+Live+Auction+affiliate+API+UK",t:"srch"}],
+ notes:"Auction platform. Low priority for MVP."},
+
+// ── BATCH 5: Charity, Discount & Specialist Bookshops ─────────────────────────
+{id:41, name:"Oxfam Online Shop",             type:"Charity / Second-hand",   route:"Awin affiliate",                      cost:"Free",          mvp:"soon",
+ links:[{l:"Affiliate search",u:"https://www.google.com/search?q=Oxfam+Online+Shop+affiliate+programme+Awin+UK",t:"srch"},{l:"Awin signup",u:"https://www.awin.com/gb/publishers/",t:"aff"}],
+ notes:"Good stock of used comics and GNs. Awin is likely their network."},
+
+{id:42, name:"BHF eBay Store",                type:"Charity / Second-hand",   route:"eBay Partner Network (eBay store)",   cost:"Free",          mvp:"later",
+ links:[{l:"eBay Partner Network",u:"https://partnernetwork.ebay.co.uk/",t:"aff"}],
+ notes:"British Heart Foundation eBay store. Use eBay affiliate links — no separate programme needed."},
+
+{id:43, name:"MusicMagpie",                   type:"Second-hand / Refurb",    route:"Awin affiliate",                      cost:"Free",          mvp:"now",
+ links:[{l:"Affiliate search",u:"https://www.google.com/search?q=MusicMagpie+affiliate+programme+Awin+UK",t:"srch"},{l:"Awin signup",u:"https://www.awin.com/gb/publishers/",t:"aff"}],
+ notes:"Large secondhand stock including books and comics. High volume. Awin is their network."},
+
+{id:44, name:"Ziffit",                        type:"Buyback / Second-hand",   route:"Possible affiliate — investigate",    cost:"Unknown",       mvp:"later",
+ links:[{l:"Affiliate search",u:"https://www.google.com/search?q=Ziffit+affiliate+programme+UK",t:"srch"}],
+ notes:"Primarily a buyback service. Check if they have a browsing/buying front-end affiliate route."},
+
+{id:45, name:"WeBuyBooks",                    type:"Buyback / Second-hand",   route:"Possible affiliate — investigate",    cost:"Unknown",       mvp:"later",
+ links:[{l:"Affiliate search",u:"https://www.google.com/search?q=WeBuyBooks+affiliate+programme+UK",t:"srch"}],
+ notes:"Primarily a buyback service. May have browsing front-end for buying."},
+
+{id:46, name:"Better World Books UK",         type:"Second-hand / Charity",   route:"Direct affiliate",                    cost:"Free",          mvp:"soon",
+ links:[{l:"Affiliate search",u:"https://www.google.com/search?q=Better+World+Books+UK+affiliate+programme",t:"srch"}],
+ notes:"Used books with charity donations. Check their current affiliate network."},
+
+{id:47, name:"Books etc.",                    type:"Bookshop",                route:"Awin / direct — investigate",         cost:"Free / unknown",mvp:"soon",
+ links:[{l:"Affiliate search",u:"https://www.google.com/search?q=Books+etc+UK+bookshop+affiliate+programme",t:"srch"}],
+ notes:"Competitive book pricing. Verify currently trading."},
+
+{id:48, name:"Rarewaves",                     type:"Entertainment / Books",   route:"Awin affiliate",                      cost:"Free",          mvp:"later",
+ links:[{l:"Affiliate search",u:"https://www.google.com/search?q=Rarewaves+affiliate+programme+UK+Awin",t:"srch"}],
+ notes:"Entertainment and books. Low priority."},
+
+{id:49, name:"The Great British Bookshop",    type:"Bookshop",                route:"Direct contact — investigate",        cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=The+Great+British+Bookshop+affiliate+API",t:"srch"}],
+ notes:"Verify currently trading and comic/GN range before contacting."},
+
+{id:50, name:"Browns Books",                  type:"Bookshop",                route:"Direct contact — investigate",        cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Browns+Books+UK+affiliate+programme",t:"srch"}],
+ notes:"Verify trading status and comic range."},
+
+// ── BATCH 6: Publishers ────────────────────────────────────────────────────────
+{id:51, name:"Booksetc",                      type:"Bookshop",                route:"Direct contact — investigate",        cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Booksetc+UK+affiliate+programme",t:"srch"}],
+ notes:"Verify trading status."},
+
+{id:52, name:"Scholastic UK",                 type:"Publisher / Bookshop",    route:"Direct contact",                      cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Scholastic+UK+affiliate+programme+API",t:"srch"}],
+ notes:"Publisher primarily. Limited direct retail. Low priority."},
+
+{id:53, name:"DK UK",                         type:"Publisher",               route:"Via Penguin Random House",            cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=DK+Dorling+Kindersley+UK+affiliate+programme",t:"srch"}],
+ notes:"DK now part of Penguin Random House. Contact via PRH digital partnerships."},
+
+{id:54, name:"Penguin UK / PRH",              type:"Publisher",               route:"Direct contact",                      cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Penguin+Random+House+UK+affiliate+programme+API",t:"srch"}],
+ notes:"Publishes Jonathan Cape GNs and others. Contact PRH digital/commercial partnerships."},
+
+{id:55, name:"HarperCollins UK",              type:"Publisher",               route:"Direct contact",                      cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=HarperCollins+UK+affiliate+programme+API",t:"srch"}],
+ notes:"Publisher of some comics and GNs."},
+
+{id:56, name:"Simon & Schuster UK",           type:"Publisher",               route:"Direct contact",                      cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Simon+Schuster+UK+affiliate+programme",t:"srch"}],
+ notes:"Publisher. Low priority for direct integration."},
+
+{id:57, name:"Pan Macmillan UK",              type:"Publisher",               route:"Direct contact",                      cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Pan+Macmillan+UK+affiliate+programme",t:"srch"}],
+ notes:"Publisher. Low priority."},
+
+{id:58, name:"Hachette UK",                   type:"Publisher",               route:"Direct contact",                      cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Hachette+UK+affiliate+programme+API",t:"srch"}],
+ notes:"Major publisher group. Contact digital/commercial partnerships team."},
+
+{id:59, name:"Bloomsbury",                    type:"Publisher",               route:"Direct contact",                      cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Bloomsbury+Publishing+affiliate+programme+UK",t:"srch"}],
+ notes:"Occasional graphic novels. Low priority."},
+
+{id:60, name:"Titan Books",                   type:"Comics Publisher / Shop", route:"Direct contact / possible affiliate", cost:"Unknown",       mvp:"later",
+ links:[{l:"Affiliate search",u:"https://www.google.com/search?q=Titan+Books+UK+affiliate+programme+API",t:"srch"}],
+ notes:"UK comics and book publisher with online shop. More relevant than other publishers here."},
+
+// ── BATCH 7: Indie Comics Publishers ──────────────────────────────────────────
+{id:61, name:"Rebellion / 2000 AD Shop",      type:"Comic publisher / Shop",  route:"Direct contact / possible affiliate", cost:"Unknown",       mvp:"soon",
+ links:[{l:"Affiliate search",u:"https://www.google.com/search?q=2000AD+Rebellion+shop+affiliate+programme+API",t:"srch"}],
+ notes:"UK's biggest native comic publisher (Judge Dredd, Strontium Dog etc). High cultural relevance for UK users."},
+
+{id:62, name:"Treasury of British Comics",    type:"Comic publisher / Shop",  route:"Direct contact",                      cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Treasury+of+British+Comics+affiliate+partnership",t:"srch"}],
+ notes:"Rebellion imprint. Classic UK comics reprints."},
+
+{id:63, name:"SelfMadeHero",                  type:"Indie comics publisher",  route:"Direct contact",                      cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=SelfMadeHero+publisher+affiliate+API+UK",t:"srch"}],
+ notes:"UK indie literary graphic novels publisher."},
+
+{id:64, name:"Drawn & Quarterly (UK)",        type:"Indie comics publisher",  route:"Via main retailer affiliates",        cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Drawn+Quarterly+UK+distributor+affiliate",t:"srch"}],
+ notes:"Canadian indie publisher distributed in UK. Link to stockist pages instead."},
+
+{id:65, name:"Nobrow / Flying Eye Books",     type:"Indie comics publisher",  route:"Direct contact",                      cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Nobrow+Flying+Eye+Books+affiliate+programme+UK",t:"srch"}],
+ notes:"London-based indie. Quality illustrated books and comics."},
+
+{id:66, name:"Avery Hill Publishing",         type:"Indie comics publisher",  route:"Direct contact",                      cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Avery+Hill+Publishing+affiliate+API+UK",t:"srch"}],
+ notes:"Small UK publisher. Low volume."},
+
+{id:67, name:"Knockabout Comics",             type:"Indie comics distributor", route:"Direct contact",                     cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Knockabout+Comics+UK+affiliate+API",t:"srch"}],
+ notes:"UK underground/alternative comics distributor. Limited volume."},
+
+{id:68, name:"Soaring Penguin Press",         type:"Indie comics publisher",  route:"Direct contact",                      cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Soaring+Penguin+Press+affiliate+partnership+UK",t:"srch"}],
+ notes:"Small UK publisher."},
+
+{id:69, name:"Cinebook",                      type:"Comics publisher",        route:"Direct contact",                      cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Cinebook+UK+affiliate+API+programme",t:"srch"}],
+ notes:"Translates European comics into English. Niche but actively producing."},
+
+{id:70, name:"Jonathan Cape Graphic Novels",  type:"Publisher imprint (PRH)", route:"Via Penguin Random House (#54)",      cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate via PRH",u:"https://www.google.com/search?q=Jonathan+Cape+graphic+novels+affiliate+Penguin+Random+House",t:"srch"}],
+ notes:"PRH imprint. Handle via Penguin UK entry (#54) — single point of contact."},
+
+// ── BATCH 8: Anime / Manga / Japan Retailers ──────────────────────────────────
+{id:71, name:"Japan Centre",                  type:"Japanese goods / Manga",  route:"Direct contact / possible affiliate", cost:"Unknown",       mvp:"soon",
+ links:[{l:"Affiliate search",u:"https://www.google.com/search?q=Japan+Centre+UK+affiliate+programme",t:"srch"}],
+ notes:"London flagship + online. Good Japanese-language manga and English manga range."},
+
+{id:72, name:"Plaza Japan",                   type:"Japanese goods / Manga",  route:"Direct contact",                      cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Plaza+Japan+UK+affiliate+API+programme",t:"srch"}],
+ notes:"Imports from Japan. UK shipping. Verify current trading status."},
+
+{id:73, name:"TokyoToys",                     type:"Anime / Manga merchandise", route:"Direct contact / possible affiliate", cost:"Unknown",      mvp:"later",
+ links:[{l:"Affiliate search",u:"https://www.google.com/search?q=TokyoToys+UK+affiliate+programme",t:"srch"}],
+ notes:"UK anime and manga retailer. Online and physical stores."},
+
+{id:74, name:"Animegami",                     type:"Anime / Manga",           route:"Direct contact",                      cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Animegami+UK+affiliate+programme",t:"srch"}],
+ notes:"Verify currently trading before contacting."},
+
+{id:75, name:"Dekai Anime",                   type:"Anime / Manga",           route:"Direct contact",                      cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Dekai+Anime+UK+affiliate+programme",t:"srch"}],
+ notes:"UK anime retailer. Verify trading status."},
+
+{id:76, name:"Japan Craft",                   type:"Japanese goods",          route:"Direct contact",                      cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Japan+Craft+UK+affiliate+programme",t:"srch"}],
+ notes:"Verify manga stock before pursuing."},
+
+{id:77, name:"Otaku.co.uk",                   type:"Anime / Manga",           route:"Direct contact / possible affiliate", cost:"Unknown",       mvp:"later",
+ links:[{l:"Affiliate search",u:"https://www.google.com/search?q=Otaku.co.uk+affiliate+programme+UK",t:"srch"}],
+ notes:"UK specialist anime/manga retailer."},
+
+{id:78, name:"Anime-On-Line",                 type:"Anime / Manga",           route:"Direct contact",                      cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Anime-On-Line+UK+affiliate+programme",t:"srch"}],
+ notes:"Verify currently trading."},
+
+{id:79, name:"Crunchyroll Store UK",          type:"Anime / Manga merchandise", route:"Direct contact / possible affiliate", cost:"Unknown",     mvp:"later",
+ links:[{l:"Affiliate search",u:"https://www.google.com/search?q=Crunchyroll+Store+UK+affiliate+programme",t:"srch"}],
+ notes:"Sony-owned. May have formal partnership programme — worth a direct enquiry."},
+
+{id:80, name:"Zavvi Anime / Manga",           type:"Entertainment / Anime",   route:"Covered under Zavvi #30",             cost:"Free",          mvp:"soon",
+ links:[{l:"See entry #30",u:"https://www.google.com/search?q=Zavvi+anime+manga+affiliate+Awin+UK",t:"srch"}],
+ notes:"Same business as #30. No duplicate application needed. Flag anime/manga filter when applying."},
+
+// ── BATCH 9: TCG / Collectibles / Games Shops ─────────────────────────────────
+{id:81, name:"Chaos Cards",                   type:"TCG / Collectibles",      route:"Direct contact / possible affiliate", cost:"Unknown",       mvp:"later",
+ links:[{l:"Affiliate search",u:"https://www.google.com/search?q=Chaos+Cards+UK+affiliate+programme",t:"srch"}],
+ notes:"Large TCG and collectibles. Verify comic/manga range before pursuing."},
+
+{id:82, name:"Magic Madhouse",                type:"TCG / Collectibles",      route:"Possible affiliate (Awin?)",          cost:"Unknown",       mvp:"later",
+ links:[{l:"Affiliate search",u:"https://www.google.com/search?q=Magic+Madhouse+UK+affiliate+programme",t:"srch"}],
+ notes:"TCG-focused. Limited comics relevance."},
+
+{id:83, name:"Total Cards",                   type:"TCG / Collectibles",      route:"Direct contact",                      cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Total+Cards+UK+affiliate+programme",t:"srch"}],
+ notes:"TCG primarily. Limited comics overlap."},
+
+{id:84, name:"Zatu Games",                    type:"Board games / TCG",       route:"Awin affiliate",                      cost:"Free",          mvp:"later",
+ links:[{l:"Affiliate search",u:"https://www.google.com/search?q=Zatu+Games+affiliate+programme+Awin+UK",t:"srch"}],
+ notes:"Board games and TCG. Some comics crossover products."},
+
+{id:85, name:"Firestorm Cards",               type:"TCG / Collectibles",      route:"Direct contact",                      cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Firestorm+Cards+affiliate+programme+UK",t:"srch"}],
+ notes:"Wales-based. TCG-focused."},
+
+{id:86, name:"Wayland Games",                 type:"Board games / Miniatures", route:"Direct contact / possible affiliate", cost:"Unknown",      mvp:"later",
+ links:[{l:"Affiliate search",u:"https://www.google.com/search?q=Wayland+Games+UK+affiliate+programme",t:"srch"}],
+ notes:"Board games and miniatures. Minimal comics overlap."},
+
+{id:87, name:"Element Games",                 type:"Miniatures / Games",      route:"Direct contact",                      cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Element+Games+UK+affiliate+programme",t:"srch"}],
+ notes:"Miniatures-focused. Very limited comics relevance."},
+
+{id:88, name:"Goblin Gaming",                 type:"Board games / TCG",       route:"Direct contact",                      cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Goblin+Gaming+UK+affiliate+programme",t:"srch"}],
+ notes:"Board games and TCG. Low comics relevance."},
+
+{id:89, name:"Leisure Games",                 type:"Board games",             route:"Direct contact",                      cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Leisure+Games+UK+affiliate+programme",t:"srch"}],
+ notes:"Finchley-based games shop. Low comics relevance."},
+
+{id:90, name:"Travelling Man Games",          type:"Comic shop / Games",      route:"Direct contact (same as #13)",        cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Travelling+Man+UK+affiliate+API",t:"srch"}],
+ notes:"Same business as #13. Contact once for both comics and games ranges."},
+
+// ── BATCH 10: eBay Stores, Niche & Placeholder ────────────────────────────────
+{id:91, name:"Forbidden Planet eBay Store",   type:"eBay Store",              route:"eBay Partner Network",                cost:"Free",          mvp:"later",
+ links:[{l:"eBay Partner Network",u:"https://partnernetwork.ebay.co.uk/",t:"aff"}],
+ notes:"Use eBay affiliate links. No separate programme. Find store via eBay seller search."},
+
+{id:92, name:"Reed Comics eBay Store",        type:"eBay Store",              route:"eBay Partner Network",                cost:"Free",          mvp:"later",
+ links:[{l:"eBay Partner Network",u:"https://partnernetwork.ebay.co.uk/",t:"aff"}],
+ notes:"Use eBay affiliate links. Find store via eBay seller search for 'Reed Comics'."},
+
+{id:93, name:"Ace Comics eBay Store",         type:"eBay Store",              route:"eBay Partner Network",                cost:"Free",          mvp:"later",
+ links:[{l:"eBay Partner Network",u:"https://partnernetwork.ebay.co.uk/",t:"aff"}],
+ notes:"Use eBay affiliate links. Find store via eBay seller search for 'Ace Comics'."},
+
+{id:94, name:"30th Century Comics",           type:"Comic shop",              route:"Direct contact",                      cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=30th+Century+Comics+UK+affiliate+API",t:"srch"}],
+ notes:"London-based. Verify trading status and online presence."},
+
+{id:95, name:"Notting Hill Comic Exchange",   type:"Second-hand comic shop",  route:"Direct contact",                      cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Notting+Hill+Comic+Exchange+affiliate+API",t:"srch"}],
+ notes:"Second-hand specialist. May be physical-only — verify online shop."},
+
+{id:96, name:"Krypton Comics",                type:"Comic shop",              route:"Direct contact",                      cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Krypton+Comics+UK+affiliate+API",t:"srch"}],
+ notes:"Verify currently trading online."},
+
+{id:97, name:"A Place in Space",              type:"Comic shop",              route:"Direct contact",                      cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=A+Place+in+Space+UK+comic+shop+affiliate",t:"srch"}],
+ notes:"Verify trading status."},
+
+{id:98, name:"Comic Connections",             type:"Comic shop",              route:"Direct contact",                      cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Comic+Connections+UK+affiliate+API",t:"srch"}],
+ notes:"Verify trading status."},
+
+{id:99, name:"Sub-City Comics UK",            type:"Comic shop",              route:"Direct contact",                      cost:"Unknown",       mvp:"later",
+ links:[{l:"Investigate",u:"https://www.google.com/search?q=Sub-City+Comics+UK+affiliate+API",t:"srch"}],
+ notes:"Verify trading status."},
+
+{id:100,name:"Local shop direct (placeholder)", type:"Comic shop",            route:"Manual direct outreach",              cost:"Free",          mvp:"later",
+ links:[{l:"Find UK shops via LICAF",u:"https://www.google.com/search?q=UK+local+comic+shop+online+shop+affiliate+contact",t:"srch"}],
+ notes:"Template entry. Duplicate for any additional local shop. Draft a standard partnership email template to use."},
+];
+
+// ─── STORAGE ───────────────────────────────────────────────────────────────────
+function getStatus(id){ return localStorage.getItem('cc_status_'+id) || 'Not started'; }
+function saveStatus(id,v){ localStorage.setItem('cc_status_'+id,v); updateStats(); }
+function getNotes(id){ return localStorage.getItem('cc_notes_'+id) || DATA.find(r=>r.id===id)?.notes || ''; }
+function saveNotes(id,v){ localStorage.setItem('cc_notes_'+id,v); }
+
+// ─── STATUS HELPERS ────────────────────────────────────────────────────────────
+function statusClass(v){
+  if(v==='Applied') return 'applied';
+  if(v==='Approved') return 'approved';
+  if(v==='Rejected') return 'rejected';
+  if(v==='Needs follow-up') return 'followup';
+  return '';
+}
+
+// ─── COST BADGE ────────────────────────────────────────────────────────────────
+function costBadge(c){
+  if(c==='Free') return `<span class="badge b-free">Free</span>`;
+  if(c==='Possible cost') return `<span class="badge b-cost">Possible cost</span>`;
+  if(c==='Paid') return `<span class="badge b-paid">Paid</span>`;
+  if(c==='N/A') return `<span class="badge b-unknown">N/A</span>`;
+  return `<span class="badge b-unknown">Unknown</span>`;
+}
+
+// ─── MVP BADGE ─────────────────────────────────────────────────────────────────
+function mvpBadge(m){
+  if(m==='now') return `<span class="badge b-now">Now</span>`;
+  if(m==='soon') return `<span class="badge b-soon">Soon</span>`;
+  return `<span class="badge b-later">Later</span>`;
+}
+
+// ─── RENDER TABLE ──────────────────────────────────────────────────────────────
+function render(){
+  const fMvp = document.getElementById('fMvp').value;
+  const fStatus = document.getElementById('fStatus').value;
+  const fCost = document.getElementById('fCost').value;
+  const fBatch = document.getElementById('fBatch').value;
+
+  let rows = DATA.filter(r => {
+    if(fMvp && r.mvp !== fMvp) return false;
+    if(fStatus && getStatus(r.id) !== fStatus) return false;
+    if(fCost && r.cost !== fCost) return false;
+    if(fBatch){
+      const b = parseInt(fBatch);
+      if(r.id < (b-1)*10+1 || r.id > b*10) return false;
+    }
+    return true;
+  });
+
+  document.getElementById('fCount').textContent = rows.length < 100 ? `Showing ${rows.length} of 100` : '';
+
+  let html = '';
+  let lastBatch = -1;
+
+  rows.forEach(r => {
+    const batch = Math.ceil(r.id / 10);
+    if(batch !== lastBatch){
+      html += `<tr class="grp-hdr"><td colspan="9">Batch ${batch}: ${BATCH_LABELS[batch-1]}</td></tr>`;
+      lastBatch = batch;
+    }
+
+    const status = getStatus(r.id);
+    const notes = getNotes(r.id);
+    const selClass = statusClass(status);
+
+    const linksHtml = r.links.map(lk => {
+      const cls = lk.t === 'api' ? 'sec' : lk.t === 'srch' ? 'srch' : '';
+      return `<a class="lnk ${cls}" href="${lk.u}" target="_blank" rel="noopener">${lk.l}</a>`;
+    }).join('');
+
+    html += `<tr class="${r.mvp}" data-id="${r.id}">
+      <td><span class="num">${r.id}</span></td>
+      <td><div class="rname">${r.name}</div><span class="badge b-type" style="margin-top:3px;display:inline-block">${r.type}</span></td>
+      <td>${r.type}</td>
+      <td>${r.route}</td>
+      <td>${costBadge(r.cost)}</td>
+      <td>${mvpBadge(r.mvp)}</td>
+      <td>${linksHtml}</td>
+      <td><select class="status-sel ${selClass}" onchange="statusChanged(${r.id},this)">
+        <option${status==='Not started'?' selected':''}>Not started</option>
+        <option${status==='Applied'?' selected':''}>Applied</option>
+        <option${status==='Approved'?' selected':''}>Approved</option>
+        <option${status==='Rejected'?' selected':''}>Rejected</option>
+        <option${status==='Needs follow-up'?' selected':''}>Needs follow-up</option>
+      </select></td>
+      <td><textarea class="notes-ta" onblur="saveNotes(${r.id},this.value)">${notes}</textarea></td>
+    </tr>`;
+  });
+
+  document.getElementById('tbody').innerHTML = html;
+  updateStats();
+}
+
+function statusChanged(id, sel){
+  saveStatus(id, sel.value);
+  sel.className = 'status-sel ' + statusClass(sel.value);
+}
+
+function clearFilters(){
+  document.getElementById('fMvp').value = '';
+  document.getElementById('fStatus').value = '';
+  document.getElementById('fCost').value = '';
+  document.getElementById('fBatch').value = '';
+  render();
+}
+
+// ─── STATS ─────────────────────────────────────────────────────────────────────
+function updateStats(){
+  let now=0, soon=0, later=0, approved=0, applied=0, ns=0;
+  DATA.forEach(r => {
+    if(r.mvp==='now') now++;
+    else if(r.mvp==='soon') soon++;
+    else later++;
+    const s = getStatus(r.id);
+    if(s==='Approved') approved++;
+    else if(s==='Applied') applied++;
+    else if(s==='Not started') ns++;
+  });
+  document.getElementById('s-now').textContent = now;
+  document.getElementById('s-soon').textContent = soon;
+  document.getElementById('s-later').textContent = later;
+  document.getElementById('s-approved').textContent = approved;
+  document.getElementById('s-applied').textContent = applied;
+  document.getElementById('s-ns').textContent = ns;
+}
+
+// ─── BATCH BUTTONS ─────────────────────────────────────────────────────────────
+function buildBatchBtns(){
+  const container = document.getElementById('batchBtns');
+  for(let b=1; b<=10; b++){
+    const items = DATA.filter(r => Math.ceil(r.id/10) === b);
+    const btn = document.createElement('button');
+    btn.className = 'btn-batch';
+    btn.innerHTML = `Batch ${b} <small>${BATCH_LABELS[b-1].split(' ').slice(0,3).join(' ')}…</small>`;
+    btn.onclick = () => openBatch(items);
+    container.appendChild(btn);
+  }
+}
+
+function openBatch(items){
+  if(!confirm(`Open up to ${items.length} affiliate/API tabs for Batch ${Math.ceil(items[0].id/10)}?\n\nMake sure your browser allows pop-ups for this page.`)) return;
+  items.forEach((r,i) => {
+    if(r.links.length > 0){
+      setTimeout(() => window.open(r.links[0].u, '_blank', 'noopener'), i * 300);
+    }
+  });
+}
+
+// ─── INIT ──────────────────────────────────────────────────────────────────────
+buildBatchBtns();
+render();
+</script>
+</body>
+</html>
