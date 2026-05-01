@@ -6,7 +6,7 @@
 **Objective:** Confirm every core user flow works end-to-end, no dead ends.
 
 - [x] Search by title returns correct results
-- [ ] Search by ISBN returns the exact correct item
+- [x] Search by ISBN returns the exact correct item
 - [ ] Search with zero results shows a clean empty state (not a blank page)
 - [ ] Each result links to a working product detail page
 - [ ] Top Deals page loads and displays real items with prices
