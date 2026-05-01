@@ -10,7 +10,8 @@ export async function GET(
     const apiKey = process.env.COMIC_VINE_API_KEY
 
     if (!apiKey) {
-      return NextResponse.json({ error: 'API key not configured' }, { status: 500 })
+      console.error('[/api/comic] COMIC_VINE_API_KEY is not set in environment variables')
+      return NextResponse.json({ error: 'Service temporarily unavailable.' }, { status: 500 })
     }
 
     const url = 'https://comicvine.gamespot.com/api/volume/4050-' + id + '/?api_key=' + apiKey + '&format=json&field_list=id,name,image,start_year,publisher,description,count_of_issues'

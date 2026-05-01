@@ -12,7 +12,8 @@ export async function GET(request: NextRequest) {
     const apiKey = process.env.COMIC_VINE_API_KEY
     
     if (!apiKey) {
-      return NextResponse.json({ error: 'API key not configured' }, { status: 500 })
+      console.error('[/api/search] COMIC_VINE_API_KEY is not set in environment variables')
+      return NextResponse.json({ error: 'Search is temporarily unavailable. Please try again later.' }, { status: 500 })
     }
 
     const response = await fetch(
