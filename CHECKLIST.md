@@ -8,7 +8,7 @@
 - [x] Search by title returns correct results
 - [x] Search by ISBN returns the exact correct item
 - [x] Search with zero results shows a clean empty state (not a blank page)
-- [ ] Each result links to a working product detail page
+- [x] Each result links to a working product detail page
 - [ ] Top Deals page loads and displays real items with prices
 - [ ] Homepage hero/search bar is functional on first load
 - [ ] Navigation links all resolve (no 404s)
