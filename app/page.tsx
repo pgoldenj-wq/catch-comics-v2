@@ -58,7 +58,7 @@ export default function Home() {
             if (img) setDealCovers(prev => ({ ...prev, [deal.id]: img }));
           })
           .catch(() => {});
-      }, index * 150);
+      }, index * 400);
     });
   }, []);
 
@@ -88,9 +88,9 @@ export default function Home() {
   };
 
   const covers = [
-    { title: 'Absolute Batman',    src: 'https://comicvine.gamespot.com/a/uploads/scale_large/14/149814/9881791-absbm_v1_zoo%28cover%29copy.jpg', rotate: '-5deg', left: '30px',  top: '8px',  width: '120px', height: '173px', zIndex: 3 },
-    { title: 'Ultimate Spider-Man',src: 'https://comicvine.gamespot.com/a/uploads/scale_large/11/110017/9226620-wwww.jpg',                         rotate: '2deg',  left: '175px', top: '-3px', width: '129px', height: '187px', zIndex: 5 },
-    { title: 'Jujutsu Kaisen',     src: 'https://comicvine.gamespot.com/a/uploads/scale_large/6/67663/6491809-01.jpg',                             rotate: '-3deg', left: '330px', top: '14px', width: '116px', height: '167px', zIndex: 3 },
+    { title: 'Absolute Batman',    src: 'https://comicvine.gamespot.com/a/uploads/scale_large/14/149814/9881791-absbm_v1_zoo%28cover%29copy.jpg', rotate: '-5deg', left: '20px',  top: '8px',  width: '136px', height: '196px', zIndex: 3 },
+    { title: 'Ultimate Spider-Man',src: 'https://comicvine.gamespot.com/a/uploads/scale_large/11/110017/9226620-wwww.jpg',                         rotate: '2deg',  left: '140px', top: '-4px', width: '148px', height: '214px', zIndex: 5 },
+    { title: 'Jujutsu Kaisen',     src: 'https://comicvine.gamespot.com/a/uploads/scale_large/6/67663/6491809-01.jpg',                             rotate: '-3deg', left: '265px', top: '14px', width: '132px', height: '190px', zIndex: 3 },
   ];
 
   const publisherLogos = [
@@ -264,7 +264,12 @@ export default function Home() {
                     src={dealCovers[deal.id] || DEAL_FALLBACKS[deal.id] || ''}
                     alt={deal.title}
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    onError={(e) => {
+                      const img = e.target as HTMLImageElement;
+                      const fallback = DEAL_FALLBACKS[deal.id];
+                      if (fallback && img.src !== fallback) { img.src = fallback; }
+                      else { img.style.display = 'none'; }
+                    }}
                   />
                   <div style={{ position: 'absolute', top: '8px', left: '8px', background: '#E8272A', color: '#fff', fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '5px' }}>{deal.discount}</div>
                   <div className="deal-overlay" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(3px)', padding: '6px 8px', opacity: 0, transition: 'opacity 0.2s', textAlign: 'center' }}>

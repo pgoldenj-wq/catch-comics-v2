@@ -20,19 +20,18 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
   const [showSuggestions, setShowSuggestions] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const fromPropRef = useRef(false);
+  const userTypedRef = useRef(false);
   const router = useRouter();
 
   useEffect(() => {
-    fromPropRef.current = true;
+    userTypedRef.current = false;
     setQuery(initialQuery);
     setSuggestions([]);
     setShowSuggestions(false);
   }, [initialQuery]);
 
   useEffect(() => {
-    if (fromPropRef.current) {
-      fromPropRef.current = false;
+    if (!userTypedRef.current) {
       return;
     }
     if (query.length < 2) {
@@ -116,7 +115,7 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
           <input
             type="text"
             value={query}
-            onChange={e => setQuery(e.target.value)}
+            onChange={e => { userTypedRef.current = true; setQuery(e.target.value); }}
             onKeyDown={handleKeyDown}
             onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
             placeholder="Search any title, character or ISBN..."
