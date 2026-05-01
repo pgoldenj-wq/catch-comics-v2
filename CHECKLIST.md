@@ -5,7 +5,7 @@
 ## PHASE 1 — CORE PRODUCT FUNCTION
 **Objective:** Confirm every core user flow works end-to-end, no dead ends.
 
-- [ ] Search by title returns correct results (test 10 real titles)
+- [x] Search by title returns correct results
 - [ ] Search by ISBN returns the exact correct item
 - [ ] Search with zero results shows a clean empty state (not a blank page)
 - [ ] Each result links to a working product detail page
