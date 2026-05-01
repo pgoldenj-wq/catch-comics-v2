@@ -90,8 +90,12 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && query.trim()) doSearch(query.trim(), e.ctrlKey || e.metaKey);
-    else if (e.key === 'Escape') setShowSuggestions(false);
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (query.trim()) doSearch(query.trim(), e.ctrlKey || e.metaKey);
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false);
+    }
   };
 
   const isHero = variant === 'hero';

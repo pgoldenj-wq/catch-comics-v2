@@ -32,6 +32,7 @@ function SearchResults() {
     if (!query) return
     setLoading(true)
     setError('')
+    setResults([])
     setDidYouMean(null)
     fetch(`/api/search?q=${encodeURIComponent(query)}`)
       .then(res => res.json())
