@@ -8,29 +8,32 @@ function detectISBN(query: string): string | null {
   return null
 }
 
-// Map a Google Books volume item to the shape the frontend expects
-function mapGoogleBooksItem(item: Record<string, unknown>) {
-  const info = (item.volumeInfo as Record<string, unknown>) || {}
-  const isbns = (info.industryIdentifiers as Array<{ type: string; identifier: string }>) || []
-  const isbn13 = isbns.find(i => i.type === 'ISBN_13')?.identifier || ''
-  const isbn10 = isbns.find(i => i.type === 'ISBN_10')?.identifier || ''
-  const imageLinks = (info.imageLinks as Record<string, string>) || {}
-  // Google Books returns http — upgrade to https to avoid mixed-content blocks
-  const thumbnail = (imageLinks.thumbnail || imageLinks.smallThumbnail || '').replace('http://', 'https://')
-  const authors = (info.authors as string[]) || []
-  const publishedDate = (info.publishedDate as string) || ''
+// Map an Open Library book record to the shape the frontend expects
+function mapOpenLibraryBook(isbn: string, book: Record<string, unknown>) {
+  const coverData = book.cover as Record<string, string> | undefined
+  // Prefer API-provided cover; fall back to the covers CDN direct URL
+  const thumbnail = coverData?.large || coverData?.medium || coverData?.small
+    || `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`
+
+  const authors = ((book.authors as Array<{ name: string }>) || []).map(a => a.name)
+  const publishers = ((book.publishers as Array<{ name: string }>) || [])
+  const identifiers = (book.identifiers as Record<string, string[]>) || {}
+
+  const publishDate = (book.publish_date as string) || ''
+  const yearMatch = publishDate.match(/\b(\d{4})\b/)
+  const start_year = yearMatch ? yearMatch[1] : ''
 
   return {
-    id: item.id as string,
-    name: (info.title as string) || 'Unknown Title',
+    id: `ol-${isbn}`,
+    name: (book.title as string) || 'Unknown Title',
     image: { medium_url: thumbnail, original_url: thumbnail },
-    start_year: publishedDate.slice(0, 4),
-    publisher: { name: (info.publisher as string) || '' },
-    description: (info.description as string) || '',
+    start_year,
+    publisher: { name: publishers[0]?.name || '' },
+    description: '',
     authors,
-    isbn13,
-    isbn10,
-    source: 'google_books',
+    isbn13: (identifiers.isbn_13 || [])[0] || (isbn.length === 13 ? isbn : ''),
+    isbn10: (identifiers.isbn_10 || [])[0] || (isbn.length === 10 ? isbn : ''),
+    source: 'open_library',
   }
 }
 
@@ -42,28 +45,35 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'No search query provided' }, { status: 400 })
   }
 
-  // ── ISBN SEARCH (Google Books) ────────────────────────────────────────────
+  // ── ISBN SEARCH (Open Library — no API key, no rate limits) ─────────────
   const isbn = detectISBN(query)
   if (isbn) {
-    console.log(`[/api/search] ISBN detected: ${isbn} — routing to Google Books`)
+    console.log(`[/api/search] ISBN detected: ${isbn} — routing to Open Library`)
     try {
-      const gbUrl = `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}&maxResults=5`
-      const response = await fetch(gbUrl)
-      console.log(`[/api/search] Google Books status: ${response.status}`)
-
-      const data = await response.json() as { items?: Record<string, unknown>[]; totalItems?: number }
-      console.log(`[/api/search] Google Books totalItems: ${data.totalItems ?? 0}`)
+      const olUrl = `https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&jscmd=data&format=json`
+      const response = await fetch(olUrl, {
+        headers: { 'User-Agent': 'CatchComics/1.0' }
+      })
+      console.log(`[/api/search] Open Library status: ${response.status}`)
 
       if (!response.ok) {
-        console.error('[/api/search] Google Books error:', response.status)
+        console.error('[/api/search] Open Library error:', response.status)
         return NextResponse.json({ results: [], total: 0 })
       }
 
-      const results = (data.items || []).map(mapGoogleBooksItem)
-      return NextResponse.json({ results, total: results.length })
+      const data = await response.json() as Record<string, unknown>
+      const book = data[`ISBN:${isbn}`] as Record<string, unknown> | undefined
+      console.log(`[/api/search] Open Library found: ${book ? 'yes' : 'no'}`)
+
+      if (!book) {
+        return NextResponse.json({ results: [], total: 0 })
+      }
+
+      const result = mapOpenLibraryBook(isbn, book)
+      return NextResponse.json({ results: [result], total: 1 })
 
     } catch (error) {
-      console.error('[/api/search] Google Books unexpected error:', error)
+      console.error('[/api/search] Open Library unexpected error:', error)
       return NextResponse.json({ results: [], total: 0 })
     }
   }

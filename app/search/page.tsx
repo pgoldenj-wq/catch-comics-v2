@@ -165,12 +165,12 @@ function SearchResults() {
                 <div className="flex-1 min-w-0">
                   <h2 className="text-sm font-medium truncate" style={{ color: '#0A0A0A' }}>{comic.name}</h2>
                   <p className="text-xs mt-0.5" style={{ color: '#9CA3AF' }}>
-                    {comic.source === 'google_books'
+                    {comic.source
                       ? [comic.authors?.join(', '), comic.start_year].filter(Boolean).join(' · ')
                       : [comic.publisher?.name, comic.start_year].filter(Boolean).join(' · ')}
                   </p>
                   <span className="inline-block mt-1.5 text-xs font-medium px-2 py-0.5 rounded-full" style={{ background: '#F3F4F6', color: '#6B7280', fontSize: '10px' }}>
-                    {comic.source === 'google_books' ? 'ISBN Match' : 'Comic Series'}
+                    {comic.source ? 'ISBN Match' : 'Comic Series'}
                   </span>
                 </div>
                 <div className="shrink-0 text-right">
