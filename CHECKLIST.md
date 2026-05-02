@@ -10,7 +10,7 @@
 - [x] Search with zero results shows a clean empty state (not a blank page)
 - [x] Each result links to a working product detail page
 - [ ] Top Deals page loads and displays real items with prices
-- [ ] Homepage hero/search bar is functional on first load
+- [x] Homepage hero/search bar is functional on first load
 - [ ] Navigation links all resolve (no 404s)
 - [ ] Back button works correctly from product pages
 - [ ] No broken routes in next.config.js redirects
