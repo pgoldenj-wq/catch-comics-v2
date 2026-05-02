@@ -112,11 +112,11 @@ export default function Home() {
     setHoverZone(zone);
   };
 
-  // Hero book covers
+  // Hero book covers — rotation lives in CSS class (not inline style) so animation works
   const covers = [
-    { title: 'Absolute Batman',     src: 'https://comicvine.gamespot.com/a/uploads/scale_large/14/149814/9881791-absbm_v1_zoo%28cover%29copy.jpg', rotate: '-5deg', left: '20px',  top: '8px',  width: '136px', height: '196px', zIndex: 3 },
-    { title: 'Ultimate Spider-Man', src: 'https://comicvine.gamespot.com/a/uploads/scale_large/11/110017/9226620-wwww.jpg',                        rotate: '2deg',  left: '140px', top: '-4px', width: '148px', height: '214px', zIndex: 5 },
-    { title: 'Jujutsu Kaisen',      src: 'https://comicvine.gamespot.com/a/uploads/scale_large/6/67663/6491809-01.jpg',                            rotate: '-3deg', left: '265px', top: '14px', width: '132px', height: '190px', zIndex: 3 },
+    { title: 'Absolute Batman',     src: 'https://comicvine.gamespot.com/a/uploads/scale_large/14/149814/9881791-absbm_v1_zoo%28cover%29copy.jpg', left: '8px',   top: '22px', width: '170px', height: '248px', zIndex: 3, animClass: 'cover-sway-1' },
+    { title: 'Ultimate Spider-Man', src: 'https://comicvine.gamespot.com/a/uploads/scale_large/11/110017/9226620-wwww.jpg',                        left: '148px', top: '0px',  width: '184px', height: '267px', zIndex: 5, animClass: 'cover-sway-2' },
+    { title: 'Jujutsu Kaisen',      src: 'https://comicvine.gamespot.com/a/uploads/scale_large/6/67663/6491809-01.jpg',                            left: '300px', top: '30px', width: '165px', height: '238px', zIndex: 3, animClass: 'cover-sway-3' },
   ];
 
   // Publisher logo strip
@@ -180,6 +180,47 @@ export default function Home() {
           will-change: transform;
         }
         .deal-card:hover .deal-overlay { opacity: 1 !important; }
+
+        /* ── Comic cover sway animations ───────────────────────────────────
+           Base rotation lives here (not in inline style) so CSS animation
+           can override it. Each cover has a unique rhythm and delay so they
+           feel independent and natural rather than in sync.
+        ─────────────────────────────────────────────────────────────────── */
+        .cover-sway-1 {
+          transform: rotate(-5deg);
+          animation: sway1 6s ease-in-out infinite;
+        }
+        .cover-sway-2 {
+          transform: rotate(2deg);
+          animation: sway2 7.5s ease-in-out infinite 0.8s;
+        }
+        .cover-sway-3 {
+          transform: rotate(-3deg);
+          animation: sway3 8.5s ease-in-out infinite 1.5s;
+        }
+        @keyframes sway1 {
+          0%, 100% { transform: rotate(-5deg)   translateY(0px); }
+          50%       { transform: rotate(-6.8deg) translateY(-3px); }
+        }
+        @keyframes sway2 {
+          0%, 100% { transform: rotate(2deg)   translateY(0px); }
+          50%       { transform: rotate(3.8deg) translateY(-4px); }
+        }
+        @keyframes sway3 {
+          0%, 100% { transform: rotate(-3deg)   translateY(0px); }
+          50%       { transform: rotate(-1.5deg) translateY(-2px); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .cover-sway-1 { animation: none; transform: rotate(-5deg); }
+          .cover-sway-2 { animation: none; transform: rotate(2deg);  }
+          .cover-sway-3 { animation: none; transform: rotate(-3deg); }
+        }
+
+        /* ── Mobile hero: hide covers, full-width copy + search ─────────── */
+        @media (max-width: 768px) {
+          .hero-right { display: none !important; }
+          .hero-left  { width: 100% !important; padding: 36px 28px !important; }
+        }
       `}</style>
 
       {/* ── HEADER ──────────────────────────────────────────────────────────── */}
@@ -210,7 +251,7 @@ export default function Home() {
           <div style={{ position: 'absolute', top: '-80px', right: '-80px', width: '420px', height: '420px', pointerEvents: 'none', background: 'radial-gradient(circle, rgba(232,39,42,0.14) 0%, transparent 65%)' }} />
 
           {/* LEFT — copy + search + category hints */}
-          <div style={{ position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '48px', width: '50%', flexShrink: 0 }}>
+          <div className="hero-left" style={{ position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '48px', width: '50%', flexShrink: 0 }}>
             <p style={{ color: '#E8272A', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '20px' }}>
               The world's only comic price comparison
             </p>
@@ -244,16 +285,42 @@ export default function Home() {
           </div>
 
           {/* RIGHT — book covers + publisher strip */}
-          <div style={{ position: 'relative', flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'center', borderRadius: '0 28px 28px 0' }}>
-            <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '48px', zIndex: 20, pointerEvents: 'none', background: 'linear-gradient(to left, #111827 0%, transparent 100%)' }} />
-            <div style={{ position: 'relative', height: '220px' }}>
+          <div className="hero-right" style={{ position: 'relative', flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'center', borderRadius: '0 28px 28px 0' }}>
+            {/* Right-edge fade so covers dissolve naturally into the card border */}
+            <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '56px', zIndex: 20, pointerEvents: 'none', background: 'linear-gradient(to left, #111827 0%, transparent 100%)' }} />
+
+            {/* Cover stack — height is a flex spacer; absolute covers overflow it
+                freely within the right column's overflow:hidden boundary (420px) */}
+            <div style={{ position: 'relative', height: '280px' }}>
               {covers.map((cover, i) => (
-                <div key={i} style={{ position: 'absolute', left: cover.left, top: cover.top, width: cover.width, height: cover.height, borderRadius: '8px', overflow: 'hidden', transform: `rotate(${cover.rotate})`, boxShadow: '0 20px 50px rgba(0,0,0,0.6)', zIndex: cover.zIndex, background: '#1a1a2e' }}>
-                  <img src={cover.src} alt={cover.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.target as HTMLImageElement).style.opacity = '0'; }} />
+                <div
+                  key={i}
+                  className={cover.animClass}
+                  style={{
+                    position: 'absolute',
+                    left: cover.left,
+                    top: cover.top,
+                    width: cover.width,
+                    height: cover.height,
+                    borderRadius: '10px',
+                    overflow: 'hidden',
+                    /* transform intentionally omitted — set via CSS class so animation works */
+                    boxShadow: '0 24px 56px rgba(0,0,0,0.65)',
+                    zIndex: cover.zIndex,
+                    background: '#1a1a2e',
+                  }}>
+                  <img
+                    src={cover.src}
+                    alt={cover.title}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    onError={(e) => { (e.target as HTMLImageElement).style.opacity = '0'; }}
+                  />
                 </div>
               ))}
             </div>
-            <div style={{ position: 'relative', marginTop: '8px', marginLeft: '30px', width: '460px', overflow: 'hidden', height: '36px' }}>
+
+            {/* Publisher logo strip — full-width, anchored in flex column flow */}
+            <div style={{ position: 'relative', marginTop: '14px', overflow: 'hidden', height: '36px' }}>
               <div style={{ position: 'absolute', left: 0,  top: 0, bottom: 0, width: '32px', zIndex: 2, pointerEvents: 'none', background: 'linear-gradient(to right, #111827 0%, transparent 100%)' }} />
               <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '32px', zIndex: 2, pointerEvents: 'none', background: 'linear-gradient(to left,  #111827 0%, transparent 100%)' }} />
               <div className="pub-track">
