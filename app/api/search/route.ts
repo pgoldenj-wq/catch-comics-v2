@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
     }
 
     console.log(`[/api/search] Title search via Comic Vine: "${query}"`)
-    const cvUrl = `https://comicvine.gamespot.com/api/search/?api_key=${apiKey}&format=json&resources=volume&query=${encodeURIComponent(query)}&limit=20&field_list=id,name,image,start_year,publisher,description`
+    const cvUrl = `https://comicvine.gamespot.com/api/search/?api_key=${apiKey}&format=json&resources=volume&query=${encodeURIComponent(query)}&limit=20&field_list=id,name,image,start_year,publisher,description,count_of_issues`
 
     const response = await fetch(cvUrl, {
       headers: { 'User-Agent': 'CatchComics/1.0' }
