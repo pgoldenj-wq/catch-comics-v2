@@ -114,9 +114,9 @@ export default function Home() {
 
   // Hero book covers — rotation lives in CSS class (not inline style) so animation works
   const covers = [
-    { title: 'Absolute Batman',     src: 'https://comicvine.gamespot.com/a/uploads/scale_large/14/149814/9881791-absbm_v1_zoo%28cover%29copy.jpg', left: '8px',   top: '22px', width: '170px', height: '248px', zIndex: 3, animClass: 'cover-sway-1' },
-    { title: 'Ultimate Spider-Man', src: 'https://comicvine.gamespot.com/a/uploads/scale_large/11/110017/9226620-wwww.jpg',                        left: '148px', top: '0px',  width: '184px', height: '267px', zIndex: 5, animClass: 'cover-sway-2' },
-    { title: 'Jujutsu Kaisen',      src: 'https://comicvine.gamespot.com/a/uploads/scale_large/6/67663/6491809-01.jpg',                            left: '300px', top: '30px', width: '165px', height: '238px', zIndex: 3, animClass: 'cover-sway-3' },
+    { title: 'Absolute Batman',     searchQuery: 'absolute batman',     src: 'https://comicvine.gamespot.com/a/uploads/scale_large/14/149814/9881791-absbm_v1_zoo%28cover%29copy.jpg', left: '8px',   top: '22px', width: '170px', height: '248px', zIndex: 3, animClass: 'cover-sway-1' },
+    { title: 'Ultimate Spider-Man', searchQuery: 'ultimate spider-man', src: 'https://comicvine.gamespot.com/a/uploads/scale_large/11/110017/9226620-wwww.jpg',                        left: '148px', top: '0px',  width: '184px', height: '267px', zIndex: 5, animClass: 'cover-sway-2' },
+    { title: 'Jujutsu Kaisen',      searchQuery: 'jujutsu kaisen',      src: 'https://comicvine.gamespot.com/a/uploads/scale_large/6/67663/6491809-01.jpg',                            left: '300px', top: '30px', width: '165px', height: '238px', zIndex: 3, animClass: 'cover-sway-3' },
   ];
 
   // Publisher logo strip
@@ -141,7 +141,7 @@ export default function Home() {
   const trending = ['Batman', 'Spider-Man', 'One Piece', 'Saga', 'Watchmen', 'Naruto', 'X-Men', 'Invincible', 'Demon Slayer', 'Hellboy'];
 
   const UKFlag = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 30" width="24" height="12" aria-label="UK flag">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 30" preserveAspectRatio="xMidYMid slice" style={{ width: '100%', height: '100%', display: 'block' }} aria-label="UK flag">
       <path d="M0 0v30h60V0z" fill="#012169"/>
       <path d="M0 0l60 30m0-30L0 30" stroke="#fff" strokeWidth="6"/>
       <path d="M0 0l60 30m0-30L0 30" stroke="#C8102E" strokeWidth="4"/>
@@ -151,7 +151,7 @@ export default function Home() {
   );
 
   const USFlag = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 30" width="24" height="12" aria-label="US flag">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 30" preserveAspectRatio="xMidYMid slice" style={{ width: '100%', height: '100%', display: 'block' }} aria-label="US flag">
       <rect width="60" height="30" fill="#B22234"/>
       <path d="M0 3.46h60M0 6.92h60M0 10.38h60M0 13.85h60M0 17.31h60M0 20.77h60M0 24.23h60" stroke="#fff" strokeWidth="2.31"/>
       <rect width="24" height="16.15" fill="#3C3B6E"/>
@@ -171,8 +171,8 @@ export default function Home() {
     <main className="min-h-screen font-sans" style={{ background: '#F8F8F6' }}>
       <style>{`
         @keyframes scrollPublishers {
-          0%   { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
+          0%   { transform: translateX(-50%); }
+          100% { transform: translateX(0); }
         }
         .pub-track {
           display: flex; align-items: center; width: max-content;
@@ -293,9 +293,11 @@ export default function Home() {
                 freely within the right column's overflow:hidden boundary (420px) */}
             <div style={{ position: 'relative', height: '280px' }}>
               {covers.map((cover, i) => (
-                <div
+                <button
                   key={i}
                   className={cover.animClass}
+                  onClick={() => router.push(`/search?q=${encodeURIComponent(cover.searchQuery)}&region=${region}`)}
+                  aria-label={`Search for ${cover.title}`}
                   style={{
                     position: 'absolute',
                     left: cover.left,
@@ -308,14 +310,17 @@ export default function Home() {
                     boxShadow: '0 24px 56px rgba(0,0,0,0.65)',
                     zIndex: cover.zIndex,
                     background: '#1a1a2e',
+                    cursor: 'pointer',
+                    padding: 0,
+                    border: 'none',
                   }}>
                   <img
                     src={cover.src}
                     alt={cover.title}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                     onError={(e) => { (e.target as HTMLImageElement).style.opacity = '0'; }}
                   />
-                </div>
+                </button>
               ))}
             </div>
 
@@ -336,14 +341,27 @@ export default function Home() {
       {/* ── TOP DEALS ───────────────────────────────────────────────────────── */}
       {/* Immediately below hero — tight spacing so deals are visible on load */}
       <div className="max-w-6xl mx-auto px-6 pt-4 pb-2">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-          <div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', gap: '16px', flexWrap: 'wrap' }}>
+          {/* Left — section title */}
+          <div style={{ flexShrink: 0 }}>
             <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#111', margin: 0 }}>Top deals today</h2>
             <p style={{ fontSize: '11px', color: '#9CA3AF', margin: '2px 0 0' }}>
               Prices from Amazon {region === 'uk' ? 'UK' : 'US'} · Updated daily
             </p>
           </div>
-          <button style={{ fontSize: '12px', color: '#9CA3AF', background: 'none', border: 'none', cursor: 'pointer' }}>See all →</button>
+          {/* Right — popular search tags, low visual weight */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#D1D5DB', flexShrink: 0 }}>Popular:</span>
+            {trending.map((term) => (
+              <button key={term}
+                onClick={() => router.push(`/search?q=${encodeURIComponent(term)}&region=${region}`)}
+                style={{ padding: '3px 11px', fontSize: '11px', border: '1px solid #EAECEF', borderRadius: '999px', color: '#9CA3AF', background: '#fff', cursor: 'pointer', transition: 'border-color 0.15s, color 0.15s', fontFamily: 'inherit', flexShrink: 0 }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = '#E8272A'; e.currentTarget.style.color = '#E8272A'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = '#EAECEF'; e.currentTarget.style.color = '#9CA3AF'; }}>
+                {term}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div
@@ -430,24 +448,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* ── POPULAR RIGHT NOW ───────────────────────────────────────────────── */}
-      {/* Each button triggers a fresh navigation to the search page,
-          which always mounts a new component and fetches current results. */}
-      <div className="max-w-6xl mx-auto px-6 py-6">
-        <p style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#C9CDD4', marginBottom: '12px' }}>
-          Popular right now
-        </p>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-          {trending.map((term) => (
-            <button key={term}
-              onClick={() => router.push(`/search?q=${encodeURIComponent(term)}&region=${region}`)}
-              style={{ padding: '6px 16px', fontSize: '13px', border: '1px solid #E5E7EB', borderRadius: '999px', color: '#6B7280', background: '#fff', cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit' }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = '#E8272A'; e.currentTarget.style.color = '#E8272A'; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = '#E5E7EB'; e.currentTarget.style.color = '#6B7280'; }}
-            >{term}</button>
-          ))}
-        </div>
-      </div>
     </main>
   );
 }
