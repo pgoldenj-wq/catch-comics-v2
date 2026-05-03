@@ -25,17 +25,25 @@ interface ComicResult {
 type Format = 'single-issue' | 'graphic-novel' | 'hardcover' | 'omnibus' | 'manga' | 'compact' | 'one-shot'
 type Category = 'comics' | 'manga' | 'indie'
 
+// Validated set used by URL parsing — anything outside this list falls back to 'all'.
+const VALID_FORMATS: string[] = [
+  'all', 'single-issue', 'graphic-novel', 'hardcover', 'omnibus', 'manga', 'compact', 'one-shot',
+]
+
 // ─── Format / Category Detection ─────────────────────────────────────────────
 
 const MANGA_PUBLISHERS = ['viz', 'kodansha', 'yen press', 'seven seas', 'tokyopop', 'square enix', 'shonen jump', 'dark horse manga', 'j-novel', 'vertical']
 const INDIE_PUBLISHERS  = ['image', 'boom', 'dark horse', 'fantagraphics', 'oni press', 'dynamite', 'aftershock', 'vault', 'idw', 'drawn & quarterly', 'top shelf']
 
 function detectFormat(comic: ComicResult): Format {
-  // Actual Comic Vine issue records always get 'single-issue' regardless of name
-  if (comic.source === 'cv_issue') return 'single-issue'
   const name = (comic.name || '').toLowerCase()
   const pub  = (comic.publisher?.name || '').toLowerCase()
+  // BUG FIX: manga publisher must beat the cv_issue check below — without this,
+  // a manga single issue (e.g. a Chainsaw Man chapter from Viz) classifies as
+  // 'single-issue' and disappears when the user filters by Manga.
   if (MANGA_PUBLISHERS.some(p => pub.includes(p))) return 'manga'
+  // Comic Vine issue records — single issue when not from a manga publisher.
+  if (comic.source === 'cv_issue') return 'single-issue'
   // One-shot / annuals — checked before general heuristics to avoid mislabelling
   if (
     name.includes('annual') ||
@@ -127,7 +135,9 @@ interface FilterPanelProps {
 }
 
 function FilterPanel({ category, publisher, publishers, priceMax, currency, onChange, onClear }: FilterPanelProps) {
-  const [openSections, setOpenSections] = useState<Set<string>>(new Set(['publisher', 'price']))
+  // Default: only Price Range open. Other sections collapse so the sidebar
+  // reads as a small, focused widget on first load.
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set(['price']))
 
   const toggleSection = (id: string) => setOpenSections(prev => {
     const s = new Set(prev)
@@ -255,15 +265,16 @@ function SearchResults() {
   // URL-derived values — all filter state lives in the URL
   const query       = searchParams.get('q') || ''
   const regionParam = searchParams.get('region') as 'uk' | 'us' | null
-  const formatParam = searchParams.get('format') || ''
-  // formats[] = multi-select. "all" or empty means no filter.
-  const formats     = (formatParam === '' || formatParam === 'all')
-                        ? []
-                        : formatParam.split(',').filter(Boolean)
-  const category    = searchParams.get('category')  || 'all'
-  const publisher   = searchParams.get('publisher') || 'all'
-  const priceMax    = searchParams.get('priceMax')  || 'all'
-  const sort        = searchParams.get('sort')      || 'relevance'
+  // SINGLE-SELECT format. Backwards-compat: if URL still has a comma-separated
+  // value from the old multi-select system, take the first segment. Anything
+  // we don't recognise falls back to 'all' — prevents stale URLs producing zero results.
+  const formatRaw       = searchParams.get('format') || 'all'
+  const formatCandidate = formatRaw.split(',')[0]
+  const format          = VALID_FORMATS.includes(formatCandidate) ? formatCandidate : 'all'
+  const category        = searchParams.get('category')  || 'all'
+  const publisher       = searchParams.get('publisher') || 'all'
+  const priceMax        = searchParams.get('priceMax')  || 'all'
+  const sort            = searchParams.get('sort')      || 'relevance'
 
   // Region has local state for immediate button feedback; syncs from URL
   const [region, setRegion] = useState<'uk' | 'us'>(regionParam || 'uk')
@@ -281,15 +292,14 @@ function SearchResults() {
   const buildUrl = (overrides: Record<string, string> = {}) => {
     const merged: Record<string, string> = {
       q: query, region,
-      format: formats.join(','),     // joined multi-select
+      format,                        // single-select string
       category, publisher, priceMax, sort,
       ...overrides,
     }
     const params = new URLSearchParams()
     Object.entries(merged).forEach(([k, v]) => {
       if (!v) return
-      if (k === 'format' && (v === '' || v === 'all')) return
-      if (['category', 'publisher', 'priceMax'].includes(k) && v === 'all') return
+      if (['format', 'category', 'publisher', 'priceMax'].includes(k) && v === 'all') return
       if (k === 'sort' && v === 'relevance') return
       params.set(k, v)
     })
@@ -299,18 +309,10 @@ function SearchResults() {
   const handleFilterChange = (key: string, value: string) =>
     router.push(buildUrl({ [key]: value }), { scroll: false })
 
-  // Multi-select format toggle — "all" clears, others add/remove
-  const toggleFormat = (id: string) => {
-    let next: string[]
-    if (id === 'all') {
-      next = []
-    } else {
-      const set = new Set(formats)
-      if (set.has(id)) set.delete(id)
-      else set.add(id)
-      next = Array.from(set)
-    }
-    router.push(buildUrl({ format: next.join(',') }), { scroll: false })
+  // Single-select format setter — clicking the active pill clears to 'all'.
+  const setFormatFilter = (id: string) => {
+    const next = id === format ? 'all' : id
+    router.push(buildUrl({ format: next }), { scroll: false })
   }
 
   const clearFilters = () => {
@@ -362,7 +364,7 @@ function SearchResults() {
   // Client-side filter + sort — instant, no re-fetch
   const filteredResults = useMemo(() => {
     let res = [...results]
-    if (formats.length)      res = res.filter(r => formats.includes(detectFormat(r)))
+    if (format    !== 'all') res = res.filter(r => detectFormat(r)   === format)
     if (category  !== 'all') res = res.filter(r => detectCategory(r) === category)
     if (publisher !== 'all') res = res.filter(r => r.publisher?.name === publisher)
     if (priceMax  !== 'all') {
@@ -379,9 +381,9 @@ function SearchResults() {
     }
     if (sort === 'newest')   res.sort((a, b) => parseInt(b.start_year || '0') - parseInt(a.start_year || '0'))
     return res
-  }, [results, formats, category, publisher, priceMax, sort])
+  }, [results, format, category, publisher, priceMax, sort])
 
-  const hasActiveFilters = formats.length > 0 || category !== 'all' || publisher !== 'all' || priceMax !== 'all'
+  const hasActiveFilters = format !== 'all' || category !== 'all' || publisher !== 'all' || priceMax !== 'all'
 
   const filterPanelProps: FilterPanelProps = {
     category, publisher,
@@ -442,9 +444,8 @@ function SearchResults() {
         {/* Results column */}
         <div style={{ flex: 1, minWidth: 0 }}>
 
-          {/* TOP FILTER ROW — multi-select format pills + result count
-              Pills are visually prominent (filled black when active) so they
-              read as the primary filter; sidebar handles secondary filters. */}
+          {/* TOP FILTER ROW — single-select format pills + result count.
+              Clicking the active pill clears back to 'all'. */}
           {!loading && !error && (
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
               {([
@@ -453,11 +454,11 @@ function SearchResults() {
                 { id: 'single-issue', label: 'Single Issues' },
                 { id: 'manga',         label: 'Manga' },
               ] as { id: string; label: string }[]).map(({ id, label }) => {
-                const active = id === 'all' ? formats.length === 0 : formats.includes(id)
+                const active = id === format
                 return (
                   <button
                     key={id}
-                    onClick={() => toggleFormat(id)}
+                    onClick={() => setFormatFilter(id)}
                     aria-pressed={active}
                     style={{
                       padding: '7px 14px',
@@ -542,7 +543,7 @@ function SearchResults() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {[...Array(6)].map((_, i) => (
                 <div key={i} className="animate-pulse" style={{ display: 'flex', gap: '14px', padding: '16px', borderRadius: '12px', border: '1px solid #F3F4F6', background: '#fff' }}>
-                  <div style={{ width: '52px', height: '72px', borderRadius: '6px', background: '#F3F4F6', flexShrink: 0 }} />
+                  <div style={{ width: '80px', height: '112px', borderRadius: '6px', background: '#F3F4F6', flexShrink: 0 }} />
                   <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', paddingTop: '4px' }}>
                     <div style={{ height: '14px', borderRadius: '4px', width: '65%', background: '#F3F4F6' }} />
                     <div style={{ height: '12px', borderRadius: '4px', width: '42%', background: '#F3F4F6' }} />
@@ -578,9 +579,10 @@ function SearchResults() {
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
 
                     {/* Cover image — letter always rendered as background fallback;
-                        image overlays it and hides itself via onError if it fails */}
-                    <div style={{ width: '52px', height: '72px', borderRadius: '6px', overflow: 'hidden', background: '#F3F4F6', border: '1px solid #EBEBEB', flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <span style={{ color: '#9CA3AF', fontSize: '18px', fontWeight: 500, position: 'absolute' }}>
+                        image overlays it and hides itself via onError if it fails.
+                        Bumped from 52×72 → 80×112 so covers actually read as covers. */}
+                    <div style={{ width: '80px', height: '112px', borderRadius: '6px', overflow: 'hidden', background: '#F3F4F6', border: '1px solid #EBEBEB', flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <span style={{ color: '#9CA3AF', fontSize: '26px', fontWeight: 500, position: 'absolute' }}>
                         {comic.name.charAt(0)}
                       </span>
                       {comic.image?.medium_url && (

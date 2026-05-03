@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 
 interface SuggestionTerm {
   term: string;
@@ -30,6 +30,7 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
   const wrapperRef = useRef<HTMLDivElement>(null);
   const userTypedRef = useRef(false);
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     userTypedRef.current = false;
@@ -86,6 +87,16 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  // Reset suggestion dropdown on any navigation. Catches the case where the
+  // user clicks a result card / region toggle / browser back-or-forward and the
+  // SearchBar (in the persistent header) keeps its old open dropdown.
+  useEffect(() => {
+    setSuggestions([]);
+    setShowSuggestions(false);
+    userTypedRef.current = false;
+    abortRef.current?.abort();
+  }, [pathname]);
 
   const doSearch = (term: string, newTab = false) => {
     const url = `/search?q=${encodeURIComponent(term)}&region=${region}`;
