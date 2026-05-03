@@ -38,6 +38,7 @@
 ## PHASE 3 — PRICING & API CONNECTIONS
 **Objective:** Prices are real, always display, and never silently fail.
 
+- [ ] switch ebay production keys to API once API approved
 - [ ] eBay Browse API credentials stored in Vercel env vars (not hardcoded)
 - [ ] eBay search returns price + listing URL for at least 80% of test queries
 - [ ] Price display never shows £0.00, "undefined", or blank — use fallback text: "Check price →"
