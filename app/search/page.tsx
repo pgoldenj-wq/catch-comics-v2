@@ -15,6 +15,8 @@ interface ComicResult {
   publisher: { name: string }
   count_of_issues?: number
   source?: string
+  type?: string           // 'volume' | 'issue' | 'book'
+  relevanceScore?: number
   authors?: string[]
   isbn13?: string
   isbn10?: string

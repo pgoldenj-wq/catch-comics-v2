@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 
 interface SuggestionTerm {
   term: string;
+  type?: string;   // "Manga" | "Series" | undefined
   count: number;
 }
 
@@ -12,6 +13,12 @@ interface SearchBarProps {
   initialQuery?: string;
   region: 'uk' | 'us';
   variant?: 'hero' | 'header';
+}
+
+// Type badge colours
+const TYPE_BADGE: Record<string, { bg: string; color: string }> = {
+  'Manga':  { bg: '#FEF3C7', color: '#92400E' },
+  'Series': { bg: '#DBEAFE', color: '#1E40AF' },
 }
 
 export default function SearchBar({ initialQuery = '', region, variant = 'hero' }: SearchBarProps) {
@@ -31,9 +38,7 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
   }, [initialQuery]);
 
   useEffect(() => {
-    if (!userTypedRef.current) {
-      return;
-    }
+    if (!userTypedRef.current) return;
     if (query.length < 2) {
       setSuggestions([]);
       setShowSuggestions(false);
@@ -42,7 +47,7 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/autocomplete?q=${encodeURIComponent(query)}`);
+        const res  = await fetch(`/api/autocomplete?q=${encodeURIComponent(query)}`);
         const data = await res.json();
         const seen = new Set<string>();
         const terms: SuggestionTerm[] = [];
@@ -50,9 +55,9 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
           const term = r.name.trim();
           if (!seen.has(term.toLowerCase())) {
             seen.add(term.toLowerCase());
-            terms.push({ term, count: r.count || 1 });
+            terms.push({ term, type: r.type, count: r.count || 1 });
           }
-          if (terms.length >= 6) break;
+          if (terms.length >= 8) break;
         }
         setSuggestions(terms);
         setShowSuggestions(terms.length > 0);
@@ -171,29 +176,40 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
           overflow: 'hidden',
           borderTop: '1px solid #F3F4F6',
         }}>
-          {suggestions.map((s, i) => (
-            <div key={i}
-              onClick={() => { setQuery(s.term); doSearch(s.term); }}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '10px',
-                padding: '11px 18px', cursor: 'pointer',
-                borderBottom: i < suggestions.length - 1 ? '1px solid #F9F9F9' : 'none',
-                background: '#fff',
-              }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#F3F4F6')}
-              onMouseLeave={e => (e.currentTarget.style.background = '#fff')}
-            >
-              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" style={{ color: '#D1D5DB', flexShrink: 0 }}>
-                <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2"/>
-                <path d="M16.5 16.5L21 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              </svg>
-              <span style={{ flex: 1, fontSize: '13px', color: '#0A0A0A' }}>{s.term}</span>
-              {s.count > 1 && <span style={{ fontSize: '11px', color: '#9CA3AF' }}>{s.count} editions</span>}
-              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" style={{ color: '#D1D5DB', flexShrink: 0 }}>
-                <path d="M7 17L17 7M17 7H7M17 7v10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              </svg>
-            </div>
-          ))}
+          {suggestions.map((s, i) => {
+            const badge = s.type ? TYPE_BADGE[s.type] : undefined
+            return (
+              <div key={i}
+                onClick={() => { setQuery(s.term); doSearch(s.term); }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '10px',
+                  padding: '11px 18px', cursor: 'pointer',
+                  borderBottom: i < suggestions.length - 1 ? '1px solid #F9F9F9' : 'none',
+                  background: '#fff',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#F3F4F6')}
+                onMouseLeave={e => (e.currentTarget.style.background = '#fff')}
+              >
+                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" style={{ color: '#D1D5DB', flexShrink: 0 }}>
+                  <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2"/>
+                  <path d="M16.5 16.5L21 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+                <span style={{ flex: 1, fontSize: '13px', color: '#0A0A0A' }}>{s.term}</span>
+                {badge && s.type && (
+                  <span style={{
+                    fontSize: '10px', fontWeight: 600, padding: '2px 7px',
+                    borderRadius: '999px', background: badge.bg, color: badge.color,
+                    flexShrink: 0,
+                  }}>
+                    {s.type}
+                  </span>
+                )}
+                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" style={{ color: '#D1D5DB', flexShrink: 0 }}>
+                  <path d="M7 17L17 7M17 7H7M17 7v10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>

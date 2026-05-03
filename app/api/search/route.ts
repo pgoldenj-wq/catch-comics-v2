@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { searchCache, volumeCache } from '@/lib/cache'
-import { parseComicQuery, scoreIssueResult } from '@/lib/parseComicQuery'
+import { parseComicQuery, titleMatchScore } from '@/lib/parseComicQuery'
 
 // ── Image helpers ─────────────────────────────────────────────────────────────
 
-// Comic Vine stores its "no cover" placeholder under user_id 0 in their CDN.
-// Pattern: /uploads/{scale}/0/{object_id}/...
 function isPlaceholderImage(url: string | undefined | null): boolean {
   if (!url) return true
   if (url.includes('no_image')) return true
@@ -52,13 +50,103 @@ function mapOpenLibraryBook(isbn: string, book: Record<string, unknown>) {
     isbn13: (identifiers.isbn_13 || [])[0] || (isbn.length === 13 ? isbn : ''),
     isbn10: (identifiers.isbn_10 || [])[0] || (isbn.length === 10 ? isbn : ''),
     source: 'open_library',
+    type: 'book',
+    relevanceScore: 100,
   }
 }
 
-// ── Comic Vine result mappers ─────────────────────────────────────────────────
+// ── Relevance scoring ─────────────────────────────────────────────────────────
+
+// Publishers known to produce non-English editions — demote from results
+const FOREIGN_PUBLISHERS = new Set([
+  'panini', 'glenat', 'glénat', 'urban comics', 'planeta', 'ivrea',
+  'editorial ivrea', 'delcourt', 'soleil', 'dargaud', 'le lombard',
+  'lombard', 'humanoides', 'les humanoïdes associés', 'bonelli',
+  'sergio bonelli editore', 'editions 12bis', 'dupuis', 'casterman',
+  'standaard uitgeverij', 'carlsen', 'ehapa', 'kana', 'tonkam',
+])
+
+// Publishers that signal high-quality / major-market results
+const MAJOR_PUBLISHERS = new Set([
+  'marvel', 'dc comics', 'image comics', 'image', 'dark horse comics', 'dark horse',
+  'idw publishing', 'idw', 'boom! studios', 'boom studios', 'oni press',
+  'fantagraphics books', 'fantagraphics', 'drawn & quarterly',
+  'viz media', 'viz', 'kodansha comics', 'kodansha', 'yen press',
+  'seven seas entertainment', 'seven seas', 'tokyopop',
+  'square enix manga', 'shueisha', 'vertical', 'titan comics',
+  'dynamite entertainment', 'dynamite', 'aftershock comics', 'aftershock',
+  'vault comics', 'vault', 'scout comics', 'ahoy comics', 'top shelf productions',
+])
+
+function isForeignPublisher(name: string | undefined): boolean {
+  const p = (name || '').toLowerCase().trim()
+  if (!p) return false
+  if (FOREIGN_PUBLISHERS.has(p)) return true
+  if (p.startsWith('panini')) return true   // "Panini Comics France", "Panini Verlag", etc.
+  if (p.startsWith('glenat') || p.startsWith('glénat')) return true
+  return false
+}
+
+function isForeignTitle(title: string): boolean {
+  return /\((?:french|spanish|german|italian|portuguese|dutch|turkish|greek|polish|korean|chinese|arabic|russian)\s+edition\)/i.test(title)
+}
+
+function isMajorPublisher(name: string | undefined): boolean {
+  return MAJOR_PUBLISHERS.has((name || '').toLowerCase().trim())
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapCVIssue(r: any) {
+type ParsedQuery = ReturnType<typeof parseComicQuery>
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function scoreVolume(r: any, parsed: ParsedQuery): number {
+  const pub = (r.publisher?.name as string) || ''
+  if (isForeignPublisher(pub) || isForeignTitle(r.name || '')) return -9999
+
+  // Base: higher when NOT looking for a specific issue (broad query prefers volumes)
+  let score = parsed.hasIssueIntent ? 10 : 50
+  score += titleMatchScore(r.name || '', parsed.cleanTitle)
+  if (isMajorPublisher(pub)) score += 10
+  return score
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function scoreIssue(r: any, parsed: ParsedQuery): number {
+  const pub        = (r.volume?.publisher?.name as string) || ''
+  const seriesName = (r.volume?.name as string) || ''
+  if (isForeignPublisher(pub) || isForeignTitle(seriesName)) return -9999
+
+  // Base: higher when query clearly targets a specific issue
+  let score = parsed.hasIssueIntent ? 60 : 10
+  if (parsed.hasIssueIntent && parsed.issueNumber) {
+    const resultNum = String(parseInt(r.issue_number || '0', 10))
+    if (resultNum === parsed.issueNumber) score += 60
+  }
+  score += titleMatchScore(seriesName, parsed.cleanTitle)
+  if (isMajorPublisher(pub)) score += 10
+  return score
+}
+
+// ── CV result mappers ─────────────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapCVVolume(r: any, relevanceScore: number) {
+  return {
+    id:              r.id as number,
+    name:            (r.name as string) || '',
+    image:           cleanImageUrls(r.image),
+    start_year:      (r.start_year as string) || '',
+    publisher:       { name: (r.publisher?.name as string) || '' },
+    description:     (r.description as string) || '',
+    count_of_issues: (r.count_of_issues as number) || 0,
+    source:          'cv_volume',
+    type:            'volume',
+    relevanceScore,
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapCVIssue(r: any, relevanceScore: number) {
   const volumeName  = (r.volume?.name as string) || ''
   const issueNum    = (r.issue_number as string) || ''
   const displayName = issueNum
@@ -67,38 +155,22 @@ function mapCVIssue(r: any) {
   const coverYear = ((r.cover_date || r.store_date || '') as string).match(/^(\d{4})/)?.[1] || ''
 
   return {
-    id: `i${r.id as number}`,
-    name: displayName,
-    image: cleanImageUrls(r.image),
-    start_year: coverYear,
-    publisher: { name: (r.volume?.publisher?.name as string) || '' },
-    description: (r.description as string) || '',
+    id:              `i${r.id as number}`,
+    name:            displayName,
+    image:           cleanImageUrls(r.image),
+    start_year:      coverYear,
+    publisher:       { name: (r.volume?.publisher?.name as string) || '' },
+    description:     (r.description as string) || '',
     count_of_issues: 1,
-    source: 'cv_issue',
+    source:          'cv_issue',
+    type:            'issue',
+    relevanceScore,
   }
-}
-
-// Sanitise a raw Comic Vine volume results array: dedup, filter empties and
-// variant-cover entries, blank placeholder images.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function sanitiseVolumeResults(raw: any[]): any[] {
-  const seenIds = new Set<number>()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return raw.reduce((acc: any[], r: any) => {
-    if (!r.name?.trim()) return acc
-    if (seenIds.has(r.id)) return acc
-    seenIds.add(r.id)
-    if (/\(\s*variant\b/i.test(r.name)) return acc
-    if ((r.name as string).toLowerCase().includes('variant cover edition')) return acc
-    acc.push({ ...r, image: cleanImageUrls(r.image) })
-    return acc
-  }, [])
 }
 
 // ── Publisher enrichment ──────────────────────────────────────────────────────
 // Batch-fetch publisher names for unique volume IDs that issue results reference.
-// Results are cached in volumeCache under key "publisher:{id}".
-// Limited to 5 unique volumes per request to protect CV rate limits.
+// Results are cached in volumeCache. Limited to 5 unique volumes per request.
 
 async function enrichIssuePublishers(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -112,7 +184,7 @@ async function enrichIssuePublishers(
         .map(r => r.volume?.id)
         .filter((id): id is number => !!id)
     ),
-  ].slice(0, 5)  // guard against large fan-out
+  ].slice(0, 5)
 
   if (uniqueVolumeIds.length === 0) return
 
@@ -141,7 +213,6 @@ async function enrichIssuePublishers(
     })
   )
 
-  // Attach publisher names to issue results
   rawIssueData.forEach((raw, i) => {
     const volId = raw.volume?.id
     if (volId && publisherMap[volId] && issueResults[i]) {
@@ -200,36 +271,16 @@ export async function GET(request: NextRequest) {
 
   const parsed  = parseComicQuery(query)
   const encoded = encodeURIComponent(query)
-  console.log(`[/api/search] parsed: title="${parsed.cleanTitle}" issue="${parsed.issueNumber}" intent=${parsed.hasIssueIntent}`)
+  console.log(
+    `[/api/search] parsed: title="${parsed.cleanTitle}" issue="${parsed.issueNumber}" vol="${parsed.volumeNumber}" issueIntent=${parsed.hasIssueIntent} volIntent=${parsed.hasVolumeIntent}`
+  )
 
+  // Always search BOTH volumes and issues in parallel.
+  // Scoring handles ordering: issue intent → issues ranked first; broad intent → volumes first.
   const volumeUrl = `https://comicvine.gamespot.com/api/search/?api_key=${apiKey}&format=json&resources=volume&query=${encoded}&limit=20&field_list=id,name,image,start_year,publisher,description,count_of_issues`
+  const issueUrl  = `https://comicvine.gamespot.com/api/search/?api_key=${apiKey}&format=json&resources=issue&query=${encoded}&limit=15&field_list=id,name,image,issue_number,volume,cover_date,store_date,description`
 
   try {
-    if (!parsed.hasIssueIntent) {
-      // ── Volume-only path ─────────────────────────────────────────────────
-      const res  = await fetch(volumeUrl, { headers: { 'User-Agent': 'CatchComics/1.0' } })
-      const data = await res.json()
-      console.log(`[/api/search] CV volume status_code=${data.status_code} count=${Array.isArray(data.results) ? data.results.length : '?'}`)
-
-      if (!res.ok || data.status_code !== 1) {
-        return NextResponse.json(
-          { error: `Comic Vine error: ${data.error || res.status}` },
-          { status: 502 }
-        )
-      }
-
-      const body = {
-        results: sanitiseVolumeResults(data.results || []),
-        total:   data.number_of_total_results || 0,
-      }
-      searchCache.set(searchCacheKey, body)
-      return NextResponse.json(body)
-    }
-
-    // ── Issue + volume parallel path ─────────────────────────────────────────
-    // Run both searches concurrently; issues ranked first.
-    const issueUrl = `https://comicvine.gamespot.com/api/search/?api_key=${apiKey}&format=json&resources=issue&query=${encoded}&limit=15&field_list=id,name,image,issue_number,volume,cover_date,store_date,description`
-
     const [volumeRes, issueRes] = await Promise.all([
       fetch(volumeUrl, { headers: { 'User-Agent': 'CatchComics/1.0' } }),
       fetch(issueUrl,  { headers: { 'User-Agent': 'CatchComics/1.0' } }),
@@ -238,35 +289,60 @@ export async function GET(request: NextRequest) {
       volumeRes.json(),
       issueRes.json(),
     ])
-    console.log(`[/api/search] CV issue status_code=${issueData.status_code} count=${Array.isArray(issueData.results) ? issueData.results.length : '?'}`)
+    console.log(
+      `[/api/search] CV volume status=${volumeData.status_code} count=${Array.isArray(volumeData.results) ? volumeData.results.length : '?'} | issue status=${issueData.status_code} count=${Array.isArray(issueData.results) ? issueData.results.length : '?'}`
+    )
 
-    // ── Re-rank raw issue results before mapping ──────────────────────────
+    // ── Score and deduplicate volumes ─────────────────────────────────────
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rawVolumes: any[] = (volumeData.status_code === 1 && Array.isArray(volumeData.results))
+      ? volumeData.results
+      : []
+
+    const seenVolumeIds = new Set<number>()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const scoredVolumes: Array<{ r: any; score: number }> = []
+    for (const r of rawVolumes) {
+      if (!r.name?.trim() || !r.id) continue
+      if (seenVolumeIds.has(r.id)) continue
+      seenVolumeIds.add(r.id)
+      if (/\(\s*variant\b/i.test(r.name)) continue
+      if ((r.name as string).toLowerCase().includes('variant cover edition')) continue
+      const score = scoreVolume(r, parsed)
+      if (score <= -9999) continue   // foreign — drop
+      scoredVolumes.push({ r, score })
+    }
+
+    // ── Score and deduplicate issues ──────────────────────────────────────
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rawIssues: any[] = (issueData.status_code === 1 && Array.isArray(issueData.results))
       ? issueData.results.filter((r: { id?: number; volume?: unknown }) => r.id && r.volume)
       : []
 
-    // Sort by composite score (issue# match + title match) descending
-    rawIssues.sort((a, b) => scoreIssueResult(b, parsed) - scoreIssueResult(a, parsed))
+    const seenIssueIds = new Set<number>()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const scoredIssues: Array<{ r: any; score: number }> = []
+    for (const r of rawIssues) {
+      if (seenIssueIds.has(r.id)) continue
+      seenIssueIds.add(r.id)
+      const score = scoreIssue(r, parsed)
+      if (score <= -9999) continue   // foreign — drop
+      scoredIssues.push({ r, score })
+    }
 
-    // Map to frontend shape
-    const issueResults = rawIssues.map(mapCVIssue)
+    // ── Map to frontend shape ─────────────────────────────────────────────
+    const volumeResults = scoredVolumes.map(({ r, score }) => mapCVVolume(r, score))
+    const issueResults  = scoredIssues.map(({ r, score }) => mapCVIssue(r, score))
 
-    // ── Publisher enrichment (concurrent, cached) ─────────────────────────
-    await enrichIssuePublishers(issueResults, rawIssues, apiKey)
+    // ── Publisher enrichment for issues (concurrent, cached) ──────────────
+    await enrichIssuePublishers(issueResults, scoredIssues.map(({ r }) => r), apiKey)
 
-    // ── Sanitise volumes; drop any whose series has an issue result ───────
-    const issueVolumeIds = new Set(
-      rawIssues.map((r: { volume?: { id?: number } }) => r.volume?.id).filter(Boolean)
-    )
-    const volumeResults = (volumeData.status_code === 1 && Array.isArray(volumeData.results))
-      ? sanitiseVolumeResults(volumeData.results).filter(
-          (r: { id: number }) => !issueVolumeIds.has(r.id)
-        )
-      : []
+    // ── Merge and sort by relevanceScore descending, cap at 20 ────────────
+    const combined = [...volumeResults, ...issueResults]
+      .sort((a, b) => b.relevanceScore - a.relevanceScore)
+      .slice(0, 20)
 
-    const combined = [...issueResults, ...volumeResults]
-    const body     = { results: combined, total: combined.length }
+    const body = { results: combined, total: combined.length }
     searchCache.set(searchCacheKey, body)
     return NextResponse.json(body)
 
