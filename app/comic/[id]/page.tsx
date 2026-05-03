@@ -2,6 +2,7 @@
 
 import { useEffect, useState, Suspense } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
+import PricingPanel from '@/components/PricingPanel'
 
 interface ComicDetail {
   id: number
@@ -22,13 +23,6 @@ interface IssueListItem {
   cover_date: string
 }
 
-interface PriceResult {
-  seller: string
-  condition: string
-  url: string
-  isFirst?: boolean
-}
-
 function ComicPage() {
   const params = useParams()
   const router = useRouter()
@@ -37,10 +31,8 @@ function ComicPage() {
   const regionParam = searchParams.get('region') as 'uk' | 'us' | null
 
   const [comic, setComic] = useState<ComicDetail | null>(null)
-  const [prices, setPrices] = useState<PriceResult[]>([])
   const [loading, setLoading] = useState(true)
   const [market, setMarket] = useState<'uk' | 'us'>(regionParam || 'uk')
-  const [activeTab, setActiveTab] = useState<'all' | 'new' | 'used'>('all')
   const [issues, setIssues]               = useState<IssueListItem[]>([])
   const [issuesLoading, setIssuesLoading] = useState(false)
 
@@ -101,38 +93,6 @@ function ComicPage() {
       })
       .catch(() => setIssuesLoading(false))
   }, [id, isVolume])
-
-  useEffect(() => {
-    if (!comic) return
-    const isbn     = id.startsWith('ol-') ? id.slice(3) : null
-    const keyword  = isbn ?? encodeURIComponent(comic.name + ' comic')
-    const amazonTag = market === 'uk' ? 'catchcomics-21' : 'catchcomics-us'
-    const amazonUrl = market === 'uk'
-      ? `https://www.amazon.co.uk/s?k=${keyword}&tag=${amazonTag}`
-      : `https://www.amazon.com/s?k=${keyword}&tag=${amazonTag}`
-    const ebayUrl = market === 'uk'
-      ? `https://www.ebay.co.uk/sch/i.html?_nkw=${keyword}`
-      : `https://www.ebay.com/sch/i.html?_nkw=${keyword}`
-    const abebooksUrl = `https://www.abebooks.co.uk/servlet/SearchResults?kn=${encodeURIComponent(comic.name)}`
-
-    setPrices([
-      { seller: 'Amazon', condition: 'New', url: amazonUrl, isFirst: true },
-      { seller: 'eBay', condition: 'New & Used', url: ebayUrl },
-      { seller: 'AbeBooks', condition: 'New & Used', url: abebooksUrl },
-    ])
-  }, [comic, market, id])
-
-  const filteredPrices = prices.filter(p => {
-    if (activeTab === 'new') return p.condition === 'New'
-    if (activeTab === 'used') return p.condition.includes('Used')
-    return true
-  })
-
-  const sellerColour: Record<string, string> = {
-    Amazon: 'text-amber-700',
-    eBay: 'text-blue-700',
-    AbeBooks: 'text-green-700',
-  }
 
   if (loading) {
     return (
@@ -234,73 +194,11 @@ function ComicPage() {
         </div>
       </div>
 
-      {/* OFFERS */}
+      {/* OFFERS — live eBay listings via /api/prices */}
       <div className="max-w-4xl mx-auto px-8 py-6">
-
-        {/* TABS */}
-        <div className="flex border-b border-gray-200 mb-5">
-          {(['all', 'new', 'used'] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className="px-4 py-2.5 text-sm capitalize font-medium border-b-2 transition-all -mb-px"
-              style={{
-                borderColor: activeTab === tab ? '#E8272A' : 'transparent',
-                color: activeTab === tab ? '#E8272A' : '#9CA3AF',
-              }}
-            >
-              {tab === 'all' ? 'All offers' : tab}
-            </button>
-          ))}
-        </div>
-
-        <p className="text-xs text-gray-400 mb-4 uppercase tracking-wide">
-          {filteredPrices.length} {filteredPrices.length === 1 ? 'offer' : 'offers'} · {market === 'uk' ? 'United Kingdom' : 'United States'}
-        </p>
-
-        <div className="space-y-3">
-          {filteredPrices.map((price, i) => (
-            <div
-              key={i}
-              className="flex items-center gap-4 p-4 rounded-2xl bg-white transition-all"
-              style={{
-                border: price.isFirst ? '2px solid #E8272A' : '1px solid #F3F4F6',
-              }}
-            >
-              {price.isFirst && (
-                <span className="text-[10px] font-semibold uppercase tracking-wide bg-[#E8272A] text-white px-2 py-1 rounded-md shrink-0">
-                  Best
-                </span>
-              )}
-              {!price.isFirst && <div className="w-10 shrink-0" />}
-
-              <div className="flex-1 min-w-0">
-                <p className={`text-sm font-semibold ${sellerColour[price.seller] || 'text-gray-900'}`}>
-                  {price.seller}
-                </p>
-                <p className="text-xs text-gray-400 mt-0.5">{price.condition}</p>
-              </div>
-
-              <button
-                onClick={() => window.open(price.url, '_blank')}
-                className="shrink-0 px-5 py-2 text-white text-xs font-semibold rounded-xl transition-colors"
-                style={{ background: '#0A0A0A' }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#E8272A')}
-                onMouseLeave={e => (e.currentTarget.style.background = '#0A0A0A')}
-              >
-                View deal →
-              </button>
-            </div>
-          ))}
-
-          {filteredPrices.length === 0 && (
-            <p className="text-sm text-gray-400 text-center py-8">No {activeTab} offers available</p>
-          )}
-        </div>
-
+        <PricingPanel query={comic.name} region={market} />
         <p className="text-xs text-gray-300 mt-8 leading-relaxed">
           Catch Comics links to third-party retailers. Prices and availability may vary.
-          Amazon links include our affiliate tag which helps support the site at no extra cost to you.
         </p>
       </div>
 
