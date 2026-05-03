@@ -12,7 +12,7 @@
 - [ ] Top Deals page loads and displays real items with prices
 - [x] Homepage hero/search bar is functional on first load
 - [ ] Navigation links all resolve (no 404s)
-- [ ] Back button works correctly from product pages
+- [x] Back button works correctly from product pages
 - [ ] No broken routes in next.config.js redirects
 
 > Run every flow on Chrome + Safari + Firefox before moving on.
