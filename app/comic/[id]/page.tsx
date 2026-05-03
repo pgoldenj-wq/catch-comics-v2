@@ -159,17 +159,19 @@ function ComicPage() {
           }}
         />
         <div className="relative px-8 py-8 flex gap-6 max-w-4xl mx-auto">
-          {comic.image?.medium_url ? (
-            <img
-              src={comic.image.medium_url}
-              alt={comic.name}
-              className="w-28 h-40 object-cover rounded-lg border border-white/10 shadow-xl shrink-0"
-            />
-          ) : (
-            <div className="w-28 h-40 bg-white/5 rounded-lg border border-white/10 flex items-center justify-center shrink-0">
-              <span className="text-white/30 text-3xl font-medium">{comic.name.charAt(0)}</span>
-            </div>
-          )}
+          {/* Cover — letter always visible as fallback; image overlays and removes
+              itself via onError if the URL is missing or returns an error */}
+          <div className="relative w-28 h-40 rounded-lg border border-white/10 shadow-xl shrink-0 bg-white/5 flex items-center justify-center overflow-hidden">
+            <span className="text-white/30 text-3xl font-medium absolute">{comic.name.charAt(0)}</span>
+            {comic.image?.medium_url && (
+              <img
+                src={comic.image.medium_url}
+                alt={comic.name}
+                className="absolute inset-0 w-full h-full object-cover"
+                onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+              />
+            )}
+          </div>
           <div className="flex-1 min-w-0 flex flex-col justify-center">
             <p className="text-white/40 text-xs mb-2">
               {[comic.publisher?.name, comic.start_year ? `Est. ${comic.start_year}` : null].filter(Boolean).join(' · ')}

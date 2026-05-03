@@ -1,5 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+// Comic Vine stores its "no cover available" placeholder under user_id 0 in their CDN.
+// Real cover images always have a non-zero user_id segment after the scale type.
+// Pattern: /uploads/{scale}/0/{object_id}/...
+function isPlaceholderImage(url: string | undefined | null): boolean {
+  if (!url) return true
+  if (url.includes('no_image')) return true
+  // Match: .../uploads/<scale>/0/<digits>/... — Comic Vine's system/placeholder ownership
+  if (/\/uploads\/[^/]+\/0\/\d+\//.test(url)) return true
+  return false
+}
+
 // Detect ISBN-10 or ISBN-13 (tolerates spaces and hyphens)
 function detectISBN(query: string): string | null {
   const stripped = query.replace(/[\s\-]/g, '')
@@ -106,8 +117,28 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // ── Sanitise results ────────────────────────────────────────────────────
+    const seenIds = new Set<number>()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const results = (data.results || []).reduce((acc: any[], r: any) => {
+      // 1. Skip entries with no name
+      if (!r.name?.trim()) return acc
+      // 2. Deduplicate by Comic Vine ID
+      if (seenIds.has(r.id)) return acc
+      seenIds.add(r.id)
+      // 3. Filter variant-cover volumes — these are collector label entries,
+      //    not independent purchasable books (e.g. "Batman #1 (Variant Cover)")
+      const lname = (r.name as string).toLowerCase()
+      if (/\(\s*variant\b/i.test(r.name) || lname.includes('variant cover edition')) return acc
+      // 4. Blank placeholder image URLs so the frontend shows the letter fallback
+      const midUrl = isPlaceholderImage(r.image?.medium_url)   ? '' : r.image?.medium_url   ?? ''
+      const origUrl = isPlaceholderImage(r.image?.original_url) ? '' : r.image?.original_url ?? ''
+      acc.push({ ...r, image: { medium_url: midUrl, original_url: origUrl } })
+      return acc
+    }, [])
+
     return NextResponse.json({
-      results: data.results || [],
+      results,
       total: data.number_of_total_results || 0
     })
 

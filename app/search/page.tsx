@@ -20,7 +20,7 @@ interface ComicResult {
   isbn10?: string
 }
 
-type Format = 'graphic-novel' | 'hardcover' | 'omnibus' | 'manga' | 'compact'
+type Format = 'graphic-novel' | 'hardcover' | 'omnibus' | 'manga' | 'compact' | 'one-shot'
 type Category = 'comics' | 'manga' | 'indie'
 
 // ─── Format / Category Detection ─────────────────────────────────────────────
@@ -32,6 +32,16 @@ function detectFormat(comic: ComicResult): Format {
   const name = (comic.name || '').toLowerCase()
   const pub  = (comic.publisher?.name || '').toLowerCase()
   if (MANGA_PUBLISHERS.some(p => pub.includes(p))) return 'manga'
+  // One-shot / annuals — checked before general heuristics to avoid mislabelling
+  if (
+    name.includes('annual') ||
+    name.includes('one-shot') ||
+    name.includes('one shot') ||
+    name.includes('giant-size') ||
+    name.includes('giant size') ||
+    name.endsWith(' special') ||
+    name.includes(' special #')
+  ) return 'one-shot'
   if (name.includes('omnibus')) return 'omnibus'
   if (name.includes('absolute') || name.includes('deluxe') || name.endsWith(' hc') || name.includes('hardcover')) return 'hardcover'
   if (name.includes('pocket') || name.includes('compact')) return 'compact'
@@ -51,6 +61,7 @@ const FORMAT_LABELS: Record<Format, string> = {
   'omnibus':       'Omnibus / Deluxe',
   'manga':         'Manga',
   'compact':       'Compact / Pocket',
+  'one-shot':      'One-Shot / Annual',
 }
 
 const FORMAT_STYLES: Record<Format, { bg: string; color: string }> = {
@@ -59,6 +70,7 @@ const FORMAT_STYLES: Record<Format, { bg: string; color: string }> = {
   'omnibus':       { bg: '#FCE7F3', color: '#9D174D' },
   'manga':         { bg: '#FEF3C7', color: '#92400E' },
   'compact':       { bg: '#D1FAE5', color: '#065F46' },
+  'one-shot':      { bg: '#FEF9C3', color: '#854D0E' },
 }
 
 // ─── Flag SVGs ────────────────────────────────────────────────────────────────
@@ -178,6 +190,7 @@ function FilterPanel({ format, category, publisher, publishers, currency, onChan
               ['omnibus',       'Omnibus / Deluxe'],
               ['manga',         'Manga'],
               ['compact',       'Compact / Pocket'],
+              ['one-shot',      'One-Shot / Annual'],
             ] as [string, string][]).map(([v, l]) => radioOption('format', v, format, l))}
           </div>
         )}
@@ -477,14 +490,20 @@ function SearchResults() {
                     onMouseEnter={e => (e.currentTarget.style.background = '#FAFAFA')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
 
-                    {/* Cover image */}
-                    <div style={{ width: '52px', height: '72px', borderRadius: '6px', overflow: 'hidden', background: '#F3F4F6', border: '1px solid #EBEBEB', flexShrink: 0 }}>
-                      {comic.image?.medium_url
-                        ? <img src={comic.image.medium_url} alt={comic.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <span style={{ color: '#9CA3AF', fontSize: '18px', fontWeight: 500 }}>{comic.name.charAt(0)}</span>
-                          </div>
-                      }
+                    {/* Cover image — letter always rendered as background fallback;
+                        image overlays it and hides itself via onError if it fails */}
+                    <div style={{ width: '52px', height: '72px', borderRadius: '6px', overflow: 'hidden', background: '#F3F4F6', border: '1px solid #EBEBEB', flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <span style={{ color: '#9CA3AF', fontSize: '18px', fontWeight: 500, position: 'absolute' }}>
+                        {comic.name.charAt(0)}
+                      </span>
+                      {comic.image?.medium_url && (
+                        <img
+                          src={comic.image.medium_url}
+                          alt={comic.name}
+                          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                          onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+                        />
+                      )}
                     </div>
 
                     {/* Metadata */}
