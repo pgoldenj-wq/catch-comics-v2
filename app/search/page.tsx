@@ -97,12 +97,13 @@ function UKFlag() {
 
 function USFlag() {
   return (
+    // Star radius 1.4 — visible at icon size; xMinYMid slice keeps canton in view.
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 30" preserveAspectRatio="xMinYMid slice" style={{ width: '100%', height: '100%', display: 'block' }} aria-label="US flag">
       <rect width="60" height="30" fill="#B22234"/>
       <path d="M0 3.46h60M0 6.92h60M0 10.38h60M0 13.85h60M0 17.31h60M0 20.77h60M0 24.23h60" stroke="#fff" strokeWidth="2.31"/>
       <rect width="24" height="16.15" fill="#3C3B6E"/>
       <g fill="#fff">{[...Array(5)].map((_, row) => [...Array(row % 2 === 0 ? 6 : 5)].map((_, col) => (
-        <circle key={`${row}-${col}`} cx={row % 2 === 0 ? 2 + col * 4 : 4 + col * 4} cy={2 + row * 3} r="0.9" />
+        <circle key={`${row}-${col}`} cx={row % 2 === 0 ? 2 + col * 4 : 4 + col * 4} cy={2 + row * 3} r="1.4" />
       )))}</g>
     </svg>
   )

@@ -156,6 +156,8 @@ export default function Home() {
   );
 
   const USFlag = () => (
+    // Star radius 1.4 (was 0.9) so stars stay visible at icon size; canton kept
+    // left-aligned via xMinYMid slice so the stars/blue field show in the circle.
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 30" preserveAspectRatio="xMinYMid slice" style={{ width: '100%', height: '100%', display: 'block' }} aria-label="US flag">
       <rect width="60" height="30" fill="#B22234"/>
       <path d="M0 3.46h60M0 6.92h60M0 10.38h60M0 13.85h60M0 17.31h60M0 20.77h60M0 24.23h60" stroke="#fff" strokeWidth="2.31"/>
@@ -163,7 +165,7 @@ export default function Home() {
       <g fill="#fff">
         {[...Array(5)].map((_, row) =>
           [...Array(row % 2 === 0 ? 6 : 5)].map((_, col) => (
-            <circle key={`${row}-${col}`} cx={row % 2 === 0 ? 2 + col * 4 : 4 + col * 4} cy={2 + row * 3} r="0.9"/>
+            <circle key={`${row}-${col}`} cx={row % 2 === 0 ? 2 + col * 4 : 4 + col * 4} cy={2 + row * 3} r="1.4"/>
           ))
         )}
       </g>
@@ -184,8 +186,6 @@ export default function Home() {
           animation: scrollPublishers 60s linear infinite;
           will-change: transform;
         }
-        .deal-card:hover .deal-overlay { opacity: 1 !important; }
-
         /* ── Comic cover sway animations ───────────────────────────────────
            Base rotation lives here (not in inline style) so CSS animation
            can override it. Each cover has a unique rhythm and delay so they
@@ -263,7 +263,7 @@ export default function Home() {
             <h1 style={{ color: '#fff', fontSize: 'clamp(2rem,3.5vw,3rem)', fontWeight: 600, letterSpacing: '-0.03em', lineHeight: 1.1, marginBottom: '14px' }}>
               Search, compare,<br />save on comics
             </h1>
-            <p style={{ color: 'rgba(255,255,255,0.42)', fontSize: '14px', lineHeight: 1.6, marginBottom: '28px', maxWidth: '320px' }}>
+            <p style={{ color: '#fff', fontSize: '14px', lineHeight: 1.6, marginBottom: '28px', maxWidth: '320px' }}>
               Every comic, graphic novel and manga — compared across the web in seconds.
             </p>
 
@@ -274,7 +274,6 @@ export default function Home() {
 
             {/* Category hint pills — directly under search bar, non-interactive */}
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '14px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.28)', marginRight: '2px' }}>Browse:</span>
               {['Graphic Novels', 'Manga', 'Single Issues'].map(cat => (
                 <span key={cat} style={{
                   fontSize: '11px', padding: '4px 12px', borderRadius: '999px',
@@ -407,22 +406,12 @@ export default function Home() {
                       }}
                     />
 
-                    {/* Discount badge */}
+                    {/* Discount badge — only overlay kept; the section is "Top deals" */}
                     {hasSale && (
                       <div style={{ position: 'absolute', top: '8px', left: '8px', background: '#E8272A', color: '#fff', fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '5px' }}>
                         -{pct}%
                       </div>
                     )}
-
-                    {/* Format badge */}
-                    <div style={{ position: 'absolute', top: '8px', right: '8px', background: 'rgba(0,0,0,0.68)', backdropFilter: 'blur(4px)', color: 'rgba(255,255,255,0.9)', fontSize: '9px', fontWeight: 600, padding: '2px 6px', borderRadius: '4px' }}>
-                      {deal.format}
-                    </div>
-
-                    {/* Hover overlay */}
-                    <div className="deal-overlay" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(3px)', padding: '6px 8px', opacity: 0, transition: 'opacity 0.2s', textAlign: 'center' }}>
-                      <span style={{ fontSize: '10px', color: '#fff', fontWeight: 600 }}>Compare prices</span>
-                    </div>
                   </div>
 
                   {/* Title */}
