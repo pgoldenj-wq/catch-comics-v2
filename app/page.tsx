@@ -142,8 +142,11 @@ export default function Home() {
 
   // viewBox adds vertical padding so flags have breathing room inside the circular button.
   // US flag uses xMinYMid to show the left (canton / stars) rather than the centre stripe area.
+  // slice fills the circular container; xMid/xMin controls which part of the flag is shown.
+  // UK: centre the Union Jack in the circle.
+  // US: show the left side (canton / stars) rather than the centre stripe area.
   const UKFlag = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -5 60 40" preserveAspectRatio="xMidYMid meet" style={{ width: '100%', height: '100%', display: 'block' }} aria-label="UK flag">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 30" preserveAspectRatio="xMidYMid slice" style={{ width: '100%', height: '100%', display: 'block' }} aria-label="UK flag">
       <path d="M0 0v30h60V0z" fill="#012169"/>
       <path d="M0 0l60 30m0-30L0 30" stroke="#fff" strokeWidth="6"/>
       <path d="M0 0l60 30m0-30L0 30" stroke="#C8102E" strokeWidth="4"/>
@@ -153,7 +156,7 @@ export default function Home() {
   );
 
   const USFlag = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -5 60 40" preserveAspectRatio="xMinYMid meet" style={{ width: '100%', height: '100%', display: 'block' }} aria-label="US flag">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 30" preserveAspectRatio="xMinYMid slice" style={{ width: '100%', height: '100%', display: 'block' }} aria-label="US flag">
       <rect width="60" height="30" fill="#B22234"/>
       <path d="M0 3.46h60M0 6.92h60M0 10.38h60M0 13.85h60M0 17.31h60M0 20.77h60M0 24.23h60" stroke="#fff" strokeWidth="2.31"/>
       <rect width="24" height="16.15" fill="#3C3B6E"/>

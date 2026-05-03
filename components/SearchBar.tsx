@@ -26,6 +26,7 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
   const [suggestions, setSuggestions] = useState<SuggestionTerm[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const abortRef    = useRef<AbortController | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const userTypedRef = useRef(false);
   const router = useRouter();
@@ -45,10 +46,16 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
       return;
     }
     clearTimeout(debounceRef.current);
+    // Cancel any in-flight request so stale responses never overwrite fresh ones
+    abortRef.current?.abort();
+
     debounceRef.current = setTimeout(async () => {
+      const controller = new AbortController();
+      abortRef.current = controller;
       try {
-        const res  = await fetch(`/api/autocomplete?q=${encodeURIComponent(query)}`);
+        const res  = await fetch(`/api/autocomplete?q=${encodeURIComponent(query)}`, { signal: controller.signal });
         const data = await res.json();
+        if (controller.signal.aborted) return;   // response arrived after a newer request started
         const seen = new Set<string>();
         const terms: SuggestionTerm[] = [];
         for (const r of (data.results || [])) {
@@ -61,7 +68,9 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
         }
         setSuggestions(terms);
         setShowSuggestions(terms.length > 0);
-      } catch {
+      } catch (err) {
+        // AbortError = a newer request superseded this one; don't touch state
+        if (err instanceof Error && err.name === 'AbortError') return;
         setSuggestions([]);
       }
     }, 200);

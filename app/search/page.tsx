@@ -81,10 +81,11 @@ const FORMAT_STYLES: Record<Format, { bg: string; color: string }> = {
 
 // ─── Flag SVGs ────────────────────────────────────────────────────────────────
 
+// slice fills the circular container entirely; xMid/xMin controls which part of the flag shows.
+// UK: centre the Union Jack. US: show the left side (canton / stars).
 function UKFlag() {
-  // viewBox adds vertical padding so the Union Jack has breathing room in the circle
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -5 60 40" preserveAspectRatio="xMidYMid meet" style={{ width: '100%', height: '100%', display: 'block' }} aria-label="UK flag">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 30" preserveAspectRatio="xMidYMid slice" style={{ width: '100%', height: '100%', display: 'block' }} aria-label="UK flag">
       <path d="M0 0v30h60V0z" fill="#012169"/>
       <path d="M0 0l60 30m0-30L0 30" stroke="#fff" strokeWidth="6"/>
       <path d="M0 0l60 30m0-30L0 30" stroke="#C8102E" strokeWidth="4"/>
@@ -95,10 +96,8 @@ function UKFlag() {
 }
 
 function USFlag() {
-  // xMinYMid: show the left side of the flag (canton with stars) instead of the centre
-  // viewBox adds vertical padding so the flag has breathing room inside the circle
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -5 60 40" preserveAspectRatio="xMinYMid meet" style={{ width: '100%', height: '100%', display: 'block' }} aria-label="US flag">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 30" preserveAspectRatio="xMinYMid slice" style={{ width: '100%', height: '100%', display: 'block' }} aria-label="US flag">
       <rect width="60" height="30" fill="#B22234"/>
       <path d="M0 3.46h60M0 6.92h60M0 10.38h60M0 13.85h60M0 17.31h60M0 20.77h60M0 24.23h60" stroke="#fff" strokeWidth="2.31"/>
       <rect width="24" height="16.15" fill="#3C3B6E"/>

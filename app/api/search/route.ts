@@ -277,8 +277,10 @@ export async function GET(request: NextRequest) {
 
   // Always search BOTH volumes and issues in parallel.
   // Scoring handles ordering: issue intent → issues ranked first; broad intent → volumes first.
+  // NOTE: limits are intentionally generous — we do NOT slice the merged results so that
+  // every issue survives into the dataset where client-side filters can surface it.
   const volumeUrl = `https://comicvine.gamespot.com/api/search/?api_key=${apiKey}&format=json&resources=volume&query=${encoded}&limit=20&field_list=id,name,image,start_year,publisher,description,count_of_issues`
-  const issueUrl  = `https://comicvine.gamespot.com/api/search/?api_key=${apiKey}&format=json&resources=issue&query=${encoded}&limit=15&field_list=id,name,image,issue_number,volume,cover_date,store_date,description`
+  const issueUrl  = `https://comicvine.gamespot.com/api/search/?api_key=${apiKey}&format=json&resources=issue&query=${encoded}&limit=20&field_list=id,name,image,issue_number,volume,cover_date,store_date,description`
 
   try {
     const [volumeRes, issueRes] = await Promise.all([
@@ -337,10 +339,13 @@ export async function GET(request: NextRequest) {
     // ── Publisher enrichment for issues (concurrent, cached) ──────────────
     await enrichIssuePublishers(issueResults, scoredIssues.map(({ r }) => r), apiKey)
 
-    // ── Merge and sort by relevanceScore descending, cap at 20 ────────────
+    // ── Merge and sort by relevanceScore descending ───────────────────────
+    // IMPORTANT: Do NOT slice here. Every issue result must survive into the
+    // response payload so client-side filters (Single Issues, etc.) have data
+    // to work with. Without this, broad queries fill all slots with volumes
+    // and the Single Issues filter returns empty results.
     const combined = [...volumeResults, ...issueResults]
       .sort((a, b) => b.relevanceScore - a.relevanceScore)
-      .slice(0, 20)
 
     const body = { results: combined, total: combined.length }
     searchCache.set(searchCacheKey, body)
