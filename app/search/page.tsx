@@ -95,16 +95,21 @@ function UKFlag() {
   )
 }
 
+// 5-point star polygon centred at (0,0) with outer radius 1.2, inner 0.46.
+// Drawn once and translated per-star — the proper iconic US-flag look.
+const STAR_5_POINTS = "0,-1.2 0.27,-0.37 1.14,-0.37 0.44,0.14 0.71,0.97 0,0.46 -0.71,0.97 -0.44,0.14 -1.14,-0.37 -0.27,-0.37"
+
 function USFlag() {
   return (
-    // Star radius 1.4 — visible at icon size; xMinYMid slice keeps canton in view.
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 30" preserveAspectRatio="xMinYMid slice" style={{ width: '100%', height: '100%', display: 'block' }} aria-label="US flag">
       <rect width="60" height="30" fill="#B22234"/>
       <path d="M0 3.46h60M0 6.92h60M0 10.38h60M0 13.85h60M0 17.31h60M0 20.77h60M0 24.23h60" stroke="#fff" strokeWidth="2.31"/>
       <rect width="24" height="16.15" fill="#3C3B6E"/>
-      <g fill="#fff">{[...Array(5)].map((_, row) => [...Array(row % 2 === 0 ? 6 : 5)].map((_, col) => (
-        <circle key={`${row}-${col}`} cx={row % 2 === 0 ? 2 + col * 4 : 4 + col * 4} cy={2 + row * 3} r="1.4" />
-      )))}</g>
+      <g fill="#fff">{[...Array(5)].map((_, row) => [...Array(row % 2 === 0 ? 6 : 5)].map((_, col) => {
+        const cx = row % 2 === 0 ? 2 + col * 4 : 4 + col * 4
+        const cy = 2 + row * 3
+        return <polygon key={`${row}-${col}`} points={STAR_5_POINTS} transform={`translate(${cx} ${cy})`} />
+      }))}</g>
     </svg>
   )
 }
@@ -112,17 +117,17 @@ function USFlag() {
 // ─── Filter Panel ─────────────────────────────────────────────────────────────
 
 interface FilterPanelProps {
-  format: string
-  category: string
+  category:  string
   publisher: string
   publishers: string[]
-  currency: string
-  onChange: (key: string, value: string) => void
-  onClear: () => void
+  priceMax:  string         // 'all' | '5' | '10' | '15' | '25' | '35' | '50'
+  currency:  string
+  onChange:  (key: string, value: string) => void
+  onClear:   () => void
 }
 
-function FilterPanel({ format, category, publisher, publishers, currency, onChange, onClear }: FilterPanelProps) {
-  const [openSections, setOpenSections] = useState<Set<string>>(new Set(['format', 'publisher']))
+function FilterPanel({ category, publisher, publishers, priceMax, currency, onChange, onClear }: FilterPanelProps) {
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set(['publisher', 'price']))
 
   const toggleSection = (id: string) => setOpenSections(prev => {
     const s = new Set(prev)
@@ -130,7 +135,7 @@ function FilterPanel({ format, category, publisher, publishers, currency, onChan
     return s
   })
 
-  const hasActive = format !== 'all' || category !== 'all' || publisher !== 'all'
+  const hasActive = category !== 'all' || publisher !== 'all' || priceMax !== 'all'
 
   const sectionHeader = (id: string, label: string) => (
     <button
@@ -187,24 +192,7 @@ function FilterPanel({ format, category, publisher, publishers, currency, onChan
         )}
       </div>
 
-      {/* FORMAT */}
-      <div style={{ borderTop: '1px solid #F0F0F0' }}>
-        {sectionHeader('format', 'Format')}
-        {openSections.has('format') && (
-          <div style={{ paddingBottom: '14px' }}>
-            {([
-              ['all',           'All formats'],
-              ['single-issue',  'Single Issues'],
-              ['graphic-novel', 'Graphic Novels / TPB'],
-              ['manga',         'Manga'],
-              ['hardcover',     'Hardcover Edition'],
-              ['omnibus',       'Omnibus / Deluxe'],
-              ['one-shot',      'One-Shot / Annual'],
-              ['compact',       'Compact / Pocket'],
-            ] as [string, string][]).map(([v, l]) => radioOption('format', v, format, l))}
-          </div>
-        )}
-      </div>
+      {/* FORMAT — moved to top filter row (multi-select pills above results) */}
 
       {/* CATEGORY */}
       <div style={{ borderTop: '1px solid #F0F0F0' }}>
@@ -234,14 +222,23 @@ function FilterPanel({ format, category, publisher, publishers, currency, onChan
         </div>
       )}
 
-      {/* PRICE RANGE — placeholder until store pricing is wired */}
+      {/* PRICE RANGE — region-aware "Under £X / Under $X" thresholds.
+          Filter logic in SearchResults treats results without a price as a
+          pass-through, so this is effectively a no-op until /api/prices
+          populates a `price` field on individual results. */}
       <div style={{ borderTop: '1px solid #F0F0F0' }}>
         {sectionHeader('price', `Price Range (${currency})`)}
         {openSections.has('price') && (
           <div style={{ paddingBottom: '14px' }}>
-            <p style={{ fontSize: '12px', color: '#9CA3AF', margin: 0, lineHeight: 1.6 }}>
-              Price filters apply when browsing store listings.
-            </p>
+            {([
+              ['all', 'All prices'],
+              ['5',   `Under ${currency}5`],
+              ['10',  `Under ${currency}10`],
+              ['15',  `Under ${currency}15`],
+              ['25',  `Under ${currency}25`],
+              ['35',  `Under ${currency}35`],
+              ['50',  `Under ${currency}50`],
+            ] as [string, string][]).map(([v, l]) => radioOption('priceMax', v, priceMax, l))}
           </div>
         )}
       </div>
@@ -256,12 +253,17 @@ function SearchResults() {
   const router = useRouter()
 
   // URL-derived values — all filter state lives in the URL
-  const query     = searchParams.get('q') || ''
+  const query       = searchParams.get('q') || ''
   const regionParam = searchParams.get('region') as 'uk' | 'us' | null
-  const format    = searchParams.get('format')    || 'all'
-  const category  = searchParams.get('category')  || 'all'
-  const publisher = searchParams.get('publisher') || 'all'
-  const sort      = searchParams.get('sort')      || 'relevance'
+  const formatParam = searchParams.get('format') || ''
+  // formats[] = multi-select. "all" or empty means no filter.
+  const formats     = (formatParam === '' || formatParam === 'all')
+                        ? []
+                        : formatParam.split(',').filter(Boolean)
+  const category    = searchParams.get('category')  || 'all'
+  const publisher   = searchParams.get('publisher') || 'all'
+  const priceMax    = searchParams.get('priceMax')  || 'all'
+  const sort        = searchParams.get('sort')      || 'relevance'
 
   // Region has local state for immediate button feedback; syncs from URL
   const [region, setRegion] = useState<'uk' | 'us'>(regionParam || 'uk')
@@ -277,11 +279,17 @@ function SearchResults() {
 
   // Build a URL preserving all non-default params
   const buildUrl = (overrides: Record<string, string> = {}) => {
-    const merged: Record<string, string> = { q: query, region, format, category, publisher, sort, ...overrides }
+    const merged: Record<string, string> = {
+      q: query, region,
+      format: formats.join(','),     // joined multi-select
+      category, publisher, priceMax, sort,
+      ...overrides,
+    }
     const params = new URLSearchParams()
     Object.entries(merged).forEach(([k, v]) => {
       if (!v) return
-      if (['format', 'category', 'publisher'].includes(k) && v === 'all') return
+      if (k === 'format' && (v === '' || v === 'all')) return
+      if (['category', 'publisher', 'priceMax'].includes(k) && v === 'all') return
       if (k === 'sort' && v === 'relevance') return
       params.set(k, v)
     })
@@ -290,6 +298,20 @@ function SearchResults() {
 
   const handleFilterChange = (key: string, value: string) =>
     router.push(buildUrl({ [key]: value }), { scroll: false })
+
+  // Multi-select format toggle — "all" clears, others add/remove
+  const toggleFormat = (id: string) => {
+    let next: string[]
+    if (id === 'all') {
+      next = []
+    } else {
+      const set = new Set(formats)
+      if (set.has(id)) set.delete(id)
+      else set.add(id)
+      next = Array.from(set)
+    }
+    router.push(buildUrl({ format: next.join(',') }), { scroll: false })
+  }
 
   const clearFilters = () => {
     const params = new URLSearchParams({ q: query, region })
@@ -340,18 +362,31 @@ function SearchResults() {
   // Client-side filter + sort — instant, no re-fetch
   const filteredResults = useMemo(() => {
     let res = [...results]
-    if (format    !== 'all') res = res.filter(r => detectFormat(r)   === format)
+    if (formats.length)      res = res.filter(r => formats.includes(detectFormat(r)))
     if (category  !== 'all') res = res.filter(r => detectCategory(r) === category)
     if (publisher !== 'all') res = res.filter(r => r.publisher?.name === publisher)
+    if (priceMax  !== 'all') {
+      const max = parseFloat(priceMax)
+      if (!isNaN(max)) {
+        res = res.filter(r => {
+          // Activates once results carry a `price.value` (eBay integration to follow);
+          // until then this is a pass-through so the UI state is preserved without
+          // hiding all results.
+          const price = (r as { price?: { value?: number } }).price?.value
+          return price == null || price < max
+        })
+      }
+    }
     if (sort === 'newest')   res.sort((a, b) => parseInt(b.start_year || '0') - parseInt(a.start_year || '0'))
     return res
-  }, [results, format, category, publisher, sort])
+  }, [results, formats, category, publisher, priceMax, sort])
 
-  const hasActiveFilters = format !== 'all' || category !== 'all' || publisher !== 'all'
+  const hasActiveFilters = formats.length > 0 || category !== 'all' || publisher !== 'all' || priceMax !== 'all'
 
   const filterPanelProps: FilterPanelProps = {
-    format, category, publisher,
+    category, publisher,
     publishers: availablePublishers,
+    priceMax,
     currency,
     onChange: handleFilterChange,
     onClear: clearFilters,
@@ -389,9 +424,15 @@ function SearchResults() {
       {/* ── BODY ───────────────────────────────────────────────────────────── */}
       <div className="max-w-6xl mx-auto px-4 py-6" style={{ display: 'flex', gap: '28px', alignItems: 'flex-start' }}>
 
-        {/* Sidebar — desktop only */}
+        {/* Sidebar — desktop only.
+            maxHeight + overflowY makes the sidebar scroll independently when its
+            content exceeds the viewport (e.g. lots of publishers). overscrollBehavior
+            stops scroll-chaining into the page so the body doesn't jump. */}
         <aside className="hidden md:block" style={{
           width: '220px', flexShrink: 0, position: 'sticky', top: '96px',
+          maxHeight: 'calc(100vh - 96px - 24px)',
+          overflowY: 'auto',
+          overscrollBehavior: 'contain',
           background: '#fff', borderRadius: '16px', padding: '20px',
           border: '1px solid #F0F0F0',
         }}>
@@ -401,18 +442,54 @@ function SearchResults() {
         {/* Results column */}
         <div style={{ flex: 1, minWidth: 0 }}>
 
-          {/* Top bar: count + mobile filter toggle + sort */}
+          {/* TOP FILTER ROW — multi-select format pills + result count
+              Pills are visually prominent (filled black when active) so they
+              read as the primary filter; sidebar handles secondary filters. */}
+          {!loading && !error && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+              {([
+                { id: 'all',           label: 'All' },
+                { id: 'graphic-novel', label: 'Graphic Novels' },
+                { id: 'single-issue', label: 'Single Issues' },
+                { id: 'manga',         label: 'Manga' },
+              ] as { id: string; label: string }[]).map(({ id, label }) => {
+                const active = id === 'all' ? formats.length === 0 : formats.includes(id)
+                return (
+                  <button
+                    key={id}
+                    onClick={() => toggleFormat(id)}
+                    aria-pressed={active}
+                    style={{
+                      padding: '7px 14px',
+                      borderRadius: '999px',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      fontFamily: 'inherit',
+                      cursor: 'pointer',
+                      background:  active ? '#0A0A0A' : '#fff',
+                      color:       active ? '#fff'    : '#374151',
+                      border:      `1px solid ${active ? '#0A0A0A' : '#E5E7EB'}`,
+                      transition:  'background 0.12s, color 0.12s, border-color 0.12s',
+                      whiteSpace:  'nowrap',
+                    }}>
+                    {label}
+                  </button>
+                )
+              })}
+              <p style={{ fontSize: '13px', color: '#6B7280', margin: 0, marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+                <span style={{ fontWeight: 500, color: '#0A0A0A' }}>{filteredResults.length}</span>
+                {results.length !== filteredResults.length && (
+                  <span style={{ color: '#9CA3AF' }}> of {results.length}</span>
+                )}{' '}
+                {filteredResults.length === 1 ? 'result' : 'results'} for &ldquo;{query}&rdquo;
+              </p>
+            </div>
+          )}
+
+          {/* SECONDARY ROW — mobile filter button + sort dropdown */}
           {!loading && !error && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <p style={{ fontSize: '13px', color: '#6B7280', margin: 0 }}>
-                  <span style={{ fontWeight: 500, color: '#0A0A0A' }}>{filteredResults.length}</span>
-                  {results.length !== filteredResults.length && (
-                    <span style={{ color: '#9CA3AF' }}> of {results.length}</span>
-                  )}{' '}
-                  results for &ldquo;{query}&rdquo;
-                </p>
-
                 {/* Mobile filter button — hidden on desktop via Tailwind */}
                 <button
                   onClick={() => setMobileFilterOpen(true)}
