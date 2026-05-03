@@ -179,7 +179,9 @@ function ComicPage() {
             <h1 className="text-white text-2xl font-semibold leading-tight tracking-tight mb-2">
               {comic.name}
             </h1>
-            <p className="text-white/40 text-xs mb-6">Comic Series</p>
+            <p className="text-white/40 text-xs mb-6">
+              {/^i\d+$/.test(id) ? 'Single Issue' : 'Comic Series'}
+            </p>
 
             {/* REGION TOGGLE */}
             <div className="flex items-center gap-2">

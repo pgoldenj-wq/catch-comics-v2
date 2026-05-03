@@ -140,8 +140,10 @@ export default function Home() {
   // Popular search terms — clicking always navigates to a fresh search page
   const trending = ['Batman', 'Spider-Man', 'One Piece', 'Saga', 'Watchmen', 'Naruto', 'X-Men', 'Invincible', 'Demon Slayer', 'Hellboy'];
 
+  // viewBox adds vertical padding so flags have breathing room inside the circular button.
+  // US flag uses xMinYMid to show the left (canton / stars) rather than the centre stripe area.
   const UKFlag = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 30" preserveAspectRatio="xMidYMid slice" style={{ width: '100%', height: '100%', display: 'block' }} aria-label="UK flag">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -5 60 40" preserveAspectRatio="xMidYMid meet" style={{ width: '100%', height: '100%', display: 'block' }} aria-label="UK flag">
       <path d="M0 0v30h60V0z" fill="#012169"/>
       <path d="M0 0l60 30m0-30L0 30" stroke="#fff" strokeWidth="6"/>
       <path d="M0 0l60 30m0-30L0 30" stroke="#C8102E" strokeWidth="4"/>
@@ -151,7 +153,7 @@ export default function Home() {
   );
 
   const USFlag = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 30" preserveAspectRatio="xMidYMid slice" style={{ width: '100%', height: '100%', display: 'block' }} aria-label="US flag">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -5 60 40" preserveAspectRatio="xMinYMid meet" style={{ width: '100%', height: '100%', display: 'block' }} aria-label="US flag">
       <rect width="60" height="30" fill="#B22234"/>
       <path d="M0 3.46h60M0 6.92h60M0 10.38h60M0 13.85h60M0 17.31h60M0 20.77h60M0 24.23h60" stroke="#fff" strokeWidth="2.31"/>
       <rect width="24" height="16.15" fill="#3C3B6E"/>
@@ -346,7 +348,7 @@ export default function Home() {
           <div style={{ flexShrink: 0 }}>
             <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#111', margin: 0 }}>Top deals today</h2>
             <p style={{ fontSize: '11px', color: '#9CA3AF', margin: '2px 0 0' }}>
-              Prices from Amazon {region === 'uk' ? 'UK' : 'US'} · Updated daily
+              Prices updated daily
             </p>
           </div>
           {/* Right — popular search tags, low visual weight */}

@@ -20,7 +20,7 @@ interface ComicResult {
   isbn10?: string
 }
 
-type Format = 'graphic-novel' | 'hardcover' | 'omnibus' | 'manga' | 'compact' | 'one-shot'
+type Format = 'single-issue' | 'graphic-novel' | 'hardcover' | 'omnibus' | 'manga' | 'compact' | 'one-shot'
 type Category = 'comics' | 'manga' | 'indie'
 
 // ─── Format / Category Detection ─────────────────────────────────────────────
@@ -29,6 +29,8 @@ const MANGA_PUBLISHERS = ['viz', 'kodansha', 'yen press', 'seven seas', 'tokyopo
 const INDIE_PUBLISHERS  = ['image', 'boom', 'dark horse', 'fantagraphics', 'oni press', 'dynamite', 'aftershock', 'vault', 'idw', 'drawn & quarterly', 'top shelf']
 
 function detectFormat(comic: ComicResult): Format {
+  // Actual Comic Vine issue records always get 'single-issue' regardless of name
+  if (comic.source === 'cv_issue') return 'single-issue'
   const name = (comic.name || '').toLowerCase()
   const pub  = (comic.publisher?.name || '').toLowerCase()
   if (MANGA_PUBLISHERS.some(p => pub.includes(p))) return 'manga'
@@ -56,6 +58,7 @@ function detectCategory(comic: ComicResult): Category {
 }
 
 const FORMAT_LABELS: Record<Format, string> = {
+  'single-issue':  'Single Issue',
   'graphic-novel': 'Graphic Novel / TPB',
   'hardcover':     'Hardcover Edition',
   'omnibus':       'Omnibus / Deluxe',
@@ -65,6 +68,7 @@ const FORMAT_LABELS: Record<Format, string> = {
 }
 
 const FORMAT_STYLES: Record<Format, { bg: string; color: string }> = {
+  'single-issue':  { bg: '#FFE4E6', color: '#9F1239' },
   'graphic-novel': { bg: '#DBEAFE', color: '#1E40AF' },
   'hardcover':     { bg: '#EDE9FE', color: '#5B21B6' },
   'omnibus':       { bg: '#FCE7F3', color: '#9D174D' },
@@ -76,8 +80,9 @@ const FORMAT_STYLES: Record<Format, { bg: string; color: string }> = {
 // ─── Flag SVGs ────────────────────────────────────────────────────────────────
 
 function UKFlag() {
+  // viewBox adds vertical padding so the Union Jack has breathing room in the circle
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 30" preserveAspectRatio="xMidYMid slice" style={{ width: '100%', height: '100%', display: 'block' }} aria-label="UK flag">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -5 60 40" preserveAspectRatio="xMidYMid meet" style={{ width: '100%', height: '100%', display: 'block' }} aria-label="UK flag">
       <path d="M0 0v30h60V0z" fill="#012169"/>
       <path d="M0 0l60 30m0-30L0 30" stroke="#fff" strokeWidth="6"/>
       <path d="M0 0l60 30m0-30L0 30" stroke="#C8102E" strokeWidth="4"/>
@@ -88,8 +93,10 @@ function UKFlag() {
 }
 
 function USFlag() {
+  // xMinYMid: show the left side of the flag (canton with stars) instead of the centre
+  // viewBox adds vertical padding so the flag has breathing room inside the circle
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 30" preserveAspectRatio="xMidYMid slice" style={{ width: '100%', height: '100%', display: 'block' }} aria-label="US flag">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -5 60 40" preserveAspectRatio="xMinYMid meet" style={{ width: '100%', height: '100%', display: 'block' }} aria-label="US flag">
       <rect width="60" height="30" fill="#B22234"/>
       <path d="M0 3.46h60M0 6.92h60M0 10.38h60M0 13.85h60M0 17.31h60M0 20.77h60M0 24.23h60" stroke="#fff" strokeWidth="2.31"/>
       <rect width="24" height="16.15" fill="#3C3B6E"/>
@@ -185,12 +192,13 @@ function FilterPanel({ format, category, publisher, publishers, currency, onChan
           <div style={{ paddingBottom: '14px' }}>
             {([
               ['all',           'All formats'],
-              ['graphic-novel', 'Graphic Novel / TPB'],
+              ['single-issue',  'Single Issues'],
+              ['graphic-novel', 'Graphic Novels / TPB'],
+              ['manga',         'Manga'],
               ['hardcover',     'Hardcover Edition'],
               ['omnibus',       'Omnibus / Deluxe'],
-              ['manga',         'Manga'],
-              ['compact',       'Compact / Pocket'],
               ['one-shot',      'One-Shot / Annual'],
+              ['compact',       'Compact / Pocket'],
             ] as [string, string][]).map(([v, l]) => radioOption('format', v, format, l))}
           </div>
         )}
@@ -473,7 +481,7 @@ function SearchResults() {
           {!loading && !error && filteredResults.length > 0 && (
             <div style={{ borderTop: '1px solid #F0F0F0' }}>
               {filteredResults.map(comic => {
-                const isIsbnResult = !!comic.source
+                const isIsbnResult = comic.source === 'open_library'
                 const fmt = isIsbnResult ? 'graphic-novel' as Format : detectFormat(comic)
                 const fmtStyle = FORMAT_STYLES[fmt]
                 const isbn = comic.isbn13 || comic.isbn10 || ''
