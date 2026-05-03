@@ -53,3 +53,5 @@ export const volumeCache       = new TTLCache<any>(WEEK)       // 7 d  — volum
 export const issueCache        = new TTLCache<any>(WEEK)       // 7 d  — individual issue details
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const volumeIssuesCache = new TTLCache<any>(WEEK)       // 7 d  — full issue list for a volume
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const pricesCache       = new TTLCache<any>(HOUR)       // 1 h  — eBay listings (prices change)
