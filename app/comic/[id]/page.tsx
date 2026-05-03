@@ -35,6 +35,35 @@ function ComicPage() {
 
   useEffect(() => {
     if (!id) return
+
+    if (id.startsWith('ol-')) {
+      // Open Library ISBN result — fetch book data directly, Comic Vine won't have it
+      const isbn = id.slice(3)
+      fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&jscmd=data&format=json`)
+        .then(r => r.json())
+        .then(data => {
+          const book = data[`ISBN:${isbn}`]
+          if (book) {
+            setComic({
+              id: 0,
+              name: book.title || 'Unknown Title',
+              image: {
+                medium_url: book.cover?.medium || book.cover?.large || `https://covers.openlibrary.org/b/isbn/${isbn}-M.jpg`,
+                original_url: book.cover?.large || `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`,
+              },
+              start_year: (book.publish_date as string | undefined)?.match(/\d{4}/)?.[0] || '',
+              publisher: { name: (book.publishers as Array<{ name: string }> | undefined)?.[0]?.name || '' },
+              description: '',
+              count_of_issues: 1,
+            })
+          }
+          setLoading(false)
+        })
+        .catch(() => setLoading(false))
+      return
+    }
+
+    // Standard Comic Vine fetch
     fetch('/api/comic/' + id)
       .then(res => res.json())
       .then(data => {
@@ -46,14 +75,15 @@ function ComicPage() {
 
   useEffect(() => {
     if (!comic) return
-    const searchTerm = encodeURIComponent(comic.name + ' comic')
+    const isbn     = id.startsWith('ol-') ? id.slice(3) : null
+    const keyword  = isbn ?? encodeURIComponent(comic.name + ' comic')
     const amazonTag = market === 'uk' ? 'catchcomics-21' : 'catchcomics-us'
     const amazonUrl = market === 'uk'
-      ? `https://www.amazon.co.uk/s?k=${searchTerm}&tag=${amazonTag}`
-      : `https://www.amazon.com/s?k=${searchTerm}&tag=${amazonTag}`
+      ? `https://www.amazon.co.uk/s?k=${keyword}&tag=${amazonTag}`
+      : `https://www.amazon.com/s?k=${keyword}&tag=${amazonTag}`
     const ebayUrl = market === 'uk'
-      ? `https://www.ebay.co.uk/sch/i.html?_nkw=${searchTerm}`
-      : `https://www.ebay.com/sch/i.html?_nkw=${searchTerm}`
+      ? `https://www.ebay.co.uk/sch/i.html?_nkw=${keyword}`
+      : `https://www.ebay.com/sch/i.html?_nkw=${keyword}`
     const abebooksUrl = `https://www.abebooks.co.uk/servlet/SearchResults?kn=${encodeURIComponent(comic.name)}`
 
     setPrices([
@@ -61,7 +91,7 @@ function ComicPage() {
       { seller: 'eBay', condition: 'New & Used', url: ebayUrl },
       { seller: 'AbeBooks', condition: 'New & Used', url: abebooksUrl },
     ])
-  }, [comic, market])
+  }, [comic, market, id])
 
   const filteredPrices = prices.filter(p => {
     if (activeTab === 'new') return p.condition === 'New'
