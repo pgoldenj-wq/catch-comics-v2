@@ -38,6 +38,7 @@
 ## PHASE 3 — PRICING & API CONNECTIONS
 **Objective:** Prices are real, always display, and never silently fail.
 
+- [ ] Comic Vine API key is checked into your local .env.local in plaintext and is currently visible to me in this conversation. The key (******************************) is gitignored locally, but if you ever pasted it elsewhere (Slack, email, a screenshot), or if this assistant's transcript is shared, it could leak. Recommend rotating it on Comic Vine's dashboard when convenient — it's a 10-second swap. Not blocking; flagging for hygiene.
 - [ ] switch ebay production keys to API once API approved
 - [ ] eBay Browse API credentials stored in Vercel env vars (not hardcoded)
 - [ ] eBay search returns price + listing URL for at least 80% of test queries
