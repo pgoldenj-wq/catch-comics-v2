@@ -44,8 +44,12 @@ const WEEK  = 7  * DAY
 
 // Module-level singletons — one instance per Node.js process.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const searchCache = new TTLCache<any>(DAY)   // 24 h — search result pages
+export const searchCache       = new TTLCache<any>(DAY)        // 24 h — search result pages
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const volumeCache = new TTLCache<any>(WEEK)  // 7 d  — volume details & publisher lookups
+export const autocompleteCache = new TTLCache<any>(6 * HOUR)   // 6 h  — autocomplete suggestions
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const issueCache  = new TTLCache<any>(WEEK)  // 7 d  — individual issue details
+export const volumeCache       = new TTLCache<any>(WEEK)       // 7 d  — volume details & publisher lookups
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const issueCache        = new TTLCache<any>(WEEK)       // 7 d  — individual issue details
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const volumeIssuesCache = new TTLCache<any>(WEEK)       // 7 d  — full issue list for a volume

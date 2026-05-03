@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { autocompleteCache } from '@/lib/cache'
 
 // ── Curated dictionary ────────────────────────────────────────────────────────
 
@@ -140,9 +141,19 @@ export async function GET(req: NextRequest) {
 
   // ── Spelling correction mode ──────────────────────────────────────────────
   if (mode === 'correct') {
+    const cacheKey = `correct:${ql}`
+    const cached   = autocompleteCache.get(cacheKey)
+    if (cached) return NextResponse.json(cached)
     const correction = findSpellingCorrection(q)
-    return NextResponse.json({ correction })
+    const body = { correction }
+    autocompleteCache.set(cacheKey, body)
+    return NextResponse.json(body)
   }
+
+  // ── Autocomplete cache check ──────────────────────────────────────────────
+  const suggestCacheKey = `suggest:${ql}`
+  const cachedSuggest   = autocompleteCache.get(suggestCacheKey)
+  if (cachedSuggest) return NextResponse.json(cachedSuggest)
 
   // ── Autocomplete mode ─────────────────────────────────────────────────────
   // Separate prefix matches from substring matches so prefix comes first.
@@ -166,14 +177,20 @@ export async function GET(req: NextRequest) {
 
   const curatedMatches = [...prefixMatches, ...substringMatches].slice(0, 6)
 
+  // Helper: write to cache then respond — single source of truth
+  const respond = (body: { results: Suggestion[]; correction: null }) => {
+    autocompleteCache.set(suggestCacheKey, body)
+    return NextResponse.json(body)
+  }
+
   if (curatedMatches.length >= 4) {
-    return NextResponse.json({ results: curatedMatches, correction: null })
+    return respond({ results: curatedMatches, correction: null })
   }
 
   // ── Supplement with Comic Vine ────────────────────────────────────────────
   const apiKey = process.env.COMIC_VINE_API_KEY
   if (!apiKey) {
-    return NextResponse.json({ results: curatedMatches, correction: null })
+    return respond({ results: curatedMatches, correction: null })
   }
 
   try {
@@ -199,8 +216,8 @@ export async function GET(req: NextRequest) {
     const apiDeduped   = [...apiPrefix, ...apiSubstring]
 
     const merged = [...curatedMatches, ...apiDeduped].slice(0, 8)
-    return NextResponse.json({ results: merged, correction: null })
+    return respond({ results: merged, correction: null })
   } catch {
-    return NextResponse.json({ results: curatedMatches, correction: null })
+    return respond({ results: curatedMatches, correction: null })
   }
 }

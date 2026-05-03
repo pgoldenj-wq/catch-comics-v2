@@ -13,6 +13,15 @@ interface ComicDetail {
   count_of_issues: number
 }
 
+interface IssueListItem {
+  id: number
+  issue_number: string
+  name: string
+  image: { small_url: string; medium_url: string }
+  cover_year: string
+  cover_date: string
+}
+
 interface PriceResult {
   seller: string
   condition: string
@@ -32,6 +41,12 @@ function ComicPage() {
   const [loading, setLoading] = useState(true)
   const [market, setMarket] = useState<'uk' | 'us'>(regionParam || 'uk')
   const [activeTab, setActiveTab] = useState<'all' | 'new' | 'used'>('all')
+  const [issues, setIssues]               = useState<IssueListItem[]>([])
+  const [issuesLoading, setIssuesLoading] = useState(false)
+
+  // True only for numeric Comic Vine volume IDs — issues (i-prefixed) and
+  // Open Library books (ol-prefixed) don't have child issues to list.
+  const isVolume = /^\d+$/.test(id)
 
   useEffect(() => {
     if (!id) return
@@ -72,6 +87,20 @@ function ComicPage() {
       })
       .catch(() => setLoading(false))
   }, [id])
+
+  // Fetch the full issue list for a volume — runs in parallel with the volume detail
+  // fetch so the issues grid appears as soon as it's ready.
+  useEffect(() => {
+    if (!isVolume) return
+    setIssuesLoading(true)
+    fetch(`/api/comic/${id}/issues`)
+      .then(res => res.json())
+      .then(data => {
+        setIssues(Array.isArray(data.issues) ? data.issues : [])
+        setIssuesLoading(false)
+      })
+      .catch(() => setIssuesLoading(false))
+  }, [id, isVolume])
 
   useEffect(() => {
     if (!comic) return
@@ -274,6 +303,68 @@ function ComicPage() {
           Amazon links include our affiliate tag which helps support the site at no extra cost to you.
         </p>
       </div>
+
+      {/* ── ISSUES GRID — only for volumes with multiple issues ─────────────── */}
+      {isVolume && (issuesLoading || issues.length > 0) && (
+        <div className="max-w-4xl mx-auto px-8 pb-12">
+          <div className="border-t border-gray-200 pt-8">
+            <div className="flex items-baseline justify-between mb-4">
+              <h2 className="text-base font-semibold text-gray-900">
+                Issues in this series
+              </h2>
+              {!issuesLoading && issues.length > 0 && (
+                <span className="text-xs text-gray-400">
+                  {issues.length} {issues.length === 1 ? 'issue' : 'issues'}
+                </span>
+              )}
+            </div>
+
+            {issuesLoading ? (
+              <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))' }}>
+                {[...Array(8)].map((_, i) => (
+                  <div key={i} className="animate-pulse">
+                    <div className="rounded-md bg-gray-100" style={{ aspectRatio: '2 / 3' }} />
+                    <div className="h-3 bg-gray-100 rounded mt-2 w-1/2" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))' }}>
+                {issues.map(issue => {
+                  const cover  = issue.image.medium_url || issue.image.small_url
+                  const label  = issue.issue_number ? `#${issue.issue_number}` : (issue.name || 'Issue')
+                  const sub    = issue.cover_year || ''
+                  return (
+                    <button
+                      key={issue.id}
+                      onClick={() => router.push(`/comic/i${issue.id}?region=${market}`)}
+                      className="text-left bg-transparent border-0 p-0 cursor-pointer group"
+                    >
+                      <div className="relative rounded-md overflow-hidden bg-gray-100 border border-gray-200 transition-shadow group-hover:shadow-md" style={{ aspectRatio: '2 / 3' }}>
+                        <span className="absolute inset-0 flex items-center justify-center text-gray-400 text-base font-medium">
+                          {label}
+                        </span>
+                        {cover && (
+                          <img
+                            src={cover}
+                            alt={`${comic.name} ${label}`}
+                            className="absolute inset-0 w-full h-full object-cover"
+                            loading="lazy"
+                            onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+                          />
+                        )}
+                      </div>
+                      <div className="mt-1.5 text-xs font-medium text-gray-900 truncate">{label}</div>
+                      {sub && <div className="text-[11px] text-gray-400">{sub}</div>}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
     </main>
   )
 }
