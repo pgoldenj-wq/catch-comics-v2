@@ -30,6 +30,17 @@ const VALID_FORMATS: string[] = [
   'all', 'single-issue', 'graphic-novel', 'hardcover', 'omnibus', 'manga', 'compact', 'one-shot',
 ]
 
+// Top-pill umbrellas. Each user-facing pill maps to multiple internal format
+// IDs because detectFormat() uses heuristics on inconsistent data. Without
+// this grouping, picking "Graphic Novels" excludes anything tagged 'hardcover'
+// (e.g. "Absolute Batman" — name contains "absolute" → hardcover) even though
+// users clearly expect those to appear under Graphic Novels.
+const FORMAT_FILTER_GROUPS: Record<string, Format[]> = {
+  'graphic-novel': ['graphic-novel', 'hardcover', 'omnibus', 'compact', 'one-shot'],
+  'single-issue': ['single-issue'],
+  'manga':         ['manga'],
+}
+
 // ─── Format / Category Detection ─────────────────────────────────────────────
 
 const MANGA_PUBLISHERS = ['viz', 'kodansha', 'yen press', 'seven seas', 'tokyopop', 'square enix', 'shonen jump', 'dark horse manga', 'j-novel', 'vertical']
@@ -364,7 +375,13 @@ function SearchResults() {
   // Client-side filter + sort — instant, no re-fetch
   const filteredResults = useMemo(() => {
     let res = [...results]
-    if (format    !== 'all') res = res.filter(r => detectFormat(r)   === format)
+    if (format !== 'all') {
+      // Use the umbrella group so heuristic-classified results (hardcover,
+      // omnibus, etc.) still match the user's chosen pill. Falls back to
+      // strict equality for unknown format ids.
+      const allowed = FORMAT_FILTER_GROUPS[format] || [format as Format]
+      res = res.filter(r => allowed.includes(detectFormat(r)))
+    }
     if (category  !== 'all') res = res.filter(r => detectCategory(r) === category)
     if (publisher !== 'all') res = res.filter(r => r.publisher?.name === publisher)
     if (priceMax  !== 'all') {
@@ -574,13 +591,14 @@ function SearchResults() {
                   <div
                     key={comic.id}
                     onClick={() => router.push(`/comic/${comic.id}?region=${region}`)}
+                    className="group"
                     style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', padding: '16px 0', cursor: 'pointer', borderBottom: '1px solid #F0F0F0' }}
                     onMouseEnter={e => (e.currentTarget.style.background = '#FAFAFA')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
 
                     {/* Cover image — letter always rendered as background fallback;
                         image overlays it and hides itself via onError if it fails.
-                        Bumped from 52×72 → 80×112 so covers actually read as covers. */}
+                        overflow:hidden contains the hover zoom on the <img>. */}
                     <div style={{ width: '80px', height: '112px', borderRadius: '6px', overflow: 'hidden', background: '#F3F4F6', border: '1px solid #EBEBEB', flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <span style={{ color: '#9CA3AF', fontSize: '26px', fontWeight: 500, position: 'absolute' }}>
                         {comic.name.charAt(0)}
@@ -589,6 +607,7 @@ function SearchResults() {
                         <img
                           src={comic.image.medium_url}
                           alt={comic.name}
+                          className="transition-transform duration-300 ease-out group-hover:scale-105"
                           style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%', objectFit: 'cover' }}
                           onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
                         />

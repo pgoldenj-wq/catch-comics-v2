@@ -99,10 +99,18 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
   }, [pathname]);
 
   const doSearch = (term: string, newTab = false) => {
+    // Reset BEFORE navigation so the dropdown disappears in the same render
+    // cycle as the route change — not after, when a stale dropdown can flash
+    // visible against the new page.
+    setShowSuggestions(false);
+    setSuggestions([]);
+    userTypedRef.current = false;
+    abortRef.current?.abort();
+    clearTimeout(debounceRef.current);
+
     const url = `/search?q=${encodeURIComponent(term)}&region=${region}`;
     if (newTab) window.open(url, '_blank');
     else router.push(url);
-    setShowSuggestions(false);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
