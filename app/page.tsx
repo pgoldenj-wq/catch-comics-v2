@@ -354,19 +354,19 @@ export default function Home() {
           {/* Left — section title */}
           <div style={{ flexShrink: 0 }}>
             <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#111', margin: 0 }}>Top deals today</h2>
-            <p style={{ fontSize: '11px', color: '#9CA3AF', margin: '2px 0 0' }}>
+            <p style={{ fontSize: '11px', color: '#6B7280', margin: '2px 0 0' }}>
               Prices updated daily
             </p>
           </div>
           {/* Right — popular search tags, low visual weight */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#D1D5DB', flexShrink: 0 }}>Popular:</span>
+            <span style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#6B7280', flexShrink: 0 }}>Popular:</span>
             {trending.map((term) => (
               <button key={term}
                 onClick={() => router.push(`/search?q=${encodeURIComponent(term)}&region=${region}`)}
-                style={{ padding: '3px 11px', fontSize: '11px', border: '1px solid #EAECEF', borderRadius: '999px', color: '#9CA3AF', background: '#fff', cursor: 'pointer', transition: 'border-color 0.15s, color 0.15s', fontFamily: 'inherit', flexShrink: 0 }}
+                style={{ padding: '3px 11px', fontSize: '11px', border: '1px solid #EAECEF', borderRadius: '999px', color: '#6B7280', background: '#fff', cursor: 'pointer', transition: 'border-color 0.15s, color 0.15s', fontFamily: 'inherit', flexShrink: 0 }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = '#E8272A'; e.currentTarget.style.color = '#E8272A'; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = '#EAECEF'; e.currentTarget.style.color = '#9CA3AF'; }}>
+                onMouseLeave={e => { e.currentTarget.style.borderColor = '#EAECEF'; e.currentTarget.style.color = '#6B7280'; }}>
                 {term}
               </button>
             ))}
@@ -411,9 +411,11 @@ export default function Home() {
                       }}
                     />
 
-                    {/* Discount badge — only overlay kept; the section is "Top deals" */}
+                    {/* Discount badge — uses the slightly darker brand red (#C41F22, also used
+                        as the search button hover) so 10px white text clears AA's 4.5:1
+                        threshold. The primary brand red (#E8272A) is unchanged elsewhere. */}
                     {hasSale && (
-                      <div style={{ position: 'absolute', top: '8px', left: '8px', background: '#E8272A', color: '#fff', fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '5px' }}>
+                      <div style={{ position: 'absolute', top: '8px', left: '8px', background: '#C41F22', color: '#fff', fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '5px' }}>
                         -{pct}%
                       </div>
                     )}
@@ -425,7 +427,7 @@ export default function Home() {
                   </div>
 
                   {/* Publisher */}
-                  <div style={{ fontSize: '10px', color: '#9CA3AF', marginTop: '2px' }}>
+                  <div style={{ fontSize: '10px', color: '#6B7280', marginTop: '2px' }}>
                     {deal.publisher}
                   </div>
 
@@ -435,7 +437,7 @@ export default function Home() {
                       {currency}{price.toFixed(2)}
                     </span>
                     {hasSale && (
-                      <span style={{ fontSize: '10px', color: '#C4C4C4', textDecoration: 'line-through' }}>
+                      <span style={{ fontSize: '10px', color: '#6B7280', textDecoration: 'line-through' }}>
                         {currency}{rrp.toFixed(2)}
                       </span>
                     )}

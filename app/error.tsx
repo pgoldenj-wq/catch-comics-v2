@@ -12,7 +12,7 @@ export default function GlobalError({ reset }: { error: Error; reset: () => void
           !
         </div>
         <h1 style={{ fontSize: '22px', fontWeight: 600, color: '#111', margin: '0 0 10px' }}>Something went wrong</h1>
-        <p style={{ fontSize: '14px', color: '#9CA3AF', margin: '0 0 32px', maxWidth: '300px', lineHeight: 1.6 }}>
+        <p style={{ fontSize: '14px', color: '#6B7280', margin: '0 0 32px', maxWidth: '300px', lineHeight: 1.6 }}>
           An unexpected error occurred. Try refreshing the page or head back to search.
         </p>
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>

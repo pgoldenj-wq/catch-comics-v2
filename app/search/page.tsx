@@ -514,7 +514,7 @@ function SearchResults() {
               <p style={{ fontSize: '13px', color: '#6B7280', margin: 0, marginLeft: 'auto', whiteSpace: 'nowrap' }}>
                 <span style={{ fontWeight: 500, color: '#0A0A0A' }}>{filteredResults.length}</span>
                 {results.length !== filteredResults.length && (
-                  <span style={{ color: '#9CA3AF' }}> of {results.length}</span>
+                  <span style={{ color: '#6B7280' }}> of {results.length}</span>
                 )}{' '}
                 {filteredResults.length === 1 ? 'result' : 'results'} for &ldquo;{query}&rdquo;
               </p>
@@ -545,7 +545,7 @@ function SearchResults() {
 
               {/* Sort dropdown */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <label htmlFor="results-sort" style={{ fontSize: '12px', color: '#9CA3AF' }}>Sort by</label>
+                <label htmlFor="results-sort" style={{ fontSize: '12px', color: '#6B7280' }}>Sort by</label>
                 <select
                   id="results-sort"
                   aria-label="Sort results by"
@@ -630,7 +630,7 @@ function SearchResults() {
                     <div
                       className="transition-transform duration-300 ease-out hover:scale-[3] hover:z-50"
                       style={{ width: '80px', height: '112px', borderRadius: '6px', background: '#F3F4F6', border: '1px solid #EBEBEB', flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <span style={{ color: '#9CA3AF', fontSize: '26px', fontWeight: 500, position: 'absolute' }}>
+                      <span style={{ color: '#6B7280', fontSize: '26px', fontWeight: 500, position: 'absolute' }}>
                         {comic.name.charAt(0)}
                       </span>
                       {comic.image?.medium_url && (
@@ -650,7 +650,7 @@ function SearchResults() {
                       </h2>
 
                       {meta && (
-                        <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '0 0 7px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <p style={{ fontSize: '12px', color: '#6B7280', margin: '0 0 7px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {meta}
                         </p>
                       )}
@@ -667,7 +667,7 @@ function SearchResults() {
 
                       {/* ISBN — subtle, grey, monospace */}
                       {isbn && (
-                        <p style={{ fontSize: '11px', color: '#C9C9C9', margin: '5px 0 0', fontFamily: 'monospace', letterSpacing: '0.03em' }}>
+                        <p style={{ fontSize: '11px', color: '#6B7280', margin: '5px 0 0', fontFamily: 'monospace', letterSpacing: '0.03em' }}>
                           ISBN {isbn}
                         </p>
                       )}
@@ -675,9 +675,9 @@ function SearchResults() {
 
                     {/* Region-aware CTA */}
                     <div style={{ flexShrink: 0, textAlign: 'right', paddingTop: '2px' }}>
-                      <div style={{ fontSize: '10px', color: '#9CA3AF', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '2px' }}>Compare</div>
+                      <div style={{ fontSize: '10px', color: '#6B7280', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '2px' }}>Compare</div>
                       <div style={{ fontSize: '13px', fontWeight: 500, color: '#E8272A' }}>Find prices →</div>
-                      <div style={{ fontSize: '10px', color: '#9CA3AF', marginTop: '2px' }}>
+                      <div style={{ fontSize: '10px', color: '#6B7280', marginTop: '2px' }}>
                         {region === 'uk' ? 'UK stores' : 'US stores'}
                       </div>
                     </div>
@@ -755,7 +755,7 @@ export default function SearchPage() {
   return (
     <Suspense fallback={
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F8F8F6', fontFamily: 'sans-serif' }}>
-        <p style={{ color: '#9CA3AF', fontSize: '14px' }}>Loading...</p>
+        <p style={{ color: '#6B7280', fontSize: '14px' }}>Loading...</p>
       </div>
     }>
       <SearchResults />
