@@ -208,7 +208,15 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
             const badge = s.type ? TYPE_BADGE[s.type] : undefined
             return (
               <div key={i}
-                onClick={() => { setQuery(s.term); doSearch(s.term); }}
+                onClick={() => {
+                  // Explicit reset before doSearch (which also resets) so the
+                  // intent is clear at the call site too — dropdown closes
+                  // synchronously with the click, never after navigation.
+                  setSuggestions([]);
+                  setShowSuggestions(false);
+                  setQuery(s.term);
+                  doSearch(s.term);
+                }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '10px',
                   padding: '11px 18px', cursor: 'pointer',

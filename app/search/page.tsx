@@ -30,15 +30,36 @@ const VALID_FORMATS: string[] = [
   'all', 'single-issue', 'graphic-novel', 'hardcover', 'omnibus', 'manga', 'compact', 'one-shot',
 ]
 
-// Top-pill umbrellas. Each user-facing pill maps to multiple internal format
-// IDs because detectFormat() uses heuristics on inconsistent data. Without
-// this grouping, picking "Graphic Novels" excludes anything tagged 'hardcover'
-// (e.g. "Absolute Batman" — name contains "absolute" → hardcover) even though
-// users clearly expect those to appear under Graphic Novels.
-const FORMAT_FILTER_GROUPS: Record<string, Format[]> = {
-  'graphic-novel': ['graphic-novel', 'hardcover', 'omnibus', 'compact', 'one-shot'],
-  'single-issue': ['single-issue'],
-  'manga':         ['manga'],
+// Tolerant matching for the four user-facing pills. Combines (a) umbrella over
+// the internal heuristic ids returned by detectFormat() with (b) lowercase
+// title-substring fallbacks. The fallbacks catch cases where detectFormat()
+// mis-classifies due to inconsistent external data (Comic Vine titles,
+// publisher fields, etc.) — for example "Absolute Batman" lands as 'hardcover'
+// via the substring rule, and would otherwise vanish under Graphic Novels.
+function matchesFormat(comic: ComicResult, filter: string): boolean {
+  if (filter === 'all') return true
+  const detected = detectFormat(comic)
+  const name     = (comic.name || '').toLowerCase()
+
+  switch (filter) {
+    case 'graphic-novel':
+      if (['graphic-novel', 'hardcover', 'omnibus', 'compact', 'one-shot'].includes(detected)) return true
+      if (name.includes('graphic')) return true
+      if (name.includes('tpb'))     return true
+      if (/\bvol(?:ume)?\b/.test(name)) return true
+      return false
+    case 'single-issue':
+      if (detected === 'single-issue') return true
+      if (/\bissue\b/.test(name))      return true
+      if (/#\d+/.test(name))           return true
+      return false
+    case 'manga':
+      if (detected === 'manga')   return true
+      if (name.includes('manga')) return true
+      return false
+    default:
+      return detected === filter
+  }
 }
 
 // ─── Format / Category Detection ─────────────────────────────────────────────
@@ -375,13 +396,7 @@ function SearchResults() {
   // Client-side filter + sort — instant, no re-fetch
   const filteredResults = useMemo(() => {
     let res = [...results]
-    if (format !== 'all') {
-      // Use the umbrella group so heuristic-classified results (hardcover,
-      // omnibus, etc.) still match the user's chosen pill. Falls back to
-      // strict equality for unknown format ids.
-      const allowed = FORMAT_FILTER_GROUPS[format] || [format as Format]
-      res = res.filter(r => allowed.includes(detectFormat(r)))
-    }
+    if (format !== 'all') res = res.filter(r => matchesFormat(r, format))
     if (category  !== 'all') res = res.filter(r => detectCategory(r) === category)
     if (publisher !== 'all') res = res.filter(r => r.publisher?.name === publisher)
     if (priceMax  !== 'all') {
@@ -591,15 +606,16 @@ function SearchResults() {
                   <div
                     key={comic.id}
                     onClick={() => router.push(`/comic/${comic.id}?region=${region}`)}
-                    className="group"
                     style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', padding: '16px 0', cursor: 'pointer', borderBottom: '1px solid #F0F0F0' }}
                     onMouseEnter={e => (e.currentTarget.style.background = '#FAFAFA')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
 
-                    {/* Cover image — letter always rendered as background fallback;
-                        image overlays it and hides itself via onError if it fails.
-                        overflow:hidden contains the hover zoom on the <img>. */}
-                    <div style={{ width: '80px', height: '112px', borderRadius: '6px', overflow: 'hidden', background: '#F3F4F6', border: '1px solid #EBEBEB', flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {/* Cover frame — scales as a whole on hover (transition + scale + z-index live on the
+                        container itself, not the <img>). overflow:hidden removed; the <img> carries its own
+                        borderRadius so the rounded corners stay clean without clipping. */}
+                    <div
+                      className="transition-transform duration-300 ease-out hover:scale-105 hover:z-10"
+                      style={{ width: '80px', height: '112px', borderRadius: '6px', background: '#F3F4F6', border: '1px solid #EBEBEB', flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <span style={{ color: '#9CA3AF', fontSize: '26px', fontWeight: 500, position: 'absolute' }}>
                         {comic.name.charAt(0)}
                       </span>
@@ -607,8 +623,7 @@ function SearchResults() {
                         <img
                           src={comic.image.medium_url}
                           alt={comic.name}
-                          className="transition-transform duration-300 ease-out group-hover:scale-105"
-                          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px' }}
                           onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
                         />
                       )}
