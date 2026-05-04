@@ -5,7 +5,7 @@
  * (-SBX- → sandbox, -PRD- → production). No code change required to switch
  * environments — just swap the keys in .env.local / Vercel.
  *
- * Security: SERVER-ONLY. This module reads EBAY_APP_ID and EBAY_CERT_ID
+ * Security: SERVER-ONLY. This module reads EBAY_CLIENT_ID and EBAY_CLIENT_SECRET
  * from process.env. Never import it from a client component. (Env vars
  * without NEXT_PUBLIC_ resolve to undefined client-side anyway, so a stray
  * import would fail silently with empty creds.)
@@ -29,7 +29,7 @@ export interface EbayListing {
 
 function isProduction(): boolean {
   // App IDs always contain -SBX- or -PRD- segment. Default to sandbox if unset.
-  return /-PRD-/.test(process.env.EBAY_APP_ID || '')
+  return /-PRD-/.test(process.env.EBAY_CLIENT_ID || '')
 }
 
 function apiBase(): string {
@@ -54,10 +54,10 @@ export async function getAccessToken(): Promise<string> {
     return cachedToken.token
   }
 
-  const appId  = process.env.EBAY_APP_ID
-  const certId = process.env.EBAY_CERT_ID
+  const appId  = process.env.EBAY_CLIENT_ID
+  const certId = process.env.EBAY_CLIENT_SECRET
   if (!appId || !certId) {
-    throw new Error('eBay credentials missing — set EBAY_APP_ID and EBAY_CERT_ID in .env.local')
+    throw new Error('eBay credentials missing — set EBAY_CLIENT_ID and EBAY_CLIENT_SECRET in .env.local')
   }
 
   const credentials = Buffer.from(`${appId}:${certId}`).toString('base64')

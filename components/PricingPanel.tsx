@@ -130,11 +130,11 @@ export default function PricingPanel({ query, region }: PricingPanelProps) {
         </div>
       )}
 
-      {/* Empty state — sandbox-aware copy */}
+      {/* Empty state */}
       {!loading && !error && listings.length === 0 && (
         <div className="rounded-2xl border border-gray-100 bg-white p-6 text-center">
           <p className="text-sm text-gray-500">
-            No sandbox listings found yet — production pricing will appear once eBay access is approved.
+            No listings found for this title right now. Check back soon.
           </p>
         </div>
       )}
@@ -210,6 +210,53 @@ export default function PricingPanel({ query, region }: PricingPanelProps) {
             )
           })}
         </ul>
+      )}
+
+      {/* ── Also search on… ───────────────────────────────────────────────────
+          Static affiliate search links — no price data. Always shown once
+          loading is done (regardless of eBay result count). */}
+      {!loading && (
+        <div className="mt-4 space-y-2">
+          <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-2">Also search on</p>
+
+          {/* Amazon */}
+          <a
+            href={`https://www.amazon.com/s?k=${encodeURIComponent(query + ' comic')}&tag=catchcomics-20`}
+            target="_blank"
+            rel="noopener noreferrer sponsored"
+            className="flex items-center gap-3 p-3 rounded-xl bg-white border border-gray-100 hover:border-gray-300 transition-colors group"
+            aria-label={`Search for ${query} on Amazon`}
+          >
+            {/* Amazon logo mark */}
+            <div className="w-8 h-8 rounded-md bg-[#FF9900] flex items-center justify-center shrink-0 text-white font-bold text-xs">
+              a
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-800">Amazon</p>
+              <p className="text-xs text-gray-400">Search for this title</p>
+            </div>
+            <span className="text-xs text-gray-400 group-hover:text-gray-600 shrink-0">Search →</span>
+          </a>
+
+          {/* AbeBooks */}
+          <a
+            href={`https://www.abebooks.com/servlet/SearchResults?kn=${encodeURIComponent(query)}&tn=&cm_sp=mbc-_-abb-_-used`}
+            target="_blank"
+            rel="noopener noreferrer sponsored"
+            className="flex items-center gap-3 p-3 rounded-xl bg-white border border-gray-100 hover:border-gray-300 transition-colors group"
+            aria-label={`Search for ${query} on AbeBooks`}
+          >
+            {/* AbeBooks logo mark */}
+            <div className="w-8 h-8 rounded-md bg-[#C41F22] flex items-center justify-center shrink-0 text-white font-bold text-xs">
+              A
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-800">AbeBooks</p>
+              <p className="text-xs text-gray-400">New, used &amp; collectible</p>
+            </div>
+            <span className="text-xs text-gray-400 group-hover:text-gray-600 shrink-0">Search →</span>
+          </a>
+        </div>
       )}
     </div>
   )
