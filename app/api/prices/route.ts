@@ -9,7 +9,7 @@ import { pricesCache } from '@/lib/cache'
  * query, sorts by price ascending, and caches the result for 1h per
  * (region, query) pair.
  *
- * Sandbox vs production is auto-detected from the EBAY_APP_ID prefix.
+ * Sandbox vs production is auto-detected from the EBAY_CLIENT_ID prefix.
  */
 
 export async function GET(request: NextRequest) {
@@ -33,7 +33,11 @@ export async function GET(request: NextRequest) {
   const cached   = pricesCache.get(cacheKey)
   if (cached) {
     console.log(`[/api/prices] cache hit for "${query}" (${region})`)
-    return NextResponse.json(cached)
+    return NextResponse.json({
+      query,
+      region,
+      listings: Array.isArray(cached.listings) ? cached.listings : [],
+    })
   }
 
   // ── Live fetch ─────────────────────────────────────────────────────────────
@@ -45,9 +49,6 @@ export async function GET(request: NextRequest) {
     const body = {
       query,
       region,
-      marketplace,
-      source:   'ebay',
-      count:    sorted.length,
       listings: sorted,
     }
     pricesCache.set(cacheKey, body)

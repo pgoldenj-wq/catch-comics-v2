@@ -1,7 +1,7 @@
 /**
  * eBay Buy Browse API — server-side integration.
  *
- * Auto-detects sandbox vs production from the App ID prefix
+ * Auto-detects sandbox vs production from the Client ID prefix
  * (-SBX- → sandbox, -PRD- → production). No code change required to switch
  * environments — just swap the keys in .env.local / Vercel.
  *
@@ -28,8 +28,9 @@ export interface EbayListing {
 // ── Environment detection ─────────────────────────────────────────────────────
 
 function isProduction(): boolean {
-  // App IDs always contain -SBX- or -PRD- segment. Default to sandbox if unset.
-  return /-PRD-/.test(process.env.EBAY_CLIENT_ID || '')
+  // eBay Client IDs contain -SBX- or -PRD-. Default to production so real
+  // listings are returned when keys do not include an environment marker.
+  return !/-SBX-/.test(process.env.EBAY_CLIENT_ID || '')
 }
 
 function apiBase(): string {
@@ -54,13 +55,13 @@ export async function getAccessToken(): Promise<string> {
     return cachedToken.token
   }
 
-  const appId  = process.env.EBAY_CLIENT_ID
-  const certId = process.env.EBAY_CLIENT_SECRET
-  if (!appId || !certId) {
+  const clientId     = process.env.EBAY_CLIENT_ID
+  const clientSecret = process.env.EBAY_CLIENT_SECRET
+  if (!clientId || !clientSecret) {
     throw new Error('eBay credentials missing — set EBAY_CLIENT_ID and EBAY_CLIENT_SECRET in .env.local')
   }
 
-  const credentials = Buffer.from(`${appId}:${certId}`).toString('base64')
+  const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
   const url  = `${apiBase()}/identity/v1/oauth2/token`
   const body = new URLSearchParams({
     grant_type: 'client_credentials',
