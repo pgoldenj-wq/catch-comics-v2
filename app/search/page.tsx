@@ -182,6 +182,8 @@ function FilterPanel({ category, publisher, publishers, priceMax, currency, onCh
   const sectionHeader = (id: string, label: string) => (
     <button
       onClick={() => toggleSection(id)}
+      aria-expanded={openSections.has(id)}
+      aria-controls={`filter-section-${id}`}
       style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         width: '100%', background: 'none', border: 'none', cursor: 'pointer',
@@ -190,7 +192,7 @@ function FilterPanel({ category, publisher, publishers, priceMax, currency, onCh
         fontFamily: 'inherit',
       }}>
       {label}
-      <span style={{
+      <span aria-hidden="true" style={{
         fontSize: '9px', display: 'inline-block', transition: 'transform 0.15s',
         transform: openSections.has(id) ? 'rotate(180deg)' : 'none',
       }}>▼</span>
@@ -543,8 +545,10 @@ function SearchResults() {
 
               {/* Sort dropdown */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '12px', color: '#9CA3AF' }}>Sort by</span>
+                <label htmlFor="results-sort" style={{ fontSize: '12px', color: '#9CA3AF' }}>Sort by</label>
                 <select
+                  id="results-sort"
+                  aria-label="Sort results by"
                   value={sort}
                   onChange={e => handleFilterChange('sort', e.target.value)}
                   style={{
@@ -605,7 +609,16 @@ function SearchResults() {
                 return (
                   <div
                     key={comic.id}
+                    role="link"
+                    tabIndex={0}
+                    aria-label={`View details for ${comic.name}`}
                     onClick={() => router.push(`/comic/${comic.id}?region=${region}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        router.push(`/comic/${comic.id}?region=${region}`)
+                      }
+                    }}
                     style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', padding: '16px 0', cursor: 'pointer', borderBottom: '1px solid #F0F0F0' }}
                     onMouseEnter={e => (e.currentTarget.style.background = '#FAFAFA')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
@@ -718,8 +731,9 @@ function SearchResults() {
               <span style={{ fontSize: '16px', fontWeight: 600, color: '#0A0A0A' }}>Filters</span>
               <button
                 onClick={() => setMobileFilterOpen(false)}
+                aria-label="Close filters"
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6B7280', fontSize: '20px', lineHeight: 1 }}>
-                ✕
+                <span aria-hidden="true">✕</span>
               </button>
             </div>
             <FilterPanel

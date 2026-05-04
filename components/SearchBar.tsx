@@ -156,6 +156,10 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
             onKeyDown={handleKeyDown}
             onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
             placeholder="Search any title, character or ISBN..."
+            aria-label="Search comics, characters, or ISBN"
+            aria-autocomplete="list"
+            aria-expanded={showSuggestions && suggestions.length > 0}
+            role="combobox"
             style={{
               flex: 1,
               background: 'transparent',
@@ -170,6 +174,7 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
           <button
             type="button"
             onClick={handleButtonClick}
+            aria-label="Search"
             style={{
               width: isHero ? '42px' : '36px',
               height: isHero ? '42px' : '36px',
@@ -185,14 +190,14 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
             onMouseEnter={e => (e.currentTarget.style.background = '#c41f22')}
             onMouseLeave={e => (e.currentTarget.style.background = '#E8272A')}
           >
-            <svg width="15" height="15" fill="none" viewBox="0 0 24 24" style={{ color: '#fff' }}>
+            <svg width="15" height="15" fill="none" viewBox="0 0 24 24" style={{ color: '#fff' }} aria-hidden="true">
               <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </button>
         </form>
 
       {showSuggestions && suggestions.length > 0 && (
-        <div style={{
+        <div role="listbox" aria-label="Search suggestions" style={{
           position: 'absolute',
           top: '100%',
           left: 0,
@@ -207,7 +212,10 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
           {suggestions.map((s, i) => {
             const badge = s.type ? TYPE_BADGE[s.type] : undefined
             return (
-              <div key={i}
+              <button key={i}
+                type="button"
+                role="option"
+                aria-selected={false}
                 onClick={() => {
                   // Explicit reset before doSearch (which also resets) so the
                   // intent is clear at the call site too — dropdown closes
@@ -222,11 +230,16 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
                   padding: '11px 18px', cursor: 'pointer',
                   borderBottom: i < suggestions.length - 1 ? '1px solid #F9F9F9' : 'none',
                   background: '#fff',
+                  border: 'none',
+                  width: '100%',
+                  textAlign: 'left',
+                  font: 'inherit',
+                  color: 'inherit',
                 }}
                 onMouseEnter={e => (e.currentTarget.style.background = '#F3F4F6')}
                 onMouseLeave={e => (e.currentTarget.style.background = '#fff')}
               >
-                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" style={{ color: '#D1D5DB', flexShrink: 0 }}>
+                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" style={{ color: '#D1D5DB', flexShrink: 0 }} aria-hidden="true">
                   <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2"/>
                   <path d="M16.5 16.5L21 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
                 </svg>
@@ -240,10 +253,10 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
                     {s.type}
                   </span>
                 )}
-                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" style={{ color: '#D1D5DB', flexShrink: 0 }}>
+                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" style={{ color: '#D1D5DB', flexShrink: 0 }} aria-hidden="true">
                   <path d="M7 17L17 7M17 7H7M17 7v10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
                 </svg>
-              </div>
+              </button>
             )
           })}
         </div>

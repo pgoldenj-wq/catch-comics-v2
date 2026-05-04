@@ -323,7 +323,7 @@ export default function Home() {
                   }}>
                   <img
                     src={cover.src}
-                    alt={cover.title}
+                    alt=""    /* parent <button> has aria-label="Search for {title}" — avoid double-announce */
                     style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                     onError={(e) => { (e.target as HTMLImageElement).style.opacity = '0'; }}
                   />
@@ -331,8 +331,10 @@ export default function Home() {
               ))}
             </div>
 
-            {/* Publisher logo strip — full-width, anchored in flex column flow */}
-            <div style={{ position: 'relative', marginTop: '14px', overflow: 'hidden', height: '36px' }}>
+            {/* Publisher logo strip — full-width, anchored in flex column flow.
+                Marked aria-hidden because it's an ambient branding flourish duplicated for
+                infinite-scroll; screen readers would otherwise hear "Marvel DC Image..." twice. */}
+            <div aria-hidden="true" style={{ position: 'relative', marginTop: '14px', overflow: 'hidden', height: '36px' }}>
               <div style={{ position: 'absolute', left: 0,  top: 0, bottom: 0, width: '32px', zIndex: 2, pointerEvents: 'none', background: 'linear-gradient(to right, #111827 0%, transparent 100%)' }} />
               <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '32px', zIndex: 2, pointerEvents: 'none', background: 'linear-gradient(to left,  #111827 0%, transparent 100%)' }} />
               <div className="pub-track">

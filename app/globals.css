@@ -24,3 +24,30 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ─── Accessibility: subtle, premium focus-visible rings ────────────────────
+   Only keyboard navigation triggers these (mouse focus is suppressed via
+   :focus-visible). 2px brand-red outline at low offset matches the rest
+   of the visual language without screaming. */
+:focus { outline: none; }
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible,
+[role="link"]:focus-visible,
+[role="option"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid #E8272A;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Inputs already have rounded containers — keep the offset tight so the
+   ring hugs the existing border */
+input:focus-visible,
+select:focus-visible {
+  outline-offset: 1px;
+}
