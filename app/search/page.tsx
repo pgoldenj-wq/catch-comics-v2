@@ -230,7 +230,7 @@ function FilterPanel({ category, publisher, publishers, priceMax, currency, onCh
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
         <span style={{ fontSize: '14px', fontWeight: 600, color: '#0A0A0A' }}>Filters</span>
         {hasActive && (
-          <button onClick={onClear} style={{ fontSize: '11px', color: '#E8272A', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
+          <button onClick={onClear} style={{ fontSize: '11px', color: '#C41F22', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
             Clear all
           </button>
         )}
@@ -568,7 +568,7 @@ function SearchResults() {
             <div style={{ padding: '12px 16px', borderRadius: '12px', background: '#fff', border: '1px solid #F0F0F0', fontSize: '14px', color: '#6B7280', marginBottom: '16px' }}>
               Did you mean{' '}
               <button onClick={() => router.push(buildUrl({ q: didYouMean }))}
-                style={{ fontWeight: 600, color: '#E8272A', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
+                style={{ fontWeight: 600, color: '#C41F22', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
                 {didYouMean}
               </button>?
             </div>
@@ -676,7 +676,7 @@ function SearchResults() {
                     {/* Region-aware CTA */}
                     <div style={{ flexShrink: 0, textAlign: 'right', paddingTop: '2px' }}>
                       <div style={{ fontSize: '10px', color: '#6B7280', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '2px' }}>Compare</div>
-                      <div style={{ fontSize: '13px', fontWeight: 500, color: '#E8272A' }}>Find prices →</div>
+                      <div style={{ fontSize: '13px', fontWeight: 500, color: '#C41F22' }}>Find prices →</div>
                       <div style={{ fontSize: '10px', color: '#6B7280', marginTop: '2px' }}>
                         {region === 'uk' ? 'UK stores' : 'US stores'}
                       </div>
@@ -693,7 +693,7 @@ function SearchResults() {
               <p style={{ fontWeight: 500, color: '#0A0A0A', marginBottom: '8px', fontSize: '15px' }}>
                 No results match your filters
               </p>
-              <button onClick={clearFilters} style={{ fontSize: '13px', color: '#E8272A', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' }}>
+              <button onClick={clearFilters} style={{ fontSize: '13px', color: '#C41F22', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' }}>
                 Clear filters
               </button>
             </div>

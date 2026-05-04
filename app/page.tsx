@@ -119,22 +119,27 @@ export default function Home() {
     { title: 'Jujutsu Kaisen',      searchQuery: 'jujutsu kaisen',      src: 'https://comicvine.gamespot.com/a/uploads/scale_large/6/67663/6491809-01.jpg',                            left: '300px', top: '30px', width: '165px', height: '238px', zIndex: 3, animClass: 'cover-sway-3' },
   ];
 
-  // Publisher logo strip
+  // Publisher logo strip — fills normalised to rgba(255,255,255,0.7) so each logo
+  // clears AA contrast (~6.9:1) on the dark hero (#111827). Marvel keeps its boxed
+  // glyph for brand emphasis at full white. Parent opacity multiplier removed so
+  // declared values render as-stated (was *0.65, dragging some logos to ~0.3 — barely
+  // visible and well under contrast threshold; specifically failed for VALIANT,
+  // SEVEN SEAS, DYNAMITE).
   const publisherLogos = [
-    <svg key="marvel"    viewBox="0 0 58 28"  width="58"  height="28"><rect x="1" y="4" width="56" height="20" rx="2.5" fill="rgba(255,255,255,0.18)"/><text x="29" y="18.5" textAnchor="middle" fontSize="9.5" fontWeight="900" fontFamily="Arial Black,Impact,sans-serif" fill="white" letterSpacing="0.8">MARVEL</text></svg>,
-    <svg key="dc"        viewBox="0 0 40 28"  width="40"  height="28"><text x="20" y="20" textAnchor="middle" fontSize="16" fontWeight="900" fontFamily="Arial Black,Impact,sans-serif" fill="rgba(255,255,255,0.7)" letterSpacing="1">DC</text></svg>,
-    <svg key="image"     viewBox="0 0 72 28"  width="72"  height="28"><text x="36" y="19" textAnchor="middle" fontSize="10" fontWeight="700" fontFamily="Arial,sans-serif" fill="rgba(255,255,255,0.6)" letterSpacing="2">IMAGE</text></svg>,
-    <svg key="darkhorse" viewBox="0 0 96 28"  width="96"  height="28"><text x="48" y="19" textAnchor="middle" fontSize="9"  fontWeight="700" fontFamily="Arial,sans-serif" fill="rgba(255,255,255,0.55)" letterSpacing="1.5">DARK HORSE</text></svg>,
-    <svg key="viz"       viewBox="0 0 52 28"  width="52"  height="28"><text x="26" y="21" textAnchor="middle" fontSize="15" fontWeight="900" fontFamily="Arial Black,Impact,sans-serif" fill="rgba(255,255,255,0.65)" letterSpacing="1">VIZ</text></svg>,
-    <svg key="idw"       viewBox="0 0 48 28"  width="48"  height="28"><text x="24" y="21" textAnchor="middle" fontSize="13" fontWeight="900" fontFamily="Arial Black,Impact,sans-serif" fill="rgba(255,255,255,0.55)" letterSpacing="1">IDW</text></svg>,
-    <svg key="boom"      viewBox="0 0 110 28" width="110" height="28"><text x="55" y="19" textAnchor="middle" fontSize="9.5" fontWeight="700" fontFamily="Arial,sans-serif" fill="rgba(255,255,255,0.55)" letterSpacing="1.5">BOOM! STUDIOS</text></svg>,
-    <svg key="vertigo"   viewBox="0 0 72 28"  width="72"  height="28"><text x="36" y="19" textAnchor="middle" fontSize="10" fontWeight="700" fontFamily="Arial,sans-serif" fill="rgba(255,255,255,0.5)" letterSpacing="2" transform="skewX(-6)">VERTIGO</text></svg>,
-    <svg key="kodansha"  viewBox="0 0 84 28"  width="84"  height="28"><text x="42" y="19" textAnchor="middle" fontSize="9"  fontWeight="700" fontFamily="Arial,sans-serif" fill="rgba(255,255,255,0.5)" letterSpacing="1.5">KODANSHA</text></svg>,
-    <svg key="shueisha"  viewBox="0 0 80 28"  width="80"  height="28"><text x="40" y="19" textAnchor="middle" fontSize="9"  fontWeight="700" fontFamily="Arial,sans-serif" fill="rgba(255,255,255,0.5)" letterSpacing="1.5">SHUEISHA</text></svg>,
-    <svg key="yenpress"  viewBox="0 0 84 28"  width="84"  height="28"><text x="42" y="19" textAnchor="middle" fontSize="9"  fontWeight="700" fontFamily="Arial,sans-serif" fill="rgba(255,255,255,0.5)" letterSpacing="1.5">YEN PRESS</text></svg>,
-    <svg key="valiant"   viewBox="0 0 68 28"  width="68"  height="28"><text x="34" y="19" textAnchor="middle" fontSize="9"  fontWeight="700" fontFamily="Arial,sans-serif" fill="rgba(255,255,255,0.5)" letterSpacing="2">VALIANT</text></svg>,
-    <svg key="sevenseas" viewBox="0 0 90 28"  width="90"  height="28"><text x="45" y="19" textAnchor="middle" fontSize="8.5" fontWeight="700" fontFamily="Arial,sans-serif" fill="rgba(255,255,255,0.45)" letterSpacing="1.5">SEVEN SEAS</text></svg>,
-    <svg key="dynamite"  viewBox="0 0 80 28"  width="80"  height="28"><text x="40" y="19" textAnchor="middle" fontSize="9"  fontWeight="700" fontFamily="Arial,sans-serif" fill="rgba(255,255,255,0.45)" letterSpacing="1.5">DYNAMITE</text></svg>,
+    <svg key="marvel"    viewBox="0 0 58 28"  width="58"  height="28"><rect x="1" y="4" width="56" height="20" rx="2.5" fill="rgba(255,255,255,0.22)"/><text x="29" y="18.5" textAnchor="middle" fontSize="9.5" fontWeight="900" fontFamily="Arial Black,Impact,sans-serif" fill="white" letterSpacing="0.8">MARVEL</text></svg>,
+    <svg key="dc"        viewBox="0 0 40 28"  width="40"  height="28"><text x="20" y="20" textAnchor="middle" fontSize="16" fontWeight="900" fontFamily="Arial Black,Impact,sans-serif" fill="rgba(255,255,255,0.78)" letterSpacing="1">DC</text></svg>,
+    <svg key="image"     viewBox="0 0 72 28"  width="72"  height="28"><text x="36" y="19" textAnchor="middle" fontSize="10" fontWeight="700" fontFamily="Arial,sans-serif" fill="rgba(255,255,255,0.7)" letterSpacing="2">IMAGE</text></svg>,
+    <svg key="darkhorse" viewBox="0 0 96 28"  width="96"  height="28"><text x="48" y="19" textAnchor="middle" fontSize="9"  fontWeight="700" fontFamily="Arial,sans-serif" fill="rgba(255,255,255,0.7)" letterSpacing="1.5">DARK HORSE</text></svg>,
+    <svg key="viz"       viewBox="0 0 52 28"  width="52"  height="28"><text x="26" y="21" textAnchor="middle" fontSize="15" fontWeight="900" fontFamily="Arial Black,Impact,sans-serif" fill="rgba(255,255,255,0.78)" letterSpacing="1">VIZ</text></svg>,
+    <svg key="idw"       viewBox="0 0 48 28"  width="48"  height="28"><text x="24" y="21" textAnchor="middle" fontSize="13" fontWeight="900" fontFamily="Arial Black,Impact,sans-serif" fill="rgba(255,255,255,0.7)" letterSpacing="1">IDW</text></svg>,
+    <svg key="boom"      viewBox="0 0 110 28" width="110" height="28"><text x="55" y="19" textAnchor="middle" fontSize="9.5" fontWeight="700" fontFamily="Arial,sans-serif" fill="rgba(255,255,255,0.7)" letterSpacing="1.5">BOOM! STUDIOS</text></svg>,
+    <svg key="vertigo"   viewBox="0 0 72 28"  width="72"  height="28"><text x="36" y="19" textAnchor="middle" fontSize="10" fontWeight="700" fontFamily="Arial,sans-serif" fill="rgba(255,255,255,0.7)" letterSpacing="2" transform="skewX(-6)">VERTIGO</text></svg>,
+    <svg key="kodansha"  viewBox="0 0 84 28"  width="84"  height="28"><text x="42" y="19" textAnchor="middle" fontSize="9"  fontWeight="700" fontFamily="Arial,sans-serif" fill="rgba(255,255,255,0.7)" letterSpacing="1.5">KODANSHA</text></svg>,
+    <svg key="shueisha"  viewBox="0 0 80 28"  width="80"  height="28"><text x="40" y="19" textAnchor="middle" fontSize="9"  fontWeight="700" fontFamily="Arial,sans-serif" fill="rgba(255,255,255,0.7)" letterSpacing="1.5">SHUEISHA</text></svg>,
+    <svg key="yenpress"  viewBox="0 0 84 28"  width="84"  height="28"><text x="42" y="19" textAnchor="middle" fontSize="9"  fontWeight="700" fontFamily="Arial,sans-serif" fill="rgba(255,255,255,0.7)" letterSpacing="1.5">YEN PRESS</text></svg>,
+    <svg key="valiant"   viewBox="0 0 68 28"  width="68"  height="28"><text x="34" y="19" textAnchor="middle" fontSize="9"  fontWeight="700" fontFamily="Arial,sans-serif" fill="rgba(255,255,255,0.7)" letterSpacing="2">VALIANT</text></svg>,
+    <svg key="sevenseas" viewBox="0 0 90 28"  width="90"  height="28"><text x="45" y="19" textAnchor="middle" fontSize="8.5" fontWeight="700" fontFamily="Arial,sans-serif" fill="rgba(255,255,255,0.7)" letterSpacing="1.5">SEVEN SEAS</text></svg>,
+    <svg key="dynamite"  viewBox="0 0 80 28"  width="80"  height="28"><text x="40" y="19" textAnchor="middle" fontSize="9"  fontWeight="700" fontFamily="Arial,sans-serif" fill="rgba(255,255,255,0.7)" letterSpacing="1.5">DYNAMITE</text></svg>,
   ];
 
   // Popular search terms — clicking always navigates to a fresh search page
@@ -278,11 +283,15 @@ export default function Home() {
             {/* Category hint pills — directly under search bar, non-interactive */}
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '14px', flexWrap: 'wrap' }}>
               {['Graphic Novels', 'Manga', 'Single Issues'].map(cat => (
+                /* Text bumped to 0.7 opacity (≈6.9:1 on the dark hero) so the chips
+                   actually pass AA without becoming visually loud. Border lifted to
+                   0.18 for a subtle but readable edge. Background stays at 0.07 — it's
+                   pure decoration and not subject to text-contrast rules. */
                 <span key={cat} style={{
                   fontSize: '11px', padding: '4px 12px', borderRadius: '999px',
                   background: 'rgba(255,255,255,0.07)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  color: 'rgba(255,255,255,0.38)',
+                  border: '1px solid rgba(255,255,255,0.18)',
+                  color: 'rgba(255,255,255,0.7)',
                   userSelect: 'none',
                 }}>
                   {cat}
@@ -339,7 +348,9 @@ export default function Home() {
               <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '32px', zIndex: 2, pointerEvents: 'none', background: 'linear-gradient(to left,  #111827 0%, transparent 100%)' }} />
               <div className="pub-track">
                 {[...publisherLogos, ...publisherLogos].map((logo, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', padding: '0 20px', flexShrink: 0, opacity: 0.65 }}>{logo}</div>
+                  /* No parent opacity — each logo SVG already encodes its target alpha
+                     so contrast survives. Was *0.65, which dragged faint logos to ~0.3 alpha. */
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', padding: '0 20px', flexShrink: 0 }}>{logo}</div>
                 ))}
               </div>
             </div>
@@ -433,7 +444,7 @@ export default function Home() {
 
                   {/* Price row */}
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px', marginTop: '5px' }}>
-                    <span style={{ fontSize: '14px', fontWeight: 700, color: '#E8272A' }}>
+                    <span style={{ fontSize: '14px', fontWeight: 700, color: '#C41F22' }}>
                       {currency}{price.toFixed(2)}
                     </span>
                     {hasSale && (
