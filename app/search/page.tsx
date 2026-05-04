@@ -610,11 +610,12 @@ function SearchResults() {
                     onMouseEnter={e => (e.currentTarget.style.background = '#FAFAFA')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
 
-                    {/* Cover frame — scales as a whole on hover (transition + scale + z-index live on the
-                        container itself, not the <img>). overflow:hidden removed; the <img> carries its own
+                    {/* Cover frame — scales as a whole on hover. Bumped to ~3x for a true
+                        preview-on-hover feel. transition + scale + z-index on the container,
+                        not the <img>. overflow:hidden removed; the <img> carries its own
                         borderRadius so the rounded corners stay clean without clipping. */}
                     <div
-                      className="transition-transform duration-300 ease-out hover:scale-105 hover:z-10"
+                      className="transition-transform duration-300 ease-out hover:scale-[3] hover:z-50"
                       style={{ width: '80px', height: '112px', borderRadius: '6px', background: '#F3F4F6', border: '1px solid #EBEBEB', flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <span style={{ color: '#9CA3AF', fontSize: '26px', fontWeight: 500, position: 'absolute' }}>
                         {comic.name.charAt(0)}
