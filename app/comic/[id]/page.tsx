@@ -13,6 +13,8 @@ interface ComicDetail {
   publisher: { name: string }
   description: string
   count_of_issues: number
+  people?: Array<{ name: string; role: string; id: number }>
+  characters?: Array<{ name: string; id: number }>
 }
 
 interface IssueListItem {
@@ -40,8 +42,8 @@ function ComicPage() {
   const [formatFilter, setFormatFilter] = useState<'all' | 'graphic-novel' | 'single-issue' | 'manga'>('all')
   const [priceMax, setPriceMax]         = useState<'all' | '5' | '10' | '15' | '25' | '35' | '50'>('all')
   const [condition, setCondition]       = useState<'all' | 'new' | 'used'>('all')
-  // Which filter accordion sections are open (price open by default)
-  const [openSections, setOpenSections] = useState<Set<string>>(new Set(['price']))
+  // Which filter accordion sections are open (condition open by default)
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set(['condition']))
   const toggleSection = (id: string) => setOpenSections(prev => {
     const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s
   })
@@ -151,8 +153,8 @@ function ComicPage() {
         </button>
       </nav>
 
-      {/* DARK HEADER */}
-      <div className="relative bg-[#111827] overflow-hidden">
+      {/* DARK HEADER — overflow visible so hero cover can scale beyond bounds on hover */}
+      <div className="relative bg-[#111827]">
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
@@ -162,7 +164,7 @@ function ComicPage() {
         />
         <div className="relative px-8 py-8 flex gap-6 max-w-4xl mx-auto">
           {/* Cover — hover zooms 2× for a closer look without obscuring the title.
-              overflow-hidden removed so the scaled cover can escape the box. */}
+              overflow-hidden removed from parent so the scaled cover can escape the box. */}
           <div className="relative w-28 h-40 rounded-lg border border-white/10 shadow-xl shrink-0 bg-white/5 flex items-center justify-center transition-transform duration-300 ease-out hover:scale-[2] hover:z-50">
             <span className="text-white/30 text-3xl font-medium absolute">{comic.name.charAt(0)}</span>
             {comic.image?.medium_url && (
@@ -174,6 +176,8 @@ function ComicPage() {
               />
             )}
           </div>
+
+          {/* Title + region toggle */}
           <div className="flex-1 min-w-0 flex flex-col justify-center">
             <p className="text-white/40 text-xs mb-2">
               {[comic.publisher?.name, comic.start_year ? `Est. ${comic.start_year}` : null].filter(Boolean).join(' · ')}
@@ -204,6 +208,52 @@ function ComicPage() {
               ))}
             </div>
           </div>
+
+          {/* ── METADATA PANEL ─────────────────────────────────────────────────
+              Only rendered when there are people/character fields to show.
+              Writer / Artist / Cover artist are extracted by role keyword. */}
+          {(() => {
+            const people = comic.people || []
+            const roleMatch = (role: string, kw: string) => role.toLowerCase().includes(kw)
+            const writers      = [...new Set(people.filter(p => roleMatch(p.role, 'writer')).map(p => p.name))]
+            const pencilers    = [...new Set(people.filter(p => roleMatch(p.role, 'pencil') || (roleMatch(p.role, 'artist') && !roleMatch(p.role, 'cover'))).map(p => p.name))]
+            const coverArtists = [...new Set(people.filter(p => roleMatch(p.role, 'cover')).map(p => p.name))]
+            const chars        = (comic.characters || []).slice(0, 6).map(c => c.name)
+
+            const rows: { label: string; value: string }[] = []
+            if (writers.length)      rows.push({ label: writers.length > 1 ? 'Writers' : 'Writer',      value: writers.join(', ') })
+            if (pencilers.length)    rows.push({ label: pencilers.length > 1 ? 'Artists' : 'Artist',    value: pencilers.join(', ') })
+            if (coverArtists.length) rows.push({ label: 'Cover',     value: coverArtists.join(', ') })
+            if (comic.publisher?.name) rows.push({ label: 'Publisher', value: comic.publisher.name })
+            if (comic.start_year)    rows.push({ label: 'Year',       value: comic.start_year })
+            if (!isNaN(comic.count_of_issues) && comic.count_of_issues > 0)
+                                     rows.push({ label: 'Issues',     value: String(comic.count_of_issues) })
+            if (chars.length)        rows.push({ label: 'Characters', value: chars.join(', ') })
+
+            if (rows.length === 0) return null
+
+            return (
+              <div style={{
+                width: '180px', flexShrink: 0,
+                borderLeft: '1px solid rgba(255,255,255,0.08)',
+                paddingLeft: '20px',
+                alignSelf: 'center',
+              }}>
+                <dl style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {rows.map(({ label, value }) => (
+                    <div key={label}>
+                      <dt style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', marginBottom: '1px' }}>
+                        {label}
+                      </dt>
+                      <dd style={{ margin: 0, fontSize: '12px', color: 'rgba(255,255,255,0.75)', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                        {value}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            )
+          })()}
         </div>
       </div>
 
@@ -224,9 +274,9 @@ function ComicPage() {
           {/* Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
             <span style={{ fontSize: '14px', fontWeight: 600, color: '#0A0A0A' }}>Filters</span>
-            {(priceMax !== 'all' || condition !== 'all') && (
+            {(priceMax !== 'all' || condition !== 'all' || formatFilter !== 'all') && (
               <button
-                onClick={() => { setPriceMax('all'); setCondition('all') }}
+                onClick={() => { setPriceMax('all'); setCondition('all'); setFormatFilter('all') }}
                 style={{ fontSize: '11px', color: '#C41F22', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
               >
                 Clear
@@ -234,7 +284,44 @@ function ComicPage() {
             )}
           </div>
 
-          {/* PRICE RANGE */}
+          {/* CONDITION — first, open by default */}
+          <div style={{ borderTop: '1px solid #F0F0F0' }}>
+            <button
+              onClick={() => toggleSection('condition')}
+              aria-expanded={openSections.has('condition')}
+              style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                width: '100%', background: 'none', border: 'none', cursor: 'pointer',
+                padding: '10px 0', fontSize: '10px', fontWeight: 700,
+                letterSpacing: '0.1em', textTransform: 'uppercase', color: '#6B7280',
+                fontFamily: 'inherit',
+              }}>
+              Condition
+              <span aria-hidden="true" style={{ fontSize: '9px', display: 'inline-block', transition: 'transform 0.15s', transform: openSections.has('condition') ? 'rotate(180deg)' : 'none' }}>▼</span>
+            </button>
+            {openSections.has('condition') && (
+              <div style={{ paddingBottom: '14px' }}>
+                {([
+                  ['all',  'All'],
+                  ['new',  'New'],
+                  ['used', 'Used'],
+                ] as [string, string][]).map(([val, label]) => {
+                  const active = condition === val
+                  return (
+                    <button key={val} onClick={() => setCondition(val as typeof condition)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0', textAlign: 'left', fontFamily: 'inherit' }}>
+                      <span style={{ width: '14px', height: '14px', borderRadius: '50%', flexShrink: 0, border: `2px solid ${active ? '#E8272A' : '#D1D5DB'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff' }}>
+                        {active && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#E8272A', display: 'block' }} />}
+                      </span>
+                      <span style={{ fontSize: '13px', color: active ? '#0A0A0A' : '#6B7280', fontWeight: active ? 500 : 400 }}>{label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* PRICE RANGE — second */}
           <div style={{ borderTop: '1px solid #F0F0F0' }}>
             <button
               onClick={() => toggleSection('price')}
@@ -274,43 +361,6 @@ function ComicPage() {
               </div>
             )}
           </div>
-
-          {/* CONDITION */}
-          <div style={{ borderTop: '1px solid #F0F0F0' }}>
-            <button
-              onClick={() => toggleSection('condition')}
-              aria-expanded={openSections.has('condition')}
-              style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                width: '100%', background: 'none', border: 'none', cursor: 'pointer',
-                padding: '10px 0', fontSize: '10px', fontWeight: 700,
-                letterSpacing: '0.1em', textTransform: 'uppercase', color: '#6B7280',
-                fontFamily: 'inherit',
-              }}>
-              Condition
-              <span aria-hidden="true" style={{ fontSize: '9px', display: 'inline-block', transition: 'transform 0.15s', transform: openSections.has('condition') ? 'rotate(180deg)' : 'none' }}>▼</span>
-            </button>
-            {openSections.has('condition') && (
-              <div style={{ paddingBottom: '14px' }}>
-                {([
-                  ['all',  'All'],
-                  ['new',  'New'],
-                  ['used', 'Used'],
-                ] as [string, string][]).map(([val, label]) => {
-                  const active = condition === val
-                  return (
-                    <button key={val} onClick={() => setCondition(val as typeof condition)}
-                      style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0', textAlign: 'left', fontFamily: 'inherit' }}>
-                      <span style={{ width: '14px', height: '14px', borderRadius: '50%', flexShrink: 0, border: `2px solid ${active ? '#E8272A' : '#D1D5DB'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff' }}>
-                        {active && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#E8272A', display: 'block' }} />}
-                      </span>
-                      <span style={{ fontSize: '13px', color: active ? '#0A0A0A' : '#6B7280', fontWeight: active ? 500 : 400 }}>{label}</span>
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-          </div>
         </aside>
 
         {/* ── PRICING (centre) ────────────────────────────────────────────────── */}
@@ -319,6 +369,7 @@ function ComicPage() {
             query={comic.name}
             region={market}
             formatFilter={formatFilter}
+            onFormatChange={setFormatFilter}
             priceMax={priceMax}
             condition={condition}
           />

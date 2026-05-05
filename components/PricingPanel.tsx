@@ -30,6 +30,8 @@ interface PricingPanelProps {
   region:       'uk' | 'us'
   /** Client-side format filter applied to eBay listings ('all' = no filter) */
   formatFilter?: 'all' | 'graphic-novel' | 'single-issue' | 'manga'
+  /** Called when the user clicks a format pill. When provided, pills are rendered in the panel header. */
+  onFormatChange?: (f: 'all' | 'graphic-novel' | 'single-issue' | 'manga') => void
   /** Client-side max-price filter applied to eBay listings ('all' = no filter) */
   priceMax?:    'all' | '5' | '10' | '15' | '25' | '35' | '50'
   /** Client-side condition filter ('all' = no filter) */
@@ -56,7 +58,7 @@ function formatPrice(value: number, currency: string): string {
  * eBay Buy Browse API. Listings are sorted cheapest-first server-side; we
  * re-sort defensively, then optionally filter client-side by format/priceMax.
  */
-export default function PricingPanel({ query, region, formatFilter = 'all', priceMax = 'all', condition = 'all' }: PricingPanelProps) {
+export default function PricingPanel({ query, region, formatFilter = 'all', onFormatChange, priceMax = 'all', condition = 'all' }: PricingPanelProps) {
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState<string | null>(null)
   const [listings, setListings] = useState<Listing[]>([])
@@ -136,14 +138,50 @@ export default function PricingPanel({ query, region, formatFilter = 'all', pric
 
   const regionLabel = region === 'uk' ? 'United Kingdom' : 'United States'
 
+  const FORMAT_PILLS: { value: 'all' | 'graphic-novel' | 'single-issue' | 'manga'; label: string }[] = [
+    { value: 'all',           label: 'All' },
+    { value: 'graphic-novel', label: 'TPB / GN' },
+    { value: 'single-issue',  label: 'Issues' },
+    { value: 'manga',         label: 'Manga' },
+  ]
+
   return (
     <div>
-      {/* Header */}
-      <p className="text-xs text-gray-400 mb-4 uppercase tracking-wide">
-        {loading
-          ? 'Loading offers…'
-          : `${visibleListings.length} ${visibleListings.length === 1 ? 'offer' : 'offers'} · ${regionLabel}`}
-      </p>
+      {/* Header: format pills (left) + offer count (right) */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', gap: '12px', flexWrap: 'wrap' }}>
+        {onFormatChange ? (
+          <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+            {FORMAT_PILLS.map(({ value, label }) => {
+              const active = formatFilter === value
+              return (
+                <button
+                  key={value}
+                  onClick={() => onFormatChange(value)}
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: active ? 600 : 400,
+                    padding: '3px 10px',
+                    borderRadius: '20px',
+                    cursor: 'pointer',
+                    border: active ? '1.5px solid #E8272A' : '1px solid #E5E7EB',
+                    background: active ? '#E8272A' : '#fff',
+                    color: active ? '#fff' : '#6B7280',
+                    fontFamily: 'inherit',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+        ) : <div />}
+        <p style={{ fontSize: '12px', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0, whiteSpace: 'nowrap' }}>
+          {loading
+            ? 'Loading offers…'
+            : `${visibleListings.length} ${visibleListings.length === 1 ? 'offer' : 'offers'} · ${regionLabel}`}
+        </p>
+      </div>
 
       {/* Loading skeleton */}
       {loading && (

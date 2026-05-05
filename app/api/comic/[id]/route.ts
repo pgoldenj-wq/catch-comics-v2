@@ -46,7 +46,7 @@ export async function GET(
     // Comic Vine issue resource prefix is 4000
     ? `https://comicvine.gamespot.com/api/issue/4000-${numericId}/?api_key=${apiKey}&format=json&field_list=id,name,image,issue_number,volume,cover_date,store_date,description`
     // Comic Vine volume resource prefix is 4050
-    : `https://comicvine.gamespot.com/api/volume/4050-${numericId}/?api_key=${apiKey}&format=json&field_list=id,name,image,start_year,publisher,description,count_of_issues`
+    : `https://comicvine.gamespot.com/api/volume/4050-${numericId}/?api_key=${apiKey}&format=json&field_list=id,name,image,start_year,publisher,description,count_of_issues,people,characters`
 
   try {
     const response = await fetch(url, { headers: { 'User-Agent': 'CatchComics/1.0' } })
