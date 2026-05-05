@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import PricingPanel from '@/components/PricingPanel'
+import SearchBar from '@/components/SearchBar'
 
 interface ComicDetail {
   id: number
@@ -35,6 +36,9 @@ function ComicPage() {
   const [market, setMarket] = useState<'uk' | 'us'>(regionParam || 'uk')
   const [issues, setIssues]               = useState<IssueListItem[]>([])
   const [issuesLoading, setIssuesLoading] = useState(false)
+  // Detail-page listing filters
+  const [formatFilter, setFormatFilter] = useState<'all' | 'graphic-novel' | 'single-issue' | 'manga'>('all')
+  const [priceMax, setPriceMax]         = useState<'all' | '5' | '10'>('all')
 
   // True only for numeric Comic Vine volume IDs — issues (i-prefixed) and
   // Open Library books (ol-prefixed) don't have child issues to list.
@@ -126,15 +130,18 @@ function ComicPage() {
     <main className="min-h-screen font-sans" style={{ background: '#F8F8F6' }}>
 
       {/* NAV */}
-      <nav className="sticky top-0 z-20 bg-white border-b border-gray-100 px-8 h-20 flex items-center justify-between">
-        <a href="/">
+      <nav className="sticky top-0 z-20 bg-white border-b border-gray-100 px-8 h-20 flex items-center gap-4">
+        <a href="/" className="shrink-0">
           <img src="/logo.png" alt="Catch Comics" className="h-12 w-auto" />
         </a>
+        <div className="flex-1" style={{ maxWidth: '480px' }}>
+          <SearchBar region={market} variant="header" initialQuery={comic?.name ?? ''} />
+        </div>
         <button
           onClick={() => router.back()}
-          className="text-xs text-gray-400 hover:text-gray-700 transition-colors flex items-center gap-1"
+          className="text-xs text-gray-400 hover:text-gray-700 transition-colors flex items-center gap-1 shrink-0 ml-auto"
         >
-          ← Back to results
+          ← Back
         </button>
       </nav>
 
@@ -194,74 +201,143 @@ function ComicPage() {
         </div>
       </div>
 
-      {/* OFFERS — live eBay listings via /api/prices */}
+      {/* ── BODY: two columns — pricing (left) + issues grid (right) ───────── */}
       <div className="max-w-4xl mx-auto px-8 py-6">
-        <PricingPanel query={comic.name} region={market} />
-        <p className="text-xs text-gray-300 mt-8 leading-relaxed">
-          Catch Comics links to third-party retailers. Prices and availability may vary.
-        </p>
-      </div>
 
-      {/* ── ISSUES GRID — only for volumes with multiple issues ─────────────── */}
-      {isVolume && (issuesLoading || issues.length > 0) && (
-        <div className="max-w-4xl mx-auto px-8 pb-12">
-          <div className="border-t border-gray-200 pt-8">
-            <div className="flex items-baseline justify-between mb-4">
-              <h2 className="text-base font-semibold text-gray-900">
-                Issues in this series
-              </h2>
-              {!issuesLoading && issues.length > 0 && (
-                <span className="text-xs text-gray-400">
-                  {issues.length} {issues.length === 1 ? 'issue' : 'issues'}
-                </span>
+        {/* ── Filter pills row ──────────────────────────────────────────────── */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px', alignItems: 'center' }}>
+          {/* Format */}
+          {([
+            { id: 'all',           label: 'All' },
+            { id: 'graphic-novel', label: 'Graphic Novels' },
+            { id: 'single-issue',  label: 'Single Issues' },
+            { id: 'manga',         label: 'Manga' },
+          ] as { id: 'all' | 'graphic-novel' | 'single-issue' | 'manga'; label: string }[]).map(({ id, label }) => {
+            const active = formatFilter === id
+            return (
+              <button
+                key={id}
+                onClick={() => setFormatFilter(id)}
+                aria-pressed={active}
+                style={{
+                  padding: '5px 14px', borderRadius: '999px', fontSize: '12px',
+                  fontWeight: 500, fontFamily: 'inherit', cursor: 'pointer',
+                  background: active ? '#0A0A0A' : '#fff',
+                  color:      active ? '#fff'    : '#374151',
+                  border:     `1px solid ${active ? '#0A0A0A' : '#E5E7EB'}`,
+                  transition: 'background 0.12s, color 0.12s',
+                }}
+              >
+                {label}
+              </button>
+            )
+          })}
+
+          {/* Divider */}
+          <span style={{ width: '1px', height: '20px', background: '#E5E7EB', flexShrink: 0 }} />
+
+          {/* Price cap */}
+          {([
+            { id: 'all', label: 'Any price' },
+            { id: '5',   label: `Under ${market === 'uk' ? '£' : '$'}5` },
+            { id: '10',  label: `Under ${market === 'uk' ? '£' : '$'}10` },
+          ] as { id: 'all' | '5' | '10'; label: string }[]).map(({ id, label }) => {
+            const active = priceMax === id
+            return (
+              <button
+                key={id}
+                onClick={() => setPriceMax(id)}
+                aria-pressed={active}
+                style={{
+                  padding: '5px 14px', borderRadius: '999px', fontSize: '12px',
+                  fontWeight: 500, fontFamily: 'inherit', cursor: 'pointer',
+                  background: active ? '#E8272A' : '#fff',
+                  color:      active ? '#fff'    : '#374151',
+                  border:     `1px solid ${active ? '#E8272A' : '#E5E7EB'}`,
+                  transition: 'background 0.12s, color 0.12s',
+                }}
+              >
+                {label}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* ── Two-column layout ──────────────────────────────────────────────── */}
+        <div style={{ display: 'flex', gap: '28px', alignItems: 'flex-start' }}>
+
+          {/* LEFT — live eBay listings */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <PricingPanel
+              query={comic.name}
+              region={market}
+              formatFilter={formatFilter}
+              priceMax={priceMax}
+            />
+            <p className="text-xs text-gray-400 mt-8 leading-relaxed">
+              Catch Comics links to third-party retailers. Prices and availability may vary.
+            </p>
+          </div>
+
+          {/* RIGHT — issues grid (volumes only) */}
+          {isVolume && (issuesLoading || issues.length > 0) && (
+            <div style={{ width: '240px', flexShrink: 0 }}>
+              <div className="flex items-baseline justify-between mb-3">
+                <h2 className="text-sm font-semibold text-gray-900">Issues in this series</h2>
+                {!issuesLoading && issues.length > 0 && (
+                  <span className="text-xs text-gray-400">{issues.length}</span>
+                )}
+              </div>
+
+              {issuesLoading ? (
+                <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i} className="animate-pulse">
+                      <div className="rounded-md bg-gray-100" style={{ aspectRatio: '2 / 3' }} />
+                      <div className="h-2.5 bg-gray-100 rounded mt-1.5 w-1/2" />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                  {issues.map(issue => {
+                    const cover = issue.image.medium_url || issue.image.small_url
+                    const label = issue.issue_number ? `#${issue.issue_number}` : (issue.name || 'Issue')
+                    const sub   = issue.cover_year || ''
+                    return (
+                      <button
+                        key={issue.id}
+                        onClick={() => router.push(`/comic/i${issue.id}?region=${market}`)}
+                        className="text-left bg-transparent border-0 p-0 cursor-pointer group"
+                      >
+                        <div
+                          className="relative rounded-md overflow-hidden bg-gray-100 border border-gray-200 transition-all group-hover:shadow-md group-hover:scale-105"
+                          style={{ aspectRatio: '2 / 3' }}
+                        >
+                          <span className="absolute inset-0 flex items-center justify-center text-gray-400 text-xs font-medium">
+                            {label}
+                          </span>
+                          {cover && (
+                            <img
+                              src={cover}
+                              alt={`${comic.name} ${label}`}
+                              className="absolute inset-0 w-full h-full object-cover"
+                              loading="lazy"
+                              onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+                            />
+                          )}
+                        </div>
+                        <div className="mt-1 text-[11px] font-medium text-gray-900 truncate">{label}</div>
+                        {sub && <div className="text-[10px] text-gray-400">{sub}</div>}
+                      </button>
+                    )
+                  })}
+                </div>
               )}
             </div>
-
-            {issuesLoading ? (
-              <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))' }}>
-                {[...Array(8)].map((_, i) => (
-                  <div key={i} className="animate-pulse">
-                    <div className="rounded-md bg-gray-100" style={{ aspectRatio: '2 / 3' }} />
-                    <div className="h-3 bg-gray-100 rounded mt-2 w-1/2" />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))' }}>
-                {issues.map(issue => {
-                  const cover  = issue.image.medium_url || issue.image.small_url
-                  const label  = issue.issue_number ? `#${issue.issue_number}` : (issue.name || 'Issue')
-                  const sub    = issue.cover_year || ''
-                  return (
-                    <button
-                      key={issue.id}
-                      onClick={() => router.push(`/comic/i${issue.id}?region=${market}`)}
-                      className="text-left bg-transparent border-0 p-0 cursor-pointer group"
-                    >
-                      <div className="relative rounded-md overflow-hidden bg-gray-100 border border-gray-200 transition-shadow group-hover:shadow-md" style={{ aspectRatio: '2 / 3' }}>
-                        <span className="absolute inset-0 flex items-center justify-center text-gray-400 text-base font-medium">
-                          {label}
-                        </span>
-                        {cover && (
-                          <img
-                            src={cover}
-                            alt={`${comic.name} ${label}`}
-                            className="absolute inset-0 w-full h-full object-cover"
-                            loading="lazy"
-                            onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
-                          />
-                        )}
-                      </div>
-                      <div className="mt-1.5 text-xs font-medium text-gray-900 truncate">{label}</div>
-                      {sub && <div className="text-[11px] text-gray-400">{sub}</div>}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-          </div>
+          )}
         </div>
-      )}
+      </div>
 
     </main>
   )

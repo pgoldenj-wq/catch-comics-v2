@@ -12,7 +12,19 @@ import { pricesCache } from '@/lib/cache'
  * Sandbox vs production is auto-detected from the EBAY_CLIENT_ID prefix.
  */
 
+// Force Node.js runtime — required for Buffer (OAuth base64 encoding) and for
+// the in-memory token cache. Edge runtime does not have Buffer.
+export const runtime = 'nodejs'
+
 export async function GET(request: NextRequest) {
+  // Diagnostic: confirm env vars are present on every cold start.
+  // Values are never logged — only presence is checked.
+  console.log('[/api/prices] env check:', {
+    EBAY_CLIENT_ID:     !!process.env.EBAY_CLIENT_ID,
+    EBAY_CLIENT_SECRET: !!process.env.EBAY_CLIENT_SECRET,
+    MARKETPLACE_UK:     process.env.EBAY_MARKETPLACE_ID_UK || '(fallback EBAY_GB)',
+    MARKETPLACE_US:     process.env.EBAY_MARKETPLACE_ID_US || '(fallback EBAY_US)',
+  })
   const { searchParams } = request.nextUrl
   const query  = (searchParams.get('q')      || '').trim()
   const region = (searchParams.get('region') || 'uk').toLowerCase()
@@ -56,10 +68,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(body)
 
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'unknown error'
+    const message = err instanceof Error ? err.message : String(err)
+    // Full error detail logged server-side (visible in Vercel Functions logs)
     console.error('[/api/prices] eBay error:', message)
     return NextResponse.json(
-      { error: 'Failed to fetch listings.', detail: message, listings: [], count: 0 },
+      { error: message, listings: [], count: 0 },
       { status: 502 }
     )
   }

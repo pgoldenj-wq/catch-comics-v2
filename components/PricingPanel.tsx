@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -26,8 +26,12 @@ interface PricesResponse {
 }
 
 interface PricingPanelProps {
-  query:  string
-  region: 'uk' | 'us'
+  query:        string
+  region:       'uk' | 'us'
+  /** Client-side format filter applied to eBay listings ('all' = no filter) */
+  formatFilter?: 'all' | 'graphic-novel' | 'single-issue' | 'manga'
+  /** Client-side max-price filter applied to eBay listings ('all' = no filter) */
+  priceMax?:    'all' | '5' | '10'
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -47,16 +51,10 @@ function formatPrice(value: number, currency: string): string {
 
 /**
  * Live pricing panel — calls /api/prices on the server, which proxies the
- * eBay Buy Browse API (auto-detects sandbox vs production from the configured
- * App ID). Listings are sorted cheapest-first server-side; we re-sort defensively.
- *
- * States:
- *   - loading           → skeleton rows
- *   - error             → text card
- *   - empty (sandbox)   → "production pricing will appear once approved"
- *   - has results       → card list with "Best" badge on the cheapest
+ * eBay Buy Browse API. Listings are sorted cheapest-first server-side; we
+ * re-sort defensively, then optionally filter client-side by format/priceMax.
  */
-export default function PricingPanel({ query, region }: PricingPanelProps) {
+export default function PricingPanel({ query, region, formatFilter = 'all', priceMax = 'all' }: PricingPanelProps) {
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState<string | null>(null)
   const [listings, setListings] = useState<Listing[]>([])
@@ -93,15 +91,47 @@ export default function PricingPanel({ query, region }: PricingPanelProps) {
     return () => controller.abort()
   }, [query, region])
 
+  // Client-side filter applied on top of the server-sorted listings
+  const visibleListings = useMemo(() => {
+    let ls = [...listings]
+
+    if (formatFilter !== 'all') {
+      ls = ls.filter(l => {
+        const t = l.title.toLowerCase()
+        switch (formatFilter) {
+          case 'single-issue':
+            return /#\d/.test(t) || t.includes('issue') || t.includes('single')
+          case 'graphic-novel':
+            return (
+              /\bvol(ume)?\b/.test(t) || t.includes('tpb') || t.includes('trade') ||
+              t.includes('omnibus') || t.includes('hardcover') || t.includes('complete') ||
+              t.includes('complet')
+            )
+          case 'manga':
+            return t.includes('manga') || t.includes('tankobon') || t.includes(' vol.')
+          default:
+            return true
+        }
+      })
+    }
+
+    if (priceMax !== 'all') {
+      const max = parseFloat(priceMax)
+      if (!isNaN(max)) ls = ls.filter(l => l.price.value < max)
+    }
+
+    return ls
+  }, [listings, formatFilter, priceMax])
+
   const regionLabel = region === 'uk' ? 'United Kingdom' : 'United States'
 
   return (
     <div>
-      {/* Header — matches the existing offers strip on the comic detail page */}
+      {/* Header */}
       <p className="text-xs text-gray-400 mb-4 uppercase tracking-wide">
         {loading
           ? 'Loading offers…'
-          : `${listings.length} ${listings.length === 1 ? 'offer' : 'offers'} · ${regionLabel}`}
+          : `${visibleListings.length} ${visibleListings.length === 1 ? 'offer' : 'offers'} · ${regionLabel}`}
       </p>
 
       {/* Loading skeleton */}
@@ -123,26 +153,29 @@ export default function PricingPanel({ query, region }: PricingPanelProps) {
         </div>
       )}
 
-      {/* Error state */}
+      {/* Error state — shows actual eBay/network error for easier debugging */}
       {!loading && error && (
-        <div className="rounded-2xl border border-gray-100 bg-white p-6 text-center">
-          <p className="text-sm text-gray-500">{error}</p>
+        <div className="rounded-2xl border border-red-100 bg-red-50 p-6 text-center">
+          <p className="text-sm text-red-600 font-medium mb-1">Couldn&apos;t load listings</p>
+          <p className="text-xs text-red-400 break-words">{error}</p>
         </div>
       )}
 
       {/* Empty state */}
-      {!loading && !error && listings.length === 0 && (
+      {!loading && !error && visibleListings.length === 0 && (
         <div className="rounded-2xl border border-gray-100 bg-white p-6 text-center">
           <p className="text-sm text-gray-500">
-            No listings found for this title right now. Check back soon.
+            {listings.length > 0
+              ? 'No listings match the active filters.'
+              : 'No listings found for this title right now.'}
           </p>
         </div>
       )}
 
       {/* Listings */}
-      {!loading && !error && listings.length > 0 && (
+      {!loading && !error && visibleListings.length > 0 && (
         <ul className="space-y-3">
-          {listings.map((l, i) => {
+          {visibleListings.map((l, i) => {
             const isBest    = i === 0
             const feedback  = l.seller.feedbackPercentage > 0 ? `${l.seller.feedbackPercentage}% feedback` : ''
             const meta      = ['eBay', l.condition || 'Unspecified', l.seller.username, feedback].filter(Boolean).join(' · ')

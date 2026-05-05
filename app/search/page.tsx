@@ -5,6 +5,67 @@ import { useEffect, useState, useMemo, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import SearchBar from '@/components/SearchBar'
 
+// ─── PriceTag — live "From £X.XX" badge per result card ──────────────────────
+// Fetches /api/price-hint for one comic at a time, staggered by index so we
+// don't fire 20 simultaneous eBay requests. Shows a shimmer while loading,
+// the live price on success, or "Find prices →" as a graceful fallback.
+
+const CURRENCY_SYMBOLS: Record<string, string> = { GBP: '£', USD: '$', EUR: '€' }
+
+function PriceTag({ query, region, index }: { query: string; region: 'uk' | 'us'; index: number }) {
+  const [state, setState] = useState<'loading' | 'found' | 'empty'>('loading')
+  const [label, setLabel] = useState('')
+
+  useEffect(() => {
+    setState('loading')
+    setLabel('')
+    // Stagger by index so requests don't all fire simultaneously
+    const delay = index * 80
+    const controller = new AbortController()
+    const t = setTimeout(() => {
+      fetch(`/api/price-hint?q=${encodeURIComponent(query)}&region=${region}`, { signal: controller.signal })
+        .then(r => r.json())
+        .then((data: { lowestPrice: number | null; currency: string | null }) => {
+          if (data.lowestPrice != null && data.currency) {
+            const sym = CURRENCY_SYMBOLS[data.currency] || `${data.currency} `
+            setLabel(`From ${sym}${data.lowestPrice.toFixed(2)}`)
+            setState('found')
+          } else {
+            setState('empty')
+          }
+        })
+        .catch(err => {
+          if (err instanceof Error && err.name === 'AbortError') return
+          setState('empty')
+        })
+    }, delay)
+    return () => { clearTimeout(t); controller.abort() }
+  }, [query, region, index])
+
+  return (
+    <div style={{ flexShrink: 0, textAlign: 'right', paddingTop: '2px', minWidth: '90px' }}>
+      {state === 'loading' ? (
+        <>
+          <div style={{ fontSize: '10px', color: '#D1D5DB', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>···</div>
+          <div style={{ height: '16px', width: '72px', background: '#F3F4F6', borderRadius: '4px', marginLeft: 'auto' }} />
+        </>
+      ) : state === 'found' ? (
+        <>
+          <div style={{ fontSize: '10px', color: '#6B7280', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '2px' }}>eBay</div>
+          <div style={{ fontSize: '13px', fontWeight: 600, color: '#C41F22' }}>{label}</div>
+          <div style={{ fontSize: '10px', color: '#6B7280', marginTop: '2px' }}>{region === 'uk' ? 'UK stores' : 'US stores'}</div>
+        </>
+      ) : (
+        <>
+          <div style={{ fontSize: '10px', color: '#6B7280', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '2px' }}>Compare</div>
+          <div style={{ fontSize: '13px', fontWeight: 500, color: '#C41F22' }}>Find prices →</div>
+          <div style={{ fontSize: '10px', color: '#6B7280', marginTop: '2px' }}>{region === 'uk' ? 'UK stores' : 'US stores'}</div>
+        </>
+      )}
+    </div>
+  )
+}
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface ComicResult {
@@ -596,7 +657,7 @@ function SearchResults() {
           {/* Result cards */}
           {!loading && !error && filteredResults.length > 0 && (
             <div style={{ borderTop: '1px solid #F0F0F0' }}>
-              {filteredResults.map(comic => {
+              {filteredResults.map((comic, index) => {
                 const isIsbnResult = comic.source === 'open_library'
                 const fmt = isIsbnResult ? 'graphic-novel' as Format : detectFormat(comic)
                 const fmtStyle = FORMAT_STYLES[fmt]
@@ -619,14 +680,25 @@ function SearchResults() {
                         router.push(`/comic/${comic.id}?region=${region}`)
                       }
                     }}
-                    style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', padding: '16px 0', cursor: 'pointer', borderBottom: '1px solid #F0F0F0' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = '#FAFAFA')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                    style={{
+                      display: 'flex', alignItems: 'flex-start', gap: '14px',
+                      padding: '16px 6px', cursor: 'pointer',
+                      borderBottom: '1px solid #F0F0F0',
+                      borderRadius: '8px',
+                      transition: 'background 0.12s, transform 0.15s, box-shadow 0.15s',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = '#FAFAFA'
+                      e.currentTarget.style.transform = 'scale(1.012)'
+                      e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.06)'
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = 'transparent'
+                      e.currentTarget.style.transform = 'scale(1)'
+                      e.currentTarget.style.boxShadow = 'none'
+                    }}>
 
-                    {/* Cover frame — scales as a whole on hover. Bumped to ~3x for a true
-                        preview-on-hover feel. transition + scale + z-index on the container,
-                        not the <img>. overflow:hidden removed; the <img> carries its own
-                        borderRadius so the rounded corners stay clean without clipping. */}
+                    {/* Cover frame — 3x zoom on hover for a quick preview feel */}
                     <div
                       className="transition-transform duration-300 ease-out hover:scale-[3] hover:z-50"
                       style={{ width: '80px', height: '112px', borderRadius: '6px', background: '#F3F4F6', border: '1px solid #EBEBEB', flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -673,14 +745,8 @@ function SearchResults() {
                       )}
                     </div>
 
-                    {/* Region-aware CTA */}
-                    <div style={{ flexShrink: 0, textAlign: 'right', paddingTop: '2px' }}>
-                      <div style={{ fontSize: '10px', color: '#6B7280', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '2px' }}>Compare</div>
-                      <div style={{ fontSize: '13px', fontWeight: 500, color: '#C41F22' }}>Find prices →</div>
-                      <div style={{ fontSize: '10px', color: '#6B7280', marginTop: '2px' }}>
-                        {region === 'uk' ? 'UK stores' : 'US stores'}
-                      </div>
-                    </div>
+                    {/* Live price tag — fetches eBay lowest price per card */}
+                    <PriceTag query={comic.name} region={region} index={index} />
                   </div>
                 )
               })}
