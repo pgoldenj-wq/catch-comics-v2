@@ -16,21 +16,24 @@ import { pricesCache } from '@/lib/cache'
 // the in-memory token cache. Edge runtime does not have Buffer.
 export const runtime = 'nodejs'
 
+// Temporary env-var presence check — visible directly in the API response.
+// Remove once credentials are confirmed working in production.
+const ENV_DEBUG = {
+  hasClientId:     !!process.env.EBAY_CLIENT_ID,
+  hasClientSecret: !!process.env.EBAY_CLIENT_SECRET,
+  hasMarketplaceUK: !!process.env.EBAY_MARKETPLACE_ID_UK,
+  hasMarketplaceUS: !!process.env.EBAY_MARKETPLACE_ID_US,
+  nodeEnv:          process.env.NODE_ENV ?? 'unknown',
+}
+
 export async function GET(request: NextRequest) {
-  // Diagnostic: confirm env vars are present on every cold start.
-  // Values are never logged — only presence is checked.
-  console.log('[/api/prices] env check:', {
-    EBAY_CLIENT_ID:     !!process.env.EBAY_CLIENT_ID,
-    EBAY_CLIENT_SECRET: !!process.env.EBAY_CLIENT_SECRET,
-    MARKETPLACE_UK:     process.env.EBAY_MARKETPLACE_ID_UK || '(fallback EBAY_GB)',
-    MARKETPLACE_US:     process.env.EBAY_MARKETPLACE_ID_US || '(fallback EBAY_US)',
-  })
+  console.log('[/api/prices] env debug:', ENV_DEBUG)
   const { searchParams } = request.nextUrl
   const query  = (searchParams.get('q')      || '').trim()
   const region = (searchParams.get('region') || 'uk').toLowerCase()
 
   if (!query) {
-    return NextResponse.json({ error: 'No query provided' }, { status: 400 })
+    return NextResponse.json({ error: 'No query provided', _env: ENV_DEBUG }, { status: 400 })
   }
   if (region !== 'uk' && region !== 'us') {
     return NextResponse.json({ error: 'Invalid region (must be uk or us)' }, { status: 400 })
@@ -72,7 +75,7 @@ export async function GET(request: NextRequest) {
     // Full error detail logged server-side (visible in Vercel Functions logs)
     console.error('[/api/prices] eBay error:', message)
     return NextResponse.json(
-      { error: message, listings: [], count: 0 },
+      { error: message, listings: [], count: 0, _env: ENV_DEBUG },
       { status: 502 }
     )
   }
