@@ -42,8 +42,8 @@ function ComicPage() {
   const [formatFilter, setFormatFilter] = useState<'all' | 'graphic-novel' | 'single-issue' | 'manga'>('all')
   const [priceMax, setPriceMax]         = useState<'all' | '5' | '10' | '15' | '25' | '35' | '50'>('all')
   const [condition, setCondition]       = useState<'all' | 'new' | 'used'>('all')
-  // Which filter accordion sections are open (condition open by default)
-  const [openSections, setOpenSections] = useState<Set<string>>(new Set(['condition']))
+  // Both Condition and Price Range open by default
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set(['condition', 'price']))
   const toggleSection = (id: string) => setOpenSections(prev => {
     const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s
   })
@@ -145,13 +145,29 @@ function ComicPage() {
         <div className="flex-1" style={{ maxWidth: '480px' }}>
           <SearchBar region={market} variant="header" initialQuery={comic?.name ?? ''} />
         </div>
+      </nav>
+
+      {/* BACK NAV — sits between the sticky header and the dark hero panel */}
+      <div style={{ background: '#F8F8F6', padding: '10px 32px 0' }}>
         <button
           onClick={() => router.back()}
-          className="text-xs text-gray-400 hover:text-gray-700 transition-colors flex items-center gap-1 shrink-0 ml-auto"
+          aria-label="Back to previous page"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: '6px',
+            fontSize: '13px', color: '#6B7280',
+            background: 'none', border: 'none', cursor: 'pointer',
+            padding: '4px 0', fontFamily: 'inherit',
+            transition: 'color 0.12s',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.color = '#0A0A0A')}
+          onMouseLeave={e => (e.currentTarget.style.color = '#6B7280')}
         >
-          ← Back
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M19 12H5M12 5l-7 7 7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Back to results
         </button>
-      </nav>
+      </div>
 
       {/* DARK HEADER — overflow visible so hero cover can scale beyond bounds on hover */}
       <div className="relative bg-[#111827]">
@@ -211,24 +227,27 @@ function ComicPage() {
 
           {/* ── METADATA PANEL ─────────────────────────────────────────────────
               Only rendered when there are people/character fields to show.
-              Writer / Artist / Cover artist are extracted by role keyword. */}
+              Creator rows (writers, artists, etc.) render names as search links. */}
           {(() => {
             const people = comic.people || []
             const roleMatch = (role: string | null | undefined, kw: string) => (role ?? '').toLowerCase().includes(kw)
             const writers      = [...new Set(people.filter(p => roleMatch(p.role, 'writer')).map(p => p.name))]
             const pencilers    = [...new Set(people.filter(p => roleMatch(p.role, 'pencil') || (roleMatch(p.role, 'artist') && !roleMatch(p.role, 'cover'))).map(p => p.name))]
+            const colourists   = [...new Set(people.filter(p => roleMatch(p.role, 'colour') || roleMatch(p.role, 'color')).map(p => p.name))]
             const coverArtists = [...new Set(people.filter(p => roleMatch(p.role, 'cover')).map(p => p.name))]
             const chars        = (comic.characters || []).slice(0, 6).map(c => c.name)
 
-            const rows: { label: string; value: string }[] = []
-            if (writers.length)      rows.push({ label: writers.length > 1 ? 'Writers' : 'Writer',      value: writers.join(', ') })
-            if (pencilers.length)    rows.push({ label: pencilers.length > 1 ? 'Artists' : 'Artist',    value: pencilers.join(', ') })
-            if (coverArtists.length) rows.push({ label: 'Cover',     value: coverArtists.join(', ') })
+            // links:true rows render each comma-separated name as a clickable search link
+            const rows: { label: string; value: string; links?: boolean }[] = []
+            if (writers.length)      rows.push({ label: writers.length > 1 ? 'Writers' : 'Writer',      value: writers.join(', '),      links: true })
+            if (pencilers.length)    rows.push({ label: pencilers.length > 1 ? 'Artists' : 'Artist',    value: pencilers.join(', '),    links: true })
+            if (colourists.length)   rows.push({ label: 'Colours',    value: colourists.join(', '),   links: true })
+            if (coverArtists.length) rows.push({ label: 'Cover',      value: coverArtists.join(', '), links: true })
             if (comic.publisher?.name) rows.push({ label: 'Publisher', value: comic.publisher.name })
             if (comic.start_year)    rows.push({ label: 'Year',       value: comic.start_year })
             if (!isNaN(comic.count_of_issues) && comic.count_of_issues > 0)
                                      rows.push({ label: 'Issues',     value: String(comic.count_of_issues) })
-            if (chars.length)        rows.push({ label: 'Characters', value: chars.join(', ') })
+            if (chars.length)        rows.push({ label: 'Characters', value: chars.join(', '), links: true })
 
             if (rows.length === 0) return null
 
@@ -240,13 +259,27 @@ function ComicPage() {
                 alignSelf: 'center',
               }}>
                 <dl style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {rows.map(({ label, value }) => (
+                  {rows.map(({ label, value, links }) => (
                     <div key={label}>
                       <dt style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', marginBottom: '1px' }}>
                         {label}
                       </dt>
                       <dd style={{ margin: 0, fontSize: '12px', color: 'rgba(255,255,255,0.75)', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-                        {value}
+                        {links
+                          ? value.split(', ').map((name, i, arr) => (
+                              <span key={name}>
+                                <a
+                                  href={`/search?q=${encodeURIComponent(name)}&region=${market}`}
+                                  style={{ color: 'rgba(255,255,255,0.75)', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,0.25)', cursor: 'pointer' }}
+                                  onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
+                                  onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.75)')}
+                                >
+                                  {name}
+                                </a>
+                                {i < arr.length - 1 ? ', ' : ''}
+                              </span>
+                            ))
+                          : value}
                       </dd>
                     </div>
                   ))}

@@ -140,7 +140,7 @@ export default function PricingPanel({ query, region, formatFilter = 'all', onFo
 
   const FORMAT_PILLS: { value: 'all' | 'graphic-novel' | 'single-issue' | 'manga'; label: string }[] = [
     { value: 'all',           label: 'All' },
-    { value: 'graphic-novel', label: 'TPB / GN' },
+    { value: 'graphic-novel', label: 'Graphic Novels / TPB' },
     { value: 'single-issue',  label: 'Issues' },
     { value: 'manga',         label: 'Manga' },
   ]

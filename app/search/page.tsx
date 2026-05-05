@@ -12,14 +12,21 @@ import SearchBar from '@/components/SearchBar'
 
 const CURRENCY_SYMBOLS: Record<string, string> = { GBP: '£', USD: '$', EUR: '€' }
 
-function PriceTag({ query, region, index }: { query: string; region: 'uk' | 'us'; index: number }) {
+function PriceTag({
+  query, region, index,
+  onPriceLoaded,
+}: {
+  query: string
+  region: 'uk' | 'us'
+  index: number
+  onPriceLoaded?: (query: string, price: number | null) => void
+}) {
   const [state, setState] = useState<'loading' | 'found' | 'empty'>('loading')
   const [label, setLabel] = useState('')
 
   useEffect(() => {
     setState('loading')
     setLabel('')
-    // Stagger by index so requests don't all fire simultaneously
     const delay = index * 80
     const controller = new AbortController()
     const t = setTimeout(() => {
@@ -30,17 +37,20 @@ function PriceTag({ query, region, index }: { query: string; region: 'uk' | 'us'
             const sym = CURRENCY_SYMBOLS[data.currency] || `${data.currency} `
             setLabel(`From ${sym}${data.lowestPrice.toFixed(2)}`)
             setState('found')
+            onPriceLoaded?.(query, data.lowestPrice)
           } else {
             setState('empty')
+            onPriceLoaded?.(query, null)
           }
         })
         .catch(err => {
           if (err instanceof Error && err.name === 'AbortError') return
           setState('empty')
+          onPriceLoaded?.(query, null)
         })
     }, delay)
     return () => { clearTimeout(t); controller.abort() }
-  }, [query, region, index])
+  }, [query, region, index, onPriceLoaded])
 
   return (
     <div style={{ flexShrink: 0, textAlign: 'right', paddingTop: '2px', minWidth: '90px' }}>
@@ -380,6 +390,8 @@ function SearchResults() {
   const [error,      setError]      = useState('')
   const [didYouMean, setDidYouMean] = useState<string | null>(null)
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false)
+  // Collected price data from PriceTag callbacks — used for "Lowest price" sort
+  const [priceMap, setPriceMap] = useState<Map<string, number | null>>(new Map())
 
   const currency = region === 'uk' ? '£' : '$'
 
@@ -428,6 +440,7 @@ function SearchResults() {
     setError('')
     setResults([])
     setDidYouMean(null)
+    setPriceMap(new Map()) // reset prices for new query
     fetch(`/api/search?q=${encodeURIComponent(query)}`)
       .then(res => res.json())
       .then(data => {
@@ -474,9 +487,21 @@ function SearchResults() {
         })
       }
     }
-    if (sort === 'newest')   res.sort((a, b) => parseInt(b.start_year || '0') - parseInt(a.start_year || '0'))
+    if (sort === 'newest') {
+      res.sort((a, b) => parseInt(b.start_year || '0') - parseInt(a.start_year || '0'))
+    } else if (sort === 'price') {
+      res.sort((a, b) => {
+        const pa = priceMap.get(a.name) ?? null
+        const pb = priceMap.get(b.name) ?? null
+        // Items without a price go last
+        if (pa === null && pb === null) return 0
+        if (pa === null) return 1
+        if (pb === null) return -1
+        return pa - pb
+      })
+    }
     return res
-  }, [results, format, category, publisher, priceMax, sort])
+  }, [results, format, category, publisher, priceMax, sort, priceMap])
 
   const hasActiveFilters = format !== 'all' || category !== 'all' || publisher !== 'all' || priceMax !== 'all'
 
@@ -619,6 +644,7 @@ function SearchResults() {
                   }}>
                   <option value="relevance">Relevance</option>
                   <option value="newest">Newest Release</option>
+                  <option value="price">Lowest Price</option>
                 </select>
               </div>
             </div>
@@ -746,7 +772,14 @@ function SearchResults() {
                     </div>
 
                     {/* Live price tag — fetches eBay lowest price per card */}
-                    <PriceTag query={comic.name} region={region} index={index} />
+                    <PriceTag
+                      query={comic.name}
+                      region={region}
+                      index={index}
+                      onPriceLoaded={(q, price) =>
+                        setPriceMap(prev => { const m = new Map(prev); m.set(q, price); return m })
+                      }
+                    />
                   </div>
                 )
               })}

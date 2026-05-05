@@ -300,50 +300,69 @@ export default function Home() {
             </div>
           </div>
 
-          {/* RIGHT — book covers + publisher strip */}
-          <div className="hero-right" style={{ position: 'relative', flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'center', borderRadius: '0 28px 28px 0' }}>
+          {/* RIGHT — book covers + publisher strip.
+              overflow:visible so covers can scale beyond container bounds on hover. */}
+          <div className="hero-right" style={{ position: 'relative', flex: 1, overflow: 'visible', display: 'flex', flexDirection: 'column', justifyContent: 'center', borderRadius: '0 28px 28px 0' }}>
             {/* Right-edge fade so covers dissolve naturally into the card border */}
             <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '56px', zIndex: 20, pointerEvents: 'none', background: 'linear-gradient(to left, #111827 0%, transparent 100%)' }} />
 
-            {/* Cover stack — height is a flex spacer; absolute covers overflow it
-                freely within the right column's overflow:hidden boundary (420px) */}
+            {/* Cover stack — height is a flex spacer; covers are absolutely positioned.
+                Each cover has a wrapper div that handles hover-scale so the whole frame
+                (including border-radius) enlarges by 15%. The inner button retains its
+                CSS sway animation independently — scale on the wrapper does not conflict. */}
             <div style={{ position: 'relative', height: '280px' }}>
               {covers.map((cover, i) => (
-                <button
+                <div
                   key={i}
-                  className={cover.animClass}
-                  onClick={() => router.push(`/search?q=${encodeURIComponent(cover.searchQuery)}&region=${region}`)}
-                  aria-label={`Search for ${cover.title}`}
                   style={{
                     position: 'absolute',
                     left: cover.left,
                     top: cover.top,
                     width: cover.width,
                     height: cover.height,
-                    borderRadius: '10px',
-                    overflow: 'hidden',
-                    /* transform intentionally omitted — set via CSS class so animation works */
-                    boxShadow: '0 24px 56px rgba(0,0,0,0.65)',
                     zIndex: cover.zIndex,
-                    background: '#1a1a2e',
-                    cursor: 'pointer',
-                    padding: 0,
-                    border: 'none',
-                  }}>
-                  <img
-                    src={cover.src}
-                    alt=""    /* parent <button> has aria-label="Search for {title}" — avoid double-announce */
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                    onError={(e) => { (e.target as HTMLImageElement).style.opacity = '0'; }}
-                  />
-                </button>
+                    transformOrigin: 'center center',
+                    transition: 'transform 0.25s ease-out, z-index 0s',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.transform = 'scale(1.15)'
+                    e.currentTarget.style.zIndex = '20'
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.transform = 'scale(1)'
+                    e.currentTarget.style.zIndex = String(cover.zIndex)
+                  }}
+                >
+                  <button
+                    className={cover.animClass}
+                    onClick={() => router.push(`/search?q=${encodeURIComponent(cover.searchQuery)}&region=${region}`)}
+                    aria-label={`Search for ${cover.title}`}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      borderRadius: '10px',
+                      overflow: 'hidden',
+                      boxShadow: '0 24px 56px rgba(0,0,0,0.65)',
+                      background: '#1a1a2e',
+                      cursor: 'pointer',
+                      padding: 0,
+                      border: 'none',
+                      display: 'block',
+                    }}>
+                    <img
+                      src={cover.src}
+                      alt=""
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                      onError={(e) => { (e.target as HTMLImageElement).style.opacity = '0'; }}
+                    />
+                  </button>
+                </div>
               ))}
             </div>
 
-            {/* Publisher logo strip — full-width, anchored in flex column flow.
-                Marked aria-hidden because it's an ambient branding flourish duplicated for
-                infinite-scroll; screen readers would otherwise hear "Marvel DC Image..." twice. */}
-            <div aria-hidden="true" style={{ position: 'relative', marginTop: '14px', overflow: 'hidden', height: '36px' }}>
+            {/* Publisher logo strip — wrapped in its own overflow:hidden so the
+                strip scrolls cleanly after hero-right was changed to overflow:visible. */}
+            <div aria-hidden="true" style={{ position: 'relative', marginTop: '14px', height: '36px', overflow: 'hidden' }}>
               <div style={{ position: 'absolute', left: 0,  top: 0, bottom: 0, width: '32px', zIndex: 2, pointerEvents: 'none', background: 'linear-gradient(to right, #111827 0%, transparent 100%)' }} />
               <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '32px', zIndex: 2, pointerEvents: 'none', background: 'linear-gradient(to left,  #111827 0%, transparent 100%)' }} />
               <div className="pub-track">

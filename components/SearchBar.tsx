@@ -15,6 +15,18 @@ interface SearchBarProps {
   variant?: 'hero' | 'header';
 }
 
+// Shown on the homepage when the search bar is focused and the query is empty.
+// Only displayed for the hero variant.
+const POPULAR_SEARCHES = [
+  'Absolute Batman',
+  'Ultimate Spider-Man',
+  'Batman: Dark Patterns',
+  'X-Men',
+  'Void Rivals',
+  'Transformers',
+  'Invincible',
+]
+
 // Type badge colours
 const TYPE_BADGE: Record<string, { bg: string; color: string }> = {
   'Manga':  { bg: '#FEF3C7', color: '#92400E' },
@@ -25,12 +37,16 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
   const [query, setQuery] = useState(initialQuery);
   const [suggestions, setSuggestions] = useState<SuggestionTerm[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isFocused, setIsFocused]             = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const abortRef    = useRef<AbortController | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const userTypedRef = useRef(false);
   const router = useRouter();
   const pathname = usePathname();
+
+  // Show the popular-searches panel when: hero variant, focused, nothing typed yet
+  const showPopular = variant === 'hero' && isFocused && query.trim() === '' && suggestions.length === 0;
 
   useEffect(() => {
     userTypedRef.current = false;
@@ -88,12 +104,11 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Reset suggestion dropdown on any navigation. Catches the case where the
-  // user clicks a result card / region toggle / browser back-or-forward and the
-  // SearchBar (in the persistent header) keeps its old open dropdown.
+  // Reset suggestion dropdown on any navigation.
   useEffect(() => {
     setSuggestions([]);
     setShowSuggestions(false);
+    setIsFocused(false);
     userTypedRef.current = false;
     abortRef.current?.abort();
   }, [pathname]);
@@ -139,7 +154,7 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
           display: 'flex',
           alignItems: 'center',
           background: '#fff',
-          borderRadius: showSuggestions && suggestions.length > 0 ? '18px 18px 0 0' : '999px',
+          borderRadius: (showSuggestions && suggestions.length > 0) || showPopular ? '18px 18px 0 0' : '999px',
           padding: isHero ? '6px 6px 6px 20px' : '4px 4px 4px 16px',
           boxShadow: isHero ? '0 8px 32px rgba(0,0,0,0.28)' : '0 1px 4px rgba(0,0,0,0.06)',
           border: isHero ? 'none' : '1px solid #E5E7EB',
@@ -154,7 +169,8 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
             value={query}
             onChange={e => { userTypedRef.current = true; setQuery(e.target.value); }}
             onKeyDown={handleKeyDown}
-            onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+            onFocus={() => { setIsFocused(true); if (suggestions.length > 0) setShowSuggestions(true); }}
+            onBlur={() => setIsFocused(false)}
             placeholder="Search any title, character or ISBN..."
             aria-label="Search comics, characters, or ISBN"
             aria-autocomplete="list"
@@ -195,6 +211,60 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
             </svg>
           </button>
         </form>
+
+      {/* Popular searches — hero variant, empty query, focused */}
+      {showPopular && (
+        <div role="listbox" aria-label="Popular searches" style={{
+          position: 'absolute',
+          top: '100%',
+          left: 0,
+          right: 0,
+          zIndex: 9999,
+          background: '#fff',
+          borderRadius: '0 0 18px 18px',
+          boxShadow: '0 20px 50px rgba(0,0,0,0.18)',
+          overflow: 'hidden',
+          borderTop: '1px solid #F3F4F6',
+        }}>
+          <div style={{ padding: '10px 18px 6px', fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#9CA3AF' }}>
+            Popular searches
+          </div>
+          {POPULAR_SEARCHES.map((term, i) => (
+            <button key={term}
+              type="button"
+              role="option"
+              aria-selected={false}
+              // mouseDown fires before blur so we can navigate before the blur hides the dropdown
+              onMouseDown={e => {
+                e.preventDefault()
+                setSuggestions([])
+                setShowSuggestions(false)
+                setIsFocused(false)
+                setQuery(term)
+                doSearch(term)
+              }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '10px',
+                padding: '10px 18px', cursor: 'pointer',
+                borderBottom: i < POPULAR_SEARCHES.length - 1 ? '1px solid #F9F9F9' : 'none',
+                background: '#fff', border: 'none', width: '100%',
+                textAlign: 'left', font: 'inherit', color: 'inherit',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#F3F4F6')}
+              onMouseLeave={e => (e.currentTarget.style.background = '#fff')}
+            >
+              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" style={{ color: '#E8272A', flexShrink: 0 }} aria-hidden="true">
+                <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" stroke="currentColor" strokeWidth="2"/>
+                <path d="M15 11a4 4 0 11-8 0 4 4 0 018 0z" fill="currentColor" fillOpacity="0.2" stroke="currentColor" strokeWidth="2"/>
+              </svg>
+              <span style={{ flex: 1, fontSize: '13px', color: '#0A0A0A' }}>{term}</span>
+              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" style={{ color: '#D1D5DB', flexShrink: 0 }} aria-hidden="true">
+                <path d="M7 17L17 7M17 7H7M17 7v10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            </button>
+          ))}
+        </div>
+      )}
 
       {showSuggestions && suggestions.length > 0 && (
         <div role="listbox" aria-label="Search suggestions" style={{
