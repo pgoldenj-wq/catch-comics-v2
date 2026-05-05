@@ -1,7 +1,7 @@
 'use client'
 
 import { useSearchParams } from 'next/navigation'
-import { useEffect, useState, useMemo, Suspense } from 'react'
+import { useEffect, useState, useMemo, useRef, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import SearchBar from '@/components/SearchBar'
 
@@ -21,12 +21,21 @@ function PriceTag({
   index: number
   onPriceLoaded?: (query: string, price: number | null) => void
 }) {
-  const [state, setState] = useState<'loading' | 'found' | 'empty'>('loading')
-  const [label, setLabel] = useState('')
+  // Stable price state — never cleared once a value is set.
+  // undefined = first fetch not yet complete (show shimmer)
+  // null      = fetched but no listing found ("Find prices →")
+  // number    = lowest price found
+  const [priceValue, setPriceValue]       = useState<number | null | undefined>(undefined)
+  const [priceCurrency, setPriceCurrency] = useState('')
+
+  // Keep onPriceLoaded in a ref so it never appears in effect deps.
+  // Without this, an inline arrow in the parent re-creates the function every
+  // render → effect re-fires → state resets → price disappears (flicker).
+  const onPriceLoadedRef = useRef(onPriceLoaded)
+  useEffect(() => { onPriceLoadedRef.current = onPriceLoaded }, [onPriceLoaded])
 
   useEffect(() => {
-    setState('loading')
-    setLabel('')
+    // Do NOT reset priceValue here — we only update it if we get a better price.
     const delay = index * 80
     const controller = new AbortController()
     const t = setTimeout(() => {
@@ -34,35 +43,43 @@ function PriceTag({
         .then(r => r.json())
         .then((data: { lowestPrice: number | null; currency: string | null }) => {
           if (data.lowestPrice != null && data.currency) {
-            const sym = CURRENCY_SYMBOLS[data.currency] || `${data.currency} `
-            setLabel(`From ${sym}${data.lowestPrice.toFixed(2)}`)
-            setState('found')
-            onPriceLoaded?.(query, data.lowestPrice)
+            // Only update if: no price yet, or new price is cheaper
+            setPriceValue(prev =>
+              prev === undefined || prev === null || data.lowestPrice! < prev
+                ? data.lowestPrice
+                : prev
+            )
+            setPriceCurrency(c => c || data.currency!)
+            onPriceLoadedRef.current?.(query, data.lowestPrice)
           } else {
-            setState('empty')
-            onPriceLoaded?.(query, null)
+            // Don't overwrite an existing price with "not found"
+            setPriceValue(prev => (prev !== undefined && prev !== null) ? prev : null)
+            onPriceLoadedRef.current?.(query, null)
           }
         })
         .catch(err => {
           if (err instanceof Error && err.name === 'AbortError') return
-          setState('empty')
-          onPriceLoaded?.(query, null)
+          setPriceValue(prev => (prev !== undefined && prev !== null) ? prev : null)
+          onPriceLoadedRef.current?.(query, null)
         })
     }, delay)
     return () => { clearTimeout(t); controller.abort() }
-  }, [query, region, index, onPriceLoaded])
+  }, [query, region, index]) // onPriceLoaded intentionally omitted — tracked via ref
+
+  const sym = CURRENCY_SYMBOLS[priceCurrency] || (priceCurrency ? `${priceCurrency} ` : '')
 
   return (
     <div style={{ flexShrink: 0, textAlign: 'right', paddingTop: '2px', minWidth: '90px' }}>
-      {state === 'loading' ? (
+      {priceValue === undefined ? (
+        // Shimmer — only on the very first load
         <>
           <div style={{ fontSize: '10px', color: '#D1D5DB', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>···</div>
           <div style={{ height: '16px', width: '72px', background: '#F3F4F6', borderRadius: '4px', marginLeft: 'auto' }} />
         </>
-      ) : state === 'found' ? (
+      ) : priceValue !== null ? (
         <>
           <div style={{ fontSize: '10px', color: '#6B7280', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '2px' }}>eBay</div>
-          <div style={{ fontSize: '13px', fontWeight: 600, color: '#C41F22' }}>{label}</div>
+          <div style={{ fontSize: '13px', fontWeight: 600, color: '#C41F22' }}>From {sym}{priceValue.toFixed(2)}</div>
           <div style={{ fontSize: '10px', color: '#6B7280', marginTop: '2px' }}>{region === 'uk' ? 'UK stores' : 'US stores'}</div>
         </>
       ) : (

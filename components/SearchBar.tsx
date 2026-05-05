@@ -246,8 +246,9 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
               style={{
                 display: 'flex', alignItems: 'center', gap: '10px',
                 padding: '10px 18px', cursor: 'pointer',
+                borderTop: 'none', borderLeft: 'none', borderRight: 'none',
                 borderBottom: i < POPULAR_SEARCHES.length - 1 ? '1px solid #F9F9F9' : 'none',
-                background: '#fff', border: 'none', width: '100%',
+                background: '#fff', width: '100%',
                 textAlign: 'left', font: 'inherit', color: 'inherit',
               }}
               onMouseEnter={e => (e.currentTarget.style.background = '#F3F4F6')}
@@ -298,9 +299,9 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
                 style={{
                   display: 'flex', alignItems: 'center', gap: '10px',
                   padding: '11px 18px', cursor: 'pointer',
+                  borderTop: 'none', borderLeft: 'none', borderRight: 'none',
                   borderBottom: i < suggestions.length - 1 ? '1px solid #F9F9F9' : 'none',
                   background: '#fff',
-                  border: 'none',
                   width: '100%',
                   textAlign: 'left',
                   font: 'inherit',

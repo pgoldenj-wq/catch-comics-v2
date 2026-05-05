@@ -84,8 +84,10 @@ export function parseComicQuery(query: string): ParsedQuery {
 // Raised ceilings give exact matches more separation from near-matches, which
 // is important for deduplication tiebreaking and ranking.
 export function titleMatchScore(resultTitle: string, cleanTitle: string): number {
-  const r = resultTitle.toLowerCase().trim()
-  const q = cleanTitle.toLowerCase().trim()
+  // Strip punctuation so "Batman: Year One" matches query "batman year one"
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim()
+  const r = norm(resultTitle)
+  const q = norm(cleanTitle)
   if (!r || !q) return 0
   if (r === q) return 50                              // exact match
   if (r.startsWith(q) || q.startsWith(r)) return 30  // prefix match

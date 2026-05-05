@@ -383,7 +383,10 @@ export async function GET(request: NextRequest) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const titleBestMap = new Map<string, { r: any; score: number }>()
     for (const item of scoredVolumes) {
-      const key      = normalizeTitle((item.r.name as string) || '')
+      // Include publisher in the key so "Batman (DC)" and "Batman (Panini)" are
+      // treated as distinct series rather than collapsed into one entry.
+      const pubName  = ((item.r.publisher?.name as string) || '').toLowerCase().trim()
+      const key      = normalizeTitle((item.r.name as string) || '') + '|' + pubName
       const existing = titleBestMap.get(key)
       if (!existing || item.score > existing.score) {
         titleBestMap.set(key, item)

@@ -147,28 +147,6 @@ function ComicPage() {
         </div>
       </nav>
 
-      {/* BACK NAV — sits between the sticky header and the dark hero panel */}
-      <div style={{ background: '#F8F8F6', padding: '10px 32px 0' }}>
-        <button
-          onClick={() => router.back()}
-          aria-label="Back to previous page"
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: '6px',
-            fontSize: '13px', color: '#6B7280',
-            background: 'none', border: 'none', cursor: 'pointer',
-            padding: '4px 0', fontFamily: 'inherit',
-            transition: 'color 0.12s',
-          }}
-          onMouseEnter={e => (e.currentTarget.style.color = '#0A0A0A')}
-          onMouseLeave={e => (e.currentTarget.style.color = '#6B7280')}
-        >
-          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M19 12H5M12 5l-7 7 7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          Back to results
-        </button>
-      </div>
-
       {/* DARK HEADER — overflow visible so hero cover can scale beyond bounds on hover */}
       <div className="relative bg-[#111827]">
         <div
@@ -178,7 +156,29 @@ function ComicPage() {
             backgroundSize: '22px 22px',
           }}
         />
-        <div className="relative px-8 py-8 flex gap-6 max-w-4xl mx-auto">
+        {/* BACK NAV — inside the dark hero for visual anchoring and contrast */}
+        <div className="relative px-8 pt-5 max-w-4xl mx-auto">
+          <button
+            onClick={() => router.back()}
+            aria-label="Back to previous page"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '6px',
+              fontSize: '12px', color: 'rgba(255,255,255,0.45)',
+              background: 'none', border: 'none', cursor: 'pointer',
+              padding: '6px 0', fontFamily: 'inherit', minHeight: '44px',
+              transition: 'color 0.12s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.9)')}
+            onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.45)')}
+          >
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M19 12H5M12 5l-7 7 7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Back to results
+          </button>
+        </div>
+
+        <div className="relative px-8 pb-8 flex gap-6 max-w-4xl mx-auto">
           {/* Cover — hover zooms 2× for a closer look without obscuring the title.
               overflow-hidden removed from parent so the scaled cover can escape the box. */}
           <div className="relative w-28 h-40 rounded-lg border border-white/10 shadow-xl shrink-0 bg-white/5 flex items-center justify-center transition-transform duration-300 ease-out hover:scale-[2] hover:z-50">
@@ -232,10 +232,15 @@ function ComicPage() {
             const people = comic.people || []
             const roleMatch = (role: string | null | undefined, kw: string) => (role ?? '').toLowerCase().includes(kw)
             const writers      = [...new Set(people.filter(p => roleMatch(p.role, 'writer')).map(p => p.name))]
-            const pencilers    = [...new Set(people.filter(p => roleMatch(p.role, 'pencil') || (roleMatch(p.role, 'artist') && !roleMatch(p.role, 'cover'))).map(p => p.name))]
+            // Artists: penciler, inker, and general "artist" roles (excluding cover artists)
+            const pencilers    = [...new Set(people.filter(p =>
+              roleMatch(p.role, 'pencil') ||
+              roleMatch(p.role, 'inker') ||
+              (roleMatch(p.role, 'artist') && !roleMatch(p.role, 'cover'))
+            ).map(p => p.name))]
             const colourists   = [...new Set(people.filter(p => roleMatch(p.role, 'colour') || roleMatch(p.role, 'color')).map(p => p.name))]
             const coverArtists = [...new Set(people.filter(p => roleMatch(p.role, 'cover')).map(p => p.name))]
-            const chars        = (comic.characters || []).slice(0, 6).map(c => c.name)
+            const chars        = (comic.characters || [])
 
             // links:true rows render each comma-separated name as a clickable search link
             const rows: { label: string; value: string; links?: boolean }[] = []
@@ -247,9 +252,8 @@ function ComicPage() {
             if (comic.start_year)    rows.push({ label: 'Year',       value: comic.start_year })
             if (!isNaN(comic.count_of_issues) && comic.count_of_issues > 0)
                                      rows.push({ label: 'Issues',     value: String(comic.count_of_issues) })
-            if (chars.length)        rows.push({ label: 'Characters', value: chars.join(', '), links: true })
 
-            if (rows.length === 0) return null
+            if (rows.length === 0 && chars.length === 0) return null
 
             return (
               <div style={{
@@ -283,6 +287,55 @@ function ComicPage() {
                       </dd>
                     </div>
                   ))}
+
+                  {/* CHARACTERS — interactive pill tags */}
+                  {chars.length > 0 && (() => {
+                    const VISIBLE = 4
+                    const visible = chars.slice(0, VISIBLE)
+                    const overflow = chars.length - VISIBLE
+                    return (
+                      <div key="characters">
+                        <dt style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', marginBottom: '4px' }}>
+                          Characters
+                        </dt>
+                        <dd style={{ margin: 0, display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                          {visible.map(c => (
+                            <a
+                              key={c.id}
+                              href={`/search?q=${encodeURIComponent(c.name)}&region=${market}`}
+                              aria-label={`Search comics featuring ${c.name}`}
+                              style={{
+                                display: 'inline-block',
+                                fontSize: '10px', fontWeight: 500,
+                                padding: '2px 7px', borderRadius: '999px',
+                                background: 'rgba(255,255,255,0.1)',
+                                color: 'rgba(255,255,255,0.7)',
+                                textDecoration: 'none',
+                                border: '1px solid rgba(255,255,255,0.12)',
+                                transition: 'background 0.12s, color 0.12s',
+                                cursor: 'pointer',
+                              }}
+                              onMouseEnter={e => {
+                                e.currentTarget.style.background = 'rgba(255,255,255,0.2)'
+                                e.currentTarget.style.color = '#fff'
+                              }}
+                              onMouseLeave={e => {
+                                e.currentTarget.style.background = 'rgba(255,255,255,0.1)'
+                                e.currentTarget.style.color = 'rgba(255,255,255,0.7)'
+                              }}
+                            >
+                              {c.name}
+                            </a>
+                          ))}
+                          {overflow > 0 && (
+                            <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', alignSelf: 'center', paddingLeft: '2px' }}>
+                              +{overflow} more
+                            </span>
+                          )}
+                        </dd>
+                      </div>
+                    )
+                  })()}
                 </dl>
               </div>
             )

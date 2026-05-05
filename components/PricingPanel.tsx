@@ -232,19 +232,38 @@ export default function PricingPanel({ query, region, formatFilter = 'all', onFo
             return (
               <li
                 key={l.itemId}
-                className="flex items-center gap-4 p-4 rounded-2xl bg-white transition-all"
-                style={{ border: isBest ? '2px solid #E8272A' : '1px solid #F3F4F6' }}
+                className="flex items-center gap-4 rounded-2xl bg-white"
+                style={{
+                  border: isBest ? '2px solid #E8272A' : '1px solid #F3F4F6',
+                  padding: isBest ? '14px' : '12px',
+                  transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                  position: 'relative',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.transform = 'scale(1.02)'
+                  e.currentTarget.style.boxShadow = '0 6px 24px rgba(0,0,0,0.10)'
+                  e.currentTarget.style.zIndex = '1'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.transform = 'scale(1)'
+                  e.currentTarget.style.boxShadow = 'none'
+                  e.currentTarget.style.zIndex = 'auto'
+                }}
               >
-                {/* Cover thumbnail — letter fallback hidden behind the image */}
-                <div className="relative w-14 h-14 rounded-md overflow-hidden bg-gray-100 border border-gray-200 shrink-0 flex items-center justify-center">
-                  <span className="absolute text-gray-300 text-base font-medium" aria-hidden="true">
+                {/* Cover thumbnail — 2:3 aspect ratio, contain so artwork isn't cropped */}
+                <div
+                  className="relative rounded-md overflow-hidden bg-gray-50 border border-gray-200 shrink-0 flex items-center justify-center"
+                  style={{ width: isBest ? '52px' : '44px', height: isBest ? '72px' : '62px' }}
+                >
+                  <span className="text-gray-300 text-sm font-medium" aria-hidden="true">
                     {(l.title.charAt(0) || '?').toUpperCase()}
                   </span>
                   {l.imageUrl && (
                     <img
                       src={l.imageUrl}
                       alt=""
-                      className="absolute inset-0 w-full h-full object-cover"
+                      className="absolute inset-0 w-full h-full"
+                      style={{ objectFit: 'contain', padding: '2px' }}
                       loading="lazy"
                       onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
                     />
