@@ -25,7 +25,7 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
   const [query, setQuery] = useState(initialQuery);
   const [suggestions, setSuggestions] = useState<SuggestionTerm[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const abortRef    = useRef<AbortController | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const userTypedRef = useRef(false);

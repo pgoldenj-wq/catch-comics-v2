@@ -58,7 +58,7 @@ export async function getAccessToken(): Promise<string> {
   const clientId     = process.env.EBAY_CLIENT_ID
   const clientSecret = process.env.EBAY_CLIENT_SECRET
   if (!clientId || !clientSecret) {
-    throw new Error('eBay credentials missing — set EBAY_CLIENT_ID and EBAY_CLIENT_SECRET in .env.local')
+    throw new Error('eBay credentials missing — set EBAY_CLIENT_ID and EBAY_CLIENT_SECRET')
   }
 
   const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
