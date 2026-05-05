@@ -55,10 +55,13 @@ export async function getAccessToken(): Promise<string> {
     return cachedToken.token
   }
 
-  const clientId     = process.env.EBAY_CLIENT_ID
-  const clientSecret = process.env.EBAY_CLIENT_SECRET
+  const clientId     = (process.env.EBAY_CLIENT_ID     || '').trim()
+  const clientSecret = (process.env.EBAY_CLIENT_SECRET || '').trim()
   if (!clientId || !clientSecret) {
-    throw new Error('eBay credentials missing — set EBAY_CLIENT_ID and EBAY_CLIENT_SECRET')
+    throw new Error(
+      `eBay credentials missing — set EBAY_CLIENT_ID and EBAY_CLIENT_SECRET ` +
+      `(id length: ${clientId.length}, secret length: ${clientSecret.length})`
+    )
   }
 
   const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
