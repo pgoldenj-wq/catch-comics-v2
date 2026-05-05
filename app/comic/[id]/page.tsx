@@ -38,7 +38,13 @@ function ComicPage() {
   const [issuesLoading, setIssuesLoading] = useState(false)
   // Detail-page listing filters
   const [formatFilter, setFormatFilter] = useState<'all' | 'graphic-novel' | 'single-issue' | 'manga'>('all')
-  const [priceMax, setPriceMax]         = useState<'all' | '5' | '10'>('all')
+  const [priceMax, setPriceMax]         = useState<'all' | '5' | '10' | '15' | '25' | '35' | '50'>('all')
+  const [condition, setCondition]       = useState<'all' | 'new' | 'used'>('all')
+  // Which filter accordion sections are open (price open by default)
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set(['price']))
+  const toggleSection = (id: string) => setOpenSections(prev => {
+    const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s
+  })
 
   // True only for numeric Comic Vine volume IDs — issues (i-prefixed) and
   // Open Library books (ol-prefixed) don't have child issues to list.
@@ -155,15 +161,15 @@ function ComicPage() {
           }}
         />
         <div className="relative px-8 py-8 flex gap-6 max-w-4xl mx-auto">
-          {/* Cover — letter always visible as fallback; image overlays and removes
-              itself via onError if the URL is missing or returns an error */}
-          <div className="relative w-28 h-40 rounded-lg border border-white/10 shadow-xl shrink-0 bg-white/5 flex items-center justify-center overflow-hidden">
+          {/* Cover — hover zooms 2× for a closer look without obscuring the title.
+              overflow-hidden removed so the scaled cover can escape the box. */}
+          <div className="relative w-28 h-40 rounded-lg border border-white/10 shadow-xl shrink-0 bg-white/5 flex items-center justify-center transition-transform duration-300 ease-out hover:scale-[2] hover:z-50">
             <span className="text-white/30 text-3xl font-medium absolute">{comic.name.charAt(0)}</span>
             {comic.image?.medium_url && (
               <img
                 src={comic.image.medium_url}
                 alt={comic.name}
-                className="absolute inset-0 w-full h-full object-cover"
+                className="absolute inset-0 w-full h-full object-cover rounded-lg"
                 onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
               />
             )}
@@ -201,142 +207,186 @@ function ComicPage() {
         </div>
       </div>
 
-      {/* ── BODY: two columns — pricing (left) + issues grid (right) ───────── */}
-      <div className="max-w-4xl mx-auto px-8 py-6">
+      {/* ── BODY: three columns — filter sidebar | pricing | issues ─────────── */}
+      <div className="max-w-5xl mx-auto px-8 py-6" style={{ display: 'flex', gap: '24px', alignItems: 'flex-start' }}>
 
-        {/* ── Filter pills row ──────────────────────────────────────────────── */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '16px', alignItems: 'center' }}>
-          {/* Format */}
-          {([
-            { id: 'all',           label: 'All' },
-            { id: 'graphic-novel', label: 'Graphic Novels' },
-            { id: 'single-issue',  label: 'Single Issues' },
-            { id: 'manga',         label: 'Manga' },
-          ] as { id: 'all' | 'graphic-novel' | 'single-issue' | 'manga'; label: string }[]).map(({ id, label }) => {
-            const active = formatFilter === id
-            return (
+        {/* ── FILTER SIDEBAR ──────────────────────────────────────────────────
+            Matches the results-page sidebar style: sticky, collapsible sections,
+            radio-style options. */}
+        <aside style={{
+          width: '188px', flexShrink: 0,
+          position: 'sticky', top: '96px',
+          maxHeight: 'calc(100vh - 96px - 24px)', overflowY: 'auto',
+          overscrollBehavior: 'contain',
+          background: '#fff', borderRadius: '16px',
+          padding: '18px', border: '1px solid #F0F0F0',
+        }}>
+          {/* Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <span style={{ fontSize: '14px', fontWeight: 600, color: '#0A0A0A' }}>Filters</span>
+            {(priceMax !== 'all' || condition !== 'all') && (
               <button
-                key={id}
-                onClick={() => setFormatFilter(id)}
-                aria-pressed={active}
-                style={{
-                  padding: '5px 14px', borderRadius: '999px', fontSize: '12px',
-                  fontWeight: 500, fontFamily: 'inherit', cursor: 'pointer',
-                  background: active ? '#0A0A0A' : '#fff',
-                  color:      active ? '#fff'    : '#374151',
-                  border:     `1px solid ${active ? '#0A0A0A' : '#E5E7EB'}`,
-                  transition: 'background 0.12s, color 0.12s',
-                }}
+                onClick={() => { setPriceMax('all'); setCondition('all') }}
+                style={{ fontSize: '11px', color: '#C41F22', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}
               >
-                {label}
+                Clear
               </button>
-            )
-          })}
-
-          {/* Divider */}
-          <span style={{ width: '1px', height: '20px', background: '#E5E7EB', flexShrink: 0 }} />
-
-          {/* Price cap */}
-          {([
-            { id: 'all', label: 'Any price' },
-            { id: '5',   label: `Under ${market === 'uk' ? '£' : '$'}5` },
-            { id: '10',  label: `Under ${market === 'uk' ? '£' : '$'}10` },
-          ] as { id: 'all' | '5' | '10'; label: string }[]).map(({ id, label }) => {
-            const active = priceMax === id
-            return (
-              <button
-                key={id}
-                onClick={() => setPriceMax(id)}
-                aria-pressed={active}
-                style={{
-                  padding: '5px 14px', borderRadius: '999px', fontSize: '12px',
-                  fontWeight: 500, fontFamily: 'inherit', cursor: 'pointer',
-                  background: active ? '#E8272A' : '#fff',
-                  color:      active ? '#fff'    : '#374151',
-                  border:     `1px solid ${active ? '#E8272A' : '#E5E7EB'}`,
-                  transition: 'background 0.12s, color 0.12s',
-                }}
-              >
-                {label}
-              </button>
-            )
-          })}
-        </div>
-
-        {/* ── Two-column layout ──────────────────────────────────────────────── */}
-        <div style={{ display: 'flex', gap: '28px', alignItems: 'flex-start' }}>
-
-          {/* LEFT — live eBay listings */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <PricingPanel
-              query={comic.name}
-              region={market}
-              formatFilter={formatFilter}
-              priceMax={priceMax}
-            />
-            <p className="text-xs text-gray-400 mt-8 leading-relaxed">
-              Catch Comics links to third-party retailers. Prices and availability may vary.
-            </p>
+            )}
           </div>
 
-          {/* RIGHT — issues grid (volumes only) */}
-          {isVolume && (issuesLoading || issues.length > 0) && (
-            <div style={{ width: '240px', flexShrink: 0 }}>
-              <div className="flex items-baseline justify-between mb-3">
-                <h2 className="text-sm font-semibold text-gray-900">Issues in this series</h2>
-                {!issuesLoading && issues.length > 0 && (
-                  <span className="text-xs text-gray-400">{issues.length}</span>
-                )}
+          {/* PRICE RANGE */}
+          <div style={{ borderTop: '1px solid #F0F0F0' }}>
+            <button
+              onClick={() => toggleSection('price')}
+              aria-expanded={openSections.has('price')}
+              style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                width: '100%', background: 'none', border: 'none', cursor: 'pointer',
+                padding: '10px 0', fontSize: '10px', fontWeight: 700,
+                letterSpacing: '0.1em', textTransform: 'uppercase', color: '#6B7280',
+                fontFamily: 'inherit',
+              }}>
+              Price Range
+              <span aria-hidden="true" style={{ fontSize: '9px', display: 'inline-block', transition: 'transform 0.15s', transform: openSections.has('price') ? 'rotate(180deg)' : 'none' }}>▼</span>
+            </button>
+            {openSections.has('price') && (
+              <div style={{ paddingBottom: '14px' }}>
+                {([
+                  ['all', 'All prices'],
+                  ['5',   `Under ${market === 'uk' ? '£' : '$'}5`],
+                  ['10',  `Under ${market === 'uk' ? '£' : '$'}10`],
+                  ['15',  `Under ${market === 'uk' ? '£' : '$'}15`],
+                  ['25',  `Under ${market === 'uk' ? '£' : '$'}25`],
+                  ['35',  `Under ${market === 'uk' ? '£' : '$'}35`],
+                  ['50',  `Under ${market === 'uk' ? '£' : '$'}50`],
+                ] as [string, string][]).map(([val, label]) => {
+                  const active = priceMax === val
+                  return (
+                    <button key={val} onClick={() => setPriceMax(val as typeof priceMax)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0', textAlign: 'left', fontFamily: 'inherit' }}>
+                      <span style={{ width: '14px', height: '14px', borderRadius: '50%', flexShrink: 0, border: `2px solid ${active ? '#E8272A' : '#D1D5DB'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff' }}>
+                        {active && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#E8272A', display: 'block' }} />}
+                      </span>
+                      <span style={{ fontSize: '13px', color: active ? '#0A0A0A' : '#6B7280', fontWeight: active ? 500 : 400 }}>{label}</span>
+                    </button>
+                  )
+                })}
               </div>
+            )}
+          </div>
 
-              {issuesLoading ? (
-                <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-                  {[...Array(6)].map((_, i) => (
-                    <div key={i} className="animate-pulse">
-                      <div className="rounded-md bg-gray-100" style={{ aspectRatio: '2 / 3' }} />
-                      <div className="h-2.5 bg-gray-100 rounded mt-1.5 w-1/2" />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-                  {issues.map(issue => {
-                    const cover = issue.image.medium_url || issue.image.small_url
-                    const label = issue.issue_number ? `#${issue.issue_number}` : (issue.name || 'Issue')
-                    const sub   = issue.cover_year || ''
-                    return (
-                      <button
-                        key={issue.id}
-                        onClick={() => router.push(`/comic/i${issue.id}?region=${market}`)}
-                        className="text-left bg-transparent border-0 p-0 cursor-pointer group"
-                      >
-                        <div
-                          className="relative rounded-md overflow-hidden bg-gray-100 border border-gray-200 transition-all group-hover:shadow-md group-hover:scale-105"
-                          style={{ aspectRatio: '2 / 3' }}
-                        >
-                          <span className="absolute inset-0 flex items-center justify-center text-gray-400 text-xs font-medium">
-                            {label}
-                          </span>
-                          {cover && (
-                            <img
-                              src={cover}
-                              alt={`${comic.name} ${label}`}
-                              className="absolute inset-0 w-full h-full object-cover"
-                              loading="lazy"
-                              onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
-                            />
-                          )}
-                        </div>
-                        <div className="mt-1 text-[11px] font-medium text-gray-900 truncate">{label}</div>
-                        {sub && <div className="text-[10px] text-gray-400">{sub}</div>}
-                      </button>
-                    )
-                  })}
-                </div>
+          {/* CONDITION */}
+          <div style={{ borderTop: '1px solid #F0F0F0' }}>
+            <button
+              onClick={() => toggleSection('condition')}
+              aria-expanded={openSections.has('condition')}
+              style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                width: '100%', background: 'none', border: 'none', cursor: 'pointer',
+                padding: '10px 0', fontSize: '10px', fontWeight: 700,
+                letterSpacing: '0.1em', textTransform: 'uppercase', color: '#6B7280',
+                fontFamily: 'inherit',
+              }}>
+              Condition
+              <span aria-hidden="true" style={{ fontSize: '9px', display: 'inline-block', transition: 'transform 0.15s', transform: openSections.has('condition') ? 'rotate(180deg)' : 'none' }}>▼</span>
+            </button>
+            {openSections.has('condition') && (
+              <div style={{ paddingBottom: '14px' }}>
+                {([
+                  ['all',  'All'],
+                  ['new',  'New'],
+                  ['used', 'Used'],
+                ] as [string, string][]).map(([val, label]) => {
+                  const active = condition === val
+                  return (
+                    <button key={val} onClick={() => setCondition(val as typeof condition)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0', textAlign: 'left', fontFamily: 'inherit' }}>
+                      <span style={{ width: '14px', height: '14px', borderRadius: '50%', flexShrink: 0, border: `2px solid ${active ? '#E8272A' : '#D1D5DB'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff' }}>
+                        {active && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#E8272A', display: 'block' }} />}
+                      </span>
+                      <span style={{ fontSize: '13px', color: active ? '#0A0A0A' : '#6B7280', fontWeight: active ? 500 : 400 }}>{label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </aside>
+
+        {/* ── PRICING (centre) ────────────────────────────────────────────────── */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <PricingPanel
+            query={comic.name}
+            region={market}
+            formatFilter={formatFilter}
+            priceMax={priceMax}
+            condition={condition}
+          />
+          <p className="text-xs text-gray-400 mt-8 leading-relaxed">
+            Catch Comics links to third-party retailers. Prices and availability may vary.
+          </p>
+        </div>
+
+        {/* ── ISSUES GRID (right, volumes only) ───────────────────────────────
+            Cover frame: overflow visible so 3× hover can escape the cell.
+            z-50 on hover stacks above neighbours inside this positioned container. */}
+        {isVolume && (issuesLoading || issues.length > 0) && (
+          <div style={{ width: '216px', flexShrink: 0, position: 'relative' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '10px' }}>
+              <h2 style={{ fontSize: '13px', fontWeight: 600, color: '#111827', margin: 0 }}>Issues in this series</h2>
+              {!issuesLoading && issues.length > 0 && (
+                <span style={{ fontSize: '11px', color: '#9CA3AF' }}>{issues.length}</span>
               )}
             </div>
-          )}
-        </div>
+
+            {issuesLoading ? (
+              <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="animate-pulse">
+                    <div className="rounded-md bg-gray-100" style={{ aspectRatio: '2 / 3' }} />
+                    <div className="h-2.5 bg-gray-100 rounded mt-1.5 w-1/2" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                {issues.map(issue => {
+                  const cover = issue.image.medium_url || issue.image.small_url
+                  const label = issue.issue_number ? `#${issue.issue_number}` : (issue.name || 'Issue')
+                  const sub   = issue.cover_year || ''
+                  return (
+                    <button
+                      key={issue.id}
+                      onClick={() => router.push(`/comic/i${issue.id}?region=${market}`)}
+                      style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', textAlign: 'left' }}
+                    >
+                      {/* Cover — overflow visible, 3× zoom on hover, z-50 pops above siblings */}
+                      <div
+                        className="relative bg-gray-100 border border-gray-200 rounded-md transition-transform duration-300 ease-out hover:scale-[3] hover:z-50"
+                        style={{ aspectRatio: '2 / 3', position: 'relative' }}
+                      >
+                        <span className="absolute inset-0 flex items-center justify-center text-gray-400 text-[10px] font-medium">
+                          {label}
+                        </span>
+                        {cover && (
+                          <img
+                            src={cover}
+                            alt={`${comic.name} ${label}`}
+                            className="absolute inset-0 w-full h-full object-cover rounded-md"
+                            loading="lazy"
+                            onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+                          />
+                        )}
+                      </div>
+                      <div style={{ marginTop: '4px', fontSize: '11px', fontWeight: 500, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
+                      {sub && <div style={{ fontSize: '10px', color: '#9CA3AF' }}>{sub}</div>}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
     </main>

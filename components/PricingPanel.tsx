@@ -31,7 +31,9 @@ interface PricingPanelProps {
   /** Client-side format filter applied to eBay listings ('all' = no filter) */
   formatFilter?: 'all' | 'graphic-novel' | 'single-issue' | 'manga'
   /** Client-side max-price filter applied to eBay listings ('all' = no filter) */
-  priceMax?:    'all' | '5' | '10'
+  priceMax?:    'all' | '5' | '10' | '15' | '25' | '35' | '50'
+  /** Client-side condition filter ('all' = no filter) */
+  condition?:   'all' | 'new' | 'used'
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -54,7 +56,7 @@ function formatPrice(value: number, currency: string): string {
  * eBay Buy Browse API. Listings are sorted cheapest-first server-side; we
  * re-sort defensively, then optionally filter client-side by format/priceMax.
  */
-export default function PricingPanel({ query, region, formatFilter = 'all', priceMax = 'all' }: PricingPanelProps) {
+export default function PricingPanel({ query, region, formatFilter = 'all', priceMax = 'all', condition = 'all' }: PricingPanelProps) {
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState<string | null>(null)
   const [listings, setListings] = useState<Listing[]>([])
@@ -120,8 +122,17 @@ export default function PricingPanel({ query, region, formatFilter = 'all', pric
       if (!isNaN(max)) ls = ls.filter(l => l.price.value < max)
     }
 
+    if (condition !== 'all') {
+      ls = ls.filter(l => {
+        const c = (l.condition || '').toLowerCase()
+        if (condition === 'new')  return c === 'new'
+        if (condition === 'used') return c !== 'new' && c !== '' && c !== 'unspecified'
+        return true
+      })
+    }
+
     return ls
-  }, [listings, formatFilter, priceMax])
+  }, [listings, formatFilter, priceMax, condition])
 
   const regionLabel = region === 'uk' ? 'United Kingdom' : 'United States'
 

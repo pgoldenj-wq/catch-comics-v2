@@ -656,7 +656,7 @@ function SearchResults() {
 
           {/* Result cards */}
           {!loading && !error && filteredResults.length > 0 && (
-            <div style={{ borderTop: '1px solid #F0F0F0' }}>
+            <div style={{ borderTop: '1px solid #F0F0F0', position: 'relative' }}>
               {filteredResults.map((comic, index) => {
                 const isIsbnResult = comic.source === 'open_library'
                 const fmt = isIsbnResult ? 'graphic-novel' as Format : detectFormat(comic)
@@ -685,16 +685,16 @@ function SearchResults() {
                       padding: '16px 6px', cursor: 'pointer',
                       borderBottom: '1px solid #F0F0F0',
                       borderRadius: '8px',
-                      transition: 'background 0.12s, transform 0.15s, box-shadow 0.15s',
+                      // No transform here — transform creates a stacking context that
+                      // traps the cover's hover:z-50 inside it, causing underlap.
+                      transition: 'background 0.12s, box-shadow 0.15s',
                     }}
                     onMouseEnter={e => {
                       e.currentTarget.style.background = '#FAFAFA'
-                      e.currentTarget.style.transform = 'scale(1.012)'
                       e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.06)'
                     }}
                     onMouseLeave={e => {
                       e.currentTarget.style.background = 'transparent'
-                      e.currentTarget.style.transform = 'scale(1)'
                       e.currentTarget.style.boxShadow = 'none'
                     }}>
 
