@@ -214,7 +214,7 @@ function ComicPage() {
               Writer / Artist / Cover artist are extracted by role keyword. */}
           {(() => {
             const people = comic.people || []
-            const roleMatch = (role: string, kw: string) => role.toLowerCase().includes(kw)
+            const roleMatch = (role: string | null | undefined, kw: string) => (role ?? '').toLowerCase().includes(kw)
             const writers      = [...new Set(people.filter(p => roleMatch(p.role, 'writer')).map(p => p.name))]
             const pencilers    = [...new Set(people.filter(p => roleMatch(p.role, 'pencil') || (roleMatch(p.role, 'artist') && !roleMatch(p.role, 'cover'))).map(p => p.name))]
             const coverArtists = [...new Set(people.filter(p => roleMatch(p.role, 'cover')).map(p => p.name))]
