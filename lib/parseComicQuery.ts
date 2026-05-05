@@ -80,18 +80,20 @@ export function parseComicQuery(query: string): ParsedQuery {
   return { cleanTitle: q, issueNumber: '', volumeNumber: '', hasIssueIntent: false, hasVolumeIntent: false, raw: query }
 }
 
-// ── Title similarity: 0–40 ────────────────────────────────────────────────────
+// ── Title similarity: 0–50 ───────────────────────────────────────────────────
+// Raised ceilings give exact matches more separation from near-matches, which
+// is important for deduplication tiebreaking and ranking.
 export function titleMatchScore(resultTitle: string, cleanTitle: string): number {
   const r = resultTitle.toLowerCase().trim()
   const q = cleanTitle.toLowerCase().trim()
   if (!r || !q) return 0
-  if (r === q) return 40
-  if (r.startsWith(q) || q.startsWith(r)) return 25
-  if (r.includes(q) || q.includes(r)) return 15
+  if (r === q) return 50                              // exact match
+  if (r.startsWith(q) || q.startsWith(r)) return 30  // prefix match
+  if (r.includes(q) || q.includes(r)) return 20      // substring match
   const words   = q.split(/\s+/).filter(w => w.length > 2)
   if (!words.length) return 0
   const matched = words.filter(w => r.includes(w)).length
-  return Math.round((matched / words.length) * 10)
+  return Math.round((matched / words.length) * 12)   // word-overlap (max ~12)
 }
 
 /**

@@ -98,15 +98,56 @@ function isMajorPublisher(name: string | undefined): boolean {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ParsedQuery = ReturnType<typeof parseComicQuery>
 
+// ── Title normaliser for deduplication ────────────────────────────────────────
+// Strips year suffixes "(2024)", punctuation, and collapses whitespace so that
+// "Absolute Batman (2024)" and "Absolute Batman (2025)" produce the same key.
+function normalizeTitle(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/\s*\(\d{4}\)\s*/g, ' ')   // remove "(year)" suffixes
+    .replace(/[^a-z0-9\s]/g, ' ')       // punctuation → space
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+const CURRENT_YEAR = new Date().getFullYear()
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function scoreVolume(r: any, parsed: ParsedQuery): number {
   const pub = (r.publisher?.name as string) || ''
   if (isForeignPublisher(pub) || isForeignTitle(r.name || '')) return -9999
 
-  // Base: higher when NOT looking for a specific issue (broad query prefers volumes)
-  let score = parsed.hasIssueIntent ? 10 : 50
+  // Base: issue-intent queries should be dominated by issue results, not volumes
+  let score = parsed.hasIssueIntent ? 5 : 20
+
+  // ── Title similarity (0–50) ─────────────────────────────────────────────
   score += titleMatchScore(r.name || '', parsed.cleanTitle)
+
+  // ── Issue count (0–30, log2 scale) ──────────────────────────────────────
+  // Log dampens extreme outliers (713-issue Batman) so recency can still
+  // surface current runs. log2(2)≈7, log2(20)≈28, log2(100)→capped at 30.
+  const count = (r.count_of_issues as number) || 0
+  if (count > 0) score += Math.min(30, Math.round(Math.log2(count + 1) * 7))
+
+  // ── Recency (0–25): each year away from now costs 2 points ──────────────
+  const year = parseInt((r.start_year as string) || '0', 10)
+  if (year >= 1900) score += Math.max(0, 25 - (CURRENT_YEAR - year) * 2)
+
+  // ── Active-series bonus ──────────────────────────────────────────────────
+  // Reward series that started recently AND have more than a handful of issues —
+  // this distinguishes ongoing runs from cancelled micro-series.
+  if (year >= 2019 && count >= 3) score += 20
+
+  // ── High-demand collector keywords ──────────────────────────────────────
+  const nameLower = (r.name as string || '').toLowerCase()
+  if      (/\babsolute\b/.test(nameLower))  score += 12
+  else if (/\bultimate\b/.test(nameLower))  score += 10
+  else if (/\bomnibus\b/.test(nameLower))   score += 8
+  else if (/\bdeluxe\b/.test(nameLower))    score += 6
+
+  // ── Publisher quality signal ─────────────────────────────────────────────
   if (isMajorPublisher(pub)) score += 10
+
   return score
 }
 
@@ -332,8 +373,29 @@ export async function GET(request: NextRequest) {
       scoredIssues.push({ r, score })
     }
 
+    // ── Title-level deduplication ─────────────────────────────────────────
+    // Group volumes by normalised title; keep only the highest-scoring
+    // representative per group. This collapses near-duplicate API entries
+    // such as "Absolute Batman (2024, 19 issues)" + "Absolute Batman (2025,
+    // 2 issues)" into ONE result — the 2024 series, which scores higher due
+    // to its larger issue count and active-series bonus.
+    //
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const titleBestMap = new Map<string, { r: any; score: number }>()
+    for (const item of scoredVolumes) {
+      const key      = normalizeTitle((item.r.name as string) || '')
+      const existing = titleBestMap.get(key)
+      if (!existing || item.score > existing.score) {
+        titleBestMap.set(key, item)
+      }
+    }
+    const dedupedVolumes = Array.from(titleBestMap.values())
+    console.log(
+      `[/api/search] dedup: ${scoredVolumes.length} volumes → ${dedupedVolumes.length} after title dedup`
+    )
+
     // ── Map to frontend shape ─────────────────────────────────────────────
-    const volumeResults = scoredVolumes.map(({ r, score }) => mapCVVolume(r, score))
+    const volumeResults = dedupedVolumes.map(({ r, score }) => mapCVVolume(r, score))
     const issueResults  = scoredIssues.map(({ r, score }) => mapCVIssue(r, score))
 
     // ── Publisher enrichment for issues (concurrent, cached) ──────────────
