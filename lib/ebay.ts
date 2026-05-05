@@ -138,8 +138,14 @@ export async function searchListings(
     .filter((x): x is EbayListing => x !== null)
 }
 
+function isFCBD(title: string): boolean {
+  const t = title.toLowerCase()
+  return t.includes('free comic book day') || t.includes('fcbd')
+}
+
 function mapListing(r: RawBrowseItem): EbayListing | null {
   if (!r.itemId || !r.title || !r.price?.value) return null
+  if (isFCBD(r.title)) return null
   return {
     itemId:     r.itemId,
     title:      r.title,

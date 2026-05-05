@@ -158,14 +158,14 @@ export default function PricingPanel({ query, region, formatFilter = 'all', onFo
                   key={value}
                   onClick={() => onFormatChange(value)}
                   style={{
-                    fontSize: '11px',
-                    fontWeight: active ? 600 : 400,
-                    padding: '3px 10px',
+                    fontSize: '13px',
+                    fontWeight: active ? 600 : 500,
+                    padding: '6px 14px',
                     borderRadius: '20px',
                     cursor: 'pointer',
-                    border: active ? '1.5px solid #E8272A' : '1px solid #E5E7EB',
+                    border: active ? '2px solid #E8272A' : '1.5px solid #D1D5DB',
                     background: active ? '#E8272A' : '#fff',
-                    color: active ? '#fff' : '#6B7280',
+                    color: active ? '#fff' : '#374151',
                     fontFamily: 'inherit',
                     transition: 'all 0.15s',
                   }}
@@ -253,7 +253,7 @@ export default function PricingPanel({ query, region, formatFilter = 'all', onFo
                 {/* Cover thumbnail — 2:3 aspect ratio, contain so artwork isn't cropped */}
                 <div
                   className="relative rounded-md overflow-hidden bg-gray-50 border border-gray-200 shrink-0 flex items-center justify-center"
-                  style={{ width: isBest ? '52px' : '44px', height: isBest ? '72px' : '62px' }}
+                  style={{ width: isBest ? '62px' : '53px', height: isBest ? '86px' : '74px' }}
                 >
                   <span className="text-gray-300 text-sm font-medium" aria-hidden="true">
                     {(l.title.charAt(0) || '?').toUpperCase()}

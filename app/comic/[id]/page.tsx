@@ -147,7 +147,7 @@ function ComicPage() {
         </div>
       </nav>
 
-      {/* DARK HEADER — overflow visible so hero cover can scale beyond bounds on hover */}
+      {/* DARK HEADER — 2-column: LEFT = back+cover+title+type | RIGHT = full metadata */}
       <div className="relative bg-[#111827]">
         <div
           className="absolute inset-0 pointer-events-none"
@@ -156,67 +156,71 @@ function ComicPage() {
             backgroundSize: '22px 22px',
           }}
         />
-        {/* BACK NAV — inside the dark hero for visual anchoring and contrast */}
-        <div className="relative px-8 pt-5 max-w-4xl mx-auto">
-          <button
-            onClick={() => router.back()}
-            aria-label="Back to previous page"
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: '6px',
-              fontSize: '12px', color: 'rgba(255,255,255,0.45)',
-              background: 'none', border: 'none', cursor: 'pointer',
-              padding: '6px 0', fontFamily: 'inherit', minHeight: '44px',
-              transition: 'color 0.12s',
-            }}
-            onMouseEnter={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.9)')}
-            onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.45)')}
-          >
-            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M19 12H5M12 5l-7 7 7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            Back to results
-          </button>
-        </div>
+        <div className="relative max-w-5xl mx-auto px-6 py-5" style={{ display: 'grid', gridTemplateColumns: '168px 1fr', gap: '32px', alignItems: 'start' }}>
 
-        <div className="relative px-8 pb-8 flex gap-6 max-w-4xl mx-auto">
-          {/* Cover — hover zooms 2× for a closer look without obscuring the title.
-              overflow-hidden removed from parent so the scaled cover can escape the box. */}
-          <div className="relative w-28 h-40 rounded-lg border border-white/10 shadow-xl shrink-0 bg-white/5 flex items-center justify-center transition-transform duration-300 ease-out hover:scale-[2] hover:z-50">
-            <span className="text-white/30 text-3xl font-medium absolute">{comic.name.charAt(0)}</span>
-            {comic.image?.medium_url && (
-              <img
-                src={comic.image.medium_url}
-                alt={comic.name}
-                className="absolute inset-0 w-full h-full object-cover rounded-lg"
-                onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
-              />
-            )}
-          </div>
+          {/* ── LEFT COLUMN: back + cover + title + type + region ── */}
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
 
-          {/* Title + region toggle */}
-          <div className="flex-1 min-w-0 flex flex-col justify-center">
-            <p className="text-white/40 text-xs mb-2">
-              {[comic.publisher?.name, comic.start_year ? `Est. ${comic.start_year}` : null].filter(Boolean).join(' · ')}
-            </p>
-            <h1 className="text-white text-2xl font-semibold leading-tight tracking-tight mb-2">
+            {/* Back nav — anchored left of cover */}
+            <button
+              onClick={() => router.back()}
+              aria-label="Back to previous page"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '5px',
+                fontSize: '11px', color: 'rgba(255,255,255,0.4)',
+                background: 'none', border: 'none', cursor: 'pointer',
+                padding: '4px 0', fontFamily: 'inherit', minHeight: '36px',
+                transition: 'color 0.12s', alignSelf: 'flex-start',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.85)')}
+              onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.4)')}
+            >
+              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M19 12H5M12 5l-7 7 7 7" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Back
+            </button>
+
+            {/* Cover — w-[168px] h-[232px] ≈ 2:3 ratio, ~+50% area from 112×160 */}
+            <div
+              className="relative rounded-lg border border-white/10 shadow-xl bg-white/5 flex items-center justify-center transition-transform duration-300 ease-out hover:scale-[2] hover:z-50"
+              style={{ width: '168px', height: '232px', marginTop: '6px', flexShrink: 0 }}
+            >
+              <span className="text-white/30 text-3xl font-medium absolute">{comic.name.charAt(0)}</span>
+              {comic.image?.medium_url && (
+                <img
+                  src={comic.image.medium_url}
+                  alt={comic.name}
+                  className="absolute inset-0 w-full h-full object-cover rounded-lg"
+                  onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+                />
+              )}
+            </div>
+
+            {/* Title */}
+            <h1 style={{ marginTop: '12px', fontSize: '15px', fontWeight: 700, color: '#fff', lineHeight: 1.25, letterSpacing: '-0.01em' }}>
               {comic.name}
             </h1>
-            <p className="text-white/40 text-xs mb-6">
+
+            {/* Type */}
+            <p style={{ marginTop: '3px', fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>
               {/^i\d+$/.test(id) ? 'Single Issue' : 'Comic Series'}
             </p>
 
-            {/* REGION TOGGLE */}
-            <div className="flex items-center gap-2">
-              <span className="text-white/30 text-xs">Prices for:</span>
+            {/* Region toggle */}
+            <div style={{ marginTop: '14px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               {(['uk', 'us'] as const).map((r) => (
                 <button
                   key={r}
                   onClick={() => setMarket(r)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all"
                   style={{
-                    borderColor: market === r ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)',
+                    display: 'flex', alignItems: 'center', gap: '5px',
+                    padding: '4px 10px', borderRadius: '999px',
+                    fontSize: '11px', fontWeight: 500, fontFamily: 'inherit',
+                    border: `1px solid ${market === r ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)'}`,
                     background: market === r ? 'rgba(255,255,255,0.1)' : 'transparent',
                     color: market === r ? '#fff' : 'rgba(255,255,255,0.35)',
+                    cursor: 'pointer', transition: 'all 0.12s',
                   }}
                 >
                   {r === 'uk' ? '🇬🇧 UK' : '🇺🇸 US'}
@@ -225,14 +229,11 @@ function ComicPage() {
             </div>
           </div>
 
-          {/* ── METADATA PANEL ─────────────────────────────────────────────────
-              Only rendered when there are people/character fields to show.
-              Creator rows (writers, artists, etc.) render names as search links. */}
+          {/* ── RIGHT COLUMN: full metadata ── */}
           {(() => {
             const people = comic.people || []
             const roleMatch = (role: string | null | undefined, kw: string) => (role ?? '').toLowerCase().includes(kw)
             const writers      = [...new Set(people.filter(p => roleMatch(p.role, 'writer')).map(p => p.name))]
-            // Artists: penciler, inker, and general "artist" roles (excluding cover artists)
             const pencilers    = [...new Set(people.filter(p =>
               roleMatch(p.role, 'pencil') ||
               roleMatch(p.role, 'inker') ||
@@ -240,102 +241,116 @@ function ComicPage() {
             ).map(p => p.name))]
             const colourists   = [...new Set(people.filter(p => roleMatch(p.role, 'colour') || roleMatch(p.role, 'color')).map(p => p.name))]
             const coverArtists = [...new Set(people.filter(p => roleMatch(p.role, 'cover')).map(p => p.name))]
-            const chars        = (comic.characters || [])
+            const chars        = comic.characters || []
 
-            // links:true rows render each comma-separated name as a clickable search link
-            const rows: { label: string; value: string; links?: boolean }[] = []
-            if (writers.length)      rows.push({ label: writers.length > 1 ? 'Writers' : 'Writer',      value: writers.join(', '),      links: true })
-            if (pencilers.length)    rows.push({ label: pencilers.length > 1 ? 'Artists' : 'Artist',    value: pencilers.join(', '),    links: true })
-            if (colourists.length)   rows.push({ label: 'Colours',    value: colourists.join(', '),   links: true })
-            if (coverArtists.length) rows.push({ label: 'Cover',      value: coverArtists.join(', '), links: true })
-            if (comic.publisher?.name) rows.push({ label: 'Publisher', value: comic.publisher.name })
-            if (comic.start_year)    rows.push({ label: 'Year',       value: comic.start_year })
+            // Render 2–3 names max, then "+X more" (non-interactive)
+            const renderNames = (names: string[], limit = 3) => {
+              const visible  = names.slice(0, limit)
+              const overflow = names.length - limit
+              return (
+                <>
+                  {visible.map((name, i, arr) => (
+                    <span key={name}>
+                      <a
+                        href={`/search?q=${encodeURIComponent(name)}&region=${market}`}
+                        style={{ color: 'rgba(255,255,255,0.8)', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,0.2)', cursor: 'pointer' }}
+                        onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
+                        onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.8)')}
+                      >
+                        {name}
+                      </a>
+                      {i < arr.length - 1 ? ', ' : ''}
+                    </span>
+                  ))}
+                  {overflow > 0 && (
+                    <span style={{ color: 'rgba(255,255,255,0.3)', marginLeft: '2px' }}>+{overflow} more</span>
+                  )}
+                </>
+              )
+            }
+
+            const metaRows: { label: string; names: string[]; plain?: string }[] = []
+            if (writers.length)      metaRows.push({ label: writers.length > 1 ? 'Writers' : 'Writer',   names: writers })
+            if (pencilers.length)    metaRows.push({ label: pencilers.length > 1 ? 'Artists' : 'Artist', names: pencilers })
+            if (colourists.length)   metaRows.push({ label: 'Colours',   names: colourists })
+            if (coverArtists.length) metaRows.push({ label: 'Cover',     names: coverArtists })
+
+            const plainRows: { label: string; value: string }[] = []
+            if (comic.publisher?.name) plainRows.push({ label: 'Publisher', value: comic.publisher.name })
+            if (comic.start_year)      plainRows.push({ label: 'Year',      value: comic.start_year })
             if (!isNaN(comic.count_of_issues) && comic.count_of_issues > 0)
-                                     rows.push({ label: 'Issues',     value: String(comic.count_of_issues) })
+                                       plainRows.push({ label: 'Issues',    value: String(comic.count_of_issues) })
 
-            if (rows.length === 0 && chars.length === 0) return null
+            if (metaRows.length === 0 && plainRows.length === 0 && chars.length === 0) return null
+
+            const CHAR_VISIBLE = 6
+            const visibleChars  = chars.slice(0, CHAR_VISIBLE)
+            const charOverflow  = chars.length - CHAR_VISIBLE
 
             return (
-              <div style={{
-                width: '180px', flexShrink: 0,
-                borderLeft: '1px solid rgba(255,255,255,0.08)',
-                paddingLeft: '20px',
-                alignSelf: 'center',
-              }}>
-                <dl style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {rows.map(({ label, value, links }) => (
-                    <div key={label}>
-                      <dt style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', marginBottom: '1px' }}>
+              <div style={{ paddingTop: '42px' }}>
+                <dl style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: '11px' }}>
+
+                  {/* Creator rows — with search links */}
+                  {metaRows.map(({ label, names }) => (
+                    <div key={label} style={{ display: 'grid', gridTemplateColumns: '76px 1fr', gap: '8px', alignItems: 'baseline' }}>
+                      <dt style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)' }}>
                         {label}
                       </dt>
-                      <dd style={{ margin: 0, fontSize: '12px', color: 'rgba(255,255,255,0.75)', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-                        {links
-                          ? value.split(', ').map((name, i, arr) => (
-                              <span key={name}>
-                                <a
-                                  href={`/search?q=${encodeURIComponent(name)}&region=${market}`}
-                                  style={{ color: 'rgba(255,255,255,0.75)', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,0.25)', cursor: 'pointer' }}
-                                  onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
-                                  onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.75)')}
-                                >
-                                  {name}
-                                </a>
-                                {i < arr.length - 1 ? ', ' : ''}
-                              </span>
-                            ))
-                          : value}
+                      <dd style={{ margin: 0, fontSize: '13px', color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}>
+                        {renderNames(names)}
                       </dd>
                     </div>
                   ))}
 
-                  {/* CHARACTERS — interactive pill tags */}
-                  {chars.length > 0 && (() => {
-                    const VISIBLE = 4
-                    const visible = chars.slice(0, VISIBLE)
-                    const overflow = chars.length - VISIBLE
-                    return (
-                      <div key="characters">
-                        <dt style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.3)', marginBottom: '4px' }}>
-                          Characters
-                        </dt>
-                        <dd style={{ margin: 0, display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                          {visible.map(c => (
-                            <a
-                              key={c.id}
-                              href={`/search?q=${encodeURIComponent(c.name)}&region=${market}`}
-                              aria-label={`Search comics featuring ${c.name}`}
-                              style={{
-                                display: 'inline-block',
-                                fontSize: '10px', fontWeight: 500,
-                                padding: '2px 7px', borderRadius: '999px',
-                                background: 'rgba(255,255,255,0.1)',
-                                color: 'rgba(255,255,255,0.7)',
-                                textDecoration: 'none',
-                                border: '1px solid rgba(255,255,255,0.12)',
-                                transition: 'background 0.12s, color 0.12s',
-                                cursor: 'pointer',
-                              }}
-                              onMouseEnter={e => {
-                                e.currentTarget.style.background = 'rgba(255,255,255,0.2)'
-                                e.currentTarget.style.color = '#fff'
-                              }}
-                              onMouseLeave={e => {
-                                e.currentTarget.style.background = 'rgba(255,255,255,0.1)'
-                                e.currentTarget.style.color = 'rgba(255,255,255,0.7)'
-                              }}
-                            >
-                              {c.name}
-                            </a>
-                          ))}
-                          {overflow > 0 && (
-                            <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', alignSelf: 'center', paddingLeft: '2px' }}>
-                              +{overflow} more
-                            </span>
-                          )}
-                        </dd>
-                      </div>
-                    )
-                  })()}
+                  {/* Plain rows — no links */}
+                  {plainRows.map(({ label, value }) => (
+                    <div key={label} style={{ display: 'grid', gridTemplateColumns: '76px 1fr', gap: '8px', alignItems: 'baseline' }}>
+                      <dt style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)' }}>
+                        {label}
+                      </dt>
+                      <dd style={{ margin: 0, fontSize: '13px', color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}>
+                        {value}
+                      </dd>
+                    </div>
+                  ))}
+
+                  {/* Characters — pill tags, 6 max */}
+                  {chars.length > 0 && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '76px 1fr', gap: '8px', alignItems: 'start' }}>
+                      <dt style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', paddingTop: '3px' }}>
+                        Characters
+                      </dt>
+                      <dd style={{ margin: 0, display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                        {visibleChars.map(c => (
+                          <a
+                            key={c.id}
+                            href={`/search?q=${encodeURIComponent(c.name)}&region=${market}`}
+                            aria-label={`Search comics featuring ${c.name}`}
+                            style={{
+                              display: 'inline-block', fontSize: '11px', fontWeight: 500,
+                              padding: '3px 8px', borderRadius: '999px',
+                              background: 'rgba(255,255,255,0.08)',
+                              color: 'rgba(255,255,255,0.75)',
+                              textDecoration: 'none',
+                              border: '1px solid rgba(255,255,255,0.12)',
+                              transition: 'background 0.12s, color 0.12s',
+                              cursor: 'pointer',
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.18)'; e.currentTarget.style.color = '#fff' }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = 'rgba(255,255,255,0.75)' }}
+                          >
+                            {c.name}
+                          </a>
+                        ))}
+                        {charOverflow > 0 && (
+                          <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', alignSelf: 'center' }}>
+                            +{charOverflow} more
+                          </span>
+                        )}
+                      </dd>
+                    </div>
+                  )}
                 </dl>
               </div>
             )
@@ -371,35 +386,35 @@ function ComicPage() {
           </div>
 
           {/* CONDITION — first, open by default */}
-          <div style={{ borderTop: '1px solid #F0F0F0' }}>
+          <div style={{ borderTop: '1px solid #EBEBEB' }}>
             <button
               onClick={() => toggleSection('condition')}
               aria-expanded={openSections.has('condition')}
               style={{
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                 width: '100%', background: 'none', border: 'none', cursor: 'pointer',
-                padding: '10px 0', fontSize: '10px', fontWeight: 700,
-                letterSpacing: '0.1em', textTransform: 'uppercase', color: '#6B7280',
+                padding: '12px 0', fontSize: '11px', fontWeight: 700,
+                letterSpacing: '0.08em', textTransform: 'uppercase', color: '#374151',
                 fontFamily: 'inherit',
               }}>
               Condition
               <span aria-hidden="true" style={{ fontSize: '9px', display: 'inline-block', transition: 'transform 0.15s', transform: openSections.has('condition') ? 'rotate(180deg)' : 'none' }}>▼</span>
             </button>
             {openSections.has('condition') && (
-              <div style={{ paddingBottom: '14px' }}>
+              <div style={{ paddingBottom: '16px' }}>
                 {([
-                  ['all',  'All'],
+                  ['all',  'All conditions'],
                   ['new',  'New'],
                   ['used', 'Used'],
                 ] as [string, string][]).map(([val, label]) => {
                   const active = condition === val
                   return (
                     <button key={val} onClick={() => setCondition(val as typeof condition)}
-                      style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0', textAlign: 'left', fontFamily: 'inherit' }}>
-                      <span style={{ width: '14px', height: '14px', borderRadius: '50%', flexShrink: 0, border: `2px solid ${active ? '#E8272A' : '#D1D5DB'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff' }}>
-                        {active && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#E8272A', display: 'block' }} />}
+                      style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 0', textAlign: 'left', fontFamily: 'inherit' }}>
+                      <span style={{ width: '16px', height: '16px', borderRadius: '50%', flexShrink: 0, border: `2px solid ${active ? '#E8272A' : '#D1D5DB'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff' }}>
+                        {active && <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#E8272A', display: 'block' }} />}
                       </span>
-                      <span style={{ fontSize: '13px', color: active ? '#0A0A0A' : '#6B7280', fontWeight: active ? 500 : 400 }}>{label}</span>
+                      <span style={{ fontSize: '14px', color: active ? '#0A0A0A' : '#4B5563', fontWeight: active ? 600 : 400 }}>{label}</span>
                     </button>
                   )
                 })}
@@ -408,22 +423,22 @@ function ComicPage() {
           </div>
 
           {/* PRICE RANGE — second */}
-          <div style={{ borderTop: '1px solid #F0F0F0' }}>
+          <div style={{ borderTop: '1px solid #EBEBEB' }}>
             <button
               onClick={() => toggleSection('price')}
               aria-expanded={openSections.has('price')}
               style={{
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                 width: '100%', background: 'none', border: 'none', cursor: 'pointer',
-                padding: '10px 0', fontSize: '10px', fontWeight: 700,
-                letterSpacing: '0.1em', textTransform: 'uppercase', color: '#6B7280',
+                padding: '12px 0', fontSize: '11px', fontWeight: 700,
+                letterSpacing: '0.08em', textTransform: 'uppercase', color: '#374151',
                 fontFamily: 'inherit',
               }}>
               Price Range
               <span aria-hidden="true" style={{ fontSize: '9px', display: 'inline-block', transition: 'transform 0.15s', transform: openSections.has('price') ? 'rotate(180deg)' : 'none' }}>▼</span>
             </button>
             {openSections.has('price') && (
-              <div style={{ paddingBottom: '14px' }}>
+              <div style={{ paddingBottom: '16px' }}>
                 {([
                   ['all', 'All prices'],
                   ['5',   `Under ${market === 'uk' ? '£' : '$'}5`],
@@ -436,11 +451,11 @@ function ComicPage() {
                   const active = priceMax === val
                   return (
                     <button key={val} onClick={() => setPriceMax(val as typeof priceMax)}
-                      style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0', textAlign: 'left', fontFamily: 'inherit' }}>
-                      <span style={{ width: '14px', height: '14px', borderRadius: '50%', flexShrink: 0, border: `2px solid ${active ? '#E8272A' : '#D1D5DB'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff' }}>
-                        {active && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#E8272A', display: 'block' }} />}
+                      style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 0', textAlign: 'left', fontFamily: 'inherit' }}>
+                      <span style={{ width: '16px', height: '16px', borderRadius: '50%', flexShrink: 0, border: `2px solid ${active ? '#E8272A' : '#D1D5DB'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff' }}>
+                        {active && <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#E8272A', display: 'block' }} />}
                       </span>
-                      <span style={{ fontSize: '13px', color: active ? '#0A0A0A' : '#6B7280', fontWeight: active ? 500 : 400 }}>{label}</span>
+                      <span style={{ fontSize: '14px', color: active ? '#0A0A0A' : '#4B5563', fontWeight: active ? 600 : 400 }}>{label}</span>
                     </button>
                   )
                 })}
