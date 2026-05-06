@@ -1,4 +1,5 @@
 'use client';
+// ⚠ DESIGN FREEZE — do not change layout, spacing, colours, or typography without explicit instruction
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
