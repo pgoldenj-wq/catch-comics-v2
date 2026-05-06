@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
+import { buildAmazonUrl, type ComicFormat } from '@/lib/amazon'
+import { buildAbeBooksUrl } from '@/lib/abebooks'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -315,33 +317,56 @@ export default function PricingPanel({ query, region, formatFilter = 'all', onFo
 
       {/* ── Also search on… ───────────────────────────────────────────────────
           Static affiliate search links — no price data. Always shown once
-          loading is done (regardless of eBay result count). */}
+          loading is done (regardless of eBay result count).
+          Amazon tag is read from NEXT_PUBLIC_AMAZON_UK/US_ASSOCIATE_TAG.
+          The tag is NOT a secret — it appears in every affiliate URL. ── */}
       {!loading && (
         <div className="mt-4 space-y-2">
           <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-2">Also search on</p>
 
-          {/* Amazon */}
-          <a
-            href={`https://www.amazon.com/s?k=${encodeURIComponent(query + ' comic')}&tag=catchcomics-20`}
-            target="_blank"
-            rel="noopener noreferrer sponsored"
-            className="flex items-center gap-3 p-3 rounded-xl bg-white border border-gray-100 hover:border-gray-300 transition-colors group"
-            aria-label={`Search for ${query} on Amazon`}
-          >
-            {/* Amazon logo mark */}
-            <div className="w-8 h-8 rounded-md bg-[#FF9900] flex items-center justify-center shrink-0 text-white font-bold text-xs">
-              a
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-800">Amazon</p>
-              <p className="text-xs text-gray-400">Search for this title</p>
-            </div>
-            <span className="text-xs text-gray-400 group-hover:text-gray-600 shrink-0">Search →</span>
-          </a>
+          {/* Amazon — region-aware (UK → amazon.co.uk, US → amazon.com).
+              Format-aware query suffix: manga listings say "manga", not "comic". */}
+          {(() => {
+            // Associate tags — set in .env.local and Vercel dashboard.
+            // NEXT_PUBLIC_ prefix required so client components can read them.
+            const tag = region === 'uk'
+              ? (process.env.NEXT_PUBLIC_AMAZON_UK_ASSOCIATE_TAG || '')
+              : (process.env.NEXT_PUBLIC_AMAZON_US_ASSOCIATE_TAG || '')
 
-          {/* AbeBooks */}
+            // Use the active format filter as a hint for the Amazon search suffix.
+            // 'all' → no strong format signal → use generic 'comic' suffix.
+            const formatHint: ComicFormat = formatFilter !== 'all' ? formatFilter : undefined
+
+            const amazonUrl = buildAmazonUrl({ title: query, region, format: formatHint, tag })
+
+            return (
+              <a
+                href={amazonUrl}
+                target="_blank"
+                rel="noopener noreferrer sponsored"
+                className="flex items-center gap-3 p-3 rounded-xl bg-white border border-gray-100 hover:border-gray-300 transition-colors group"
+                aria-label={`Search Amazon for ${query}`}
+              >
+                {/* Amazon logo mark */}
+                <div className="w-8 h-8 rounded-md bg-[#FF9900] flex items-center justify-center shrink-0 text-white font-bold text-xs">
+                  a
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800">Amazon</p>
+                  <p className="text-xs text-gray-400">
+                    {region === 'uk' ? 'Search Amazon UK' : 'Search Amazon US'}
+                  </p>
+                </div>
+                <span className="text-xs text-gray-400 group-hover:text-gray-600 shrink-0">Search →</span>
+              </a>
+            )
+          })()}
+
+          {/* AbeBooks — region-aware (UK → abebooks.co.uk, US → abebooks.com).
+              No live pricing API exists. Affiliate search link only.
+              No price shown. Does not affect "From £…" on results page. */}
           <a
-            href={`https://www.abebooks.com/servlet/SearchResults?kn=${encodeURIComponent(query)}&tn=&cm_sp=mbc-_-abb-_-used`}
+            href={buildAbeBooksUrl({ title: query, region })}
             target="_blank"
             rel="noopener noreferrer sponsored"
             className="flex items-center gap-3 p-3 rounded-xl bg-white border border-gray-100 hover:border-gray-300 transition-colors group"
@@ -353,7 +378,9 @@ export default function PricingPanel({ query, region, formatFilter = 'all', onFo
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-800">AbeBooks</p>
-              <p className="text-xs text-gray-400">New, used &amp; collectible</p>
+              <p className="text-xs text-gray-400">
+                {region === 'uk' ? 'Search AbeBooks UK' : 'New, used & collectible'}
+              </p>
             </div>
             <span className="text-xs text-gray-400 group-hover:text-gray-600 shrink-0">Search →</span>
           </a>

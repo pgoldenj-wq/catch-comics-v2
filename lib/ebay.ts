@@ -115,8 +115,13 @@ export async function searchListings(
 
   const token = await getAccessToken()
   const url   = new URL(`${apiBase()}/buy/browse/v1/item_summary/search`)
-  url.searchParams.set('q',     query)
-  url.searchParams.set('limit', String(limit))
+  url.searchParams.set('q',            query)
+  url.searchParams.set('limit',        String(limit))
+  // Restrict to Comics & Graphic Novels category (259104) to prevent non-comic
+  // products (e.g. household cleaners for "Bleach", costumes for "Batman") from
+  // appearing in results. This category covers singles, TPBs, omnibuses and manga
+  // on both EBAY_GB and EBAY_US.
+  url.searchParams.set('category_ids', '259104')
 
   const res = await fetch(url.toString(), {
     headers: {

@@ -157,7 +157,7 @@ function ComicPage() {
             backgroundSize: '22px 22px',
           }}
         />
-        <div className="relative max-w-5xl mx-auto px-6 py-5" style={{ display: 'grid', gridTemplateColumns: '168px 1fr', gap: '32px', alignItems: 'start' }}>
+        <div className="relative max-w-5xl mx-auto px-6 py-5" style={{ display: 'grid', gridTemplateColumns: '132px 1fr', gap: '32px', alignItems: 'start' }}>
 
           {/* ── LEFT COLUMN: back + cover + title + type + region ── */}
           <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -182,10 +182,10 @@ function ComicPage() {
               Back
             </button>
 
-            {/* Cover — w-[168px] h-[232px] ≈ 2:3 ratio, ~+50% area from 112×160 */}
+            {/* Cover — w-[132px] h-[198px] exact 2:3 ratio */}
             <div
               className="relative rounded-lg border border-white/10 shadow-xl bg-white/5 flex items-center justify-center transition-transform duration-300 ease-out hover:scale-[2] hover:z-50"
-              style={{ width: '168px', height: '232px', marginTop: '6px', flexShrink: 0 }}
+              style={{ width: '132px', height: '198px', marginTop: '6px', flexShrink: 0 }}
             >
               <span className="text-white/30 text-3xl font-medium absolute">{comic.name.charAt(0)}</span>
               {comic.image?.medium_url && (
