@@ -1,8 +1,9 @@
 'use client'
+// ⚠ DESIGN FREEZE — do not change layout, spacing, colours, or typography without explicit instruction
 
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState, useRef, Suspense } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import PricingPanel from '@/components/PricingPanel'
+import PricingPanel, { type PriceSnapshot } from '@/components/PricingPanel'
 import SearchBar from '@/components/SearchBar'
 
 interface ComicDetail {
@@ -47,6 +48,13 @@ function ComicPage() {
   const toggleSection = (id: string) => setOpenSections(prev => {
     const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s
   })
+
+  // Price intelligence panel — undefined = loading, null = no listings, snapshot = live data
+  const [priceSummary, setPriceSummary] = useState<PriceSnapshot | null | undefined>(undefined)
+  const listingsRef = useRef<HTMLDivElement>(null)
+
+  // Reset snapshot whenever the region changes so stale data isn't shown
+  useEffect(() => { setPriceSummary(undefined) }, [market])
 
   // True only for numeric Comic Vine volume IDs — issues (i-prefixed) and
   // Open Library books (ol-prefixed) don't have child issues to list.
@@ -136,6 +144,13 @@ function ComicPage() {
 
   return (
     <main className="min-h-screen font-sans" style={{ background: '#F8F8F6' }}>
+      <style>{`
+        @keyframes price-pulse {
+          0%, 100% { opacity: 1;   transform: scale(1);    }
+          50%       { opacity: 0.4; transform: scale(0.75); }
+        }
+        .price-pulse-dot { animation: price-pulse 1.8s ease-in-out infinite; }
+      `}</style>
 
       {/* NAV */}
       <nav className="sticky top-0 z-20 bg-white border-b border-gray-100 px-8 h-20 flex items-center gap-4">
@@ -147,7 +162,7 @@ function ComicPage() {
         </div>
       </nav>
 
-      {/* DARK HEADER — 2-column: LEFT = back+cover+title+type | RIGHT = full metadata */}
+      {/* DARK HEADER — 2-column: LEFT = back + cover | RIGHT = title + metadata + price + region */}
       <div className="relative bg-[#111827]">
         <div
           className="absolute inset-0 pointer-events-none"
@@ -156,12 +171,12 @@ function ComicPage() {
             backgroundSize: '22px 22px',
           }}
         />
-        <div className="relative max-w-5xl mx-auto px-6 py-5" style={{ display: 'grid', gridTemplateColumns: '168px 1fr', gap: '32px', alignItems: 'start' }}>
+        <div className="relative max-w-5xl mx-auto px-6 py-4" style={{ display: 'grid', gridTemplateColumns: '132px 1fr', gap: '24px', alignItems: 'start' }}>
 
-          {/* ── LEFT COLUMN: back + cover + title + type + region ── */}
+          {/* ── LEFT COLUMN: back nav + cover ── */}
           <div style={{ display: 'flex', flexDirection: 'column' }}>
 
-            {/* Back nav — anchored left of cover */}
+            {/* Back nav */}
             <button
               onClick={() => router.back()}
               aria-label="Back to previous page"
@@ -181,10 +196,10 @@ function ComicPage() {
               Back
             </button>
 
-            {/* Cover — w-[168px] h-[232px] ≈ 2:3 ratio, ~+50% area from 112×160 */}
+            {/* Cover — w-[132px] h-[198px] exact 2:3 ratio */}
             <div
               className="relative rounded-lg border border-white/10 shadow-xl bg-white/5 flex items-center justify-center transition-transform duration-300 ease-out hover:scale-[2] hover:z-50"
-              style={{ width: '168px', height: '232px', marginTop: '6px', flexShrink: 0 }}
+              style={{ width: '132px', height: '198px', marginTop: '6px', flexShrink: 0 }}
             >
               <span className="text-white/30 text-3xl font-medium absolute">{comic.name.charAt(0)}</span>
               {comic.image?.medium_url && (
@@ -196,40 +211,9 @@ function ComicPage() {
                 />
               )}
             </div>
-
-            {/* Title */}
-            <h1 style={{ marginTop: '12px', fontSize: '15px', fontWeight: 700, color: '#fff', lineHeight: 1.25, letterSpacing: '-0.01em' }}>
-              {comic.name}
-            </h1>
-
-            {/* Type */}
-            <p style={{ marginTop: '3px', fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>
-              {/^i\d+$/.test(id) ? 'Single Issue' : 'Comic Series'}
-            </p>
-
-            {/* Region toggle */}
-            <div style={{ marginTop: '14px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-              {(['uk', 'us'] as const).map((r) => (
-                <button
-                  key={r}
-                  onClick={() => setMarket(r)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '5px',
-                    padding: '4px 10px', borderRadius: '999px',
-                    fontSize: '11px', fontWeight: 500, fontFamily: 'inherit',
-                    border: `1px solid ${market === r ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)'}`,
-                    background: market === r ? 'rgba(255,255,255,0.1)' : 'transparent',
-                    color: market === r ? '#fff' : 'rgba(255,255,255,0.35)',
-                    cursor: 'pointer', transition: 'all 0.12s',
-                  }}
-                >
-                  {r === 'uk' ? '🇬🇧 UK' : '🇺🇸 US'}
-                </button>
-              ))}
-            </div>
           </div>
 
-          {/* ── RIGHT COLUMN: full metadata ── */}
+          {/* ── RIGHT COLUMN: eyebrow → title → type → creators → price → chars → region ── */}
           {(() => {
             const people = comic.people || []
             const roleMatch = (role: string | null | undefined, kw: string) => (role ?? '').toLowerCase().includes(kw)
@@ -243,7 +227,7 @@ function ComicPage() {
             const coverArtists = [...new Set(people.filter(p => roleMatch(p.role, 'cover')).map(p => p.name))]
             const chars        = comic.characters || []
 
-            // Render 2–3 names max, then "+X more" (non-interactive)
+            // Creator name links — up to `limit` names, then "+X" count
             const renderNames = (names: string[], limit = 3) => {
               const visible  = names.slice(0, limit)
               const overflow = names.length - limit
@@ -253,9 +237,9 @@ function ComicPage() {
                     <span key={name}>
                       <a
                         href={`/search?q=${encodeURIComponent(name)}&region=${market}`}
-                        style={{ color: 'rgba(255,255,255,0.8)', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,0.2)', cursor: 'pointer' }}
-                        onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
-                        onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.8)')}
+                        style={{ color: '#fff', textDecoration: 'none', cursor: 'pointer', transition: 'opacity 0.12s' }}
+                        onMouseEnter={e => (e.currentTarget.style.opacity = '0.6')}
+                        onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
                       >
                         {name}
                       </a>
@@ -263,95 +247,205 @@ function ComicPage() {
                     </span>
                   ))}
                   {overflow > 0 && (
-                    <span style={{ color: 'rgba(255,255,255,0.3)', marginLeft: '2px' }}>+{overflow} more</span>
+                    <span style={{ color: 'rgba(255,255,255,0.3)', marginLeft: '3px' }}>+{overflow}</span>
                   )}
                 </>
               )
             }
 
-            const metaRows: { label: string; names: string[]; plain?: string }[] = []
-            if (writers.length)      metaRows.push({ label: writers.length > 1 ? 'Writers' : 'Writer',   names: writers })
-            if (pencilers.length)    metaRows.push({ label: pencilers.length > 1 ? 'Artists' : 'Artist', names: pencilers })
-            if (colourists.length)   metaRows.push({ label: 'Colours',   names: colourists })
-            if (coverArtists.length) metaRows.push({ label: 'Cover',     names: coverArtists })
+            // Creator rows — only roles with data
+            const creatorRows: { label: string; names: string[] }[] = []
+            if (writers.length)      creatorRows.push({ label: 'Writer',  names: writers })
+            if (pencilers.length)    creatorRows.push({ label: 'Artist',  names: pencilers })
+            if (colourists.length)   creatorRows.push({ label: 'Colours', names: colourists })
+            if (coverArtists.length) creatorRows.push({ label: 'Cover',   names: coverArtists })
 
-            const plainRows: { label: string; value: string }[] = []
-            if (comic.publisher?.name) plainRows.push({ label: 'Publisher', value: comic.publisher.name })
-            if (comic.start_year)      plainRows.push({ label: 'Year',      value: comic.start_year })
-            if (!isNaN(comic.count_of_issues) && comic.count_of_issues > 0)
-                                       plainRows.push({ label: 'Issues',    value: String(comic.count_of_issues) })
-
-            if (metaRows.length === 0 && plainRows.length === 0 && chars.length === 0) return null
+            // Eyebrow: publisher + year only — issues count goes in the type subtitle
+            const eyebrowParts: string[] = []
+            if (comic.publisher?.name) eyebrowParts.push(comic.publisher.name)
+            if (comic.start_year)      eyebrowParts.push(isVolume ? `Est. ${comic.start_year}` : comic.start_year)
 
             const CHAR_VISIBLE = 6
-            const visibleChars  = chars.slice(0, CHAR_VISIBLE)
-            const charOverflow  = chars.length - CHAR_VISIBLE
+            const visibleChars = chars.slice(0, CHAR_VISIBLE)
+            const charOverflow = chars.length - CHAR_VISIBLE
+
+            // Currency symbol from live data, fallback to region
+            const currSym = priceSummary?.currency === 'GBP' ? '£'
+                          : priceSummary?.currency === 'USD' ? '$'
+                          : (market === 'uk' ? '£' : '$')
+            const mktLabel = market === 'uk' ? 'UK' : 'US'
+
+            // Scroll to listings keeping the format-filter tabs visible below the sticky nav.
+            // 80px nav + 8px breathing room = 88px offset from viewport top.
+            const scrollToListings = () => {
+              const el = listingsRef.current
+              if (!el) return
+              const top = el.getBoundingClientRect().top + window.scrollY - 88
+              window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
+            }
 
             return (
-              <div style={{ paddingTop: '42px' }}>
-                <dl style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: '11px' }}>
+              <div style={{ paddingTop: '36px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
 
-                  {/* Creator rows — with search links */}
-                  {metaRows.map(({ label, names }) => (
-                    <div key={label} style={{ display: 'grid', gridTemplateColumns: '76px 1fr', gap: '8px', alignItems: 'baseline' }}>
-                      <dt style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)' }}>
-                        {label}
-                      </dt>
-                      <dd style={{ margin: 0, fontSize: '13px', color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}>
-                        {renderNames(names)}
-                      </dd>
-                    </div>
-                  ))}
+                {/* ── EYEBROW — publisher · Est. year ─────────────────────────── */}
+                {eyebrowParts.length > 0 && (
+                  <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.38)', margin: 0, letterSpacing: '0.01em' }}>
+                    {eyebrowParts.join(' · ')}
+                  </p>
+                )}
 
-                  {/* Plain rows — no links */}
-                  {plainRows.map(({ label, value }) => (
-                    <div key={label} style={{ display: 'grid', gridTemplateColumns: '76px 1fr', gap: '8px', alignItems: 'baseline' }}>
-                      <dt style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)' }}>
-                        {label}
-                      </dt>
-                      <dd style={{ margin: 0, fontSize: '13px', color: 'rgba(255,255,255,0.85)', lineHeight: 1.4 }}>
-                        {value}
-                      </dd>
-                    </div>
-                  ))}
+                {/* ── TITLE — dominant, editorial ──────────────────────────────── */}
+                <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#fff', lineHeight: 1.2, letterSpacing: '-0.02em', margin: 0 }}>
+                  {comic.name}
+                </h1>
 
-                  {/* Characters — pill tags, 6 max */}
-                  {chars.length > 0 && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '76px 1fr', gap: '8px', alignItems: 'start' }}>
-                      <dt style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.35)', paddingTop: '3px' }}>
-                        Characters
-                      </dt>
-                      <dd style={{ margin: 0, display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                        {visibleChars.map(c => (
-                          <a
-                            key={c.id}
-                            href={`/search?q=${encodeURIComponent(c.name)}&region=${market}`}
-                            aria-label={`Search comics featuring ${c.name}`}
-                            style={{
-                              display: 'inline-block', fontSize: '11px', fontWeight: 500,
-                              padding: '3px 8px', borderRadius: '999px',
-                              background: 'rgba(255,255,255,0.08)',
-                              color: 'rgba(255,255,255,0.75)',
-                              textDecoration: 'none',
-                              border: '1px solid rgba(255,255,255,0.12)',
-                              transition: 'background 0.12s, color 0.12s',
-                              cursor: 'pointer',
-                            }}
-                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.18)'; e.currentTarget.style.color = '#fff' }}
-                            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = 'rgba(255,255,255,0.75)' }}
-                          >
-                            {c.name}
-                          </a>
-                        ))}
-                        {charOverflow > 0 && (
-                          <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', alignSelf: 'center' }}>
-                            +{charOverflow} more
-                          </span>
-                        )}
-                      </dd>
+                {/* ── TYPE + ISSUES — subtitle ─────────────────────────────────── */}
+                <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', margin: 0 }}>
+                  {/^i\d+$/.test(id) ? 'Single Issue' : 'Comic Series'}
+                  {!isNaN(comic.count_of_issues) && comic.count_of_issues > 0
+                    ? ` · ${comic.count_of_issues} issues` : ''}
+                </p>
+
+                {/* ── CREATORS — Letterboxd-style hierarchy ────────────────────── */}
+                {creatorRows.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
+                    {creatorRows.map(({ label, names }) => (
+                      <div key={label} style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
+                        <span style={{
+                          fontSize: '10px', fontWeight: 700, letterSpacing: '0.09em',
+                          textTransform: 'uppercase', color: 'rgba(255,255,255,0.28)',
+                          minWidth: '52px', flexShrink: 0,
+                        }}>
+                          {label}
+                        </span>
+                        <span style={{ fontSize: '13px', fontWeight: 600, color: '#fff', lineHeight: 1.35 }}>
+                          {renderNames(names)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* ── PRICE STRIP — inline, no card ─────────────────────────────── */}
+                <div style={{ marginTop: '6px' }}>
+
+                  {/* Loading */}
+                  {priceSummary === undefined && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span className="price-pulse-dot" style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#E8272A', flexShrink: 0 }} />
+                      <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', letterSpacing: '0.03em' }}>
+                        eBay {mktLabel} · Fetching prices…
+                      </span>
                     </div>
                   )}
-                </dl>
+
+                  {/* No listings */}
+                  {priceSummary === null && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'rgba(255,255,255,0.15)', flexShrink: 0 }} />
+                      <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)' }}>
+                        No eBay listings right now
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Live data */}
+                  {priceSummary != null && priceSummary !== undefined && (
+                    <>
+                      {/* Row 1 — dot · source · price · CTA */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span className="price-pulse-dot" style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#E8272A', flexShrink: 0 }} />
+                          <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.38)', letterSpacing: '0.03em' }}>
+                            eBay {mktLabel}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: '26px', fontWeight: 800, color: '#E8272A', letterSpacing: '-0.025em', lineHeight: 1 }}>
+                          {currSym}{priceSummary.bestPrice.toFixed(2)}
+                        </span>
+                        <button
+                          onClick={scrollToListings}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center',
+                            background: '#fff', color: '#0A0A0A',
+                            fontSize: '12px', fontWeight: 700,
+                            padding: '7px 14px', borderRadius: '999px',
+                            border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                            transition: 'background 0.15s, color 0.15s',
+                            whiteSpace: 'nowrap',
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.background = '#E8272A'; e.currentTarget.style.color = '#fff' }}
+                          onMouseLeave={e => { e.currentTarget.style.background = '#fff';    e.currentTarget.style.color = '#0A0A0A' }}
+                        >
+                          View best deal →
+                        </button>
+                      </div>
+                      {/* Row 2 — offer count + condition breakdown */}
+                      <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.33)', margin: '4px 0 0', lineHeight: 1.4 }}>
+                        {priceSummary.totalOffers} {priceSummary.totalOffers === 1 ? 'offer' : 'offers'}
+                        {priceSummary.newFrom  !== null ? ` · New from ${currSym}${priceSummary.newFrom.toFixed(2)}`  : ''}
+                        {priceSummary.usedFrom !== null ? ` · Used from ${currSym}${priceSummary.usedFrom.toFixed(2)}` : ''}
+                      </p>
+                    </>
+                  )}
+                </div>
+
+                {/* ── CHARACTERS — pill tags ─────────────────────────────────────── */}
+                {chars.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '2px' }}>
+                    {visibleChars.map(c => (
+                      <a
+                        key={c.id}
+                        href={`/search?q=${encodeURIComponent(c.name)}&region=${market}`}
+                        aria-label={`Search comics featuring ${c.name}`}
+                        style={{
+                          display: 'inline-block', fontSize: '11px', fontWeight: 500,
+                          padding: '3px 8px', borderRadius: '999px',
+                          background: 'rgba(255,255,255,0.07)',
+                          color: 'rgba(255,255,255,0.6)',
+                          textDecoration: 'none',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          transition: 'background 0.12s, color 0.12s',
+                          cursor: 'pointer',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.15)'; e.currentTarget.style.color = '#fff' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.07)';  e.currentTarget.style.color = 'rgba(255,255,255,0.6)' }}
+                      >
+                        {c.name}
+                      </a>
+                    ))}
+                    {charOverflow > 0 && (
+                      <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)', alignSelf: 'center' }}>
+                        +{charOverflow} more
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* ── REGION TOGGLE — "Prices for: GB UK  us US" ─────────────────── */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', letterSpacing: '0.01em' }}>
+                    Prices for:
+                  </span>
+                  {(['uk', 'us'] as const).map(r => (
+                    <button
+                      key={r}
+                      onClick={() => setMarket(r)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '5px',
+                        padding: '4px 10px', borderRadius: '999px',
+                        fontSize: '11px', fontWeight: 500, fontFamily: 'inherit',
+                        border: `1px solid ${market === r ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)'}`,
+                        background: market === r ? 'rgba(255,255,255,0.1)' : 'transparent',
+                        color: market === r ? '#fff' : 'rgba(255,255,255,0.35)',
+                        cursor: 'pointer', transition: 'all 0.12s',
+                      }}
+                    >
+                      {r === 'uk' ? '🇬🇧 UK' : '🇺🇸 US'}
+                    </button>
+                  ))}
+                </div>
+
               </div>
             )
           })()}
@@ -465,7 +559,7 @@ function ComicPage() {
         </aside>
 
         {/* ── PRICING (centre) ────────────────────────────────────────────────── */}
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div ref={listingsRef} style={{ flex: 1, minWidth: 0 }}>
           <PricingPanel
             query={comic.name}
             region={market}
@@ -473,6 +567,7 @@ function ComicPage() {
             onFormatChange={setFormatFilter}
             priceMax={priceMax}
             condition={condition}
+            onPriceSnapshot={setPriceSummary}
           />
           <p className="text-xs text-gray-400 mt-8 leading-relaxed">
             Catch Comics links to third-party retailers. Prices and availability may vary.

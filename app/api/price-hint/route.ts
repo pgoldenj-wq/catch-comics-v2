@@ -5,9 +5,10 @@ import { pricesCache } from '@/lib/cache'
 /**
  * GET /api/price-hint?q={query}&region={uk|us}
  *
- * Lightweight endpoint for the search results page.
- * Fetches only 5 eBay listings and returns the lowest price only.
- * Much cheaper/faster than the full /api/prices endpoint.
+ * Fetches the same 20 eBay listings as /api/prices and returns only the
+ * lowest price for the search-results page. Side-effect: warms the full
+ * prices cache so the detail page gets a cache hit and shows the same
+ * cheapest price — eliminating the "From £X" mismatch.
  *
  * Response: { lowestPrice: number | null, currency: string | null }
  */
@@ -51,10 +52,18 @@ export async function GET(request: NextRequest) {
       ? ((process.env.EBAY_MARKETPLACE_ID_UK as Marketplace) || 'EBAY_GB')
       : ((process.env.EBAY_MARKETPLACE_ID_US as Marketplace) || 'EBAY_US')
 
-    // Fall back to a small fetch — just need the cheapest listing
-    const listings = await searchListings(query, marketplace, 5)
+    // Fetch the same 20 listings that /api/prices would fetch, then:
+    //   1. Warm the full prices cache so the detail page gets a cache hit (no
+    //      second eBay round-trip) and shows an identical cheapest price.
+    //   2. Return the cheapest as the hint — guaranteed to match the detail page.
+    const listings = await searchListings(query, marketplace, 20)
     const sorted   = [...listings].sort((a, b) => a.price.value - b.price.value)
     const best     = sorted[0] ?? null
+
+    // Populate the full prices cache so /api/prices reuses this result
+    if (sorted.length > 0) {
+      pricesCache.set(fullCacheKey, { query, region, listings: sorted })
+    }
 
     const result: { lowestPrice: number | null; currency: string | null } = best
       ? { lowestPrice: best.price.value, currency: best.price.currency }

@@ -1,6 +1,9 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
+import { buildAmazonUrl, type ComicFormat } from '@/lib/amazon'
+import { buildAbeBooksUrl } from '@/lib/abebooks'
+import { buildForbiddenPlanetSearchUrl } from '@/lib/forbiddenplanet'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -25,6 +28,21 @@ interface PricesResponse {
   detail?:      string
 }
 
+/**
+ * Summary of all unfiltered eBay listings for a query — passed to the parent
+ * via onPriceSnapshot so the hero intelligence panel can display live stats
+ * without fetching independently.
+ */
+export interface PriceSnapshot {
+  bestPrice:      number
+  worstPrice:     number
+  totalOffers:    number
+  newFrom:        number | null   // cheapest New-condition listing, or null
+  usedFrom:       number | null   // cheapest Used-condition listing, or null
+  currency:       string
+  bestListingUrl: string
+}
+
 interface PricingPanelProps {
   query:        string
   region:       'uk' | 'us'
@@ -36,6 +54,12 @@ interface PricingPanelProps {
   priceMax?:    'all' | '5' | '10' | '15' | '25' | '35' | '50'
   /** Client-side condition filter ('all' = no filter) */
   condition?:   'all' | 'new' | 'used'
+  /**
+   * Called once listings are loaded (or confirmed empty).
+   * Receives a PriceSnapshot with summary stats for the hero intelligence panel,
+   * or null if no listings were found.
+   */
+  onPriceSnapshot?: (snapshot: PriceSnapshot | null) => void
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -58,7 +82,7 @@ function formatPrice(value: number, currency: string): string {
  * eBay Buy Browse API. Listings are sorted cheapest-first server-side; we
  * re-sort defensively, then optionally filter client-side by format/priceMax.
  */
-export default function PricingPanel({ query, region, formatFilter = 'all', onFormatChange, priceMax = 'all', condition = 'all' }: PricingPanelProps) {
+export default function PricingPanel({ query, region, formatFilter = 'all', onFormatChange, priceMax = 'all', condition = 'all', onPriceSnapshot }: PricingPanelProps) {
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState<string | null>(null)
   const [listings, setListings] = useState<Listing[]>([])
@@ -79,16 +103,38 @@ export default function PricingPanel({ query, region, formatFilter = 'all', onFo
         if (data.error) {
           setError(data.error)
           setListings([])
+          onPriceSnapshot?.(null)
         } else {
           // Defensive client-side sort — cheapest first
           const sorted = [...(data.listings || [])].sort((a, b) => a.price.value - b.price.value)
           setListings(sorted)
+
+          // Compute snapshot for hero intelligence panel
+          if (sorted.length === 0) {
+            onPriceSnapshot?.(null)
+          } else {
+            const newFrom  = sorted.find(l => l.condition.toLowerCase() === 'new')?.price.value ?? null
+            const usedFrom = sorted.find(l => {
+              const c = l.condition.toLowerCase()
+              return c !== 'new' && c !== '' && c !== 'unspecified'
+            })?.price.value ?? null
+            onPriceSnapshot?.({
+              bestPrice:      sorted[0].price.value,
+              worstPrice:     sorted[sorted.length - 1].price.value,
+              totalOffers:    sorted.length,
+              newFrom,
+              usedFrom,
+              currency:       sorted[0].price.currency,
+              bestListingUrl: sorted[0].itemWebUrl,
+            })
+          }
         }
         setLoading(false)
       })
       .catch(err => {
         if (err instanceof Error && err.name === 'AbortError') return
         setError('Could not load listings.')
+        onPriceSnapshot?.(null)
         setLoading(false)
       })
 
@@ -147,6 +193,20 @@ export default function PricingPanel({ query, region, formatFilter = 'all', onFo
 
   return (
     <div>
+      {/* Listing card thumbnail hover — scale pops the cover without moving the whole card */}
+      <style>{`
+        .listing-thumb {
+          transition: transform 0.32s cubic-bezier(0.34, 1.15, 0.64, 1), box-shadow 0.25s ease;
+          will-change: transform;
+        }
+        .listing-card:hover .listing-thumb {
+          transform: scale(1.13);
+          box-shadow: 0 8px 24px rgba(0,0,0,0.22);
+          position: relative;
+          z-index: 2;
+        }
+      `}</style>
+
       {/* Header: format pills (left) + offer count (right) */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', gap: '12px', flexWrap: 'wrap' }}>
         {onFormatChange ? (
@@ -232,27 +292,26 @@ export default function PricingPanel({ query, region, formatFilter = 'all', onFo
             return (
               <li
                 key={l.itemId}
-                className="flex items-center gap-4 rounded-2xl bg-white"
+                className="listing-card flex items-center gap-4 rounded-2xl bg-white"
                 style={{
                   border: isBest ? '2px solid #E8272A' : '1px solid #F3F4F6',
                   padding: isBest ? '14px' : '12px',
-                  transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                  transition: 'box-shadow 0.2s ease',
                   position: 'relative',
+                  overflow: 'visible',
                 }}
                 onMouseEnter={e => {
-                  e.currentTarget.style.transform = 'scale(1.02)'
                   e.currentTarget.style.boxShadow = '0 6px 24px rgba(0,0,0,0.10)'
                   e.currentTarget.style.zIndex = '1'
                 }}
                 onMouseLeave={e => {
-                  e.currentTarget.style.transform = 'scale(1)'
                   e.currentTarget.style.boxShadow = 'none'
                   e.currentTarget.style.zIndex = 'auto'
                 }}
               >
-                {/* Cover thumbnail — 2:3 aspect ratio, contain so artwork isn't cropped */}
+                {/* Cover thumbnail — scales independently on card hover, breaking containment slightly */}
                 <div
-                  className="relative rounded-md overflow-hidden bg-gray-50 border border-gray-200 shrink-0 flex items-center justify-center"
+                  className="listing-thumb relative rounded-md overflow-hidden bg-gray-50 border border-gray-200 shrink-0 flex items-center justify-center"
                   style={{ width: isBest ? '62px' : '53px', height: isBest ? '86px' : '74px' }}
                 >
                   <span className="text-gray-300 text-sm font-medium" aria-hidden="true">
@@ -315,33 +374,56 @@ export default function PricingPanel({ query, region, formatFilter = 'all', onFo
 
       {/* ── Also search on… ───────────────────────────────────────────────────
           Static affiliate search links — no price data. Always shown once
-          loading is done (regardless of eBay result count). */}
+          loading is done (regardless of eBay result count).
+          Amazon tag is read from NEXT_PUBLIC_AMAZON_UK/US_ASSOCIATE_TAG.
+          The tag is NOT a secret — it appears in every affiliate URL. ── */}
       {!loading && (
         <div className="mt-4 space-y-2">
           <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-2">Also search on</p>
 
-          {/* Amazon */}
-          <a
-            href={`https://www.amazon.com/s?k=${encodeURIComponent(query + ' comic')}&tag=catchcomics-20`}
-            target="_blank"
-            rel="noopener noreferrer sponsored"
-            className="flex items-center gap-3 p-3 rounded-xl bg-white border border-gray-100 hover:border-gray-300 transition-colors group"
-            aria-label={`Search for ${query} on Amazon`}
-          >
-            {/* Amazon logo mark */}
-            <div className="w-8 h-8 rounded-md bg-[#FF9900] flex items-center justify-center shrink-0 text-white font-bold text-xs">
-              a
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-800">Amazon</p>
-              <p className="text-xs text-gray-400">Search for this title</p>
-            </div>
-            <span className="text-xs text-gray-400 group-hover:text-gray-600 shrink-0">Search →</span>
-          </a>
+          {/* Amazon — region-aware (UK → amazon.co.uk, US → amazon.com).
+              Format-aware query suffix: manga listings say "manga", not "comic". */}
+          {(() => {
+            // Associate tags — set in .env.local and Vercel dashboard.
+            // NEXT_PUBLIC_ prefix required so client components can read them.
+            const tag = region === 'uk'
+              ? (process.env.NEXT_PUBLIC_AMAZON_UK_ASSOCIATE_TAG || '')
+              : (process.env.NEXT_PUBLIC_AMAZON_US_ASSOCIATE_TAG || '')
 
-          {/* AbeBooks */}
+            // Use the active format filter as a hint for the Amazon search suffix.
+            // 'all' → no strong format signal → use generic 'comic' suffix.
+            const formatHint: ComicFormat = formatFilter !== 'all' ? formatFilter : undefined
+
+            const amazonUrl = buildAmazonUrl({ title: query, region, format: formatHint, tag })
+
+            return (
+              <a
+                href={amazonUrl}
+                target="_blank"
+                rel="noopener noreferrer sponsored"
+                className="flex items-center gap-3 p-3 rounded-xl bg-white border border-gray-100 hover:border-gray-300 transition-colors group"
+                aria-label={`Search Amazon for ${query}`}
+              >
+                {/* Amazon logo mark */}
+                <div className="w-8 h-8 rounded-md bg-[#FF9900] flex items-center justify-center shrink-0 text-white font-bold text-xs">
+                  a
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800">Amazon</p>
+                  <p className="text-xs text-gray-400">
+                    {region === 'uk' ? 'Search Amazon UK' : 'Search Amazon US'}
+                  </p>
+                </div>
+                <span className="text-xs text-gray-400 group-hover:text-gray-600 shrink-0">Search →</span>
+              </a>
+            )
+          })()}
+
+          {/* AbeBooks — region-aware (UK → abebooks.co.uk, US → abebooks.com).
+              No live pricing API exists. Affiliate search link only.
+              No price shown. Does not affect "From £…" on results page. */}
           <a
-            href={`https://www.abebooks.com/servlet/SearchResults?kn=${encodeURIComponent(query)}&tn=&cm_sp=mbc-_-abb-_-used`}
+            href={buildAbeBooksUrl({ title: query, region })}
             target="_blank"
             rel="noopener noreferrer sponsored"
             className="flex items-center gap-3 p-3 rounded-xl bg-white border border-gray-100 hover:border-gray-300 transition-colors group"
@@ -353,10 +435,40 @@ export default function PricingPanel({ query, region, formatFilter = 'all', onFo
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-800">AbeBooks</p>
-              <p className="text-xs text-gray-400">New, used &amp; collectible</p>
+              <p className="text-xs text-gray-400">
+                {region === 'uk' ? 'Search AbeBooks UK' : 'New, used & collectible'}
+              </p>
             </div>
             <span className="text-xs text-gray-400 group-hover:text-gray-600 shrink-0">Search →</span>
           </a>
+
+          {/* Forbidden Planet — UK specialist retailer. No live pricing API.
+              Affiliate code read from NEXT_PUBLIC_FORBIDDEN_PLANET_AFFILIATE_CODE.
+              The code is NOT a secret — it appears in the outbound URL.
+              Only shown for UK region; FP ships internationally but is UK-native. */}
+          {region === 'uk' && (() => {
+            const fpCode = process.env.NEXT_PUBLIC_FORBIDDEN_PLANET_AFFILIATE_CODE || ''
+            const fpUrl  = buildForbiddenPlanetSearchUrl(query, fpCode)
+            return (
+              <a
+                href={fpUrl}
+                target="_blank"
+                rel="noopener noreferrer sponsored"
+                className="flex items-center gap-3 p-3 rounded-xl bg-white border border-gray-100 hover:border-gray-300 transition-colors group"
+                aria-label={`Search for ${query} on Forbidden Planet`}
+              >
+                {/* Forbidden Planet logo mark */}
+                <div className="w-8 h-8 rounded-md bg-[#E8272A] flex items-center justify-center shrink-0 text-white font-bold text-xs">
+                  FP
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800">Forbidden Planet</p>
+                  <p className="text-xs text-gray-400">UK specialist comic retailer</p>
+                </div>
+                <span className="text-xs text-gray-400 group-hover:text-gray-600 shrink-0">View on FP →</span>
+              </a>
+            )
+          })()}
         </div>
       )}
     </div>

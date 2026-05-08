@@ -11,6 +11,8 @@
  * import would fail silently with empty creds.)
  */
 
+import { enrichEbayQuery, isNonComicListing } from '@/lib/comicDisambiguation'
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type Marketplace = 'EBAY_GB' | 'EBAY_US'
@@ -113,10 +115,16 @@ export async function searchListings(
 ): Promise<EbayListing[]> {
   if (!query.trim()) return []
 
-  const token = await getAccessToken()
-  const url   = new URL(`${apiBase()}/buy/browse/v1/item_summary/search`)
-  url.searchParams.set('q',     query)
-  url.searchParams.set('limit', String(limit))
+  const token          = await getAccessToken()
+  const enrichedQuery  = enrichEbayQuery(query)
+  const url            = new URL(`${apiBase()}/buy/browse/v1/item_summary/search`)
+  url.searchParams.set('q',            enrichedQuery)
+  url.searchParams.set('limit',        String(limit))
+  // Restrict to Comics & Graphic Novels category (259104) to prevent non-comic
+  // products (e.g. household cleaners for "Bleach", costumes for "Batman") from
+  // appearing in results. This category covers singles, TPBs, omnibuses and manga
+  // on both EBAY_GB and EBAY_US.
+  url.searchParams.set('category_ids', '259104')
 
   const res = await fetch(url.toString(), {
     headers: {
@@ -146,6 +154,7 @@ function isFCBD(title: string): boolean {
 function mapListing(r: RawBrowseItem): EbayListing | null {
   if (!r.itemId || !r.title || !r.price?.value) return null
   if (isFCBD(r.title)) return null
+  if (isNonComicListing(r.title)) return null
   return {
     itemId:     r.itemId,
     title:      r.title,

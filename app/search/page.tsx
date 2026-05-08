@@ -1,4 +1,5 @@
 'use client'
+// ⚠ DESIGN FREEZE — do not change layout, spacing, colours, or typography without explicit instruction
 
 import { useSearchParams } from 'next/navigation'
 import { useEffect, useState, useMemo, useRef, Suspense } from 'react'

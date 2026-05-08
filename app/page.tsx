@@ -1,4 +1,5 @@
 'use client';
+// ⚠ DESIGN FREEZE — do not change layout, spacing, colours, or typography without explicit instruction
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -102,6 +103,16 @@ export default function Home() {
     const id = setInterval(tick, 16);
     return () => clearInterval(id);
   }, [SET_W]);
+
+  // Manual arrow scroll — snaps by one card width and keeps offset in loop range
+  const scrollCarousel = (direction: 'left' | 'right') => {
+    const delta = direction === 'left' ? -CARD_W : CARD_W;
+    let next = offsetRef.current + delta;
+    if (next >= SET_W * 2) next -= SET_W;
+    if (next < SET_W)      next += SET_W;
+    offsetRef.current = next;
+    setCarouselOffset(next);
+  };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect      = e.currentTarget.getBoundingClientRect();
@@ -413,6 +424,44 @@ export default function Home() {
           {hoverZone === 'right' && <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '20%', zIndex: 3, background: 'linear-gradient(to left,  rgba(232,39,42,0.04), transparent)', pointerEvents: 'none' }} />}
           <div style={{ position: 'absolute', left:  0, top: 0, bottom: 0, width: '40px', zIndex: 2, background: 'linear-gradient(to right, #F8F8F6, transparent)', pointerEvents: 'none' }} />
           <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '40px', zIndex: 2, background: 'linear-gradient(to left,  #F8F8F6, transparent)', pointerEvents: 'none' }} />
+
+          {/* ── Manual arrow buttons — sit above gradients (z-index 4) ── */}
+          <button
+            onClick={() => scrollCarousel('left')}
+            aria-label="Scroll left"
+            style={{
+              position: 'absolute', left: '6px', top: '50%', transform: 'translateY(-50%)',
+              zIndex: 4, width: '28px', height: '28px', borderRadius: '50%',
+              background: '#fff', border: '1px solid #E5E7EB',
+              boxShadow: '0 1px 6px rgba(0,0,0,0.10)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', transition: 'box-shadow 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 2px 10px rgba(0,0,0,0.18)'; }}
+            onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 1px 6px rgba(0,0,0,0.10)'; }}
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M15 18l-6-6 6-6" stroke="#374151" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+          <button
+            onClick={() => scrollCarousel('right')}
+            aria-label="Scroll right"
+            style={{
+              position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)',
+              zIndex: 4, width: '28px', height: '28px', borderRadius: '50%',
+              background: '#fff', border: '1px solid #E5E7EB',
+              boxShadow: '0 1px 6px rgba(0,0,0,0.10)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', transition: 'box-shadow 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 2px 10px rgba(0,0,0,0.18)'; }}
+            onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 1px 6px rgba(0,0,0,0.10)'; }}
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M9 18l6-6-6-6" stroke="#374151" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
 
           {/* 3 copies for seamless infinite loop */}
           <div style={{ display: 'flex', gap: '12px', transform: `translateX(-${carouselOffset}px)`, willChange: 'transform' }}>
