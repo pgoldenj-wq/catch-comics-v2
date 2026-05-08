@@ -162,7 +162,7 @@ function ComicPage() {
         </div>
       </nav>
 
-      {/* DARK HEADER — 2-column: LEFT = back+cover+title+type | RIGHT = full metadata */}
+      {/* DARK HEADER — 2-column: LEFT = back + cover | RIGHT = title + metadata + price + region */}
       <div className="relative bg-[#111827]">
         <div
           className="absolute inset-0 pointer-events-none"
@@ -173,10 +173,10 @@ function ComicPage() {
         />
         <div className="relative max-w-5xl mx-auto px-6 py-4" style={{ display: 'grid', gridTemplateColumns: '132px 1fr', gap: '24px', alignItems: 'start' }}>
 
-          {/* ── LEFT COLUMN: back + cover + title + type + region ── */}
+          {/* ── LEFT COLUMN: back nav + cover ── */}
           <div style={{ display: 'flex', flexDirection: 'column' }}>
 
-            {/* Back nav — anchored left of cover */}
+            {/* Back nav */}
             <button
               onClick={() => router.back()}
               aria-label="Back to previous page"
@@ -211,40 +211,9 @@ function ComicPage() {
                 />
               )}
             </div>
-
-            {/* Title */}
-            <h1 style={{ marginTop: '12px', fontSize: '15px', fontWeight: 700, color: '#fff', lineHeight: 1.25, letterSpacing: '-0.01em' }}>
-              {comic.name}
-            </h1>
-
-            {/* Type */}
-            <p style={{ marginTop: '3px', fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>
-              {/^i\d+$/.test(id) ? 'Single Issue' : 'Comic Series'}
-            </p>
-
-            {/* Region toggle */}
-            <div style={{ marginTop: '14px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-              {(['uk', 'us'] as const).map((r) => (
-                <button
-                  key={r}
-                  onClick={() => setMarket(r)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '5px',
-                    padding: '4px 10px', borderRadius: '999px',
-                    fontSize: '11px', fontWeight: 500, fontFamily: 'inherit',
-                    border: `1px solid ${market === r ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)'}`,
-                    background: market === r ? 'rgba(255,255,255,0.1)' : 'transparent',
-                    color: market === r ? '#fff' : 'rgba(255,255,255,0.35)',
-                    cursor: 'pointer', transition: 'all 0.12s',
-                  }}
-                >
-                  {r === 'uk' ? '🇬🇧 UK' : '🇺🇸 US'}
-                </button>
-              ))}
-            </div>
           </div>
 
-          {/* ── RIGHT COLUMN: creators → price strip → plain meta → chars ── */}
+          {/* ── RIGHT COLUMN: eyebrow → title → type → creators → price → chars → region ── */}
           {(() => {
             const people = comic.people || []
             const roleMatch = (role: string | null | undefined, kw: string) => (role ?? '').toLowerCase().includes(kw)
@@ -291,12 +260,10 @@ function ComicPage() {
             if (colourists.length)   creatorRows.push({ label: 'Colours', names: colourists })
             if (coverArtists.length) creatorRows.push({ label: 'Cover',   names: coverArtists })
 
-            // Plain meta as a single inline dot-separated line
-            const plainParts: string[] = []
-            if (comic.publisher?.name) plainParts.push(comic.publisher.name)
-            if (comic.start_year)      plainParts.push(comic.start_year)
-            if (!isNaN(comic.count_of_issues) && comic.count_of_issues > 0)
-              plainParts.push(`${comic.count_of_issues} issues`)
+            // Eyebrow: publisher + year only — issues count goes in the type subtitle
+            const eyebrowParts: string[] = []
+            if (comic.publisher?.name) eyebrowParts.push(comic.publisher.name)
+            if (comic.start_year)      eyebrowParts.push(isVolume ? `Est. ${comic.start_year}` : comic.start_year)
 
             const CHAR_VISIBLE = 6
             const visibleChars = chars.slice(0, CHAR_VISIBLE)
@@ -308,12 +275,40 @@ function ComicPage() {
                           : (market === 'uk' ? '£' : '$')
             const mktLabel = market === 'uk' ? 'UK' : 'US'
 
-            return (
-              <div style={{ paddingTop: '36px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            // Scroll to listings keeping the format-filter tabs visible below the sticky nav.
+            // 80px nav + 8px breathing room = 88px offset from viewport top.
+            const scrollToListings = () => {
+              const el = listingsRef.current
+              if (!el) return
+              const top = el.getBoundingClientRect().top + window.scrollY - 88
+              window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
+            }
 
-                {/* ── CREATORS — Letterboxd-style hierarchy ─────────────────── */}
+            return (
+              <div style={{ paddingTop: '36px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+
+                {/* ── EYEBROW — publisher · Est. year ─────────────────────────── */}
+                {eyebrowParts.length > 0 && (
+                  <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.38)', margin: 0, letterSpacing: '0.01em' }}>
+                    {eyebrowParts.join(' · ')}
+                  </p>
+                )}
+
+                {/* ── TITLE — dominant, editorial ──────────────────────────────── */}
+                <h1 style={{ fontSize: '22px', fontWeight: 700, color: '#fff', lineHeight: 1.2, letterSpacing: '-0.02em', margin: 0 }}>
+                  {comic.name}
+                </h1>
+
+                {/* ── TYPE + ISSUES — subtitle ─────────────────────────────────── */}
+                <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', margin: 0 }}>
+                  {/^i\d+$/.test(id) ? 'Single Issue' : 'Comic Series'}
+                  {!isNaN(comic.count_of_issues) && comic.count_of_issues > 0
+                    ? ` · ${comic.count_of_issues} issues` : ''}
+                </p>
+
+                {/* ── CREATORS — Letterboxd-style hierarchy ────────────────────── */}
                 {creatorRows.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
                     {creatorRows.map(({ label, names }) => (
                       <div key={label} style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
                         <span style={{
@@ -323,7 +318,7 @@ function ComicPage() {
                         }}>
                           {label}
                         </span>
-                        <span style={{ fontSize: '14px', fontWeight: 600, color: '#fff', lineHeight: 1.35 }}>
+                        <span style={{ fontSize: '13px', fontWeight: 600, color: '#fff', lineHeight: 1.35 }}>
                           {renderNames(names)}
                         </span>
                       </div>
@@ -331,8 +326,9 @@ function ComicPage() {
                   </div>
                 )}
 
-                {/* ── PRICE STRIP — inline, no card ─────────────────────────── */}
-                <div>
+                {/* ── PRICE STRIP — inline, no card ─────────────────────────────── */}
+                <div style={{ marginTop: '6px' }}>
+
                   {/* Loading */}
                   {priceSummary === undefined && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -368,7 +364,7 @@ function ComicPage() {
                           {currSym}{priceSummary.bestPrice.toFixed(2)}
                         </span>
                         <button
-                          onClick={() => listingsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                          onClick={scrollToListings}
                           style={{
                             display: 'inline-flex', alignItems: 'center',
                             background: '#fff', color: '#0A0A0A',
@@ -394,16 +390,9 @@ function ComicPage() {
                   )}
                 </div>
 
-                {/* ── PLAIN META — publisher · year · issues on one line ──────── */}
-                {plainParts.length > 0 && (
-                  <p style={{ fontSize: '12px', color: 'rgba(255,255,255,0.38)', margin: 0, lineHeight: 1.4 }}>
-                    {plainParts.join(' · ')}
-                  </p>
-                )}
-
-                {/* ── CHARACTERS — pill tags ─────────────────────────────────── */}
+                {/* ── CHARACTERS — pill tags ─────────────────────────────────────── */}
                 {chars.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '2px' }}>
                     {visibleChars.map(c => (
                       <a
                         key={c.id}
@@ -432,6 +421,31 @@ function ComicPage() {
                     )}
                   </div>
                 )}
+
+                {/* ── REGION TOGGLE — "Prices for: GB UK  us US" ─────────────────── */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', letterSpacing: '0.01em' }}>
+                    Prices for:
+                  </span>
+                  {(['uk', 'us'] as const).map(r => (
+                    <button
+                      key={r}
+                      onClick={() => setMarket(r)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '5px',
+                        padding: '4px 10px', borderRadius: '999px',
+                        fontSize: '11px', fontWeight: 500, fontFamily: 'inherit',
+                        border: `1px solid ${market === r ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.1)'}`,
+                        background: market === r ? 'rgba(255,255,255,0.1)' : 'transparent',
+                        color: market === r ? '#fff' : 'rgba(255,255,255,0.35)',
+                        cursor: 'pointer', transition: 'all 0.12s',
+                      }}
+                    >
+                      {r === 'uk' ? '🇬🇧 UK' : '🇺🇸 US'}
+                    </button>
+                  ))}
+                </div>
+
               </div>
             )
           })()}
