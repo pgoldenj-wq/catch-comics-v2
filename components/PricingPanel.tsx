@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { buildAmazonUrl, type ComicFormat } from '@/lib/amazon'
 import { buildAbeBooksUrl } from '@/lib/abebooks'
+import { buildForbiddenPlanetSearchUrl } from '@/lib/forbiddenplanet'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -440,6 +441,34 @@ export default function PricingPanel({ query, region, formatFilter = 'all', onFo
             </div>
             <span className="text-xs text-gray-400 group-hover:text-gray-600 shrink-0">Search →</span>
           </a>
+
+          {/* Forbidden Planet — UK specialist retailer. No live pricing API.
+              Affiliate code read from NEXT_PUBLIC_FORBIDDEN_PLANET_AFFILIATE_CODE.
+              The code is NOT a secret — it appears in the outbound URL.
+              Only shown for UK region; FP ships internationally but is UK-native. */}
+          {region === 'uk' && (() => {
+            const fpCode = process.env.NEXT_PUBLIC_FORBIDDEN_PLANET_AFFILIATE_CODE || ''
+            const fpUrl  = buildForbiddenPlanetSearchUrl(query, fpCode)
+            return (
+              <a
+                href={fpUrl}
+                target="_blank"
+                rel="noopener noreferrer sponsored"
+                className="flex items-center gap-3 p-3 rounded-xl bg-white border border-gray-100 hover:border-gray-300 transition-colors group"
+                aria-label={`Search for ${query} on Forbidden Planet`}
+              >
+                {/* Forbidden Planet logo mark */}
+                <div className="w-8 h-8 rounded-md bg-[#E8272A] flex items-center justify-center shrink-0 text-white font-bold text-xs">
+                  FP
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800">Forbidden Planet</p>
+                  <p className="text-xs text-gray-400">UK specialist comic retailer</p>
+                </div>
+                <span className="text-xs text-gray-400 group-hover:text-gray-600 shrink-0">View on FP →</span>
+              </a>
+            )
+          })()}
         </div>
       )}
     </div>
