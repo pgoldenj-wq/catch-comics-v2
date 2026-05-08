@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { searchCache, volumeCache } from '@/lib/cache'
 import { parseComicQuery, titleMatchScore } from '@/lib/parseComicQuery'
+import { isAmbiguousComicTitle } from '@/lib/comicDisambiguation'
 
 // ── Image helpers ─────────────────────────────────────────────────────────────
 
@@ -147,6 +148,11 @@ function scoreVolume(r: any, parsed: ParsedQuery): number {
 
   // ── Publisher quality signal ─────────────────────────────────────────────
   if (isMajorPublisher(pub)) score += 10
+
+  // ── Disambiguation tiebreaker ────────────────────────────────────────────
+  // For ambiguous titles (e.g. "Blade", "Venom"), favour results that are
+  // confirmed series (issue count > 0) over zero-issue stub entries.
+  if (isAmbiguousComicTitle(parsed.cleanTitle) && count > 0) score += 5
 
   return score
 }
