@@ -591,14 +591,13 @@ function SearchResults() {
         {/* Results column */}
         <div style={{ flex: 1, minWidth: 0 }}>
 
-          {/* TOP FILTER ROW — single-select format pills + result count.
-              Clicking the active pill clears back to 'all'. */}
+          {/* ── FORMAT PILLS — single-select, clicking active pill clears to 'all' */}
           {!loading && !error && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
               {([
                 { id: 'all',           label: 'All' },
                 { id: 'graphic-novel', label: 'Graphic Novels' },
-                { id: 'single-issue', label: 'Single Issues' },
+                { id: 'single-issue',  label: 'Single Issues' },
                 { id: 'manga',         label: 'Manga' },
               ] as { id: string; label: string }[]).map(({ id, label }) => {
                 const active = id === format
@@ -608,66 +607,93 @@ function SearchResults() {
                     onClick={() => setFormatFilter(id)}
                     aria-pressed={active}
                     style={{
-                      padding: '7px 14px',
-                      borderRadius: '999px',
-                      fontSize: '13px',
-                      fontWeight: 500,
-                      fontFamily: 'inherit',
-                      cursor: 'pointer',
-                      background:  active ? '#0A0A0A' : '#fff',
-                      color:       active ? '#fff'    : '#374151',
-                      border:      `1px solid ${active ? '#0A0A0A' : '#E5E7EB'}`,
-                      transition:  'background 0.12s, color 0.12s, border-color 0.12s',
-                      whiteSpace:  'nowrap',
+                      height: '36px', padding: '0 14px',
+                      borderRadius: '999px', fontSize: '13px', fontWeight: 500,
+                      fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
+                      background: active ? '#0A0A0A' : '#fff',
+                      color:      active ? '#fff'    : '#374151',
+                      border:     `1px solid ${active ? '#0A0A0A' : '#E5E7EB'}`,
+                      transition: 'background 0.12s, color 0.12s, border-color 0.12s',
                     }}>
                     {label}
                   </button>
                 )
               })}
-              <p style={{ fontSize: '13px', color: '#6B7280', margin: 0, marginLeft: 'auto', whiteSpace: 'nowrap' }}>
-                <span style={{ fontWeight: 500, color: '#0A0A0A' }}>{filteredResults.length}</span>
-                {results.length !== filteredResults.length && (
-                  <span style={{ color: '#6B7280' }}> of {results.length}</span>
-                )}{' '}
-                {filteredResults.length === 1 ? 'result' : 'results'} for &ldquo;{query}&rdquo;
-              </p>
             </div>
           )}
 
-          {/* SECONDARY ROW — mobile filter button + sort dropdown */}
+          {/* ── REGION TOGGLE — mobile only. Desktop uses the header pills. */}
           {!loading && !error && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                {/* Mobile filter button — hidden on desktop via Tailwind */}
+            <div className="md:hidden" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+              <span style={{ fontSize: '11px', color: '#6B7280', flexShrink: 0 }}>Prices for:</span>
+              {(['uk', 'us'] as const).map(r => (
                 <button
-                  onClick={() => setMobileFilterOpen(true)}
-                  className="flex md:hidden items-center gap-1.5"
+                  key={r}
+                  onClick={() => switchRegion(r)}
                   style={{
-                    padding: '5px 12px', borderRadius: '999px', cursor: 'pointer',
-                    border: `1px solid ${hasActiveFilters ? '#E8272A' : '#E5E7EB'}`,
-                    background: hasActiveFilters ? '#FEF2F2' : '#fff',
-                    color: hasActiveFilters ? '#E8272A' : '#6B7280',
-                    fontSize: '12px', fontFamily: 'inherit',
+                    height: '30px', padding: '0 10px', borderRadius: '999px',
+                    border: `1px solid ${region === r ? '#0A0A0A' : '#E5E7EB'}`,
+                    background: region === r ? '#0A0A0A' : '#fff',
+                    fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                    color: region === r ? '#fff' : '#6B7280',
+                    display: 'flex', alignItems: 'center', gap: '4px',
+                    transition: 'border-color 0.12s, background 0.12s',
                   }}>
-                  <svg width="12" height="12" fill="none" viewBox="0 0 24 24">
-                    <path d="M4 6h16M7 12h10M10 18h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                  </svg>
-                  Filters{hasActiveFilters ? ' ·' : ''}
+                  {r === 'uk' ? '🇬🇧' : '🇺🇸'}
+                  <span>{r === 'uk' ? 'UK' : 'US'}</span>
                 </button>
-              </div>
+              ))}
+            </div>
+          )}
 
-              {/* Sort dropdown */}
+          {/* ── RESULT COUNT — own row, anchored left, predictable position */}
+          {!loading && !error && (
+            <p style={{ fontSize: '13px', color: '#6B7280', margin: '0 0 12px' }}>
+              <span style={{ fontWeight: 500, color: '#0A0A0A' }}>{filteredResults.length}</span>
+              {results.length !== filteredResults.length && (
+                <span> of {results.length}</span>
+              )}{' '}
+              {filteredResults.length === 1 ? 'result' : 'results'} for &ldquo;{query}&rdquo;
+            </p>
+          )}
+
+          {/* ── FILTERS + SORT ROW — shared height, aligned baseline */}
+          {!loading && !error && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', gap: '10px' }}>
+              {/* Filters button — mobile only */}
+              <button
+                onClick={() => setMobileFilterOpen(true)}
+                className="flex md:hidden"
+                aria-label="Open filters"
+                style={{
+                  height: '36px', padding: '0 14px', borderRadius: '999px', cursor: 'pointer',
+                  border: `1px solid ${hasActiveFilters ? '#E8272A' : '#E5E7EB'}`,
+                  background: hasActiveFilters ? '#FEF2F2' : '#fff',
+                  color: hasActiveFilters ? '#E8272A' : '#6B7280',
+                  fontSize: '13px', fontFamily: 'inherit',
+                  alignItems: 'center', gap: '6px',
+                }}>
+                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 6h16M7 12h10M10 18h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+                {hasActiveFilters ? 'Filters ·' : 'Filters'}
+              </button>
+              {/* Spacer on desktop (no filter button) */}
+              <div className="hidden md:block" />
+
+              {/* Sort dropdown — same height as pills */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <label htmlFor="results-sort" style={{ fontSize: '12px', color: '#6B7280' }}>Sort by</label>
+                <label htmlFor="results-sort" style={{ fontSize: '13px', color: '#6B7280', whiteSpace: 'nowrap' }}>Sort by</label>
                 <select
                   id="results-sort"
                   aria-label="Sort results by"
                   value={sort}
                   onChange={e => handleFilterChange('sort', e.target.value)}
                   style={{
+                    height: '36px', padding: '0 10px',
                     fontSize: '13px', color: '#0A0A0A', background: '#fff',
                     border: '1px solid #E5E7EB', borderRadius: '8px',
-                    padding: '5px 10px', cursor: 'pointer', fontFamily: 'inherit', outline: 'none',
+                    cursor: 'pointer', fontFamily: 'inherit', outline: 'none',
                   }}>
                   <option value="relevance">Relevance</option>
                   <option value="newest">Newest Release</option>
@@ -735,12 +761,11 @@ function SearchResults() {
                     }}
                     style={{
                       display: 'flex', alignItems: 'flex-start', gap: '14px',
-                      padding: '16px 6px', cursor: 'pointer',
+                      padding: '14px 0', cursor: 'pointer',
                       borderBottom: '1px solid #F0F0F0',
-                      borderRadius: '8px',
                       // No transform here — transform creates a stacking context that
                       // traps the cover's hover:z-50 inside it, causing underlap.
-                      transition: 'background 0.12s, box-shadow 0.15s',
+                      transition: 'background 0.12s',
                     }}
                     onMouseEnter={e => {
                       e.currentTarget.style.background = '#FAFAFA'
@@ -770,7 +795,7 @@ function SearchResults() {
 
                     {/* Metadata */}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <h2 style={{ fontSize: '14px', fontWeight: 600, color: '#0A0A0A', margin: '0 0 3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <h2 style={{ fontSize: '14px', fontWeight: 600, color: '#0A0A0A', margin: '0 0 3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>
                         {comic.name}
                       </h2>
 
