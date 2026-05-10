@@ -245,7 +245,143 @@ export default function Home() {
           .hero-right { display: none !important; }
           .hero-left  { width: 100% !important; padding: 36px 28px !important; }
         }
+
+        /* ── Mobile deal card title — 2-line clamp ───────────────────────── */
+        .mobile-deal-title {
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+          line-height: 1.3;
+        }
       `}</style>
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          MOBILE LAYOUT — Signal design  (md:hidden, ≤767px only)
+          Completely separate JSX tree — zero risk of desktop regressions.
+          ══════════════════════════════════════════════════════════════════════ */}
+
+      {/* ── Mobile: compact sticky header ───────────────────────────────────── */}
+      <header className="md:hidden" style={{ background: '#fff', borderBottom: '1px solid #E0E0D8', position: 'sticky', top: 0, zIndex: 10 }}>
+        <div style={{ padding: '0 16px', height: '56px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <a href="/"><img src="/logo.png" alt="Catch Comics" style={{ height: '36px', width: 'auto' }} /></a>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              onClick={() => setRegion('uk')}
+              aria-label="United Kingdom"
+              style={{ width: '44px', height: '44px', borderRadius: '50%', overflow: 'hidden', padding: 0, border: region === 'uk' ? '2.5px solid #0A0A0A' : '2px solid #E0E0D8', background: 'none', cursor: 'pointer', flexShrink: 0 }}>
+              <UKFlag />
+            </button>
+            <button
+              onClick={() => setRegion('us')}
+              aria-label="United States"
+              style={{ width: '44px', height: '44px', borderRadius: '50%', overflow: 'hidden', padding: 0, border: region === 'us' ? '2.5px solid #0A0A0A' : '2px solid #E0E0D8', background: 'none', cursor: 'pointer', flexShrink: 0 }}>
+              <USFlag />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* ── Mobile: Signal hero card ─────────────────────────────────────────── */}
+      <div className="md:hidden" style={{ padding: '16px 16px 0' }}>
+        <div style={{ background: '#fff', borderRadius: '16px', padding: '28px 20px 24px', position: 'relative' }}>
+          {/* Signal L-corner registration marks */}
+          <div style={{ position: 'absolute', top: '12px',    left: '12px',  width: '14px', height: '14px', borderTop:    '2px solid #0A0A0A', borderLeft:   '2px solid #0A0A0A' }} />
+          <div style={{ position: 'absolute', top: '12px',    right: '12px', width: '14px', height: '14px', borderTop:    '2px solid #0A0A0A', borderRight:  '2px solid #0A0A0A' }} />
+          <div style={{ position: 'absolute', bottom: '12px', left: '12px',  width: '14px', height: '14px', borderBottom: '2px solid #0A0A0A', borderLeft:   '2px solid #0A0A0A' }} />
+          <div style={{ position: 'absolute', bottom: '12px', right: '12px', width: '14px', height: '14px', borderBottom: '2px solid #0A0A0A', borderRight:  '2px solid #0A0A0A' }} />
+
+          <p style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#E8272A', marginBottom: '10px' }}>
+            Comic price comparison
+          </p>
+          <h1 style={{ fontSize: '26px', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.03em', color: '#0A0A0A', marginBottom: '8px' }}>
+            Search, compare,<br />save on comics
+          </h1>
+          <p style={{ fontSize: '13px', color: '#999999', lineHeight: 1.5, marginBottom: '20px' }}>
+            Every comic compared across eBay, Amazon, AbeBooks and more.
+          </p>
+
+          {/* Category hint pills */}
+          <div style={{ display: 'flex', gap: '6px', marginBottom: '18px', flexWrap: 'wrap' }}>
+            {['Graphic Novels', 'Manga', 'Singles'].map(cat => (
+              <span key={cat} style={{ fontSize: '11px', padding: '5px 12px', borderRadius: '999px', border: '1px solid #E0E0D8', color: '#0A0A0A', background: '#F8F8F6', userSelect: 'none' }}>
+                {cat}
+              </span>
+            ))}
+          </div>
+
+          <SearchBar region={region} variant="hero" />
+        </div>
+      </div>
+
+      {/* ── Mobile: top deals 2-column grid ─────────────────────────────────── */}
+      <div className="md:hidden" style={{ padding: '16px 16px 0' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '10px' }}>
+          <h2 style={{ fontSize: '14px', fontWeight: 700, color: '#0A0A0A', margin: 0 }}>Top deals</h2>
+          <span style={{ fontSize: '11px', color: '#999999' }}>Updated daily</span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+          {TOP_DEALS.slice(0, 6).map(deal => {
+            const price = region === 'uk' ? deal.priceUK : deal.priceUS;
+            const pct   = discountPercent(deal, region);
+            return (
+              <button
+                key={deal.id}
+                onClick={() => router.push(`/comic/${deal.id}?region=${region}`)}
+                style={{ background: '#fff', border: '1px solid #E0E0D8', borderRadius: '12px', padding: '10px', textAlign: 'left', cursor: 'pointer', display: 'block', width: '100%', fontFamily: 'inherit' }}>
+                <div style={{ width: '100%', aspectRatio: '2/3', borderRadius: '8px', overflow: 'hidden', background: '#F2E8DC', marginBottom: '8px', position: 'relative' }}>
+                  <img
+                    src={dealCovers[deal.id] || DEAL_FALLBACKS[deal.id] || ''}
+                    alt={deal.title}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    onError={(e) => {
+                      const img = e.target as HTMLImageElement;
+                      const fb  = DEAL_FALLBACKS[deal.id];
+                      if (fb && img.src !== fb) img.src = fb;
+                      else img.style.display = 'none';
+                    }}
+                  />
+                  {pct > 0 && (
+                    <div style={{ position: 'absolute', top: '6px', left: '6px', background: '#E8272A', color: '#fff', fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px' }}>
+                      -{pct}%
+                    </div>
+                  )}
+                </div>
+                <div className="mobile-deal-title" style={{ fontSize: '12px', fontWeight: 600, color: '#0A0A0A', marginBottom: '2px' }}>
+                  {deal.title}
+                </div>
+                <div style={{ fontSize: '10px', color: '#999999', marginBottom: '4px' }}>{deal.publisher}</div>
+                <div style={{ fontSize: '14px', fontWeight: 700, color: '#E8272A' }}>
+                  {currency}{price.toFixed(2)}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Mobile: popular searches ─────────────────────────────────────────── */}
+      <div className="md:hidden" style={{ padding: '16px 16px 32px' }}>
+        <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#999999', margin: '0 0 10px' }}>
+          Popular
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+          {trending.map(term => (
+            <button
+              key={term}
+              onClick={() => router.push(`/search?q=${encodeURIComponent(term)}&region=${region}`)}
+              style={{ padding: '10px 16px', fontSize: '13px', fontWeight: 500, borderRadius: '999px', border: '1px solid #E0E0D8', color: '#0A0A0A', background: '#fff', cursor: 'pointer', fontFamily: 'inherit', minHeight: '44px', display: 'flex', alignItems: 'center' }}>
+              {term}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          DESKTOP LAYOUT (hidden md:block, ≥768px only)
+          Original design — frozen, no changes made inside this wrapper.
+          ══════════════════════════════════════════════════════════════════════ */}
+      <div className="hidden md:block">
 
       {/* ── HEADER ──────────────────────────────────────────────────────────── */}
       <header style={{ background: '#fff', borderBottom: '1px solid #F0F0F0', position: 'relative', zIndex: 10 }}>
@@ -527,6 +663,8 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      </div>{/* end hidden md:block desktop wrapper */}
 
     </main>
   );
