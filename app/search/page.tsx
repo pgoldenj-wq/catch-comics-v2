@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { useEffect, useState, useMemo, useRef, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import SearchBar from '@/components/SearchBar'
+import MobileHeader from '@/components/MobileHeader'
 
 // ─── PriceTag — live "From £X.XX" badge per result card ──────────────────────
 // Fetches /api/price-hint for one comic at a time, staggered by index so we
@@ -535,31 +536,39 @@ function SearchResults() {
   return (
     <main className="min-h-screen font-sans" style={{ background: '#F8F8F6' }}>
 
-      {/* ── HEADER ─────────────────────────────────────────────────────────── */}
-      <header style={{ background: '#fff', borderBottom: '1px solid #F0F0F0', position: 'sticky', top: 0, zIndex: 20 }}>
-        <div className="max-w-6xl mx-auto px-8 h-20 flex items-center gap-4">
-          <a href="/" className="shrink-0">
-            <img src="/logo.png" alt="Catch Comics" className="h-12 w-auto" />
-          </a>
-          <div className="flex-1" style={{ maxWidth: '520px' }}>
-            <SearchBar region={region} variant="header" initialQuery={query} />
+      {/* ── HEADER — mobile (shared component) + desktop (frozen) ──────────── */}
+      <MobileHeader
+        variant="search"
+        region={region}
+        onRegionChange={switchRegion}
+        initialQuery={query}
+      />
+      <div className="hidden md:block">
+        <header style={{ background: '#fff', borderBottom: '1px solid #F0F0F0', position: 'sticky', top: 0, zIndex: 20 }}>
+          <div className="max-w-6xl mx-auto px-8 h-20 flex items-center gap-4">
+            <a href="/" className="shrink-0">
+              <img src="/logo.png" alt="Catch Comics" className="h-12 w-auto" />
+            </a>
+            <div className="flex-1" style={{ maxWidth: '520px' }}>
+              <SearchBar region={region} variant="header" initialQuery={query} />
+            </div>
+            <div className="flex items-center gap-3 ml-auto shrink-0">
+              {(['uk', 'us'] as const).map(r => (
+                <button key={r} onClick={() => switchRegion(r)}
+                  className="flex items-center gap-2.5 pl-2 pr-4 py-1.5 rounded-full border-2 transition-all"
+                  style={{ borderColor: region === r ? '#0A0A0A' : '#E5E7EB', background: region === r ? '#0A0A0A' : '#fff' }}>
+                  <span className="flex items-center justify-center rounded-full overflow-hidden shrink-0" style={{ width: '32px', height: '32px', background: '#f3f4f6' }}>
+                    {r === 'uk' ? <UKFlag /> : <USFlag />}
+                  </span>
+                  <span className="text-sm font-medium" style={{ color: region === r ? '#fff' : '#6B7280' }}>
+                    {r === 'uk' ? 'United Kingdom' : 'United States'}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="flex items-center gap-3 ml-auto shrink-0">
-            {(['uk', 'us'] as const).map(r => (
-              <button key={r} onClick={() => switchRegion(r)}
-                className="flex items-center gap-2.5 pl-2 pr-4 py-1.5 rounded-full border-2 transition-all"
-                style={{ borderColor: region === r ? '#0A0A0A' : '#E5E7EB', background: region === r ? '#0A0A0A' : '#fff' }}>
-                <span className="flex items-center justify-center rounded-full overflow-hidden shrink-0" style={{ width: '32px', height: '32px', background: '#f3f4f6' }}>
-                  {r === 'uk' ? <UKFlag /> : <USFlag />}
-                </span>
-                <span className="text-sm font-medium" style={{ color: region === r ? '#fff' : '#6B7280' }}>
-                  {r === 'uk' ? 'United Kingdom' : 'United States'}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </header>
+        </header>
+      </div>
 
       {/* ── BODY ───────────────────────────────────────────────────────────── */}
       <div className="max-w-6xl mx-auto px-4 py-6" style={{ display: 'flex', gap: '28px', alignItems: 'flex-start' }}>

@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import SearchBar from '../components/SearchBar';
+import MobileHeader from '../components/MobileHeader';
 
 type HoverZone = 'left' | 'right' | null;
 
@@ -261,75 +262,67 @@ export default function Home() {
           Completely separate JSX tree — zero risk of desktop regressions.
           ══════════════════════════════════════════════════════════════════════ */}
 
-      {/* ── Mobile: compact sticky header ───────────────────────────────────── */}
-      <header className="md:hidden" style={{ background: '#fff', borderBottom: '1px solid #E0E0D8', position: 'sticky', top: 0, zIndex: 10 }}>
-        <div style={{ padding: '0 16px', height: '56px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <a href="/"><img src="/logo.png" alt="Catch Comics" style={{ height: '36px', width: 'auto' }} /></a>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              onClick={() => setRegion('uk')}
-              aria-label="United Kingdom"
-              style={{ width: '44px', height: '44px', borderRadius: '50%', overflow: 'hidden', padding: 0, border: region === 'uk' ? '2.5px solid #0A0A0A' : '2px solid #E0E0D8', background: 'none', cursor: 'pointer', flexShrink: 0 }}>
-              <UKFlag />
-            </button>
-            <button
-              onClick={() => setRegion('us')}
-              aria-label="United States"
-              style={{ width: '44px', height: '44px', borderRadius: '50%', overflow: 'hidden', padding: 0, border: region === 'us' ? '2.5px solid #0A0A0A' : '2px solid #E0E0D8', background: 'none', cursor: 'pointer', flexShrink: 0 }}>
-              <USFlag />
-            </button>
-          </div>
-        </div>
-      </header>
+      {/* ── Mobile: shared header component ─────────────────────────────────── */}
+      <MobileHeader variant="discovery" region={region} onRegionChange={setRegion} />
 
-      {/* ── Mobile: Signal hero card ─────────────────────────────────────────── */}
+      {/* ── Mobile: dark hero — matches desktop brand identity ───────────────── */}
       <div className="md:hidden" style={{ padding: '16px 16px 0' }}>
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '28px 20px 24px', position: 'relative' }}>
-          {/* Signal L-corner registration marks */}
-          <div style={{ position: 'absolute', top: '12px',    left: '12px',  width: '14px', height: '14px', borderTop:    '2px solid #0A0A0A', borderLeft:   '2px solid #0A0A0A' }} />
-          <div style={{ position: 'absolute', top: '12px',    right: '12px', width: '14px', height: '14px', borderTop:    '2px solid #0A0A0A', borderRight:  '2px solid #0A0A0A' }} />
-          <div style={{ position: 'absolute', bottom: '12px', left: '12px',  width: '14px', height: '14px', borderBottom: '2px solid #0A0A0A', borderLeft:   '2px solid #0A0A0A' }} />
-          <div style={{ position: 'absolute', bottom: '12px', right: '12px', width: '14px', height: '14px', borderBottom: '2px solid #0A0A0A', borderRight:  '2px solid #0A0A0A' }} />
+        <div style={{ background: '#111827', borderRadius: '24px', position: 'relative', overflow: 'hidden', padding: '32px 24px 28px' }}>
+          {/* Dot grid — same as desktop hero */}
+          <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px)', backgroundSize: '22px 22px' }} />
+          {/* Red glow — same as desktop hero */}
+          <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '240px', height: '240px', pointerEvents: 'none', background: 'radial-gradient(circle, rgba(232,39,42,0.18) 0%, transparent 65%)' }} />
 
-          <p style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: '#E8272A', marginBottom: '10px' }}>
-            Comic price comparison
-          </p>
-          <h1 style={{ fontSize: '26px', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.03em', color: '#0A0A0A', marginBottom: '8px' }}>
-            Search, compare,<br />save on comics
-          </h1>
-          <p style={{ fontSize: '13px', color: '#999999', lineHeight: 1.5, marginBottom: '20px' }}>
-            Every comic compared across eBay, Amazon, AbeBooks and more.
-          </p>
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            <p style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#E8272A', marginBottom: '16px' }}>
+              The world's only comic price comparison
+            </p>
+            <h1 style={{ fontSize: 'clamp(1.75rem, 7vw, 2.25rem)', fontWeight: 600, lineHeight: 1.1, letterSpacing: '-0.03em', color: '#fff', marginBottom: '12px' }}>
+              Search, compare,<br />save on comics
+            </h1>
+            <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, marginBottom: '24px' }}>
+              Every comic, graphic novel and manga — compared across the web in seconds.
+            </p>
 
-          {/* Category hint pills */}
-          <div style={{ display: 'flex', gap: '6px', marginBottom: '18px', flexWrap: 'wrap' }}>
-            {['Graphic Novels', 'Manga', 'Singles'].map(cat => (
-              <span key={cat} style={{ fontSize: '11px', padding: '5px 12px', borderRadius: '999px', border: '1px solid #E0E0D8', color: '#0A0A0A', background: '#F8F8F6', userSelect: 'none' }}>
-                {cat}
-              </span>
-            ))}
+            <SearchBar region={region} variant="hero" />
+
+            {/* Category hint pills — same style as desktop hero */}
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '14px', flexWrap: 'wrap' }}>
+              {['Graphic Novels', 'Manga', 'Single Issues'].map(cat => (
+                <span key={cat} style={{
+                  fontSize: '11px', padding: '4px 12px', borderRadius: '999px',
+                  background: 'rgba(255,255,255,0.07)',
+                  border: '1px solid rgba(255,255,255,0.18)',
+                  color: 'rgba(255,255,255,0.7)',
+                  userSelect: 'none',
+                }}>
+                  {cat}
+                </span>
+              ))}
+            </div>
           </div>
-
-          <SearchBar region={region} variant="hero" />
         </div>
       </div>
 
       {/* ── Mobile: top deals 2-column grid ─────────────────────────────────── */}
       <div className="md:hidden" style={{ padding: '16px 16px 0' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '10px' }}>
-          <h2 style={{ fontSize: '14px', fontWeight: 700, color: '#0A0A0A', margin: 0 }}>Top deals</h2>
-          <span style={{ fontSize: '11px', color: '#999999' }}>Updated daily</span>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '14px' }}>
+          <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#111', margin: 0 }}>Top deals today</h2>
+          <span style={{ fontSize: '11px', color: '#6B7280' }}>Prices updated daily</span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
           {TOP_DEALS.slice(0, 6).map(deal => {
-            const price = region === 'uk' ? deal.priceUK : deal.priceUS;
-            const pct   = discountPercent(deal, region);
+            const price   = region === 'uk' ? deal.priceUK : deal.priceUS;
+            const rrp     = region === 'uk' ? deal.rrpUK   : deal.rrpUS;
+            const pct     = discountPercent(deal, region);
+            const hasSale = pct > 0;
             return (
               <button
                 key={deal.id}
                 onClick={() => router.push(`/comic/${deal.id}?region=${region}`)}
-                style={{ background: '#fff', border: '1px solid #E0E0D8', borderRadius: '12px', padding: '10px', textAlign: 'left', cursor: 'pointer', display: 'block', width: '100%', fontFamily: 'inherit' }}>
-                <div style={{ width: '100%', aspectRatio: '2/3', borderRadius: '8px', overflow: 'hidden', background: '#F2E8DC', marginBottom: '8px', position: 'relative' }}>
+                style={{ background: '#fff', border: '1px solid #F0F0F0', borderRadius: '12px', padding: '10px', textAlign: 'left', cursor: 'pointer', display: 'block', width: '100%', fontFamily: 'inherit', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                {/* Cover — dark bg matches desktop deal cards */}
+                <div style={{ width: '100%', aspectRatio: '2/3', borderRadius: '8px', overflow: 'hidden', background: '#1a1a2e', marginBottom: '8px', position: 'relative' }}>
                   <img
                     src={dealCovers[deal.id] || DEAL_FALLBACKS[deal.id] || ''}
                     alt={deal.title}
@@ -341,18 +334,25 @@ export default function Home() {
                       else img.style.display = 'none';
                     }}
                   />
-                  {pct > 0 && (
-                    <div style={{ position: 'absolute', top: '6px', left: '6px', background: '#E8272A', color: '#fff', fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px' }}>
+                  {hasSale && (
+                    <div style={{ position: 'absolute', top: '8px', left: '8px', background: '#C41F22', color: '#fff', fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '5px' }}>
                       -{pct}%
                     </div>
                   )}
                 </div>
-                <div className="mobile-deal-title" style={{ fontSize: '12px', fontWeight: 600, color: '#0A0A0A', marginBottom: '2px' }}>
+                <div className="mobile-deal-title" style={{ fontSize: '12px', fontWeight: 500, color: '#111', marginBottom: '2px' }}>
                   {deal.title}
                 </div>
-                <div style={{ fontSize: '10px', color: '#999999', marginBottom: '4px' }}>{deal.publisher}</div>
-                <div style={{ fontSize: '14px', fontWeight: 700, color: '#E8272A' }}>
-                  {currency}{price.toFixed(2)}
+                <div style={{ fontSize: '10px', color: '#6B7280', marginTop: '2px' }}>{deal.publisher}</div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px', marginTop: '5px' }}>
+                  <span style={{ fontSize: '14px', fontWeight: 700, color: '#C41F22' }}>
+                    {currency}{price.toFixed(2)}
+                  </span>
+                  {hasSale && (
+                    <span style={{ fontSize: '10px', color: '#6B7280', textDecoration: 'line-through' }}>
+                      {currency}{rrp.toFixed(2)}
+                    </span>
+                  )}
                 </div>
               </button>
             );
@@ -362,15 +362,15 @@ export default function Home() {
 
       {/* ── Mobile: popular searches ─────────────────────────────────────────── */}
       <div className="md:hidden" style={{ padding: '16px 16px 32px' }}>
-        <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#999999', margin: '0 0 10px' }}>
-          Popular
-        </p>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+        <span style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#6B7280' }}>Popular:</span>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px', marginTop: '8px' }}>
           {trending.map(term => (
             <button
               key={term}
               onClick={() => router.push(`/search?q=${encodeURIComponent(term)}&region=${region}`)}
-              style={{ padding: '10px 16px', fontSize: '13px', fontWeight: 500, borderRadius: '999px', border: '1px solid #E0E0D8', color: '#0A0A0A', background: '#fff', cursor: 'pointer', fontFamily: 'inherit', minHeight: '44px', display: 'flex', alignItems: 'center' }}>
+              style={{ padding: '6px 14px', fontSize: '12px', borderRadius: '999px', border: '1px solid #EAECEF', color: '#6B7280', background: '#fff', cursor: 'pointer', fontFamily: 'inherit', minHeight: '36px', display: 'flex', alignItems: 'center', transition: 'border-color 0.15s, color 0.15s' }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = '#E8272A'; e.currentTarget.style.color = '#E8272A'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = '#EAECEF'; e.currentTarget.style.color = '#6B7280'; }}>
               {term}
             </button>
           ))}
