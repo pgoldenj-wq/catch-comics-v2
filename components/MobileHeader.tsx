@@ -143,16 +143,12 @@ export default function MobileHeader({
             <RegionPill active={region === 'us'} value="us" label="US" onClick={() => onRegionChange('us')} />
           </div>
         ) : (
-          /* Search: search bar expands, region pills sit to the right */
-          <>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <SearchBar region={region} variant="header" initialQuery={initialQuery} />
-            </div>
-            <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-              <RegionPill active={region === 'uk'} value="uk" label="UK" onClick={() => onRegionChange('uk')} />
-              <RegionPill active={region === 'us'} value="us" label="US" onClick={() => onRegionChange('us')} />
-            </div>
-          </>
+          /* Search: search bar fills remaining space after logo.
+             No region pills in the header — they live in the content area
+             ("Prices for: UK | US") so the header stays focused on search. */
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <SearchBar region={region} variant="header" initialQuery={initialQuery} />
+          </div>
         )}
 
       </div>

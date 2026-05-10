@@ -46,6 +46,8 @@ function ComicPage() {
   const [condition, setCondition]       = useState<'all' | 'new' | 'used'>('all')
   // Both Condition and Price Range open by default
   const [openSections, setOpenSections] = useState<Set<string>>(new Set(['condition', 'price']))
+  // Mobile filter drawer (mirrors search page pattern)
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false)
   const toggleSection = (id: string) => setOpenSections(prev => {
     const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s
   })
@@ -464,10 +466,10 @@ function ComicPage() {
       {/* ── BODY: three columns — filter sidebar | pricing | issues ─────────── */}
       <div className="max-w-5xl mx-auto px-4 md:px-8 py-6" style={{ display: 'flex', gap: '24px', alignItems: 'flex-start' }}>
 
-        {/* ── FILTER SIDEBAR ──────────────────────────────────────────────────
-            Matches the results-page sidebar style: sticky, collapsible sections,
-            radio-style options. */}
-        <aside style={{
+        {/* ── FILTER SIDEBAR — desktop only ───────────────────────────────────
+            Hidden on mobile (md:hidden → hidden md:block). Mobile uses the
+            slide-in drawer below (same pattern as search page). */}
+        <aside className="hidden md:block" style={{
           width: '188px', flexShrink: 0,
           position: 'sticky', top: '96px',
           maxHeight: 'calc(100vh - 96px - 24px)', overflowY: 'auto',
@@ -569,6 +571,42 @@ function ComicPage() {
 
         {/* ── PRICING (centre) ────────────────────────────────────────────────── */}
         <div ref={listingsRef} style={{ flex: 1, minWidth: 0 }}>
+
+          {/* Mobile filter button — same pattern as search page (md:hidden) */}
+          {(priceMax !== 'all' || condition !== 'all' || formatFilter !== 'all')
+            ? (
+              <button
+                onClick={() => setMobileFilterOpen(true)}
+                className="flex md:hidden"
+                style={{
+                  height: '36px', padding: '0 14px', borderRadius: '999px', cursor: 'pointer',
+                  border: '1px solid #E8272A', background: '#FEF2F2', color: '#E8272A',
+                  fontSize: '13px', fontFamily: 'inherit', marginBottom: '12px',
+                  alignItems: 'center', gap: '6px',
+                }}>
+                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 6h16M7 12h10M10 18h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+                Filters ·
+              </button>
+            ) : (
+              <button
+                onClick={() => setMobileFilterOpen(true)}
+                className="flex md:hidden"
+                style={{
+                  height: '36px', padding: '0 14px', borderRadius: '999px', cursor: 'pointer',
+                  border: '1px solid #E5E7EB', background: '#fff', color: '#6B7280',
+                  fontSize: '13px', fontFamily: 'inherit', marginBottom: '12px',
+                  alignItems: 'center', gap: '6px',
+                }}>
+                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 6h16M7 12h10M10 18h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+                Filters
+              </button>
+            )
+          }
+
           <PricingPanel
             query={comic.name}
             region={market}
@@ -697,6 +735,83 @@ function ComicPage() {
             </div>
           )}
         </div>
+      )}
+
+      {/* ── MOBILE FILTER DRAWER — same pattern as search page ───────────────── */}
+      {mobileFilterOpen && (
+        <>
+          <div
+            onClick={() => setMobileFilterOpen(false)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 40 }}
+          />
+          <div style={{
+            position: 'fixed', right: 0, top: 0, bottom: 0,
+            width: '300px', maxWidth: '90vw',
+            background: '#fff', zIndex: 50, overflowY: 'auto',
+            padding: '24px', boxShadow: '-4px 0 24px rgba(0,0,0,0.12)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <span style={{ fontSize: '16px', fontWeight: 600, color: '#0A0A0A' }}>Filters</span>
+              <button
+                onClick={() => setMobileFilterOpen(false)}
+                aria-label="Close filters"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6B7280', fontSize: '20px', lineHeight: 1 }}>
+                <span aria-hidden="true">✕</span>
+              </button>
+            </div>
+
+            {/* Clear all */}
+            {(priceMax !== 'all' || condition !== 'all' || formatFilter !== 'all') && (
+              <button
+                onClick={() => { setPriceMax('all'); setCondition('all'); setFormatFilter('all'); setMobileFilterOpen(false) }}
+                style={{ fontSize: '11px', color: '#C41F22', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit', marginBottom: '16px' }}>
+                Clear all filters
+              </button>
+            )}
+
+            {/* Condition */}
+            <div style={{ borderTop: '1px solid #EBEBEB' }}>
+              <p style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#374151', padding: '12px 0 8px', margin: 0 }}>Condition</p>
+              {([['all', 'All conditions'], ['new', 'New'], ['used', 'Used']] as [string, string][]).map(([val, label]) => {
+                const active = condition === val
+                return (
+                  <button key={val} onClick={() => { setCondition(val as typeof condition); setMobileFilterOpen(false) }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 0', textAlign: 'left', fontFamily: 'inherit' }}>
+                    <span style={{ width: '16px', height: '16px', borderRadius: '50%', flexShrink: 0, border: `2px solid ${active ? '#E8272A' : '#D1D5DB'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff' }}>
+                      {active && <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#E8272A', display: 'block' }} />}
+                    </span>
+                    <span style={{ fontSize: '14px', color: active ? '#0A0A0A' : '#4B5563', fontWeight: active ? 600 : 400 }}>{label}</span>
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Price Range */}
+            <div style={{ borderTop: '1px solid #EBEBEB', marginTop: '8px' }}>
+              <p style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#374151', padding: '12px 0 8px', margin: 0 }}>Price Range</p>
+              {([
+                ['all', 'All prices'],
+                ['5',   `Under ${market === 'uk' ? '£' : '$'}5`],
+                ['10',  `Under ${market === 'uk' ? '£' : '$'}10`],
+                ['15',  `Under ${market === 'uk' ? '£' : '$'}15`],
+                ['25',  `Under ${market === 'uk' ? '£' : '$'}25`],
+                ['35',  `Under ${market === 'uk' ? '£' : '$'}35`],
+                ['50',  `Under ${market === 'uk' ? '£' : '$'}50`],
+              ] as [string, string][]).map(([val, label]) => {
+                const active = priceMax === val
+                return (
+                  <button key={val} onClick={() => { setPriceMax(val as typeof priceMax); setMobileFilterOpen(false) }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 0', textAlign: 'left', fontFamily: 'inherit' }}>
+                    <span style={{ width: '16px', height: '16px', borderRadius: '50%', flexShrink: 0, border: `2px solid ${active ? '#E8272A' : '#D1D5DB'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff' }}>
+                      {active && <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#E8272A', display: 'block' }} />}
+                    </span>
+                    <span style={{ fontSize: '14px', color: active ? '#0A0A0A' : '#4B5563', fontWeight: active ? 600 : 400 }}>{label}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </>
       )}
 
     </main>
