@@ -267,11 +267,16 @@ export default function Home() {
 
       {/* ── Mobile: dark hero — matches desktop brand identity ───────────────── */}
       <div className="md:hidden" style={{ padding: '16px 16px 0' }}>
-        <div style={{ background: '#111827', borderRadius: '24px', position: 'relative', overflow: 'hidden', padding: '32px 24px 28px' }}>
-          {/* Dot grid — same as desktop hero */}
-          <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px)', backgroundSize: '22px 22px' }} />
-          {/* Red glow — same as desktop hero */}
-          <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '240px', height: '240px', pointerEvents: 'none', background: 'radial-gradient(circle, rgba(232,39,42,0.18) 0%, transparent 65%)' }} />
+        {/* overflow:visible so the SearchBar dropdown can escape the card boundary.
+            Decorative overlays are clipped inside their own wrapper instead. */}
+        <div style={{ background: '#111827', borderRadius: '24px', position: 'relative', padding: '32px 24px 28px' }}>
+          {/* Overlay clip — overflow:hidden only on the decorative layer, not the card */}
+          <div style={{ position: 'absolute', inset: 0, borderRadius: '24px', overflow: 'hidden', pointerEvents: 'none' }}>
+            {/* Dot grid — same as desktop hero */}
+            <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px)', backgroundSize: '22px 22px' }} />
+            {/* Red glow — same as desktop hero */}
+            <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '240px', height: '240px', background: 'radial-gradient(circle, rgba(232,39,42,0.18) 0%, transparent 65%)' }} />
+          </div>
 
           <div style={{ position: 'relative', zIndex: 1 }}>
             <p style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#E8272A', marginBottom: '16px' }}>
