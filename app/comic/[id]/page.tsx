@@ -5,6 +5,7 @@ import { useEffect, useState, useRef, Suspense } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import PricingPanel, { type PriceSnapshot } from '@/components/PricingPanel'
 import SearchBar from '@/components/SearchBar'
+import MobileHeader from '@/components/MobileHeader'
 
 interface ComicDetail {
   id: number
@@ -152,15 +153,23 @@ function ComicPage() {
         .price-pulse-dot { animation: price-pulse 1.8s ease-in-out infinite; }
       `}</style>
 
-      {/* NAV */}
-      <nav className="sticky top-0 z-20 bg-white border-b border-gray-100 px-8 h-20 flex items-center gap-4">
-        <a href="/" className="shrink-0">
-          <img src="/logo.png" alt="Catch Comics" className="h-12 w-auto" />
-        </a>
-        <div className="flex-1" style={{ maxWidth: '480px' }}>
-          <SearchBar region={market} variant="header" initialQuery={comic?.name ?? ''} />
-        </div>
-      </nav>
+      {/* NAV — mobile (shared component) + desktop (frozen) */}
+      <MobileHeader
+        variant="search"
+        region={market}
+        onRegionChange={setMarket}
+        initialQuery={comic?.name ?? ''}
+      />
+      <div className="hidden md:block">
+        <nav className="sticky top-0 z-20 bg-white border-b border-gray-100 px-8 h-20 flex items-center gap-4">
+          <a href="/" className="shrink-0">
+            <img src="/logo.png" alt="Catch Comics" className="h-12 w-auto" />
+          </a>
+          <div className="flex-1" style={{ maxWidth: '480px' }}>
+            <SearchBar region={market} variant="header" initialQuery={comic?.name ?? ''} />
+          </div>
+        </nav>
+      </div>
 
       {/* DARK HEADER — 2-column: LEFT = back + cover | RIGHT = title + metadata + price + region */}
       <div className="relative bg-[#111827]">
@@ -453,7 +462,7 @@ function ComicPage() {
       </div>
 
       {/* ── BODY: three columns — filter sidebar | pricing | issues ─────────── */}
-      <div className="max-w-5xl mx-auto px-8 py-6" style={{ display: 'flex', gap: '24px', alignItems: 'flex-start' }}>
+      <div className="max-w-5xl mx-auto px-4 md:px-8 py-6" style={{ display: 'flex', gap: '24px', alignItems: 'flex-start' }}>
 
         {/* ── FILTER SIDEBAR ──────────────────────────────────────────────────
             Matches the results-page sidebar style: sticky, collapsible sections,
@@ -574,11 +583,10 @@ function ComicPage() {
           </p>
         </div>
 
-        {/* ── ISSUES GRID (right, volumes only) ───────────────────────────────
-            Cover frame: overflow visible so 3× hover can escape the cell.
-            z-50 on hover stacks above neighbours inside this positioned container. */}
+        {/* ── ISSUES GRID (right, volumes only, desktop only) ─────────────────
+            Hidden on mobile — issues appear below pricing in the mobile layout. */}
         {isVolume && (issuesLoading || issues.length > 0) && (
-          <div style={{ width: '216px', flexShrink: 0, position: 'relative' }}>
+          <div className="hidden md:block" style={{ width: '216px', flexShrink: 0, position: 'relative' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '10px' }}>
               <h2 style={{ fontSize: '13px', fontWeight: 600, color: '#111827', margin: 0 }}>Issues in this series</h2>
               {!issuesLoading && issues.length > 0 && (
@@ -635,6 +643,61 @@ function ComicPage() {
           </div>
         )}
       </div>
+
+      {/* ── MOBILE: issues grid — stacked below pricing ──────────────────────
+          Only shown on mobile (md:hidden). Desktop issues appear in the
+          3-col body above. Same card style for visual consistency. */}
+      {isVolume && (issuesLoading || issues.length > 0) && (
+        <div className="md:hidden max-w-5xl mx-auto px-4 pb-8">
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '10px' }}>
+            <h2 style={{ fontSize: '13px', fontWeight: 600, color: '#111827', margin: 0 }}>Issues in this series</h2>
+            {!issuesLoading && issues.length > 0 && (
+              <span style={{ fontSize: '11px', color: '#9CA3AF' }}>{issues.length}</span>
+            )}
+          </div>
+          {issuesLoading ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+              {[...Array(8)].map((_, i) => (
+                <div key={i}>
+                  <div style={{ aspectRatio: '2/3', borderRadius: '6px', background: '#F3F4F6' }} />
+                  <div style={{ height: '10px', background: '#F3F4F6', borderRadius: '4px', marginTop: '6px', width: '60%' }} />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+              {issues.map(issue => {
+                const cover = issue.image.medium_url || issue.image.small_url
+                const label = issue.issue_number ? `#${issue.issue_number}` : (issue.name || 'Issue')
+                const sub   = issue.cover_year || ''
+                return (
+                  <button
+                    key={issue.id}
+                    onClick={() => router.push(`/comic/i${issue.id}?region=${market}`)}
+                    style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', textAlign: 'left' }}>
+                    <div style={{ aspectRatio: '2/3', borderRadius: '6px', background: '#F3F4F6', border: '1px solid #EBEBEB', position: 'relative' }}>
+                      <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9CA3AF', fontSize: '9px', fontWeight: 500 }}>
+                        {label}
+                      </span>
+                      {cover && (
+                        <img
+                          src={cover}
+                          alt={`${comic.name} ${label}`}
+                          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px' }}
+                          loading="lazy"
+                          onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+                        />
+                      )}
+                    </div>
+                    <div style={{ marginTop: '4px', fontSize: '10px', fontWeight: 500, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
+                    {sub && <div style={{ fontSize: '9px', color: '#9CA3AF' }}>{sub}</div>}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
     </main>
   )
