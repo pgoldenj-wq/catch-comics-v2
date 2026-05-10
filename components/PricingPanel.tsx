@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { buildAmazonUrl, type ComicFormat } from '@/lib/amazon'
 import { buildAbeBooksUrl } from '@/lib/abebooks'
 import { buildForbiddenPlanetSearchUrl } from '@/lib/forbiddenplanet'
@@ -87,6 +87,11 @@ export default function PricingPanel({ query, region, formatFilter = 'all', onFo
   const [error, setError]       = useState<string | null>(null)
   const [listings, setListings] = useState<Listing[]>([])
 
+  // Keep onPriceSnapshot in a ref so the visibleListings effect below never
+  // needs it as a dep (inline arrow in parent re-creates it every render).
+  const onPriceSnapshotRef = useRef(onPriceSnapshot)
+  useEffect(() => { onPriceSnapshotRef.current = onPriceSnapshot }, [onPriceSnapshot])
+
   useEffect(() => {
     if (!query) {
       setLoading(false)
@@ -97,49 +102,34 @@ export default function PricingPanel({ query, region, formatFilter = 'all', onFo
     setListings([])
 
     const controller = new AbortController()
-    fetch(`/api/prices?q=${encodeURIComponent(query)}&region=${region}`, { signal: controller.signal })
+    // Pass formatFilter to the API so it fetches a larger pool when a specific
+    // format is requested — TPBs, hardcovers, etc. are often not in the
+    // cheapest 20 listings and would be missed by client-side filtering alone.
+    const url = `/api/prices?q=${encodeURIComponent(query)}&region=${region}&format=${encodeURIComponent(formatFilter)}`
+    fetch(url, { signal: controller.signal })
       .then(res => res.json())
       .then((data: PricesResponse) => {
         if (data.error) {
           setError(data.error)
           setListings([])
-          onPriceSnapshot?.(null)
         } else {
           // Defensive client-side sort — cheapest first
           const sorted = [...(data.listings || [])].sort((a, b) => a.price.value - b.price.value)
           setListings(sorted)
-
-          // Compute snapshot for hero intelligence panel
-          if (sorted.length === 0) {
-            onPriceSnapshot?.(null)
-          } else {
-            const newFrom  = sorted.find(l => l.condition.toLowerCase() === 'new')?.price.value ?? null
-            const usedFrom = sorted.find(l => {
-              const c = l.condition.toLowerCase()
-              return c !== 'new' && c !== '' && c !== 'unspecified'
-            })?.price.value ?? null
-            onPriceSnapshot?.({
-              bestPrice:      sorted[0].price.value,
-              worstPrice:     sorted[sorted.length - 1].price.value,
-              totalOffers:    sorted.length,
-              newFrom,
-              usedFrom,
-              currency:       sorted[0].price.currency,
-              bestListingUrl: sorted[0].itemWebUrl,
-            })
-          }
         }
         setLoading(false)
       })
       .catch(err => {
         if (err instanceof Error && err.name === 'AbortError') return
         setError('Could not load listings.')
-        onPriceSnapshot?.(null)
         setLoading(false)
       })
 
     return () => controller.abort()
-  }, [query, region])
+  // Re-fetch when formatFilter changes so we get a format-appropriate pool.
+  // Cache in /api/prices is keyed by (region, format, query) so each variant
+  // is served independently without extra eBay calls after the first visit.
+  }, [query, region, formatFilter])
 
   // Client-side filter applied on top of the server-sorted listings
   const visibleListings = useMemo(() => {
@@ -181,6 +171,36 @@ export default function PricingPanel({ query, region, formatFilter = 'all', onFo
 
     return ls
   }, [listings, formatFilter, priceMax, condition])
+
+  // ── Price snapshot — driven by the filtered listing set ───────────────────
+  // Runs after every filter change so the hero intelligence panel always shows
+  // the cheapest price that matches the active category + condition + price cap.
+  useEffect(() => {
+    if (loading) return
+    if (error) {
+      onPriceSnapshotRef.current?.(null)
+      return
+    }
+    if (visibleListings.length === 0) {
+      onPriceSnapshotRef.current?.(null)
+      return
+    }
+    const newFrom  = visibleListings.find(l => l.condition.toLowerCase() === 'new')?.price.value ?? null
+    const usedFrom = visibleListings.find(l => {
+      const c = l.condition.toLowerCase()
+      return c !== 'new' && c !== '' && c !== 'unspecified'
+    })?.price.value ?? null
+    onPriceSnapshotRef.current?.({
+      bestPrice:      visibleListings[0].price.value,
+      worstPrice:     visibleListings[visibleListings.length - 1].price.value,
+      totalOffers:    visibleListings.length,
+      newFrom,
+      usedFrom,
+      currency:       visibleListings[0].price.currency,
+      bestListingUrl: visibleListings[0].itemWebUrl,
+    })
+  // onPriceSnapshot intentionally omitted — tracked via ref to prevent loops
+  }, [visibleListings, loading, error])
 
   const regionLabel = region === 'uk' ? 'United Kingdom' : 'United States'
 

@@ -15,18 +15,19 @@ import MobileHeader from '@/components/MobileHeader'
 const CURRENCY_SYMBOLS: Record<string, string> = { GBP: '£', USD: '$', EUR: '€' }
 
 function PriceTag({
-  query, region, index,
+  query, region, index, format = 'all',
   onPriceLoaded,
 }: {
   query: string
   region: 'uk' | 'us'
   index: number
+  /** Active format filter — price is the cheapest listing matching this format */
+  format?: string
   onPriceLoaded?: (query: string, price: number | null) => void
 }) {
-  // Stable price state — never cleared once a value is set.
   // undefined = first fetch not yet complete (show shimmer)
   // null      = fetched but no listing found ("Find prices →")
-  // number    = lowest price found
+  // number    = lowest price found for the active format
   const [priceValue, setPriceValue]       = useState<number | null | undefined>(undefined)
   const [priceCurrency, setPriceCurrency] = useState('')
 
@@ -37,36 +38,35 @@ function PriceTag({
   useEffect(() => { onPriceLoadedRef.current = onPriceLoaded }, [onPriceLoaded])
 
   useEffect(() => {
-    // Do NOT reset priceValue here — we only update it if we get a better price.
+    // Reset on every meaningful change (query, region, format).
+    // Format changes explicitly request different data — we must show a fresh price.
+    setPriceValue(undefined)
+    setPriceCurrency('')
+
     const delay = index * 80
     const controller = new AbortController()
     const t = setTimeout(() => {
-      fetch(`/api/price-hint?q=${encodeURIComponent(query)}&region=${region}`, { signal: controller.signal })
+      const url = `/api/price-hint?q=${encodeURIComponent(query)}&region=${region}&format=${encodeURIComponent(format)}`
+      fetch(url, { signal: controller.signal })
         .then(r => r.json())
         .then((data: { lowestPrice: number | null; currency: string | null }) => {
           if (data.lowestPrice != null && data.currency) {
-            // Only update if: no price yet, or new price is cheaper
-            setPriceValue(prev =>
-              prev === undefined || prev === null || data.lowestPrice! < prev
-                ? data.lowestPrice
-                : prev
-            )
-            setPriceCurrency(c => c || data.currency!)
+            setPriceValue(data.lowestPrice)
+            setPriceCurrency(data.currency)
             onPriceLoadedRef.current?.(query, data.lowestPrice)
           } else {
-            // Don't overwrite an existing price with "not found"
-            setPriceValue(prev => (prev !== undefined && prev !== null) ? prev : null)
+            setPriceValue(null)
             onPriceLoadedRef.current?.(query, null)
           }
         })
         .catch(err => {
           if (err instanceof Error && err.name === 'AbortError') return
-          setPriceValue(prev => (prev !== undefined && prev !== null) ? prev : null)
+          setPriceValue(null)
           onPriceLoadedRef.current?.(query, null)
         })
     }, delay)
     return () => { clearTimeout(t); controller.abort() }
-  }, [query, region, index]) // onPriceLoaded intentionally omitted — tracked via ref
+  }, [query, region, index, format]) // onPriceLoaded intentionally omitted — tracked via ref
 
   const sym = CURRENCY_SYMBOLS[priceCurrency] || (priceCurrency ? `${priceCurrency} ` : '')
 
@@ -823,11 +823,12 @@ function SearchResults() {
                       )}
                     </div>
 
-                    {/* Live price tag — fetches eBay lowest price per card */}
+                    {/* Live price tag — fetches eBay lowest price matching the active format */}
                     <PriceTag
                       query={comic.name}
                       region={region}
                       index={index}
+                      format={format}
                       onPriceLoaded={(q, price) =>
                         setPriceMap(prev => { const m = new Map(prev); m.set(q, price); return m })
                       }
