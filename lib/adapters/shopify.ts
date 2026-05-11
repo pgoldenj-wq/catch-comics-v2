@@ -58,6 +58,10 @@ interface ShopifyProduct {
   title: string
   handle: string
   body_html: string | null
+  /** Shopify product_type field — e.g. "Graphic Novel", "Manga", "Comic", "" */
+  product_type: string | null
+  /** Shopify tags array — e.g. ["TYPE|Graphic Novel", "GENRE|Superhero"] */
+  tags: string[]
   images: ShopifyImage[]
   variants: ShopifyVariant[]
 }

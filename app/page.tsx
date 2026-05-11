@@ -8,10 +8,20 @@ import MobileHeader from '../components/MobileHeader';
 
 type HoverZone = 'left' | 'right' | null;
 
-// ─── Top Deals ────────────────────────────────────────────────────────────────
-// Curated list of popular titles with approximate Amazon retail prices (early 2025).
+// ─── Live deal shape (from /api/homepage-deals) ───────────────────────────────
+interface LiveDeal {
+  slug:           string
+  title:          string
+  publisher:      string | null
+  format:         string
+  coverImageUrl:  string | null
+  lowestPriceGBP: number | null
+  lowestPriceUSD: number | null
+}
+
+// ─── Static fallback deals ────────────────────────────────────────────────────
+// Shown until live DB deals load (or if DB returns empty).
 // priceUK/priceUS = typical sale price  |  rrpUK/rrpUS = publisher RRP
-// Replace with live pricing API when eBay/Amazon Browse API is wired in.
 
 interface DealItem {
   id: number;
@@ -22,7 +32,7 @@ interface DealItem {
   priceUS: number;
   rrpUK: number;
   rrpUS: number;
-  searchQuery: string; // Used to construct Amazon search link
+  searchQuery: string;
 }
 
 const TOP_DEALS: DealItem[] = [
@@ -64,6 +74,7 @@ function discountPercent(deal: DealItem, region: 'uk' | 'us'): number {
 export default function Home() {
   const [region, setRegion]           = useState<'uk' | 'us'>('uk');
   const [dealCovers, setDealCovers]   = useState<Record<number, string>>({});
+  const [liveDeals, setLiveDeals]     = useState<LiveDeal[] | null>(null);
   const [carouselOffset, setCarouselOffset] = useState(0);
   const [hoverZone, setHoverZone]     = useState<HoverZone>(null);
   const carouselRef   = useRef<HTMLDivElement>(null);
@@ -71,11 +82,25 @@ export default function Home() {
   const hoverZoneRef  = useRef<HoverZone>(null);
   const router = useRouter();
 
-  const CARD_W = 148; // card width (136px) + gap (12px)
-  const SET_W  = TOP_DEALS.length * CARD_W;
+  const CARD_W      = 148; // card width (136px) + gap (12px)
+  const activeDeals = liveDeals ?? TOP_DEALS
+  const SET_W       = activeDeals.length * CARD_W;
 
-  // Fetch deal covers from Comic Vine — staggered to stay under rate limit
+  // Fetch live deals from DB — replaces static TOP_DEALS when available
   useEffect(() => {
+    fetch('/api/homepage-deals')
+      .then(r => r.json())
+      .then((data: { deals: LiveDeal[] }) => {
+        if (data.deals && data.deals.length >= 3) {
+          setLiveDeals(data.deals)
+        }
+      })
+      .catch(() => { /* silently fall back to static deals */ })
+  }, [])
+
+  // Fetch deal covers from Comic Vine for static fallback — staggered to stay under rate limit
+  useEffect(() => {
+    if (liveDeals) return // static covers not needed when live deals are shown
     TOP_DEALS.forEach((deal, index) => {
       setTimeout(() => {
         fetch(`/api/comic/${deal.id}`)
@@ -87,7 +112,7 @@ export default function Home() {
           .catch(() => {});
       }, index * 400);
     });
-  }, []);
+  }, [liveDeals]);
 
   // Infinite carousel — default left-scroll, speed up/reverse on hover zones
   useEffect(() => {
@@ -316,49 +341,67 @@ export default function Home() {
           <span style={{ fontSize: '11px', color: '#6B7280' }}>Prices updated daily</span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-          {TOP_DEALS.slice(0, 6).map(deal => {
-            const price   = region === 'uk' ? deal.priceUK : deal.priceUS;
-            const rrp     = region === 'uk' ? deal.rrpUK   : deal.rrpUS;
-            const pct     = discountPercent(deal, region);
-            const hasSale = pct > 0;
+          {(liveDeals ?? TOP_DEALS).slice(0, 6).map((deal, idx) => {
+            const isLive     = liveDeals !== null
+            const liveDeal   = isLive ? deal as LiveDeal : null
+            const staticDeal = !isLive ? deal as DealItem : null
+            const title      = liveDeal?.title     ?? staticDeal!.title
+            const publisher  = liveDeal?.publisher ?? staticDeal!.publisher
+            const price      = isLive
+              ? (region === 'uk' ? liveDeal!.lowestPriceGBP : liveDeal!.lowestPriceUSD)
+              : (region === 'uk' ? staticDeal!.priceUK : staticDeal!.priceUS)
+            const coverSrc   = isLive
+              ? (liveDeal!.coverImageUrl ?? '')
+              : (staticDeal ? (dealCovers[staticDeal.id] || DEAL_FALLBACKS[staticDeal.id] || '') : '')
+            const handleClick = () => isLive
+              ? router.push(`/product/${liveDeal!.slug}`)
+              : router.push(`/comic/${staticDeal!.id}?region=${region}`)
             return (
               <button
-                key={deal.id}
-                onClick={() => router.push(`/comic/${deal.id}?region=${region}`)}
+                key={idx}
+                onClick={handleClick}
                 style={{ background: '#fff', border: '1px solid #F0F0F0', borderRadius: '12px', padding: '10px', textAlign: 'left', cursor: 'pointer', display: 'block', width: '100%', fontFamily: 'inherit', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-                {/* Cover — dark bg matches desktop deal cards */}
                 <div style={{ width: '100%', aspectRatio: '2/3', borderRadius: '8px', overflow: 'hidden', background: '#1a1a2e', marginBottom: '8px', position: 'relative' }}>
-                  <img
-                    src={dealCovers[deal.id] || DEAL_FALLBACKS[deal.id] || ''}
-                    alt={deal.title}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    onError={(e) => {
-                      const img = e.target as HTMLImageElement;
-                      const fb  = DEAL_FALLBACKS[deal.id];
-                      if (fb && img.src !== fb) img.src = fb;
-                      else img.style.display = 'none';
-                    }}
-                  />
-                  {hasSale && (
+                  {coverSrc && (
+                    <img
+                      src={coverSrc}
+                      alt={title}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      onError={(e) => {
+                        const img = e.target as HTMLImageElement
+                        if (!isLive && staticDeal) {
+                          const fb = DEAL_FALLBACKS[staticDeal.id]
+                          if (fb && img.src !== fb) { img.src = fb; return }
+                        }
+                        img.style.display = 'none'
+                      }}
+                    />
+                  )}
+                  {isLive && price !== null && (
                     <div style={{ position: 'absolute', top: '8px', left: '8px', background: '#C41F22', color: '#fff', fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '5px' }}>
-                      -{pct}%
+                      {region === 'uk' ? '£' : '$'}{price!.toFixed(2)}
+                    </div>
+                  )}
+                  {!isLive && staticDeal && discountPercent(staticDeal, region) > 0 && (
+                    <div style={{ position: 'absolute', top: '8px', left: '8px', background: '#C41F22', color: '#fff', fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '5px' }}>
+                      -{discountPercent(staticDeal, region)}%
                     </div>
                   )}
                 </div>
-                <div className="mobile-deal-title" style={{ fontSize: '12px', fontWeight: 500, color: '#111', marginBottom: '2px' }}>
-                  {deal.title}
-                </div>
-                <div style={{ fontSize: '10px', color: '#6B7280', marginTop: '2px' }}>{deal.publisher}</div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px', marginTop: '5px' }}>
-                  <span style={{ fontSize: '14px', fontWeight: 700, color: '#C41F22' }}>
-                    {currency}{price.toFixed(2)}
-                  </span>
-                  {hasSale && (
-                    <span style={{ fontSize: '10px', color: '#6B7280', textDecoration: 'line-through' }}>
-                      {currency}{rrp.toFixed(2)}
+                <div className="mobile-deal-title" style={{ fontSize: '12px', fontWeight: 500, color: '#111', marginBottom: '2px' }}>{title}</div>
+                <div style={{ fontSize: '10px', color: '#6B7280', marginTop: '2px' }}>{publisher}</div>
+                {price !== null && price !== undefined && (
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px', marginTop: '5px' }}>
+                    <span style={{ fontSize: '14px', fontWeight: 700, color: '#C41F22' }}>
+                      {currency}{price.toFixed(2)}
                     </span>
-                  )}
-                </div>
+                    {!isLive && staticDeal && discountPercent(staticDeal, region) > 0 && (
+                      <span style={{ fontSize: '10px', color: '#6B7280', textDecoration: 'line-through' }}>
+                        {currency}{(region === 'uk' ? staticDeal.rrpUK : staticDeal.rrpUS).toFixed(2)}
+                      </span>
+                    )}
+                  </div>
+                )}
               </button>
             );
           })}
@@ -606,62 +649,81 @@ export default function Home() {
 
           {/* 3 copies for seamless infinite loop */}
           <div style={{ display: 'flex', gap: '12px', transform: `translateX(-${carouselOffset}px)`, willChange: 'transform' }}>
-            {[...TOP_DEALS, ...TOP_DEALS, ...TOP_DEALS].map((deal, i) => {
-              const price   = region === 'uk' ? deal.priceUK : deal.priceUS;
-              const rrp     = region === 'uk' ? deal.rrpUK   : deal.rrpUS;
-              const pct     = discountPercent(deal, region);
-              const hasSale = pct > 0;
+            {[...activeDeals, ...activeDeals, ...activeDeals].map((deal, i) => {
+              // Branch: live DB deal vs static fallback deal
+              const isLive  = liveDeals !== null
+              const liveDeal = isLive ? deal as LiveDeal : null
+              const staticDeal = !isLive ? deal as DealItem : null
+
+              const title     = liveDeal?.title     ?? staticDeal!.title
+              const publisher = liveDeal?.publisher ?? staticDeal!.publisher
+              const price     = isLive
+                ? (region === 'uk' ? liveDeal!.lowestPriceGBP : liveDeal!.lowestPriceUSD)
+                : (region === 'uk' ? staticDeal!.priceUK : staticDeal!.priceUS)
+              const coverSrc  = isLive
+                ? (liveDeal!.coverImageUrl ?? '')
+                : (staticDeal ? (dealCovers[staticDeal.id] || DEAL_FALLBACKS[staticDeal.id] || '') : '')
+
+              const handleClick = () => isLive
+                ? router.push(`/product/${liveDeal!.slug}`)
+                : router.push(`/comic/${staticDeal!.id}?region=${region}`)
 
               return (
                 <button key={i} className="deal-card"
-                  onClick={() => router.push(`/comic/${deal.id}?region=${region}`)}
+                  onClick={handleClick}
                   style={{ flexShrink: 0, width: '136px', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
 
                   {/* Cover */}
                   <div style={{ width: '136px', height: '185px', borderRadius: '10px', overflow: 'hidden', background: '#1a1a2e', position: 'relative', boxShadow: '0 4px 16px rgba(0,0,0,0.1)', marginBottom: '8px' }}>
-                    <img
-                      src={dealCovers[deal.id] || DEAL_FALLBACKS[deal.id] || ''}
-                      alt={deal.title}
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                      onError={(e) => {
-                        const img = e.target as HTMLImageElement;
-                        const fb  = DEAL_FALLBACKS[deal.id];
-                        if (fb && img.src !== fb) img.src = fb;
-                        else img.style.display = 'none';
-                      }}
-                    />
-
-                    {/* Discount badge — uses the slightly darker brand red (#C41F22, also used
-                        as the search button hover) so 10px white text clears AA's 4.5:1
-                        threshold. The primary brand red (#E8272A) is unchanged elsewhere. */}
-                    {hasSale && (
+                    {coverSrc && (
+                      <img
+                        src={coverSrc}
+                        alt={title}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        onError={(e) => {
+                          const img = e.target as HTMLImageElement
+                          if (!isLive && staticDeal) {
+                            const fb = DEAL_FALLBACKS[staticDeal.id]
+                            if (fb && img.src !== fb) { img.src = fb; return }
+                          }
+                          img.style.display = 'none'
+                        }}
+                      />
+                    )}
+                    {/* Live deal — DB price badge */}
+                    {isLive && price !== null && (
                       <div style={{ position: 'absolute', top: '8px', left: '8px', background: '#C41F22', color: '#fff', fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '5px' }}>
-                        -{pct}%
+                        {region === 'uk' ? '£' : '$'}{price!.toFixed(2)}
                       </div>
                     )}
                   </div>
 
                   {/* Title */}
                   <div style={{ fontSize: '12px', fontWeight: 500, color: '#111', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {deal.title}
+                    {title}
                   </div>
 
                   {/* Publisher */}
                   <div style={{ fontSize: '10px', color: '#6B7280', marginTop: '2px' }}>
-                    {deal.publisher}
+                    {publisher}
                   </div>
 
                   {/* Price row */}
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px', marginTop: '5px' }}>
-                    <span style={{ fontSize: '14px', fontWeight: 700, color: '#C41F22' }}>
-                      {currency}{price.toFixed(2)}
-                    </span>
-                    {hasSale && (
-                      <span style={{ fontSize: '10px', color: '#6B7280', textDecoration: 'line-through' }}>
-                        {currency}{rrp.toFixed(2)}
+                  {price !== null && price !== undefined && (
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '5px', marginTop: '5px' }}>
+                      <span style={{ fontSize: '14px', fontWeight: 700, color: '#C41F22' }}>
+                        {currency}{price.toFixed(2)}
                       </span>
-                    )}
-                  </div>
+                      {!isLive && (() => {
+                        const pct = discountPercent(staticDeal!, region)
+                        return pct > 0 ? (
+                          <span style={{ fontSize: '10px', color: '#6B7280', textDecoration: 'line-through' }}>
+                            {currency}{(region === 'uk' ? staticDeal!.rrpUK : staticDeal!.rrpUS).toFixed(2)}
+                          </span>
+                        ) : null
+                      })()}
+                    </div>
+                  )}
                 </button>
               );
             })}

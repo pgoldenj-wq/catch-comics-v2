@@ -53,6 +53,39 @@ const COMIC_TITLE_KEYWORDS = [
   'comic strip', 'illustrated novel', 'anime', 'sequential art',
 ]
 
+// Comic signals in Shopify product_type or tags (WoB and similar retailers)
+const COMIC_SHOPIFY_TYPES = [
+  'graphic novel', 'graphic novels', 'comic', 'comics', 'manga',
+  'graphic', 'sequential art', 'anime', 'tpb', 'trade paperback',
+]
+
+/**
+ * Quick pre-check using Shopify raw_data before calling enrichment API.
+ * Returns true if product_type or tags clearly indicate comics.
+ * Returns null if no signal found (needs enrichment to decide).
+ */
+function isLikelyComicFromShopifyData(
+  productType: string | null,
+  tagsJson: string | null,
+): boolean | null {
+  const type = (productType ?? '').toLowerCase()
+  if (type && COMIC_SHOPIFY_TYPES.some(t => type.includes(t))) return true
+
+  if (tagsJson) {
+    try {
+      const tags = JSON.parse(tagsJson) as string[]
+      const tagStr = tags.join(' ').toLowerCase()
+      if (COMIC_SHOPIFY_TYPES.some(t => tagStr.includes(t))) return true
+      // World of Books uses "TYPE|<category>" format
+      if (/type\|(comic|manga|graphic)/.test(tagStr)) return true
+    } catch {
+      // not valid JSON, ignore
+    }
+  }
+
+  return null  // no signal — must rely on enrichment
+}
+
 function isLikelyComic(result: EnrichmentResult): boolean {
   // If enrichment detected a comic-specific format, it's a comic
   if (result.format !== null) return true
@@ -156,14 +189,24 @@ async function main() {
   printSnapshot('Before', before)
 
   // ── Find unmatched ISBNs ordered by listing count ─────────────────────────
-  const rows = await prisma.$queryRaw<Array<{ isbn13: string; listing_count: bigint }>>`
-    SELECT   isbn_13 AS isbn13, COUNT(*) AS listing_count
-    FROM     retailer_listings
-    WHERE    isbn_13 IS NOT NULL
-      AND    canonical_product_id IS NULL
-    GROUP BY isbn_13
-    ORDER BY listing_count DESC
-    LIMIT    ${BATCH_SIZE * 10}
+  // Also fetch a sample of raw_data so we can check product_type and tags
+  // before making an expensive enrichment API call.
+  const rows = await prisma.$queryRaw<Array<{
+    isbn13:        string
+    listing_count: bigint
+    product_type:  string | null
+    tags:          string | null
+  }>>`
+    SELECT DISTINCT ON (isbn_13)
+      isbn_13                                      AS isbn13,
+      COUNT(*) OVER (PARTITION BY isbn_13)         AS listing_count,
+      raw_data->>'product_type'                    AS product_type,
+      (raw_data->'tags')::text                     AS tags
+    FROM retailer_listings
+    WHERE isbn_13 IS NOT NULL
+      AND canonical_product_id IS NULL
+    ORDER BY isbn_13, created_at DESC
+    LIMIT ${BATCH_SIZE * 10}
   `
 
   const checkpoint = loadCheckpoint()
@@ -188,7 +231,14 @@ async function main() {
 
     processed++
 
-    // ── a. Check for existing canonical ──────────────────────────────────────
+    // ── a. Quick Shopify metadata pre-check (avoids API call for obvious non-comics) ──
+    const shopifySignal = isLikelyComicFromShopifyData(row.product_type, row.tags)
+    if (shopifySignal === false) {
+      // Shopify data explicitly signals non-comic (not just "no signal")
+      // Currently no case returns false — reserved for future explicit exclusion
+    }
+
+    // ── b. Check for existing canonical ──────────────────────────────────────
     const existing = await prisma.canonicalProduct.findFirst({
       where : { isbn13 },
       select: { id: true },
@@ -218,7 +268,9 @@ async function main() {
       }
 
       // ── Genre filter — skip non-comic content ──────────────────────────────
-      if (!isLikelyComic(enrichResult)) {
+      // shopifySignal=true means the Shopify product_type/tags confirm it's a comic;
+      // skip the enrichment-based check in that case (trust the retailer's own category).
+      if (shopifySignal !== true && !isLikelyComic(enrichResult)) {
         console.log(`  [${processed}] ✗ ${isbn13}: not a comic — "${enrichResult.title}" (publisher: ${enrichResult.publisher ?? 'unknown'})`)
         notFound++
         checkpoint.add(isbn13)
