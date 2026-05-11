@@ -63,17 +63,21 @@ export function buildForbiddenPlanetAffiliateUrl(url: string, affiliateCode?: st
  * Build a Forbidden Planet product search URL for a comic title,
  * with the affiliate code appended.
  *
- * @param title         - Comic/manga title (e.g. "Saga", "One Piece")
+ * Uses the /search/ endpoint (standard Shopify search route).
+ * No price or stock data is fetched — this is a deep-link fallback only.
+ * FP's /products.json returns 403; do not attempt Shopify ingestion.
+ *
+ * @param title         - Comic/manga title or ISBN (e.g. "Saga", "9781534313491")
  * @param affiliateCode - From NEXT_PUBLIC_FORBIDDEN_PLANET_AFFILIATE_CODE.
  *                        If empty, returns a clean search URL with no tracking.
  *
  * @example
  * buildForbiddenPlanetSearchUrl('Saga', 'catchcomics')
- * // → 'https://forbiddenplanet.com/?q=Saga+comic&affiliate=catchcomics'
+ * // → 'https://forbiddenplanet.com/search/?q=Saga+comic&affiliate=catchcomics'
  */
 export function buildForbiddenPlanetSearchUrl(title: string, affiliateCode?: string): string {
   const q    = encodeURIComponent(`${title.trim()} comic`)
-  const base = `https://forbiddenplanet.com/?q=${q}`
+  const base = `https://forbiddenplanet.com/search/?q=${q}`
   return buildForbiddenPlanetAffiliateUrl(base, affiliateCode)
 }
 

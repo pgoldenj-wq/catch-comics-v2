@@ -483,9 +483,9 @@ export default function PricingPanel({ query, region, formatFilter = 'all', onFo
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-800">Forbidden Planet</p>
-                  <p className="text-xs text-gray-400">UK specialist comic retailer</p>
+                  <p className="text-xs text-gray-400">UK specialist — search only, no live pricing</p>
                 </div>
-                <span className="text-xs text-gray-400 group-hover:text-gray-600 shrink-0">View on FP →</span>
+                <span className="text-xs text-gray-400 group-hover:text-gray-600 shrink-0">Search Forbidden Planet →</span>
               </a>
             )
           })()}

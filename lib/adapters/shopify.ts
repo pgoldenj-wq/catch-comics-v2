@@ -486,6 +486,20 @@ export class ShopifyAdapter {
     const retailer = await prisma.retailer.findUniqueOrThrow({
       where: { id: retailerId },
     })
+
+    // Hard guard: this adapter must only be called for SHOPIFY retailers.
+    // Retailers classified as DIRECT_AFFILIATE (e.g. Forbidden Planet),
+    // AWIN_FEED, CJ_FEED, or MANUAL have no /products.json endpoint and
+    // must never be passed to this adapter.
+    if (retailer.platform !== 'SHOPIFY') {
+      throw new Error(
+        `ShopifyAdapter.syncRetailer called for ${retailer.domain} ` +
+        `(platform=${retailer.platform}). ` +
+        `This adapter only supports SHOPIFY retailers. ` +
+        `Use the appropriate adapter for platform=${retailer.platform}.`,
+      )
+    }
+
     const domain   = retailer.domain
     const currency = retailer.currency
     const syncCfg  = (retailer.syncConfig ?? {}) as ShopifySyncConfig

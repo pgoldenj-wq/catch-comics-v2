@@ -41,9 +41,10 @@ enum RetailerPlatform {
   SHOPIFY
   BIGCOMMERCE
   WOOCOMMERCE
-  AWIN_FEED    // Awin affiliate product feed
-  CJ_FEED      // Commission Junction feed
-  MANUAL       // Hand-entered records
+  AWIN_FEED        // Awin affiliate product feed
+  CJ_FEED          // Commission Junction feed
+  DIRECT_AFFILIATE // Retailer runs their own affiliate programme (no network intermediary)
+  MANUAL           // Hand-entered records
 }
 
 enum ListingCondition {
