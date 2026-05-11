@@ -13,7 +13,8 @@
     "db:migrate:deploy": "dotenv -e .env.local -- prisma migrate deploy",
     "db:studio": "dotenv -e .env.local -- prisma studio",
     "db:push": "dotenv -e .env.local -- prisma db push",
-    "test:shopify": "dotenv -e .env.local -- tsx scripts/test-shopify-adapter.ts"
+    "test:shopify": "dotenv -e .env.local -- tsx scripts/test-shopify-adapter.ts",
+    "enrich:isbn": "dotenv -e .env.local -- tsx scripts/enrich-isbn.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

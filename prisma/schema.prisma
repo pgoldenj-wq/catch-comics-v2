@@ -145,8 +145,34 @@ model Retailer {
   updatedAt        DateTime         @updatedAt @map("updated_at")
 
   listings RetailerListing[]
+  syncLogs SyncLog[]
 
   @@map("retailers")
+}
+
+// ── sync_logs ─────────────────────────────────────────────────────────────────
+// Append-only log of every sync run. Created by the sync API route before
+// calling the adapter; updated once the adapter returns.
+
+model SyncLog {
+  id              String    @id @default(uuid()) @db.Uuid
+  retailerId      String    @map("retailer_id") @db.Uuid
+  startedAt       DateTime  @default(now()) @map("started_at")
+  finishedAt      DateTime? @map("finished_at")
+  /// "running" | "success" | "error"
+  status          String    @default("running") @db.VarChar(16)
+  productsFetched Int       @default(0) @map("products_fetched")
+  listingsCreated Int       @default(0) @map("listings_created")
+  listingsUpdated Int       @default(0) @map("listings_updated")
+  priceChanges    Int       @default(0) @map("price_changes")
+  errorCount      Int       @default(0) @map("error_count")
+  /// Human-readable summary of any errors, truncated to fit in the admin table.
+  errorSummary    String?   @map("error_summary") @db.Text
+
+  retailer Retailer @relation(fields: [retailerId], references: [id], onDelete: Cascade)
+
+  @@index([retailerId, startedAt(sort: Desc)])
+  @@map("sync_logs")
 }
 
 // ── retailer_listings ─────────────────────────────────────────────────────────
@@ -189,6 +215,29 @@ model RetailerListing {
   @@index([canonicalProductId])
   @@index([retailerId])
   @@map("retailer_listings")
+}
+
+// ── metadata_cache ────────────────────────────────────────────────────────────
+// Caches raw API responses from enrichment sources (Google Books, Open Library)
+// keyed by (source, isbn_13). TTL is 30 days — checked at read time via
+// expires_at. Storing a { result: null } payload means "API was called and
+// returned no data" — distinguishes a cache hit (no data) from a cache miss.
+
+model MetadataCache {
+  id        String   @id @default(uuid()) @db.Uuid
+  /// "google_books" | "open_library"
+  source    String   @db.Text
+  isbn13    String   @map("isbn_13") @db.VarChar(13)
+  fetchedAt DateTime @map("fetched_at")
+  expiresAt DateTime @map("expires_at")
+  /// Wrapped as { result: <API response> | null } so a "no results" response
+  /// can be cached without needing a nullable column.
+  data      Json     @map("data")
+
+  @@unique([source, isbn13])
+  @@index([isbn13])
+  @@index([expiresAt])
+  @@map("metadata_cache")
 }
 
 // ── price_history ─────────────────────────────────────────────────────────────
