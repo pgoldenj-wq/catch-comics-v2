@@ -44,23 +44,30 @@ export default async function RetailersPage({
   const dir     = (params.dir   ?? 'asc')   as SortDir
   const flipDir = dir === 'asc' ? 'desc' : 'asc'
 
-  // ── Fetch retailers with listing counts ────────────────────────────────────
-  const retailers = await prisma.retailer.findMany({
-    include: {
-      _count: { select: { listings: true } },
-    },
-    orderBy: sort === 'name'         ? { name: dir }
-           : sort === 'lastSyncedAt' ? { lastSyncedAt: dir }
-           : undefined,  // listings / matchRate sorted in JS below
-  })
+  // ── Fetch data — surface DB errors visibly instead of crashing ─────────────
+  let retailers: Awaited<ReturnType<typeof prisma.retailer.findMany<{ include: { _count: { select: { listings: true } } } }>>> = []
+  let matchedMap = new Map<string, number>()
+  let dbError: string | null = null
 
-  // ── Fetch matched listing counts per retailer ──────────────────────────────
-  const matchedCounts = await prisma.retailerListing.groupBy({
-    by:    ['retailerId'],
-    where: { canonicalProductId: { not: null } },
-    _count: { id: true },
-  })
-  const matchedMap = new Map(matchedCounts.map(r => [r.retailerId, r._count.id]))
+  try {
+    retailers = await prisma.retailer.findMany({
+      include: {
+        _count: { select: { listings: true } },
+      },
+      orderBy: sort === 'name'         ? { name: dir }
+             : sort === 'lastSyncedAt' ? { lastSyncedAt: dir }
+             : undefined,
+    })
+
+    const matchedCounts = await prisma.retailerListing.groupBy({
+      by:    ['retailerId'],
+      where: { canonicalProductId: { not: null } },
+      _count: { id: true },
+    })
+    matchedMap = new Map(matchedCounts.map(r => [r.retailerId, r._count.id]))
+  } catch (err) {
+    dbError = err instanceof Error ? err.message : String(err)
+  }
 
   // ── Build display rows ─────────────────────────────────────────────────────
   let rows = retailers.map(r => {
@@ -99,6 +106,12 @@ export default async function RetailersPage({
 
   return (
     <div>
+      {dbError && (
+        <div className="mb-4 bg-red-50 border border-red-300 rounded p-4 font-mono text-xs text-red-800">
+          <strong>Database error</strong> — check your DATABASE_URL and that migrations are applied.
+          <pre className="mt-2 whitespace-pre-wrap break-all">{dbError}</pre>
+        </div>
+      )}
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-xl font-bold">Retailers <span className="text-gray-400 text-sm font-normal">({rows.length})</span></h1>
         <Link

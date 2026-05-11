@@ -110,6 +110,21 @@ interface ComicResult {
   authors?: string[]
   isbn13?: string
   isbn10?: string
+  // Unified mode — inline offers
+  offers?: Array<{
+    listingId: string; retailerName: string; retailerUrl: string
+    priceAmount: number; currency: string; stockStatus: string; condition: string
+  }>
+}
+
+// Unified search — additional section types (not shown as ComicResult cards)
+interface UnmatchedListingCard {
+  id: string; title: string; retailerName: string; retailerUrl: string
+  priceAmount: number; currency: string; condition: string; imageUrl: string | null
+}
+interface LooseEbayCard {
+  itemId: string; title: string; price: number; currency: string
+  condition: string; imageUrl: string; itemWebUrl: string
 }
 
 type Format = 'single-issue' | 'graphic-novel' | 'hardcover' | 'omnibus' | 'manga' | 'compact' | 'one-shot'
@@ -411,6 +426,9 @@ function SearchResults() {
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false)
   // Collected price data from PriceTag callbacks — used for "Lowest price" sort
   const [priceMap, setPriceMap] = useState<Map<string, number | null>>(new Map())
+  // Unified mode — sections below the canonical results
+  const [unmatchedListings, setUnmatchedListings]   = useState<UnmatchedListingCard[]>([])
+  const [looseEbayResults,  setLooseEbayResults]    = useState<LooseEbayCard[]>([])
 
   const currency = region === 'uk' ? '£' : '$'
 
@@ -452,23 +470,68 @@ function SearchResults() {
     router.push(buildUrl({ region: r }))
   }
 
-  // Fetch when query changes
+  // Fetch when query or region changes
   useEffect(() => {
     if (!query) return
     setLoading(true)
     setError('')
     setResults([])
+    setUnmatchedListings([])
+    setLooseEbayResults([])
     setDidYouMean(null)
     setPriceMap(new Map()) // reset prices for new query
-    fetch(`/api/search?q=${encodeURIComponent(query)}`)
+    fetch(`/api/search?q=${encodeURIComponent(query)}&region=${region}`)
       .then(res => res.json())
       .then(data => {
-        if (data.error) setError(data.error)
-        else setResults(data.results || [])
+        if (data.error) {
+          setError(data.error)
+        } else if (data.type === 'unified') {
+          // ── Unified mode ─────────────────────────────────────────────────
+          // Map canonical results → ComicResult for the existing card renderer
+          const mapped: ComicResult[] = (data.canonicalResults ?? []).map(
+            (r: {
+              id: string; title: string; publisher: string | null; format: string
+              releaseDate: string | null; coverImageUrl: string | null; isbn13: string | null
+              offers: Array<{ listingId: string; retailerName: string; retailerUrl: string; priceAmount: number; currency: string; stockStatus: string; condition: string }>
+            }) => ({
+              id:             r.id,
+              name:           r.title,
+              image:          { medium_url: r.coverImageUrl ?? '', original_url: r.coverImageUrl ?? '' },
+              start_year:     r.releaseDate ? r.releaseDate.slice(0, 4) : '',
+              publisher:      { name: r.publisher ?? '' },
+              source:         'canonical',
+              type:           r.format === 'SINGLE_ISSUE' ? 'issue' : 'volume',
+              isbn13:         r.isbn13 ?? undefined,
+              offers:         r.offers,
+            })
+          )
+          setResults(mapped)
+          setUnmatchedListings(
+            (data.unmatchedListings ?? []).map(
+              (r: { id: string; title: string; retailerName: string; retailerUrl: string; priceAmount: number; currency: string; condition: string; imageUrl: string | null }) => ({
+                id: r.id, title: r.title, retailerName: r.retailerName,
+                retailerUrl: r.retailerUrl, priceAmount: r.priceAmount,
+                currency: r.currency, condition: r.condition, imageUrl: r.imageUrl,
+              })
+            )
+          )
+          setLooseEbayResults(
+            (data.looseEbayResults ?? []).map(
+              (r: { itemId: string; title: string; price: number; currency: string; condition: string; imageUrl: string; itemWebUrl: string }) => ({
+                itemId: r.itemId, title: r.title, price: r.price,
+                currency: r.currency, condition: r.condition,
+                imageUrl: r.imageUrl, itemWebUrl: r.itemWebUrl,
+              })
+            )
+          )
+        } else {
+          // ── Legacy Comic Vine mode ────────────────────────────────────────
+          setResults(data.results || [])
+        }
         setLoading(false)
       })
       .catch(() => { setError('Something went wrong.'); setLoading(false) })
-  }, [query])
+  }, [query, region])
 
   // Spelling correction
   useEffect(() => {
@@ -839,6 +902,86 @@ function SearchResults() {
             </div>
           )}
 
+          {/* ── OTHER LISTINGS (unmatched retailer listings) ─────────────── */}
+          {!loading && !error && unmatchedListings.length > 0 && (
+            <div style={{ marginTop: '24px' }}>
+              <p style={{ fontSize: '11px', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>
+                Other listings
+              </p>
+              <div style={{ borderTop: '1px solid #F0F0F0' }}>
+                {unmatchedListings.map(listing => {
+                  const sym = listing.currency === 'GBP' ? '£' : listing.currency === 'USD' ? '$' : listing.currency + ' '
+                  return (
+                    <a
+                      key={listing.id}
+                      href={`/go/${listing.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '12px',
+                        padding: '10px 0', borderBottom: '1px solid #F0F0F0',
+                        textDecoration: 'none', color: 'inherit',
+                      }}>
+                      {listing.imageUrl ? (
+                        <img src={listing.imageUrl} alt="" style={{ width: '48px', height: '68px', objectFit: 'cover', borderRadius: '4px', flexShrink: 0, border: '1px solid #EBEBEB' }} onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
+                      ) : (
+                        <div style={{ width: '48px', height: '68px', background: '#F3F4F6', borderRadius: '4px', flexShrink: 0, border: '1px solid #EBEBEB' }} />
+                      )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontSize: '13px', fontWeight: 500, color: '#0A0A0A', margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{listing.title}</p>
+                        <p style={{ fontSize: '11px', color: '#6B7280', margin: 0 }}>{listing.retailerName} · {listing.condition.replace(/_/g, ' ')}</p>
+                      </div>
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        <p style={{ fontSize: '13px', fontWeight: 600, color: '#C41F22', margin: 0 }}>{sym}{listing.priceAmount.toFixed(2)}</p>
+                        <p style={{ fontSize: '10px', color: '#6B7280', margin: '2px 0 0', textTransform: 'uppercase', letterSpacing: '0.04em' }}>View →</p>
+                      </div>
+                    </a>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ── FROM EBAY (loose eBay results) ───────────────────────────── */}
+          {!loading && !error && looseEbayResults.length > 0 && (
+            <div style={{ marginTop: '24px' }}>
+              <p style={{ fontSize: '11px', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>
+                From eBay
+              </p>
+              <div style={{ borderTop: '1px solid #F0F0F0' }}>
+                {looseEbayResults.map(item => {
+                  const sym = item.currency === 'GBP' ? '£' : item.currency === 'USD' ? '$' : item.currency + ' '
+                  return (
+                    <a
+                      key={item.itemId}
+                      href={item.itemWebUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '12px',
+                        padding: '10px 0', borderBottom: '1px solid #F0F0F0',
+                        textDecoration: 'none', color: 'inherit',
+                      }}>
+                      {item.imageUrl ? (
+                        <img src={item.imageUrl} alt="" style={{ width: '48px', height: '68px', objectFit: 'cover', borderRadius: '4px', flexShrink: 0, border: '1px solid #EBEBEB' }} onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
+                      ) : (
+                        <div style={{ width: '48px', height: '68px', background: '#F3F4F6', borderRadius: '4px', flexShrink: 0, border: '1px solid #EBEBEB' }} />
+                      )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontSize: '13px', fontWeight: 500, color: '#0A0A0A', margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</p>
+                        <p style={{ fontSize: '11px', color: '#6B7280', margin: 0 }}>eBay · {item.condition}</p>
+                      </div>
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        <p style={{ fontSize: '13px', fontWeight: 600, color: '#C41F22', margin: 0 }}>{sym}{item.price.toFixed(2)}</p>
+                        <p style={{ fontSize: '10px', color: '#6B7280', margin: '2px 0 0', textTransform: 'uppercase', letterSpacing: '0.04em' }}>eBay →</p>
+                      </div>
+                    </a>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Filters removed all results */}
           {!loading && !error && results.length > 0 && filteredResults.length === 0 && (
             <div style={{ textAlign: 'center', padding: '64px 0' }}>
@@ -852,7 +995,7 @@ function SearchResults() {
           )}
 
           {/* Zero results from API */}
-          {!loading && !error && results.length === 0 && (
+          {!loading && !error && results.length === 0 && unmatchedListings.length === 0 && looseEbayResults.length === 0 && (
             <div style={{ textAlign: 'center', padding: '64px 0' }}>
               <p style={{ fontWeight: 500, color: '#0A0A0A', marginBottom: '8px', fontSize: '15px' }}>
                 No results for &ldquo;{query}&rdquo;
