@@ -15,6 +15,10 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           className="hover:text-white transition-colors">
           Retailers
         </Link>
+        <Link href="/admin/jobs"
+          className="hover:text-white transition-colors">
+          Jobs
+        </Link>
         <div className="ml-auto">
           <a href="/api/admin/auth?action=logout"
             className="hover:text-red-400 transition-colors">

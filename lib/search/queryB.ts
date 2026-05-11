@@ -48,6 +48,7 @@ export async function queryUnmatched(
     JOIN retailers ret ON ret.id = rl.retailer_id
     WHERE
       rl.canonical_product_id IS NULL
+      AND rl.deleted_at IS NULL
       AND ret.is_active = true
       AND (
         to_tsvector('english', rl.title) @@ websearch_to_tsquery('english', ${q})

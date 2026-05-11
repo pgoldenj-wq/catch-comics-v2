@@ -55,7 +55,7 @@ async function getProduct(slug: string) {
     where: { canonicalSlug: slug },
     include: {
       listings: {
-        where: { retailer: { isActive: true } },
+        where: { retailer: { isActive: true }, deletedAt: null },
         include: {
           retailer: {
             select: {

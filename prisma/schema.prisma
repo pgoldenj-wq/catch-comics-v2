@@ -206,6 +206,9 @@ model RetailerListing {
   firstSeenAt        DateTime         @default(now()) @map("first_seen_at")
   lastSeenAt         DateTime         @default(now()) @map("last_seen_at")
   lastPriceChangeAt  DateTime?        @map("last_price_change_at")
+  /// Set by the cleanup job when a listing has not been seen for 30 days.
+  /// Never hard-deleted — soft-delete preserves price history integrity.
+  deletedAt          DateTime?        @map("deleted_at")
 
   canonicalProduct CanonicalProduct? @relation(fields: [canonicalProductId], references: [id], onDelete: SetNull)
   retailer         Retailer          @relation(fields: [retailerId], references: [id], onDelete: Restrict)
@@ -215,6 +218,7 @@ model RetailerListing {
   @@unique([retailerId, retailerSku])
   @@index([canonicalProductId])
   @@index([retailerId])
+  @@index([deletedAt])
   @@map("retailer_listings")
 }
 
@@ -257,6 +261,29 @@ model PriceHistory {
 
   @@index([retailerListingId, recordedAt])
   @@map("price_history")
+}
+
+// ── job_runs ──────────────────────────────────────────────────────────────────
+// Append-only log of every Inngest job run (non-sync jobs — syncs use sync_logs).
+// Written at the start of each job and updated on completion or failure.
+
+model JobRun {
+  id             String    @id @default(uuid()) @db.Uuid
+  /// e.g. "enrich.canonical_products", "cleanup.stale_listings"
+  jobName        String    @map("job_name") @db.VarChar(100)
+  /// Inngest run ID for deep-link to Inngest dashboard.
+  inngestRunId   String?   @map("inngest_run_id") @db.Text
+  /// "running" | "success" | "error"
+  status         String    @default("running") @db.VarChar(16)
+  startedAt      DateTime  @default(now()) @map("started_at")
+  finishedAt     DateTime? @map("finished_at")
+  itemsProcessed Int       @default(0) @map("items_processed")
+  errorSummary   String?   @map("error_summary") @db.Text
+  /// Extra per-job stats as JSON (e.g. { enriched: 42, notFound: 8 }).
+  metadata       Json      @default("{}") @map("metadata")
+
+  @@index([jobName, startedAt(sort: Desc)])
+  @@map("job_runs")
 }
 
 // ── click_events ──────────────────────────────────────────────────────────────
