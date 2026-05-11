@@ -607,6 +607,27 @@ function ComicPage() {
             )
           }
 
+          {/* ── DESCRIPTION — rendered only when Comic Vine returns one ────── */}
+          {comic.description && comic.description.trim() && (
+            <div style={{ marginBottom: '24px' }}>
+              <h2 style={{ fontSize: '13px', fontWeight: 600, color: '#111827', marginBottom: '8px', letterSpacing: '0.01em' }}>
+                About
+              </h2>
+              <p style={{ fontSize: '14px', color: '#374151', lineHeight: 1.65, margin: 0 }}>
+                {comic.description
+                  .replace(/<[^>]+>/g, ' ')         /* strip HTML tags */
+                  .replace(/&amp;/g, '&')
+                  .replace(/&lt;/g, '<')
+                  .replace(/&gt;/g, '>')
+                  .replace(/&quot;/g, '"')
+                  .replace(/&#39;/g, "'")
+                  .replace(/&nbsp;/g, ' ')
+                  .replace(/\s+/g, ' ')
+                  .trim()}
+              </p>
+            </div>
+          )}
+
           <PricingPanel
             query={comic.name}
             region={market}

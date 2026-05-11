@@ -44,11 +44,11 @@ const CONDITION_LABELS: Record<string, string> = {
 }
 
 const STOCK_LABELS: Record<string, { label: string; cls: string }> = {
-  IN_STOCK:    { label: 'In stock',  cls: 'text-emerald-400' },
-  LOW_STOCK:   { label: 'Low stock', cls: 'text-amber-400'   },
-  PREORDER:    { label: 'Pre-order', cls: 'text-sky-400'      },
-  OUT_OF_STOCK:{ label: 'OOS',       cls: 'text-red-400'      },
-  UNKNOWN:     { label: 'Unknown',   cls: 'text-gray-500'     },
+  IN_STOCK:    { label: 'In stock',  cls: 'text-emerald-600' },
+  LOW_STOCK:   { label: 'Low stock', cls: 'text-amber-600'   },
+  PREORDER:    { label: 'Pre-order', cls: 'text-sky-600'      },
+  OUT_OF_STOCK:{ label: 'OOS',       cls: 'text-red-500'      },
+  UNKNOWN:     { label: 'Unknown',   cls: 'text-gray-400'     },
 }
 
 const STALE_DAYS = 30
@@ -98,8 +98,8 @@ export default function OffersTable({ offers }: Props) {
             onClick={() => setTab(t.id)}
             className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
               tab === t.id
-                ? 'bg-indigo-600 text-white'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+                ? 'bg-[#E8272A] text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900'
             }`}
           >
             {t.label}
@@ -114,7 +114,7 @@ export default function OffersTable({ offers }: Props) {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-gray-500 text-xs uppercase tracking-wide border-b border-gray-800">
+              <tr className="text-left text-gray-500 text-xs uppercase tracking-wide border-b border-gray-200">
                 <th className="pb-2 pr-4 font-medium">Retailer</th>
                 <th className="pb-2 pr-4 font-medium">Condition</th>
                 <th className="pb-2 pr-4 font-medium">Price</th>
@@ -124,7 +124,7 @@ export default function OffersTable({ offers }: Props) {
                 <th className="pb-2 font-medium"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800/50">
+            <tbody className="divide-y divide-gray-100">
               {visible.map(o => {
                 const stale  = isStale(o.lastSeenAt)
                 const stock  = STOCK_LABELS[o.stockStatus] ?? STOCK_LABELS['UNKNOWN']
@@ -133,34 +133,34 @@ export default function OffersTable({ offers }: Props) {
                 return (
                   <tr
                     key={o.listingId}
-                    className={`hover:bg-gray-800/40 transition-colors ${stale ? 'opacity-50' : ''}`}
+                    className={`hover:bg-gray-50 transition-colors ${stale ? 'opacity-50' : ''}`}
                   >
-                    <td className="py-3 pr-4 font-medium text-white">
+                    <td className="py-3 pr-4 font-medium text-gray-900">
                       {o.retailerName}
                       {stale && (
-                        <span className="ml-2 text-xs text-amber-500 font-normal">(stale)</span>
+                        <span className="ml-2 text-xs text-amber-600 font-normal">(stale)</span>
                       )}
                     </td>
-                    <td className="py-3 pr-4 text-gray-300">
+                    <td className="py-3 pr-4 text-gray-700">
                       {CONDITION_LABELS[o.condition] ?? o.condition}
                       {o.conditionDetail && (
-                        <span className="block text-xs text-gray-500">{o.conditionDetail}</span>
+                        <span className="block text-xs text-gray-400">{o.conditionDetail}</span>
                       )}
                     </td>
                     <td className="py-3 pr-4">
-                      <span className="font-semibold text-white">
+                      <span className="font-semibold text-gray-900">
                         {fmtPrice(o.priceAmount, o.currency)}
                       </span>
                       {o.shippingAmount !== null && o.shippingAmount > 0 && (
-                        <span className="block text-xs text-gray-500">
+                        <span className="block text-xs text-gray-400">
                           +{fmtPrice(o.shippingAmount, o.currency)} ship
                         </span>
                       )}
                       {o.shippingAmount === 0 && (
-                        <span className="block text-xs text-emerald-500">Free shipping</span>
+                        <span className="block text-xs text-emerald-600">Free shipping</span>
                       )}
                     </td>
-                    <td className="py-3 pr-4 hidden sm:table-cell text-gray-400">
+                    <td className="py-3 pr-4 hidden sm:table-cell text-gray-500">
                       {o.shippingAmount === null
                         ? '—'
                         : o.shippingAmount === 0
@@ -170,7 +170,7 @@ export default function OffersTable({ offers }: Props) {
                     <td className={`py-3 pr-4 hidden md:table-cell font-medium ${stock.cls}`}>
                       {stock.label}
                     </td>
-                    <td className="py-3 pr-4 hidden lg:table-cell text-gray-500 text-xs">
+                    <td className="py-3 pr-4 hidden lg:table-cell text-gray-400 text-xs">
                       {fmtDate(o.lastSeenAt)}
                     </td>
                     <td className="py-3 text-right">
@@ -180,8 +180,8 @@ export default function OffersTable({ offers }: Props) {
                         rel="noopener noreferrer"
                         className={`inline-block px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                           stale
-                            ? 'bg-gray-700 text-gray-400 hover:bg-gray-600'
-                            : 'bg-indigo-600 text-white hover:bg-indigo-500'
+                            ? 'bg-gray-200 text-gray-500 hover:bg-gray-300'
+                            : 'bg-[#E8272A] text-white hover:bg-[#c41f22]'
                         }`}
                       >
                         View deal ↗

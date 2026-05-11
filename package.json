@@ -22,6 +22,7 @@
     "import:retailers": "dotenv -e .env.local -- tsx scripts/bulk-import-retailers.ts",
     "seed:retailer": "dotenv -e .env.local -- tsx scripts/seed-first-retailer.ts",
     "backfill:wob-isbns": "dotenv -e .env.local -- tsx scripts/backfill-wob-isbns.ts",
+    "purge:noncomic": "dotenv -e .env.local -- tsx scripts/purge-noncomic-canonicals.ts",
     "dev:inngest": "npx @inngest/cli@latest dev -u http://localhost:3000/api/inngest"
   },
   "dependencies": {

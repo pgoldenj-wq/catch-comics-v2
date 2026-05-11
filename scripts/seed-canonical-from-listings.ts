@@ -20,10 +20,59 @@
 import { prisma }               from '../lib/prisma'
 import { enrichByIsbn }         from '../lib/enrichment/isbn'
 import { inferFormat }          from '../lib/enrichment/isbn'
+import type { EnrichmentResult } from '../lib/enrichment/isbn'
 import { makeCanonicalSlug }    from '../lib/adapters/shared/matching'
 import { MatchMethod }          from '@prisma/client'
 import * as fs                  from 'fs'
 import * as path                from 'path'
+
+// ── Comics genre filter ───────────────────────────────────────────────────────
+// World of Books sells all books. We only want to create canonical products for
+// comics, graphic novels, manga, and similar sequential art formats.
+// Reject anything that doesn't pass at least one of these signals.
+
+const COMIC_PUBLISHERS = new Set([
+  'marvel', 'marvel comics', 'dc comics', 'image comics', 'image', 'dark horse comics',
+  'dark horse', 'idw publishing', 'idw', 'boom! studios', 'boom studios', 'oni press',
+  'fantagraphics books', 'fantagraphics', 'drawn & quarterly', 'viz media', 'viz',
+  'kodansha comics', 'kodansha', 'yen press', 'seven seas entertainment', 'seven seas',
+  'tokyopop', 'square enix manga', 'square enix', 'shueisha', 'vertical comics', 'vertical',
+  'titan comics', 'dynamite entertainment', 'dynamite', 'aftershock comics', 'aftershock',
+  'vault comics', 'vault', 'scout comics', 'ahoy comics', 'top shelf productions',
+  'humanoids', 'ablaze', 'valiant entertainment', 'valiant', 'archie comics', 'archie',
+  'avatar press', 'zenescope', 'action lab', 'lion forge', 'oni-lion forge',
+  'drawn and quarterly', 'fantagraphics books', 'pantheon books',
+  'abrams comicarts', 'abrams', 'first second', 'graphix', 'scholastic graphix',
+  'viz signature', 'dark horse manga', 'j-novel club', 'seven seas',
+  'penguin comics', 'papercutz', 'eurocomics',
+])
+
+const COMIC_TITLE_KEYWORDS = [
+  'graphic novel', 'comic book', 'manga', 'superhero', 'batman', 'spider-man',
+  'avengers', 'x-men', 'justice league', 'collected edition', 'trade paperback',
+  'comic strip', 'illustrated novel', 'anime', 'sequential art',
+]
+
+function isLikelyComic(result: EnrichmentResult): boolean {
+  // If enrichment detected a comic-specific format, it's a comic
+  if (result.format !== null) return true
+
+  // Check publisher name against known comics publishers
+  const pub = (result.publisher ?? '').toLowerCase().trim()
+  if (pub) {
+    for (const known of COMIC_PUBLISHERS) {
+      if (pub.includes(known)) return true
+    }
+  }
+
+  // Check title and description for comic-specific keywords
+  const text = `${result.title ?? ''} ${result.description ?? ''}`.toLowerCase()
+  for (const kw of COMIC_TITLE_KEYWORDS) {
+    if (text.includes(kw)) return true
+  }
+
+  return false
+}
 
 // ── CLI args ──────────────────────────────────────────────────────────────────
 
@@ -161,6 +210,16 @@ async function main() {
 
       if (enrichResult.source === 'none' || !enrichResult.title) {
         console.log(`  [${processed}] – ${isbn13}: no enrichment data`)
+        notFound++
+        checkpoint.add(isbn13)
+        saveCheckpoint(checkpoint)
+        await new Promise(r => setTimeout(r, RATE_MS))
+        continue
+      }
+
+      // ── Genre filter — skip non-comic content ──────────────────────────────
+      if (!isLikelyComic(enrichResult)) {
+        console.log(`  [${processed}] ✗ ${isbn13}: not a comic — "${enrichResult.title}" (publisher: ${enrichResult.publisher ?? 'unknown'})`)
         notFound++
         checkpoint.add(isbn13)
         saveCheckpoint(checkpoint)

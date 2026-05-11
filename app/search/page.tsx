@@ -110,6 +110,8 @@ interface ComicResult {
   authors?: string[]
   isbn13?: string
   isbn10?: string
+  /** Present for canonical (DB) results — routes to /product/[slug] */
+  canonicalSlug?: string
   // Unified mode — inline offers
   offers?: Array<{
     listingId: string; retailerName: string; retailerUrl: string
@@ -492,6 +494,7 @@ function SearchResults() {
             (r: {
               id: string; title: string; publisher: string | null; format: string
               releaseDate: string | null; coverImageUrl: string | null; isbn13: string | null
+              canonicalSlug: string
               offers: Array<{ listingId: string; retailerName: string; retailerUrl: string; priceAmount: number; currency: string; stockStatus: string; condition: string }>
             }) => ({
               id:             r.id,
@@ -502,6 +505,7 @@ function SearchResults() {
               source:         'canonical',
               type:           r.format === 'SINGLE_ISSUE' ? 'issue' : 'volume',
               isbn13:         r.isbn13 ?? undefined,
+              canonicalSlug:  r.canonicalSlug,
               offers:         r.offers,
             })
           )
@@ -815,11 +819,19 @@ function SearchResults() {
                     role="link"
                     tabIndex={0}
                     aria-label={`View details for ${comic.name}`}
-                    onClick={() => router.push(`/comic/${comic.id}?region=${region}`)}
+                    onClick={() => router.push(
+                      comic.canonicalSlug
+                        ? `/product/${comic.canonicalSlug}`
+                        : `/comic/${comic.id}?region=${region}`
+                    )}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault()
-                        router.push(`/comic/${comic.id}?region=${region}`)
+                        router.push(
+                          comic.canonicalSlug
+                            ? `/product/${comic.canonicalSlug}`
+                            : `/comic/${comic.id}?region=${region}`
+                        )
                       }
                     }}
                     style={{
