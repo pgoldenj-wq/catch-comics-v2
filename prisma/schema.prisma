@@ -210,6 +210,7 @@ model RetailerListing {
   canonicalProduct CanonicalProduct? @relation(fields: [canonicalProductId], references: [id], onDelete: SetNull)
   retailer         Retailer          @relation(fields: [retailerId], references: [id], onDelete: Restrict)
   priceHistory     PriceHistory[]
+  clickEvents      ClickEvent[]
 
   @@unique([retailerId, retailerSku])
   @@index([canonicalProductId])
@@ -256,4 +257,25 @@ model PriceHistory {
 
   @@index([retailerListingId, recordedAt])
   @@map("price_history")
+}
+
+// ── click_events ──────────────────────────────────────────────────────────────
+// Append-only log of every /go/{listing_id} redirect. Used for analytics,
+// affiliate reporting, and detecting broken listings. Never update or delete.
+
+model ClickEvent {
+  id          String   @id @default(uuid()) @db.Uuid
+  listingId   String   @map("listing_id") @db.Uuid
+  /// Anonymous session token from __cc_session cookie (set by /go on first visit).
+  userSession String?  @map("user_session") @db.Text
+  /// Referer header value — may be null for direct traffic.
+  referrer    String?  @db.Text
+  userAgent   String?  @map("user_agent") @db.Text
+  clickedAt   DateTime @default(now()) @map("clicked_at")
+
+  listing RetailerListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId])
+  @@index([clickedAt])
+  @@map("click_events")
 }
