@@ -23,14 +23,19 @@
  *   a future iteration should batch findMany + createMany/updateMany.
  */
 
-import { prisma }                                   from '@/lib/prisma'
-import { inferFormat, enrichByIsbn, applyEnrichment } from '@/lib/enrichment/isbn'
+import { prisma }          from '@/lib/prisma'
 import {
   ListingCondition,
   MatchMethod,
   Prisma,
   StockStatus,
 } from '@prisma/client'
+import {
+  extractIdentifiers,
+  matchCanonical,
+  type SyncResult,
+  type SyncError,
+} from '@/lib/adapters/shared/matching'
 
 // ── Shopify API shapes ────────────────────────────────────────────────────────
 
@@ -98,23 +103,8 @@ export interface NormalizedListing {
   matchConfidence: number
 }
 
-export interface SyncResult {
-  retailerId: string
-  domain: string
-  pagesFetched: number
-  productsFetched: number
-  listingsCreated: number
-  listingsUpdated: number
-  priceChanges: number
-  errors: SyncError[]
-  durationMs: number
-}
-
-export interface SyncError {
-  type: 'fetch' | 'normalize' | 'upsert' | 'db'
-  message: string
-  context?: string
-}
+// Re-export shared types so existing importers (dispatch.ts etc.) keep working
+export type { SyncResult, SyncError }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -161,28 +151,7 @@ async function fetchWithRetry(
   throw new Error('fetchWithRetry: should not reach here')
 }
 
-// ── Barcode / identifier extraction ──────────────────────────────────────────
-
-/**
- * Parse a Shopify barcode string into ISBN-13 or EAN.
- *
- * Rules:
- *   13 digits, prefix 978/979 → ISBN-13
- *   13 digits, any other prefix → EAN
- *   Anything else              → null for both
- */
-function extractIdentifiers(barcode: string | null | undefined): {
-  isbn13: string | null
-  ean: string | null
-} {
-  if (!barcode) return { isbn13: null, ean: null }
-  const digits = barcode.replace(/\D/g, '')
-  if (digits.length !== 13) return { isbn13: null, ean: null }
-  if (digits.startsWith('978') || digits.startsWith('979')) {
-    return { isbn13: digits, ean: null }
-  }
-  return { isbn13: null, ean: digits }
-}
+// extractIdentifiers / makeCanonicalSlug / matchCanonical imported from shared/matching.ts
 
 // ── Condition mapping ─────────────────────────────────────────────────────────
 
@@ -311,143 +280,7 @@ function expandProduct(
   return [normalizeVariant(product, primary, domain, currency, null)]
 }
 
-// ── Canonical matching ────────────────────────────────────────────────────────
-
-/**
- * Convert a product title + ISBN into a URL-safe canonical slug.
- *
- * Algorithm:
- *   1. Lowercase the title
- *   2. Replace non-alphanumeric characters with hyphens
- *   3. Collapse consecutive hyphens; strip leading/trailing hyphens
- *   4. Append the last 6 digits of the ISBN for global uniqueness
- *      (two different editions with similar titles won't collide)
- *
- * Example:
- *   "Absolute Batman Vol. 1: The Zoo", "9781779527226"
- *   → "absolute-batman-vol-1-the-zoo-527226"
- */
-function makeCanonicalSlug(title: string, isbn13: string): string {
-  const base = title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')   // non-alphanumeric → hyphen
-    .replace(/-{2,}/g, '-')         // collapse runs of hyphens
-    .replace(/^-|-$/g, '')          // strip leading/trailing hyphens
-  return `${base}-${isbn13.slice(-6)}`
-}
-
-async function matchCanonical(
-  isbn13: string | null,
-  ean:    string | null,
-  title:  string,
-): Promise<Pick<NormalizedListing, 'canonicalProductId' | 'matchMethod' | 'matchConfidence'>> {
-  if (isbn13) {
-    // ── 1. Look up existing canonical product by ISBN ──────────────────────
-    const existing = await prisma.canonicalProduct.findFirst({
-      where:  { isbn13 },
-      select: { id: true },
-    })
-    if (existing) {
-      return { canonicalProductId: existing.id, matchMethod: MatchMethod.ISBN, matchConfidence: 95 }
-    }
-
-    // ── 2. No existing match — create a stub canonical product ─────────────
-    // matchConfidence is 80 (not 95) to signal this was auto-created from a
-    // retailer listing title, not confirmed against a bibliographic source.
-    // Enrichment (enrich:isbn CLI) fills description/cover/publisher later.
-    const format = inferFormat(title) ?? 'OTHER'
-    const slug   = makeCanonicalSlug(title, isbn13)
-
-    try {
-      const created = await prisma.canonicalProduct.create({
-        data: {
-          isbn13,
-          title,
-          format,
-          canonicalSlug: slug,
-          // All bibliographic fields left null — enrichment fills them later
-          isbn10:        null,
-          ean:           null,
-          comicvineId:   null,
-          subtitle:      null,
-          publisher:     null,
-          seriesName:    null,
-          volumeNumber:  null,
-          issueNumber:   null,
-          releaseDate:   null,
-          coverImageUrl: null,
-          description:   null,
-        },
-        select: { id: true },
-      })
-      console.log(`[shopify] created canonical product "${title}" (${isbn13}) → ${created.id}`)
-
-      // ── Inline enrichment — fill sparse fields immediately ──────────────
-      // Calls Google Books → Open Library and writes only null fields.
-      // Wrapped in try/catch so a network or API failure never aborts the sync.
-      // If this fails, the stub survives and `npm run enrich:isbn -- --batch`
-      // will retry it on the next run (enrichPendingProducts picks up any
-      // canonical product with isbn13 where description or coverImageUrl is null).
-      try {
-        const enrichResult = await enrichByIsbn(isbn13)
-        if (enrichResult.source !== 'none') {
-          const applied = await applyEnrichment(created.id, enrichResult)
-          console.log(
-            `[shopify] enriched stub ${isbn13} via ${enrichResult.source}` +
-            ` — fields written: ${applied ? 'yes' : 'none (already complete)'}`,
-          )
-        } else {
-          console.log(
-            `[shopify] no enrichment data found for ${isbn13} — stub left sparse, bulk job can retry`,
-          )
-        }
-      } catch (enrichErr) {
-        // Non-fatal — the canonical product exists and is matched; the listing
-        // will be stored correctly. Bulk enrichment will fill the gaps later.
-        console.warn(
-          `[shopify] enrichment failed for ${isbn13} — stub kept sparse, bulk job can retry:`,
-          enrichErr instanceof Error ? enrichErr.message : enrichErr,
-        )
-      }
-
-      return { canonicalProductId: created.id, matchMethod: MatchMethod.ISBN, matchConfidence: 80 }
-    } catch (err) {
-      // Unique-constraint violation: another concurrent sync created this ISBN
-      // between our findFirst and our create. Fetch the winner and use its id.
-      // We do NOT re-enrich here — the winning create already enriched it above.
-      const isUniqueViolation =
-        err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002'
-
-      if (isUniqueViolation) {
-        const race = await prisma.canonicalProduct.findFirst({
-          where:  { isbn13 },
-          select: { id: true },
-        })
-        if (race) {
-          return { canonicalProductId: race.id, matchMethod: MatchMethod.ISBN, matchConfidence: 80 }
-        }
-      }
-      // Any other error: re-throw so the caller's catch block logs it and
-      // marks this listing UNMATCHED rather than crashing the whole sync.
-      throw err
-    }
-  }
-
-  // ── EAN-only match (lookup only — no auto-creation) ─────────────────────
-  // EAN alone is insufficient to reliably identify a comic book: many EANs
-  // appear on packaging inserts, box sets, and non-book items.
-  if (ean) {
-    const hit = await prisma.canonicalProduct.findFirst({
-      where:  { ean },
-      select: { id: true },
-    })
-    if (hit) {
-      return { canonicalProductId: hit.id, matchMethod: MatchMethod.EAN, matchConfidence: 90 }
-    }
-  }
-
-  return { canonicalProductId: null, matchMethod: MatchMethod.UNMATCHED, matchConfidence: 0 }
-}
+// matchCanonical from shared/matching.ts — called below with adapterTag '[shopify]'
 
 // ── DB upsert ─────────────────────────────────────────────────────────────────
 
@@ -736,7 +569,7 @@ export class ShopifyAdapter {
         for (const pre of preListings) {
           let matchData: Pick<NormalizedListing, 'canonicalProductId' | 'matchMethod' | 'matchConfidence'>
           try {
-            matchData = await matchCanonical(pre.isbn13, pre.ean, pre.title)
+            matchData = await matchCanonical(pre.isbn13, pre.ean, pre.title, '[shopify]')
           } catch (err) {
             // DB look-up failed — treat as unmatched, don't skip the listing
             errors.push({

@@ -9,9 +9,11 @@
  * This function only calls the adapter — it does not touch SyncLog directly.
  */
 
-import { prisma }         from '@/lib/prisma'
-import { ShopifyAdapter } from '@/lib/adapters/shopify'
-import type { SyncResult } from '@/lib/adapters/shopify'
+import { prisma }              from '@/lib/prisma'
+import { ShopifyAdapter }      from '@/lib/adapters/shopify'
+import { BigCommerceAdapter }  from '@/lib/adapters/bigcommerce'
+import { WooCommerceAdapter }  from '@/lib/adapters/woocommerce'
+import type { SyncResult }     from '@/lib/adapters/shared/matching'
 
 // Platforms we skip in the scheduled cron (eBay is queried live; MANUAL is hand-entry).
 export const SKIP_PLATFORMS = new Set(['EBAY', 'MANUAL'])
@@ -39,17 +41,15 @@ export async function dispatchSync(retailerId: string): Promise<SyncResult> {
       return adapter.syncRetailer(retailerId)
     }
 
-    case 'BIGCOMMERCE':
-      throw new Error(
-        `BigCommerce adapter not yet implemented for ${retailer.domain}. ` +
-        `Add lib/adapters/bigcommerce.ts and register it here.`,
-      )
+    case 'BIGCOMMERCE': {
+      const adapter = new BigCommerceAdapter()
+      return adapter.syncRetailer(retailerId)
+    }
 
-    case 'WOOCOMMERCE':
-      throw new Error(
-        `WooCommerce adapter not yet implemented for ${retailer.domain}. ` +
-        `Add lib/adapters/woocommerce.ts and register it here.`,
-      )
+    case 'WOOCOMMERCE': {
+      const adapter = new WooCommerceAdapter()
+      return adapter.syncRetailer(retailerId)
+    }
 
     case 'AWIN_FEED':
     case 'CJ_FEED':
