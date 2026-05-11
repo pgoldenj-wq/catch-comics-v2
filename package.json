@@ -12,7 +12,8 @@
     "db:migrate:dev": "dotenv -e .env.local -- prisma migrate dev",
     "db:migrate:deploy": "dotenv -e .env.local -- prisma migrate deploy",
     "db:studio": "dotenv -e .env.local -- prisma studio",
-    "db:push": "dotenv -e .env.local -- prisma db push"
+    "db:push": "dotenv -e .env.local -- prisma db push",
+    "test:shopify": "dotenv -e .env.local -- tsx scripts/test-shopify-adapter.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
@@ -31,6 +32,7 @@
     "eslint-config-next": "16.2.4",
     "prisma": "^5.22.0",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }
