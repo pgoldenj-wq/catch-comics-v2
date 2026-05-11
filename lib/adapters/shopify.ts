@@ -23,8 +23,8 @@
  *   a future iteration should batch findMany + createMany/updateMany.
  */
 
-import { prisma }      from '@/lib/prisma'
-import { inferFormat } from '@/lib/enrichment/isbn'
+import { prisma }                                   from '@/lib/prisma'
+import { inferFormat, enrichByIsbn, applyEnrichment } from '@/lib/enrichment/isbn'
 import {
   ListingCondition,
   MatchMethod,
@@ -381,10 +381,40 @@ async function matchCanonical(
         select: { id: true },
       })
       console.log(`[shopify] created canonical product "${title}" (${isbn13}) → ${created.id}`)
+
+      // ── Inline enrichment — fill sparse fields immediately ──────────────
+      // Calls Google Books → Open Library and writes only null fields.
+      // Wrapped in try/catch so a network or API failure never aborts the sync.
+      // If this fails, the stub survives and `npm run enrich:isbn -- --batch`
+      // will retry it on the next run (enrichPendingProducts picks up any
+      // canonical product with isbn13 where description or coverImageUrl is null).
+      try {
+        const enrichResult = await enrichByIsbn(isbn13)
+        if (enrichResult.source !== 'none') {
+          const applied = await applyEnrichment(created.id, enrichResult)
+          console.log(
+            `[shopify] enriched stub ${isbn13} via ${enrichResult.source}` +
+            ` — fields written: ${applied ? 'yes' : 'none (already complete)'}`,
+          )
+        } else {
+          console.log(
+            `[shopify] no enrichment data found for ${isbn13} — stub left sparse, bulk job can retry`,
+          )
+        }
+      } catch (enrichErr) {
+        // Non-fatal — the canonical product exists and is matched; the listing
+        // will be stored correctly. Bulk enrichment will fill the gaps later.
+        console.warn(
+          `[shopify] enrichment failed for ${isbn13} — stub kept sparse, bulk job can retry:`,
+          enrichErr instanceof Error ? enrichErr.message : enrichErr,
+        )
+      }
+
       return { canonicalProductId: created.id, matchMethod: MatchMethod.ISBN, matchConfidence: 80 }
     } catch (err) {
       // Unique-constraint violation: another concurrent sync created this ISBN
       // between our findFirst and our create. Fetch the winner and use its id.
+      // We do NOT re-enrich here — the winning create already enriched it above.
       const isUniqueViolation =
         err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002'
 
