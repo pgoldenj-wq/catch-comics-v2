@@ -437,6 +437,14 @@ export class ShopifyAdapter {
       headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
     })
 
+    if (res.status === 403) {
+      throw new Error(
+        `HTTP 403 — ${domain} has blocked the public /products.json endpoint.\n` +
+        `This is a deliberate store setting, not a transient error.\n` +
+        `Options: (1) use their official partner/wholesale API, ` +
+        `(2) request access, or (3) remove this retailer from Shopify sync.`,
+      )
+    }
     if (!res.ok) {
       throw new Error(`HTTP ${res.status} fetching ${url}`)
     }
@@ -507,6 +515,8 @@ export class ShopifyAdapter {
       }
 
       // ── Handle error status codes ───────────────────────────────────────────
+
+      // 404 — endpoint removed; mark retailer inactive
       if (res.status === 404) {
         console.warn(`[shopify] 404 on ${domain} — marking retailer inactive`)
         await prisma.retailer.update({
@@ -515,12 +525,37 @@ export class ShopifyAdapter {
             isActive:  false,
             syncConfig: {
               ...syncCfg,
-              disabled_reason: 'products.json returned 404',
+              disabled_reason: 'products.json returned 404 — endpoint removed',
               disabled_at:     new Date().toISOString(),
             } satisfies ShopifySyncConfig as unknown as Prisma.InputJsonValue,
           },
         })
         errors.push({ type: 'fetch', message: '404 — retailer marked inactive', context: url })
+        break paginationLoop
+      }
+
+      // 403 — store has deliberately disabled the public catalog endpoint.
+      // This is a permanent configuration choice, not a transient error.
+      // We do NOT mark is_active=false (the store may still be reachable via
+      // another method in future), but we record it in sync_config so operators
+      // know why syncs are failing.
+      if (res.status === 403) {
+        console.warn(`[shopify] 403 on ${domain} — /products.json is blocked`)
+        await prisma.retailer.update({
+          where: { id: retailerId },
+          data: {
+            syncConfig: {
+              ...syncCfg,
+              disabled_reason: 'products.json returned 403 — store has blocked the public catalog endpoint',
+              disabled_at:     new Date().toISOString(),
+            } satisfies ShopifySyncConfig as unknown as Prisma.InputJsonValue,
+          },
+        })
+        errors.push({
+          type:    'fetch',
+          message: '403 — /products.json is blocked by this store; sync_config updated',
+          context: url,
+        })
         break paginationLoop
       }
 
