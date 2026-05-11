@@ -1,0 +1,308 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Catch Comics — Prisma Schema
+// Multi-retailer comic price comparison engine
+//
+// Tables:
+//   canonical_products   — deduplicated "real world" product records
+//   retailers            — each store/source we pull pricing from
+//   retailer_listings    — a specific product at a specific retailer
+//   price_history        — append-only price change log
+//
+// Migrations: prisma/migrations/
+// After editing this file, run: npm run db:migrate:dev
+// After deploy, run:            npm run db:migrate:deploy
+// ─────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Enums ─────────────────────────────────────────────────────────────────────
+
+enum ProductFormat {
+  SINGLE_ISSUE
+  TPB           // Trade Paperback / collected softcover
+  HARDCOVER
+  OMNIBUS
+  DELUXE
+  COMPENDIUM
+  MANGA_VOLUME
+  ABSOLUTE      // DC Absolute / prestige oversized
+  OTHER
+}
+
+enum RetailerPlatform {
+  EBAY
+  SHOPIFY
+  BIGCOMMERCE
+  WOOCOMMERCE
+  AWIN_FEED        // Awin affiliate product feed
+  CJ_FEED          // Commission Junction feed
+  DIRECT_AFFILIATE // Retailer runs their own affiliate programme (no network intermediary)
+  MANUAL           // Hand-entered records
+}
+
+enum ListingCondition {
+  NEW
+  LIKE_NEW
+  VERY_GOOD
+  GOOD
+  ACCEPTABLE
+  POOR
+  UNGRADED     // Marketplace listing with no condition stated
+  GRADED       // Slabbed/professionally graded (see condition_detail)
+}
+
+enum StockStatus {
+  IN_STOCK
+  LOW_STOCK
+  OUT_OF_STOCK
+  PREORDER
+  UNKNOWN
+}
+
+enum MatchMethod {
+  ISBN         // Matched via ISBN-13 exact lookup
+  EAN          // Matched via EAN/barcode
+  COMICVINE_ID // Matched via Comic Vine volume/issue id
+  FUZZY_TITLE  // Matched via normalised title similarity
+  MANUAL       // Human-reviewed and confirmed
+  UNMATCHED    // Not yet matched to a canonical product
+}
+
+// ── canonical_products ────────────────────────────────────────────────────────
+// One row per real-world product. Multiple retailer listings map here.
+// isbn_13 has a partial unique index (WHERE isbn_13 IS NOT NULL) so rows
+// without an ISBN don't conflict — see migration SQL.
+
+model CanonicalProduct {
+  id             String        @id @default(uuid()) @db.Uuid
+  /// ISBN-13 (no hyphens). Partial unique: unique only when not null.
+  isbn13         String?       @map("isbn_13") @db.VarChar(13)
+  /// ISBN-10 (legacy). Not enforced unique — some ISBNs share a 10-digit form.
+  isbn10         String?       @map("isbn_10") @db.VarChar(10)
+  /// EAN / GTIN-13 barcode.
+  ean            String?       @db.VarChar(13)
+  /// Comic Vine volume or issue ID (numeric string, e.g. "796").
+  comicvineId    String?       @map("comicvine_id")
+  title          String        @db.Text
+  subtitle       String?       @db.Text
+  publisher      String?       @db.Text
+  format         ProductFormat
+  /// Parent series name, e.g. "Absolute Batman" for issue #1.
+  seriesName     String?       @map("series_name") @db.Text
+  /// Volume number within a series (integer).
+  volumeNumber   Int?          @map("volume_number")
+  /// Issue identifier — text so it handles "1", "1A", "Annual 1", etc.
+  issueNumber    String?       @map("issue_number") @db.Text
+  releaseDate    DateTime?     @map("release_date") @db.Date
+  coverImageUrl  String?       @map("cover_image_url") @db.Text
+  description    String?       @db.Text
+  /// URL-safe slug, e.g. "absolute-batman-vol-1-the-zoo". Must be globally unique.
+  canonicalSlug  String        @unique @map("canonical_slug") @db.Text
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  listings RetailerListing[]
+
+  @@index([isbn13])
+  @@index([isbn10])
+  @@index([ean])
+  @@index([comicvineId])
+  @@index([publisher])
+  @@index([seriesName])
+  @@map("canonical_products")
+}
+
+// ── retailers ─────────────────────────────────────────────────────────────────
+// Each store, affiliate feed, or data source. One row per (platform × country)
+// combination — e.g. eBay UK and eBay US are separate retailers.
+
+model Retailer {
+  id               String           @id @default(uuid()) @db.Uuid
+  name             String           @db.Text
+  /// Bare domain, e.g. "ebay.co.uk", "forbiddenplanet.com". Unique across all retailers.
+  domain           String           @unique @db.Text
+  platform         RetailerPlatform
+  /// ISO 3166-1 alpha-2, e.g. "GB", "US".
+  countryCode      String           @map("country_code") @db.Char(2)
+  /// ISO 4217, e.g. "GBP", "USD".
+  currency         String           @db.Char(3)
+  isActive         Boolean          @default(true) @map("is_active")
+  /// 0–100. Higher = more trusted price data (fewer scam listings, etc.).
+  trustScore       Int              @default(50) @map("trust_score") @db.SmallInt
+  affiliateNetwork String?          @map("affiliate_network") @db.Text
+  affiliateId      String?          @map("affiliate_id") @db.Text
+  lastSyncedAt     DateTime?        @map("last_synced_at")
+  /// Platform-specific sync configuration (API keys, feed URL, category filters, etc.).
+  syncConfig       Json             @default("{}") @map("sync_config")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  listings RetailerListing[]
+  syncLogs SyncLog[]
+
+  @@map("retailers")
+}
+
+// ── sync_logs ─────────────────────────────────────────────────────────────────
+// Append-only log of every sync run. Created by the sync API route before
+// calling the adapter; updated once the adapter returns.
+
+model SyncLog {
+  id              String    @id @default(uuid()) @db.Uuid
+  retailerId      String    @map("retailer_id") @db.Uuid
+  startedAt       DateTime  @default(now()) @map("started_at")
+  finishedAt      DateTime? @map("finished_at")
+  /// "running" | "success" | "error"
+  status          String    @default("running") @db.VarChar(16)
+  productsFetched Int       @default(0) @map("products_fetched")
+  listingsCreated Int       @default(0) @map("listings_created")
+  listingsUpdated Int       @default(0) @map("listings_updated")
+  priceChanges    Int       @default(0) @map("price_changes")
+  errorCount      Int       @default(0) @map("error_count")
+  /// Human-readable summary of any errors, truncated to fit in the admin table.
+  errorSummary    String?   @map("error_summary") @db.Text
+
+  retailer Retailer @relation(fields: [retailerId], references: [id], onDelete: Cascade)
+
+  @@index([retailerId, startedAt(sort: Desc)])
+  @@map("sync_logs")
+}
+
+// ── retailer_listings ─────────────────────────────────────────────────────────
+// One row per product per retailer. canonical_product_id is nullable because
+// newly ingested listings are unmatched until the matching pipeline runs.
+// (retailer_id, retailer_sku) is unique — the retailer's own identifier.
+
+model RetailerListing {
+  id                 String           @id @default(uuid()) @db.Uuid
+  /// Null until matched to a canonical product.
+  canonicalProductId String?          @map("canonical_product_id") @db.Uuid
+  retailerId         String           @map("retailer_id") @db.Uuid
+  /// Retailer's own product/listing identifier (eBay itemId, Shopify product id, etc.).
+  retailerSku        String           @map("retailer_sku") @db.Text
+  retailerUrl        String           @map("retailer_url") @db.Text
+  /// Original title as returned by the retailer — not normalised.
+  title              String           @db.Text
+  priceAmount        Decimal          @map("price_amount") @db.Decimal(10, 2)
+  priceCurrency      String           @map("price_currency") @db.Char(3)
+  shippingAmount     Decimal?         @map("shipping_amount") @db.Decimal(10, 2)
+  condition          ListingCondition
+  /// Free-text detail for graded items, e.g. "CGC 9.8", "PGX 8.5".
+  conditionDetail    String?          @map("condition_detail") @db.Text
+  stockStatus        StockStatus      @default(UNKNOWN) @map("stock_status")
+  imageUrl           String?          @map("image_url") @db.Text
+  /// Full raw API/feed response — preserved for debugging and re-processing.
+  rawData            Json             @default("{}") @map("raw_data")
+  /// 0–100. Confidence in the canonical product match.
+  matchConfidence    Int              @default(0) @map("match_confidence") @db.SmallInt
+  matchMethod        MatchMethod      @default(UNMATCHED) @map("match_method")
+  firstSeenAt        DateTime         @default(now()) @map("first_seen_at")
+  lastSeenAt         DateTime         @default(now()) @map("last_seen_at")
+  lastPriceChangeAt  DateTime?        @map("last_price_change_at")
+  /// Set by the cleanup job when a listing has not been seen for 30 days.
+  /// Never hard-deleted — soft-delete preserves price history integrity.
+  deletedAt          DateTime?        @map("deleted_at")
+
+  canonicalProduct CanonicalProduct? @relation(fields: [canonicalProductId], references: [id], onDelete: SetNull)
+  retailer         Retailer          @relation(fields: [retailerId], references: [id], onDelete: Restrict)
+  priceHistory     PriceHistory[]
+  clickEvents      ClickEvent[]
+
+  @@unique([retailerId, retailerSku])
+  @@index([canonicalProductId])
+  @@index([retailerId])
+  @@index([deletedAt])
+  @@map("retailer_listings")
+}
+
+// ── metadata_cache ────────────────────────────────────────────────────────────
+// Caches raw API responses from enrichment sources (Google Books, Open Library)
+// keyed by (source, isbn_13). TTL is 30 days — checked at read time via
+// expires_at. Storing a { result: null } payload means "API was called and
+// returned no data" — distinguishes a cache hit (no data) from a cache miss.
+
+model MetadataCache {
+  id        String   @id @default(uuid()) @db.Uuid
+  /// "google_books" | "open_library"
+  source    String   @db.Text
+  isbn13    String   @map("isbn_13") @db.VarChar(13)
+  fetchedAt DateTime @map("fetched_at")
+  expiresAt DateTime @map("expires_at")
+  /// Wrapped as { result: <API response> | null } so a "no results" response
+  /// can be cached without needing a nullable column.
+  data      Json     @map("data")
+
+  @@unique([source, isbn13])
+  @@index([isbn13])
+  @@index([expiresAt])
+  @@map("metadata_cache")
+}
+
+// ── price_history ─────────────────────────────────────────────────────────────
+// Append-only log. Never UPDATE or DELETE rows — insert a new row each time
+// a listing's price or stock status changes. Enables trend charts, deal alerts.
+
+model PriceHistory {
+  id               String      @id @default(uuid()) @db.Uuid
+  retailerListingId String     @map("retailer_listing_id") @db.Uuid
+  priceAmount      Decimal     @map("price_amount") @db.Decimal(10, 2)
+  priceCurrency    String      @map("price_currency") @db.Char(3)
+  stockStatus      StockStatus @map("stock_status")
+  recordedAt       DateTime    @default(now()) @map("recorded_at")
+
+  retailerListing RetailerListing @relation(fields: [retailerListingId], references: [id], onDelete: Cascade)
+
+  @@index([retailerListingId, recordedAt])
+  @@map("price_history")
+}
+
+// ── job_runs ──────────────────────────────────────────────────────────────────
+// Append-only log of every Inngest job run (non-sync jobs — syncs use sync_logs).
+// Written at the start of each job and updated on completion or failure.
+
+model JobRun {
+  id             String    @id @default(uuid()) @db.Uuid
+  /// e.g. "enrich.canonical_products", "cleanup.stale_listings"
+  jobName        String    @map("job_name") @db.VarChar(100)
+  /// Inngest run ID for deep-link to Inngest dashboard.
+  inngestRunId   String?   @map("inngest_run_id") @db.Text
+  /// "running" | "success" | "error"
+  status         String    @default("running") @db.VarChar(16)
+  startedAt      DateTime  @default(now()) @map("started_at")
+  finishedAt     DateTime? @map("finished_at")
+  itemsProcessed Int       @default(0) @map("items_processed")
+  errorSummary   String?   @map("error_summary") @db.Text
+  /// Extra per-job stats as JSON (e.g. { enriched: 42, notFound: 8 }).
+  metadata       Json      @default("{}") @map("metadata")
+
+  @@index([jobName, startedAt(sort: Desc)])
+  @@map("job_runs")
+}
+
+// ── click_events ──────────────────────────────────────────────────────────────
+// Append-only log of every /go/{listing_id} redirect. Used for analytics,
+// affiliate reporting, and detecting broken listings. Never update or delete.
+
+model ClickEvent {
+  id          String   @id @default(uuid()) @db.Uuid
+  listingId   String   @map("listing_id") @db.Uuid
+  /// Anonymous session token from __cc_session cookie (set by /go on first visit).
+  userSession String?  @map("user_session") @db.Text
+  /// Referer header value — may be null for direct traffic.
+  referrer    String?  @db.Text
+  userAgent   String?  @map("user_agent") @db.Text
+  clickedAt   DateTime @default(now()) @map("clicked_at")
+
+  listing RetailerListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId])
+  @@index([clickedAt])
+  @@map("click_events")
+}

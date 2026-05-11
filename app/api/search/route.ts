@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { searchCache, volumeCache } from '@/lib/cache'
 import { parseComicQuery, titleMatchScore } from '@/lib/parseComicQuery'
 import { isAmbiguousComicTitle } from '@/lib/comicDisambiguation'
+import { unifiedSearch } from '@/lib/search'
 
 // ── Image helpers ─────────────────────────────────────────────────────────────
 
@@ -273,9 +274,34 @@ async function enrichIssuePublishers(
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const query        = searchParams.get('q')
+  const region       = (searchParams.get('region') ?? 'uk') as 'uk' | 'us'
 
   if (!query) {
     return NextResponse.json({ error: 'No search query provided' }, { status: 400 })
+  }
+
+  // ── Unified search mode ───────────────────────────────────────────────────
+  // SEARCH_MODE is read at request time so it can be toggled without a redeploy.
+  // 'unified' (default) → DB + eBay combined results
+  // 'ebay_only'         → legacy Comic Vine flow
+  const searchMode = process.env.SEARCH_MODE ?? 'unified'
+
+  if (searchMode === 'unified') {
+    try {
+      const result = await unifiedSearch({
+        q:        query,
+        region,
+        priceMax:    searchParams.get('priceMax')    ? parseFloat(searchParams.get('priceMax')!) : undefined,
+        condition:   searchParams.get('condition')   ?? undefined,
+        retailerIds: searchParams.get('retailerIds') ? searchParams.get('retailerIds')!.split(',') : undefined,
+        page:     parseInt(searchParams.get('page')     ?? '1',  10),
+        pageSize: parseInt(searchParams.get('pageSize') ?? '20', 10),
+      })
+      return NextResponse.json(result)
+    } catch (err) {
+      console.error('[/api/search] unified search error:', err)
+      // Fall through to legacy on error — keeps the site working if there's a DB issue
+    }
   }
 
   // ── Search cache ──────────────────────────────────────────────────────────

@@ -6,22 +6,39 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "postinstall": "prisma generate",
     "lint": "eslint",
-    "check": "tsc --noEmit && echo '✓ Types clean'"
+    "check": "tsc --noEmit && echo '✓ Types clean'",
+    "db:generate": "dotenv -e .env.local -- prisma generate",
+    "db:migrate:dev": "dotenv -e .env.local -- prisma migrate dev",
+    "db:migrate:deploy": "dotenv -e .env.local -- prisma migrate deploy",
+    "db:studio": "dotenv -e .env.local -- prisma studio",
+    "db:push": "dotenv -e .env.local -- prisma db push",
+    "test:shopify": "dotenv -e .env.local -- tsx scripts/test-shopify-adapter.ts",
+    "enrich:isbn": "dotenv -e .env.local -- tsx scripts/enrich-isbn.ts",
+    "test:unified-search": "dotenv -e .env.local -- tsx scripts/test-unified-search.ts",
+    "dev:inngest": "npx @inngest/cli@latest dev -u http://localhost:3000/api/inngest"
   },
   "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "effect": "^3.20.0",
+    "inngest": "^4.3.0",
     "next": "16.2.4",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "recharts": "^3.8.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv-cli": "^11.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
+    "prisma": "^5.22.0",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }
