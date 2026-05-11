@@ -304,7 +304,7 @@ async function* parseXmlFeed(stream: ReadableStream<Uint8Array>): AsyncGenerator
   for (const chunk of chunks) { buf.set(chunk, offset); offset += chunk.byteLength }
   const xml = Buffer.from(buf).toString('utf-8')
 
-  const parsed   = parser.parse(xml)
+  const parsed   = parser.parse(xml) as Record<string, Record<string, Record<string, unknown[]>>>
   // Awin XML feeds vary: root may be <merchant> or <feed> with nested <products><product>
   const products: unknown[] =
     parsed?.merchant?.products?.product ??
