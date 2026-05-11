@@ -218,12 +218,26 @@ function mapVariantCondition(variantTitle: string): {
   if (/\bpoor\b|\breading\s*copy\b/.test(t)) {
     return { condition: ListingCondition.POOR, conditionDetail: variantTitle }
   }
-  // Shopify's default single-variant title
+  // Shopify's default single-variant title — plain new retail stock
   if (t === '' || t === 'default title' || t === 'new') {
     return { condition: ListingCondition.NEW, conditionDetail: null }
   }
-  // Unknown variant label — store as detail for manual review
-  return { condition: ListingCondition.UNGRADED, conditionDetail: variantTitle }
+
+  // Edition / cover / format designators — common on comic Shopify stores.
+  // e.g. "Standard Cover", "DM Only", "Rafael Kayanan Cover (Regular Edition)",
+  //      "Joe Madureira Cover (DM Only)", "Foil Variant", "Deluxe Edition"
+  // These identify which version of the product is sold, NOT its physical condition.
+  // Storing them as conditionDetail would be misleading — they are not conditions.
+  if (/\bcover\b|\bedition\b|\bdm\s+only\b|\bvariant\b|\bfoil\b/.test(t)) {
+    return { condition: ListingCondition.NEW, conditionDetail: null }
+  }
+
+  // Final fallback: title didn't match any condition keyword or edition pattern.
+  // For Shopify storefronts (retail) the safe default is NEW — most unrecognised
+  // variant titles are size, colour, or format labels, not condition grades.
+  // UNGRADED is reserved for marketplace listings (e.g. eBay) where condition
+  // is genuinely unspecified by the seller.
+  return { condition: ListingCondition.NEW, conditionDetail: null }
 }
 
 // ── Variant splitting logic ───────────────────────────────────────────────────
