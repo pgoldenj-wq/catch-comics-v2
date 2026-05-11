@@ -1,0 +1,26 @@
+[
+  {
+    "name": "Forbidden Planet",
+    "domain": "forbiddenplanet.com",
+    "country": "GB",
+    "currency": "GBP"
+  },
+  {
+    "name": "Things From Another World",
+    "domain": "tfaw.com",
+    "country": "US",
+    "currency": "USD"
+  },
+  {
+    "name": "Midtown Comics",
+    "domain": "midtowncomics.com",
+    "country": "US",
+    "currency": "USD"
+  },
+  {
+    "name": "Orbital Comics",
+    "domain": "orbitalcomics.com",
+    "country": "GB",
+    "currency": "GBP"
+  }
+]

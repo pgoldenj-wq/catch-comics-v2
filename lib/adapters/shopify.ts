@@ -309,6 +309,8 @@ async function upsertListing(
         condition:         listing.condition,
         conditionDetail:   listing.conditionDetail,
         imageUrl:          listing.imageUrl,
+        // isbn13 / ean added in migration 20260511200000; prisma generate picks them up
+        ...({ isbn13: listing.isbn13, ean: listing.ean } as object),
         rawData:           listing.rawData as unknown as Prisma.InputJsonValue,
         canonicalProductId: listing.canonicalProductId,
         matchMethod:       listing.matchMethod,

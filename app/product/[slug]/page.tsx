@@ -18,6 +18,7 @@ import { Suspense }             from 'react'
 import { prisma }               from '@/lib/prisma'
 import OffersTable, { type OfferRow }    from '@/components/OffersTable'
 import PriceSparkline, { type SparkPoint } from '@/components/PriceSparkline'
+import { lookupByIsbn as lookupAmazon }  from '@/lib/adapters/amazon-rainforest'
 
 export const dynamic = 'force-dynamic'
 
@@ -158,12 +159,48 @@ export default async function ProductPage(
     product.format,
   )
 
+  // ── Amazon on-demand lookup (non-blocking, 800 ms budget) ────────────────
+  // Only attempted for canonical products with an ISBN-13.
+  // Promise.race: if Rainforest resolves within 800ms include the offer in the
+  // initial SSR render; otherwise the page renders without it (graceful skip).
+  // The TTL check inside lookupByIsbn means a DB-cached result (~1ms) almost
+  // always wins the race; a live API call may not.
+  let amazonOffer: Awaited<ReturnType<typeof lookupAmazon>> = null
+  if (product.isbn13) {
+    amazonOffer = await Promise.race([
+      lookupAmazon(product.isbn13, product.id, 'amazon.co.uk'),
+      new Promise<null>(resolve => setTimeout(() => resolve(null), 800)),
+    ])
+  }
+
   // ── Offer processing ─────────────────────────────────────────────────────
   const IN_STOCK_STATUSES = new Set(['IN_STOCK', 'LOW_STOCK', 'PREORDER'])
   const allListings       = product.listings
 
   // Best offer = cheapest in-stock listing across all conditions
   const bestListing = allListings.find(l => IN_STOCK_STATUSES.has(l.stockStatus))
+
+  // Merge Amazon offer into listings if it's not already present (fromCache=true
+  // means it was already in allListings via the DB fetch above).
+  if (amazonOffer && !amazonOffer.fromCache) {
+    const alreadyPresent = allListings.some(l => l.id === amazonOffer!.listingId)
+    if (!alreadyPresent) {
+      // Re-query to get the freshly upserted listing in the same shape
+      const freshAmazon = await prisma.retailerListing.findUnique({
+        where  : { id: amazonOffer.listingId },
+        include: {
+          retailer    : { select: { name: true, trustScore: true, affiliateNetwork: true, affiliateId: true } },
+          priceHistory: { orderBy: { recordedAt: 'asc' }, take: 90, select: { priceAmount: true, priceCurrency: true, recordedAt: true } },
+        },
+      })
+      if (freshAmazon) {
+        // Insert sorted by price (allListings is already price-sorted)
+        const insertAt = allListings.findIndex(l => Number(l.priceAmount) > Number(freshAmazon.priceAmount))
+        if (insertAt === -1) allListings.push(freshAmazon as typeof allListings[0])
+        else                 allListings.splice(insertAt, 0, freshAmazon as typeof allListings[0])
+      }
+    }
+  }
 
   // All offers for the table (in-stock first, then OOS)
   const offers: OfferRow[] = allListings.map(l => ({

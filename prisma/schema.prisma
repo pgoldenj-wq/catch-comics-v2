@@ -44,6 +44,7 @@ enum RetailerPlatform {
   AWIN_FEED        // Awin affiliate product feed
   CJ_FEED          // Commission Junction feed
   DIRECT_AFFILIATE // Retailer runs their own affiliate programme (no network intermediary)
+  EXTERNAL_API     // On-demand lookup via a paid third-party API (e.g. Rainforest for Amazon, Bookshop.org)
   MANUAL           // Hand-entered records
 }
 
@@ -206,6 +207,11 @@ model RetailerListing {
   firstSeenAt        DateTime         @default(now()) @map("first_seen_at")
   lastSeenAt         DateTime         @default(now()) @map("last_seen_at")
   lastPriceChangeAt  DateTime?        @map("last_price_change_at")
+  /// ISBN-13 extracted from the retailer's barcode/SKU (denormalised for fast querying).
+  /// Populated by adapters at upsert time; null when the retailer provided no barcode.
+  isbn13             String?          @map("isbn_13") @db.VarChar(13)
+  /// EAN-13 extracted from the retailer's barcode when not an ISBN prefix.
+  ean                String?          @db.VarChar(13)
   /// Set by the cleanup job when a listing has not been seen for 30 days.
   /// Never hard-deleted — soft-delete preserves price history integrity.
   deletedAt          DateTime?        @map("deleted_at")
@@ -218,6 +224,7 @@ model RetailerListing {
   @@unique([retailerId, retailerSku])
   @@index([canonicalProductId])
   @@index([retailerId])
+  @@index([isbn13])
   @@index([deletedAt])
   @@map("retailer_listings")
 }
@@ -284,6 +291,28 @@ model JobRun {
 
   @@index([jobName, startedAt(sort: Desc)])
   @@map("job_runs")
+}
+
+// ── api_usage_log ─────────────────────────────────────────────────────────────
+// Append-only log of every call to a paid third-party API (Rainforest, Bookshop).
+// Used for budget tracking and rate-limit auditing. Never update or delete rows.
+
+model ApiUsageLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  /// "rainforest" | "bookshop_us" | "bookshop_uk"
+  provider     String   @db.VarChar(50)
+  /// Full URL called (sanitised — no API keys)
+  endpoint     String   @db.Text
+  isbn13       String?  @map("isbn_13") @db.VarChar(13)
+  resultFound  Boolean  @map("result_found")
+  latencyMs    Int      @map("latency_ms")
+  /// Estimated cost in USD based on provider pricing at call time.
+  costEstimate Decimal? @map("cost_estimate") @db.Decimal(8, 4)
+  calledAt     DateTime @default(now()) @map("called_at")
+
+  @@index([provider, calledAt(sort: Desc)])
+  @@index([isbn13])
+  @@map("api_usage_log")
 }
 
 // ── click_events ──────────────────────────────────────────────────────────────

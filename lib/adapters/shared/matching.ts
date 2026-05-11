@@ -13,6 +13,7 @@
 import { prisma }                                     from '@/lib/prisma'
 import { inferFormat, enrichByIsbn, applyEnrichment } from '@/lib/enrichment/isbn'
 import { ListingCondition, MatchMethod, Prisma, StockStatus } from '@prisma/client'
+import { inngest }                                   from '@/lib/inngest/client'
 
 // ── Shared public types ───────────────────────────────────────────────────────
 
@@ -183,6 +184,17 @@ export async function matchCanonical(
           `${adapterTag} enrichment failed for ${isbn13} — stub kept sparse, bulk job can retry:`,
           enrichErr instanceof Error ? enrichErr.message : enrichErr,
         )
+      }
+
+      // ── Queue Bookshop.org lookup in the background ───────────────────────
+      // Non-blocking: if Inngest is not configured this fails silently.
+      try {
+        await inngest.send({
+          name: 'bookshop/lookup',
+          data: { isbn13, canonicalProductId: created.id },
+        })
+      } catch {
+        // Inngest not reachable in this context (e.g. CLI script) — ignore.
       }
 
       return { canonicalProductId: created.id, matchMethod: MatchMethod.ISBN, matchConfidence: 80 }

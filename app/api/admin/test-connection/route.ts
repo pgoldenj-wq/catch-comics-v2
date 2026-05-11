@@ -207,6 +207,60 @@ async function testAutoDetect(domain: string): Promise<NextResponse> {
   })
 }
 
+// ── Awin feed test ────────────────────────────────────────────────────────────
+
+/**
+ * Preview the first 100 rows of an Awin feed without writing to the DB.
+ * Body must include feedId and optionally apiKey (falls back to AWIN_API_KEY).
+ * Body: { domain: string; feedId: string; apiKey?: string; feedFormat?: 'xml'|'csv' }
+ */
+async function testAwinFeed(req: NextRequest): Promise<NextResponse> {
+  const body = await req.json() as {
+    domain      : string
+    feedId     ?: string
+    apiKey     ?: string
+    feedFormat ?: 'xml' | 'csv'
+  }
+
+  const feedId     = body.feedId
+  const apiKey     = body.apiKey ?? process.env.AWIN_API_KEY
+  const feedFormat = body.feedFormat ?? 'csv'
+
+  if (!feedId) {
+    return NextResponse.json({ ok: false, message: 'feedId is required for AWIN_FEED connection test' }, { status: 400 })
+  }
+  if (!apiKey) {
+    return NextResponse.json({ ok: false, message: 'No API key — set AWIN_API_KEY env var or pass apiKey in the request body' }, { status: 400 })
+  }
+
+  try {
+    const { AwinFeedAdapter } = await import('@/lib/adapters/awin-feed')
+    const adapter = new AwinFeedAdapter()
+    const preview = await adapter.previewFeed(feedId, apiKey, feedFormat, 100)
+
+    const matchRate = preview.total > 0
+      ? Math.round(((preview.withIsbn + preview.withEan) / preview.total) * 100)
+      : 0
+
+    const sample = preview.sample[0]
+    const sampleText = sample
+      ? `Sample: "${sample.product_name}" @ ${sample.currency} ${sample.search_price}`
+      : 'No products found in feed'
+
+    return NextResponse.json({
+      ok     : true,
+      message: `✓ Awin feed ${feedId} accessible — ${preview.total} rows sampled. ` +
+               `Match rate: ${matchRate}% (ISBN: ${preview.withIsbn}, EAN: ${preview.withEan}, none: ${preview.unmatched}). ` +
+               sampleText,
+    })
+  } catch (err) {
+    return NextResponse.json({
+      ok     : false,
+      message: `Awin feed test failed: ${err instanceof Error ? err.message : String(err)}`,
+    })
+  }
+}
+
 // ── Route handler ─────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
@@ -224,12 +278,16 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Platforms without automated sync get a friendly advisory message
-  if (platform && ['EBAY', 'MANUAL', 'AWIN_FEED', 'CJ_FEED', 'DIRECT_AFFILIATE'].includes(platform)) {
+  // Platforms without a live endpoint test
+  if (platform && ['EBAY', 'MANUAL', 'CJ_FEED', 'DIRECT_AFFILIATE', 'EXTERNAL_API'].includes(platform)) {
     return NextResponse.json({
       ok     : true,
       message: `No automated connection test for ${platform}. Add the retailer and verify manually.`,
     })
+  }
+
+  if (platform === 'AWIN_FEED') {
+    return testAwinFeed(req)
   }
 
   switch (platform) {

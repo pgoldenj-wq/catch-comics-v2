@@ -13,6 +13,7 @@ import { prisma }              from '@/lib/prisma'
 import { ShopifyAdapter }      from '@/lib/adapters/shopify'
 import { BigCommerceAdapter }  from '@/lib/adapters/bigcommerce'
 import { WooCommerceAdapter }  from '@/lib/adapters/woocommerce'
+import { AwinFeedAdapter }     from '@/lib/adapters/awin-feed'
 import type { SyncResult }     from '@/lib/adapters/shared/matching'
 
 // Platforms we skip in the scheduled cron (eBay is queried live; MANUAL is hand-entry).
@@ -51,7 +52,11 @@ export async function dispatchSync(retailerId: string): Promise<SyncResult> {
       return adapter.syncRetailer(retailerId)
     }
 
-    case 'AWIN_FEED':
+    case 'AWIN_FEED': {
+      const adapter = new AwinFeedAdapter()
+      return adapter.syncFeed(retailerId)
+    }
+
     case 'CJ_FEED':
     case 'DIRECT_AFFILIATE':
       throw new Error(

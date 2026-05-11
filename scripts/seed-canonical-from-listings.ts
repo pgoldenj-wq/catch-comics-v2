@@ -1,0 +1,289 @@
+#!/usr/bin/env tsx
+/**
+ * scripts/seed-canonical-from-listings.ts
+ *
+ * Backfills canonical_products for retailer_listings that have an isbn_13 but
+ * no canonical_product_id.  Orders by listing count DESC so the highest-ROI
+ * ISBNs are processed first.
+ *
+ * Usage:
+ *   npm run seed:canonical
+ *   npm run seed:canonical -- --batch-size 100
+ *   npm run seed:canonical -- --resume          (skip ISBNs in checkpoint file)
+ *   npm run seed:canonical -- --dry-run         (read-only, no DB writes)
+ *
+ * Env vars used:
+ *   DATABASE_URL          — Prisma connection string (loaded by dotenv-cli)
+ *   GOOGLE_BOOKS_API_KEY  — Optional; increases Google Books rate limit to 20/s
+ */
+
+import { prisma }               from '../lib/prisma'
+import { enrichByIsbn }         from '../lib/enrichment/isbn'
+import { inferFormat }          from '../lib/enrichment/isbn'
+import { makeCanonicalSlug }    from '../lib/adapters/shared/matching'
+import { MatchMethod }          from '@prisma/client'
+import * as fs                  from 'fs'
+import * as path                from 'path'
+
+// ── CLI args ──────────────────────────────────────────────────────────────────
+
+const args        = process.argv.slice(2)
+const DRY_RUN     = args.includes('--dry-run')
+const RESUME      = args.includes('--resume')
+const BATCH_SIZE  = (() => {
+  const idx = args.indexOf('--batch-size')
+  return idx !== -1 ? parseInt(args[idx + 1] ?? '50', 10) : 50
+})()
+const RATE_MS     = 1_000   // 1 ISBN per second (Google Books polite limit)
+
+const CHECKPOINT_PATH = path.join(__dirname, '.seed-checkpoint.json')
+
+// ── Checkpoint helpers ────────────────────────────────────────────────────────
+
+function loadCheckpoint(): Set<string> {
+  if (!RESUME || !fs.existsSync(CHECKPOINT_PATH)) return new Set()
+  try {
+    const data = JSON.parse(fs.readFileSync(CHECKPOINT_PATH, 'utf-8')) as { completed: string[] }
+    console.log(`[checkpoint] resuming — ${data.completed.length} ISBNs already processed`)
+    return new Set(data.completed)
+  } catch {
+    return new Set()
+  }
+}
+
+function saveCheckpoint(completed: Set<string>): void {
+  if (DRY_RUN) return
+  fs.writeFileSync(CHECKPOINT_PATH, JSON.stringify({ completed: [...completed] }, null, 2))
+}
+
+// ── Progress snapshot ─────────────────────────────────────────────────────────
+
+async function snapshot(): Promise<{
+  matched    : number
+  seedable   : number
+  unmatchable: number
+  total      : number
+}> {
+  // Use raw SQL so this works before AND after the isbn13 column is added
+  const rows = await prisma.$queryRaw<Array<{
+    matched: bigint; seedable: bigint; unmatchable: bigint; total: bigint
+  }>>`
+    SELECT
+      COUNT(*) FILTER (WHERE canonical_product_id IS NOT NULL)              AS matched,
+      COUNT(*) FILTER (WHERE canonical_product_id IS NULL AND isbn_13 IS NOT NULL) AS seedable,
+      COUNT(*) FILTER (WHERE canonical_product_id IS NULL AND isbn_13 IS NULL)     AS unmatchable,
+      COUNT(*)                                                               AS total
+    FROM retailer_listings
+  `
+  const r = rows[0]
+  return {
+    matched    : Number(r.matched),
+    seedable   : Number(r.seedable),
+    unmatchable: Number(r.unmatchable),
+    total      : Number(r.total),
+  }
+}
+
+function printSnapshot(label: string, s: Awaited<ReturnType<typeof snapshot>>): void {
+  console.log(`\n── ${label} ──────────────────────────────────────────`)
+  console.log(`  Matched     : ${s.matched.toLocaleString()}`)
+  console.log(`  Seedable    : ${s.seedable.toLocaleString()}  (isbn13 present, no canonical)`)
+  console.log(`  Unmatchable : ${s.unmatchable.toLocaleString()}  (no isbn13)`)
+  console.log(`  Total       : ${s.total.toLocaleString()}`)
+  console.log()
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+async function main() {
+  console.log(`\n${'═'.repeat(60)}`)
+  console.log(` Catch Comics — Canonical Product Seed`)
+  console.log(` Mode  : ${DRY_RUN ? 'DRY RUN (no writes)' : 'LIVE'}`)
+  console.log(` Batch : ${BATCH_SIZE} ISBNs, rate-limited to 1/s`)
+  console.log(` Resume: ${RESUME}`)
+  console.log(`${'═'.repeat(60)}\n`)
+
+  const before = await snapshot()
+  printSnapshot('Before', before)
+
+  // ── Find unmatched ISBNs ordered by listing count ─────────────────────────
+  const rows = await prisma.$queryRaw<Array<{ isbn13: string; listing_count: bigint }>>`
+    SELECT   isbn_13 AS isbn13, COUNT(*) AS listing_count
+    FROM     retailer_listings
+    WHERE    isbn_13 IS NOT NULL
+      AND    canonical_product_id IS NULL
+    GROUP BY isbn_13
+    ORDER BY listing_count DESC
+    LIMIT    ${BATCH_SIZE * 10}
+  `
+
+  const checkpoint = loadCheckpoint()
+
+  // Stats
+  let processed  = 0
+  let created    = 0
+  let alreadyExisted = 0
+  let linked     = 0
+  let notFound   = 0
+  let errors     = 0
+
+  const startTime = Date.now()
+
+  for (const row of rows) {
+    const isbn13 = row.isbn13
+
+    // Skip if already done in a previous run
+    if (checkpoint.has(isbn13)) {
+      continue
+    }
+
+    processed++
+
+    // ── a. Check for existing canonical ──────────────────────────────────────
+    const existing = await prisma.canonicalProduct.findFirst({
+      where : { isbn13 },
+      select: { id: true },
+    })
+
+    let canonicalId: string | null = existing?.id ?? null
+
+    if (!existing) {
+      // ── b. Enrich from Google Books / Open Library ────────────────────────
+      let enrichResult
+      try {
+        enrichResult = await enrichByIsbn(isbn13)
+      } catch (err) {
+        console.error(`  [${processed}] ✗ enrichment error for ${isbn13}:`, err)
+        errors++
+        await new Promise(r => setTimeout(r, RATE_MS))
+        continue
+      }
+
+      if (enrichResult.source === 'none' || !enrichResult.title) {
+        console.log(`  [${processed}] – ${isbn13}: no enrichment data`)
+        notFound++
+        checkpoint.add(isbn13)
+        saveCheckpoint(checkpoint)
+        await new Promise(r => setTimeout(r, RATE_MS))
+        continue
+      }
+
+      // ── c. Create canonical product ────────────────────────────────────────
+      const title  = enrichResult.title!
+      const format = enrichResult.format ?? inferFormat(title) ?? 'OTHER'
+      const slug   = makeCanonicalSlug(title, isbn13)
+
+      if (!DRY_RUN) {
+        try {
+          const product = await prisma.canonicalProduct.create({
+            data: {
+              isbn13,
+              title,
+              format,
+              canonicalSlug : slug,
+              subtitle      : enrichResult.subtitle      ?? null,
+              publisher     : enrichResult.publisher     ?? null,
+              releaseDate   : enrichResult.releaseDate   ?? null,
+              description   : enrichResult.description   ?? null,
+              coverImageUrl : enrichResult.coverImageUrl ?? null,
+              seriesName    : enrichResult.seriesName    ?? null,
+              volumeNumber  : enrichResult.volumeNumber  ?? null,
+              isbn10        : null,
+              ean           : null,
+              comicvineId   : null,
+              issueNumber   : null,
+            },
+            select: { id: true },
+          })
+          canonicalId = product.id
+          created++
+          console.log(`  [${processed}] + ${isbn13}: created "${title}" (${format})`)
+        } catch (err) {
+          // P2002 race condition — another process created it simultaneously
+          const raceRow = await prisma.canonicalProduct.findFirst({ where: { isbn13 }, select: { id: true } })
+          if (raceRow) {
+            canonicalId = raceRow.id
+            alreadyExisted++
+          } else {
+            console.error(`  [${processed}] ✗ create failed for ${isbn13}:`, err)
+            errors++
+            await new Promise(r => setTimeout(r, RATE_MS))
+            continue
+          }
+        }
+      } else {
+        console.log(`  [${processed}] ~ ${isbn13}: would create "${title}" (${format}) [dry-run]`)
+        created++
+      }
+    } else {
+      alreadyExisted++
+      console.log(`  [${processed}] = ${isbn13}: canonical already exists`)
+    }
+
+    // ── d. Link all unmatched listings for this ISBN ──────────────────────────
+    if (!DRY_RUN && canonicalId) {
+      // Raw SQL to work with the isbn_13 column regardless of Prisma client version
+      const updateResult = await prisma.$executeRaw`
+        UPDATE retailer_listings
+        SET    canonical_product_id = ${canonicalId}::uuid,
+               match_method         = 'ISBN',
+               match_confidence     = 95
+        WHERE  isbn_13              = ${isbn13}
+          AND  canonical_product_id IS NULL
+      `
+      linked += updateResult
+    } else if (DRY_RUN) {
+      const rows = await prisma.$queryRaw<[{ n: bigint }]>`
+        SELECT COUNT(*) AS n FROM retailer_listings
+        WHERE isbn_13 = ${isbn13} AND canonical_product_id IS NULL
+      `
+      linked += Number(rows[0].n)
+    }
+
+    checkpoint.add(isbn13)
+    if (processed % 10 === 0) saveCheckpoint(checkpoint)
+
+    // Rate limit
+    await new Promise(r => setTimeout(r, RATE_MS))
+  }
+
+  // Final checkpoint save
+  saveCheckpoint(checkpoint)
+
+  // ── Report ────────────────────────────────────────────────────────────────
+  const after = DRY_RUN ? before : await snapshot()
+  const elapsed = Date.now() - startTime
+
+  console.log(`\n${'═'.repeat(60)}`)
+  console.log(` Seed complete — ${(elapsed / 1000).toFixed(1)}s`)
+  console.log(`${'═'.repeat(60)}`)
+  console.log(`  ISBNs processed      : ${processed}`)
+  console.log(`  Canonical created    : ${created}`)
+  console.log(`  Already existed      : ${alreadyExisted}`)
+  console.log(`  Listings linked      : ${linked}`)
+  console.log(`  Enrichment not found : ${notFound}`)
+  console.log(`  Errors               : ${errors}`)
+
+  if (!DRY_RUN) {
+    console.log()
+    printSnapshot('After', after)
+    const delta = after.matched - before.matched
+    console.log(`  Matched delta: +${delta.toLocaleString()} listings`)
+  }
+
+  // Estimate remaining backlog
+  const remaining = after.seedable - linked
+  if (remaining > 0 && processed > 0) {
+    const ratePerHour = (processed / (elapsed / 1000)) * 3600
+    const hoursRemaining = remaining / ratePerHour
+    console.log(`\n  Remaining backlog    : ~${remaining.toLocaleString()} listings`)
+    console.log(`  Estimated time       : ~${hoursRemaining.toFixed(1)} hours at current rate`)
+    console.log(`  Tip: Run with --batch-size ${BATCH_SIZE * 4} and a GOOGLE_BOOKS_API_KEY for faster processing`)
+  }
+
+  console.log()
+}
+
+main()
+  .catch(err => { console.error('Fatal error:', err); process.exit(1) })
+  .finally(() => prisma.$disconnect())

@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma }                    from '@/lib/prisma'
 import { RetailerPlatform }          from '@prisma/client'
-import { ShopifyAdapter }            from '@/lib/adapters/shopify'
+import { inngest }                   from '@/lib/inngest/client'
 
 export async function POST(req: NextRequest) {
   const body = await req.json() as {
@@ -51,42 +51,18 @@ export async function POST(req: NextRequest) {
     },
   })
 
-  if (syncNow && platform === 'SHOPIFY') {
-    // Fire sync in background (don't await — client gets the id immediately)
-    const adapter = new ShopifyAdapter()
-    void (async () => {
-      const log = await prisma.syncLog.create({
-        data: { retailerId: retailer.id, status: 'running', startedAt: new Date() },
-      })
-      try {
-        const result = await adapter.syncRetailer(retailer.id)
-        await prisma.syncLog.update({
-          where: { id: log.id },
-          data: {
-            status:          result.errors.length > 0 ? 'error' : 'success',
-            finishedAt:      new Date(),
-            productsFetched: result.productsFetched,
-            listingsCreated: result.listingsCreated,
-            listingsUpdated: result.listingsUpdated,
-            priceChanges:    result.priceChanges,
-            errorCount:      result.errors.length,
-            errorSummary:    result.errors.length > 0
-              ? result.errors.slice(0, 3).map(e => e.message).join(' | ')
-              : null,
-          },
-        })
-      } catch (err) {
-        await prisma.syncLog.update({
-          where: { id: log.id },
-          data: {
-            status:       'error',
-            finishedAt:   new Date(),
-            errorCount:   1,
-            errorSummary: err instanceof Error ? err.message : String(err),
-          },
-        })
-      }
-    })()
+  // Platforms that support automated sync via Inngest
+  const SYNCABLE_PLATFORMS = ['SHOPIFY', 'BIGCOMMERCE', 'WOOCOMMERCE', 'AWIN_FEED']
+
+  if (syncNow && SYNCABLE_PLATFORMS.includes(platform)) {
+    // Enqueue via Inngest so the sync runs in the background with retries.
+    // Fire-and-forget — the response returns immediately with the retailer id.
+    void inngest.send({
+      name: 'sync/retailer',
+      data: { retailerId: retailer.id },
+    }).catch(err => {
+      console.error('[admin/retailers] failed to enqueue sync for', retailer.id, err)
+    })
   }
 
   return NextResponse.json({ id: retailer.id }, { status: 201 })
