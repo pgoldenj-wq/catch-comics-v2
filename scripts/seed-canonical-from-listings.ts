@@ -205,7 +205,7 @@ async function main() {
     FROM retailer_listings
     WHERE isbn_13 IS NOT NULL
       AND canonical_product_id IS NULL
-    ORDER BY isbn_13, created_at DESC
+    ORDER BY isbn_13, first_seen_at DESC
     LIMIT ${BATCH_SIZE * 10}
   `
 

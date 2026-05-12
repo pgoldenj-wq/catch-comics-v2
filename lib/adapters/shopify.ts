@@ -244,7 +244,12 @@ function normalizeVariant(
   /** Append variant ID to SKU when splitting; null → use product ID alone */
   splitSuffix: string | null,
 ): PreMatchListing {
-  const { isbn13, ean }             = extractIdentifiers(variant.barcode)
+  // Try barcode first (WoB style); fall back to SKU if barcode yields nothing
+  // (Travelling Man stores bare ISBN-13s in the SKU field instead of barcode)
+  const fromBarcode = extractIdentifiers(variant.barcode)
+  const { isbn13, ean } = fromBarcode.isbn13 || fromBarcode.ean
+    ? fromBarcode
+    : extractIdentifiers(variant.sku)
   const { condition, conditionDetail } = mapVariantCondition(variant.title)
 
   return {

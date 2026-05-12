@@ -2,26 +2,33 @@
 /**
  * scripts/backfill-wob-isbns.ts
  *
- * World of Books stores barcode as the string "undefined" but the ISBN-13
- * is reliably present in the Shopify product handle (last segment) and the
- * SKU (3-letter prefix + ISBN-13).
+ * Backfills isbn_13 for any Shopify retailer whose listings store ISBNs in
+ * the product handle or variant SKU but lack the isbn_13 column value.
+ *
+ * World of Books: handle ends in ISBN, SKU has 3-letter prefix + ISBN.
+ * Travelling Man: SKU is a bare ISBN-13 (no prefix).
+ * Both are covered by the same extractIsbn13() regex.
  *
  * This script:
- *   1. Finds all WoB retailer_listings with isbn_13 IS NULL
- *   2. Extracts ISBN-13 from raw_data->>'handle' (most reliable)
- *   3. Falls back to raw_data->'variants'->0->>'sku' strip
+ *   1. Finds all retailer_listings (for --domain) with isbn_13 IS NULL
+ *   2. Extracts ISBN-13 from raw_data->>'handle' (WoB-style)
+ *   3. Falls back to raw_data->'variants'->0->>'sku' (both WoB and TM)
  *   4. Updates isbn_13 column where found
  *
  * Run once after the first Shopify sync, then run seed:canonical.
  *
  * Usage:
- *   npx dotenv -e .env.local -- tsx scripts/backfill-wob-isbns.ts
- *   npx dotenv -e .env.local -- tsx scripts/backfill-wob-isbns.ts --dry-run
+ *   npm run backfill:isbns                                (defaults to worldofbooks.com)
+ *   npm run backfill:isbns -- --domain travellingman.com
+ *   npm run backfill:isbns -- --dry-run
  */
 
 import { prisma } from '../lib/prisma'
 
-const DRY_RUN = process.argv.includes('--dry-run')
+const args    = process.argv.slice(2)
+const DRY_RUN = args.includes('--dry-run')
+const domainIdx = args.indexOf('--domain')
+const DOMAIN  = domainIdx !== -1 ? args[domainIdx + 1] : 'worldofbooks.com'
 
 /** Extract a 13-digit ISBN starting with 978 or 979 from an arbitrary string */
 function extractIsbn13(s: string | null | undefined): string | null {
@@ -31,12 +38,11 @@ function extractIsbn13(s: string | null | undefined): string | null {
 }
 
 async function main() {
-  console.log(`\nWorld of Books ISBN backfill — ${DRY_RUN ? 'DRY RUN' : 'LIVE'}`)
+  console.log(`\nISBN backfill for ${DOMAIN} — ${DRY_RUN ? 'DRY RUN' : 'LIVE'}`)
 
-  // Find the WoB retailer id
-  const retailer = await prisma.retailer.findUnique({ where: { domain: 'worldofbooks.com' } })
+  const retailer = await prisma.retailer.findUnique({ where: { domain: DOMAIN } })
   if (!retailer) {
-    console.error('worldofbooks.com retailer not found in DB')
+    console.error(`${DOMAIN} retailer not found in DB`)
     process.exit(1)
   }
 
