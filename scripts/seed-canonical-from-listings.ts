@@ -86,9 +86,17 @@ function isLikelyComicFromShopifyData(
   return null  // no signal — must rely on enrichment
 }
 
+// Formats that are unambiguously comic-specific.
+// TPB and HARDCOVER are intentionally excluded — academic books, anthologies,
+// and non-fiction box sets also use these terms, causing false positives.
+const COMIC_SPECIFIC_FORMATS = new Set([
+  'MANGA_VOLUME', 'SINGLE_ISSUE', 'OMNIBUS', 'ABSOLUTE', 'COMPENDIUM', 'DELUXE',
+])
+
 function isLikelyComic(result: EnrichmentResult): boolean {
-  // If enrichment detected a comic-specific format, it's a comic
-  if (result.format !== null) return true
+  // Only comic-specific formats count as a positive format signal.
+  // TPB/HARDCOVER require publisher or keyword confirmation below.
+  if (result.format !== null && COMIC_SPECIFIC_FORMATS.has(result.format)) return true
 
   // Check publisher name against known comics publishers
   const pub = (result.publisher ?? '').toLowerCase().trim()
@@ -116,7 +124,9 @@ const BATCH_SIZE  = (() => {
   const idx = args.indexOf('--batch-size')
   return idx !== -1 ? parseInt(args[idx + 1] ?? '50', 10) : 50
 })()
-const RATE_MS     = 1_000   // 1 ISBN per second (Google Books polite limit)
+// With a Google Books API key the quota rises to 20 req/s.
+// Use 100 ms (10/s) when key is present — conservative but 10× faster.
+const RATE_MS     = process.env.GOOGLE_BOOKS_API_KEY ? 100 : 1_000
 
 const CHECKPOINT_PATH = path.join(__dirname, '.seed-checkpoint.json')
 
@@ -181,7 +191,7 @@ async function main() {
   console.log(`\n${'═'.repeat(60)}`)
   console.log(` Catch Comics — Canonical Product Seed`)
   console.log(` Mode  : ${DRY_RUN ? 'DRY RUN (no writes)' : 'LIVE'}`)
-  console.log(` Batch : ${BATCH_SIZE} ISBNs, rate-limited to 1/s`)
+  console.log(` Batch : ${BATCH_SIZE} ISBNs, rate-limited to ${RATE_MS === 100 ? '10/s (API key active)' : '1/s (no key)'}`)
   console.log(` Resume: ${RESUME}`)
   console.log(`${'═'.repeat(60)}\n`)
 
