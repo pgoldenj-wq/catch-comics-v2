@@ -82,7 +82,11 @@ export async function cvFetch(url: string): Promise<Response | null> {
 // so cache survives across serverless cold starts and multiple instances.
 // Without KV_URL, we fall through to the in-memory TTLCache singletons.
 
-const KV_AVAILABLE = !!process.env.KV_URL
+// @vercel/kv uses KV_REST_API_URL + KV_REST_API_TOKEN (not KV_URL).
+// Vercel auto-injects both when a KV store is provisioned; check the one
+// the client actually needs so we don't mistakenly activate KV when only
+// the raw Redis URL is present (e.g. from a non-KV Redis provider).
+const KV_AVAILABLE = !!process.env.KV_REST_API_URL
 
 // TTL map (seconds) for Vercel KV — mirrors the TTLCache constructor values
 const KV_TTL: Record<string, number> = {
