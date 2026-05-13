@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { autocompleteCache } from '@/lib/cache'
+import { autocompleteCache }         from '@/lib/cache'
+import { cvFetch }                   from '@/lib/comicvine'
 
 // ── Curated dictionary ────────────────────────────────────────────────────────
 
@@ -195,7 +196,8 @@ export async function GET(req: NextRequest) {
 
   try {
     const url = `https://comicvine.gamespot.com/api/search/?api_key=${apiKey}&format=json&query=${encodeURIComponent(q)}&resources=volume&limit=10&field_list=id,name,start_year,publisher,image`
-    const res  = await fetch(url, { headers: { 'User-Agent': 'CatchComics/1.0' } })
+    const res  = await cvFetch(url)
+    if (!res) return respond({ results: curatedMatches, correction: null })
     const data = await res.json()
 
     const curatedNames = new Set(curatedMatches.map(c => c.name.toLowerCase()))

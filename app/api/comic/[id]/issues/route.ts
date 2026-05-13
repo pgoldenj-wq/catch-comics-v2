@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { volumeIssuesCache } from '@/lib/cache'
+import { cvFetch, cvGet, cvSet } from '@/lib/comicvine'
 
 // Detect Comic Vine's "no cover" placeholder URLs
 function isPlaceholderImage(url: string | undefined | null): boolean {
@@ -40,7 +40,7 @@ export async function GET(
   }
 
   const cacheKey = `volumeIssues:${id}`
-  const cached   = volumeIssuesCache.get(cacheKey)
+  const cached   = await cvGet('volumeIssues', cacheKey)
   if (cached) {
     console.log(`[/api/comic/${id}/issues] cache hit`)
     return NextResponse.json({ issues: cached })
@@ -56,8 +56,12 @@ export async function GET(
   const url = `https://comicvine.gamespot.com/api/issues/?api_key=${apiKey}&format=json&filter=volume:${id}&sort=cover_date:asc&limit=100&field_list=id,name,issue_number,image,cover_date,store_date`
 
   try {
-    const response = await fetch(url, { headers: { 'User-Agent': 'CatchComics/1.0' } })
-    const data     = await response.json()
+    const response = await cvFetch(url)
+    if (!response) {
+      // Circuit open (429 cooldown) — return empty instead of 500
+      return NextResponse.json({ issues: [] })
+    }
+    const data = await response.json()
 
     if (data.status_code !== 1 || !Array.isArray(data.results)) {
       console.error(`[/api/comic/${id}/issues] CV error status=${data.status_code}`)
@@ -87,7 +91,7 @@ export async function GET(
         return an - bn
       })
 
-    volumeIssuesCache.set(cacheKey, issues)
+    await cvSet('volumeIssues', cacheKey, issues)
     return NextResponse.json({ issues })
 
   } catch (err) {

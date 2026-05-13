@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { volumeCache, issueCache } from '@/lib/cache'
+import { cvFetch, cvGet, cvSet } from '@/lib/comicvine'
 
 // Detect Comic Vine's "no cover" placeholder URLs.
 // Their default asset lives under user_id 0 in the uploads CDN.
@@ -25,12 +25,12 @@ export async function GET(
     return NextResponse.json({ error: 'Invalid comic ID' }, { status: 400 })
   }
 
-  const numericId = isIssue ? id.slice(1) : id
-  const cache     = isIssue ? issueCache : volumeCache
-  const cacheKey  = isIssue ? `issue:${numericId}` : `volume:${numericId}`
+  const numericId  = isIssue ? id.slice(1) : id
+  const cachePrefix = isIssue ? 'issue' : 'volume'
+  const cacheKey    = isIssue ? `issue:${numericId}` : `volume:${numericId}`
 
-  // ── Cache check ───────────────────────────────────────────────────────────
-  const cached = cache.get(cacheKey)
+  // ── Cache check (KV → TTLCache fallback) ─────────────────────────────────
+  const cached = await cvGet(cachePrefix, cacheKey)
   if (cached) {
     console.log(`[/api/comic] cache hit for ${id}`)
     return NextResponse.json({ comic: cached })
@@ -49,8 +49,12 @@ export async function GET(
     : `https://comicvine.gamespot.com/api/volume/4050-${numericId}/?api_key=${apiKey}&format=json&field_list=id,name,image,start_year,publisher,description,count_of_issues,people,characters`
 
   try {
-    const response = await fetch(url, { headers: { 'User-Agent': 'CatchComics/1.0' } })
-    const data     = await response.json()
+    const response = await cvFetch(url)
+    if (!response) {
+      // Circuit open (429 cooldown) — return empty rather than 500
+      return NextResponse.json({ comic: null })
+    }
+    const data = await response.json()
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let comic: any = (data.results && !Array.isArray(data.results)) ? data.results : null
@@ -80,7 +84,7 @@ export async function GET(
       if (isPlaceholderImage(comic.image.original_url)) comic.image.original_url = ''
     }
 
-    if (comic) cache.set(cacheKey, comic)
+    if (comic) await cvSet(cachePrefix, cacheKey, comic)
     return NextResponse.json({ comic })
 
   } catch (err) {

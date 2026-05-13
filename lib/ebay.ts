@@ -146,6 +146,29 @@ export async function searchListings(
     .filter((x): x is EbayListing => x !== null)
 }
 
+// ── EPN affiliate wrapping ────────────────────────────────────────────────────
+// Set EBAY_CAMPAIGN_ID to your eBay Partner Network campaign ID.
+// When set, all item URLs are wrapped with EPN tracking parameters so
+// qualifying purchases earn affiliate commission.
+// Find your campaign ID at: https://partnernetwork.ebay.com/
+
+const EBAY_CAMPAIGN_ID = (process.env.EBAY_CAMPAIGN_ID || '').trim()
+const EBAY_TOOL_ID     = '10001'  // standard eBay deep-link tool
+
+function wrapEpn(url: string): string {
+  if (!EBAY_CAMPAIGN_ID || !url) return url
+  try {
+    const u = new URL(url)
+    u.searchParams.set('campid',  EBAY_CAMPAIGN_ID)
+    u.searchParams.set('toolid',  EBAY_TOOL_ID)
+    u.searchParams.set('mkevt',   '1')   // event type: click
+    u.searchParams.set('mkcid',   '1')   // channel: EPN
+    return u.toString()
+  } catch {
+    return url  // malformed URL — return unchanged
+  }
+}
+
 function isFCBD(title: string): boolean {
   const t = title.toLowerCase()
   return t.includes('free comic book day') || t.includes('fcbd')
@@ -164,7 +187,7 @@ function mapListing(r: RawBrowseItem): EbayListing | null {
     },
     condition:  r.condition || 'Unspecified',
     imageUrl:   r.image?.imageUrl    || '',
-    itemWebUrl: r.itemWebUrl         || '',
+    itemWebUrl: wrapEpn(r.itemWebUrl  || ''),
     seller:     {
       username:           r.seller?.username || '',
       feedbackPercentage: parseFloat(r.seller?.feedbackPercentage || '0'),

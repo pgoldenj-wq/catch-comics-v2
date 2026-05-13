@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { searchCache, volumeCache } from '@/lib/cache'
+import { searchCache }              from '@/lib/cache'
+import { cvFetch, cvGet, cvSet }    from '@/lib/comicvine'
 import { parseComicQuery, titleMatchScore } from '@/lib/parseComicQuery'
 import { isAmbiguousComicTitle } from '@/lib/comicDisambiguation'
 import { unifiedSearch } from '@/lib/search'
@@ -241,19 +242,17 @@ async function enrichIssuePublishers(
   await Promise.all(
     uniqueVolumeIds.map(async (volId) => {
       const cacheKey = `publisher:${volId}`
-      const cached   = volumeCache.get(cacheKey) as string | null
+      const cached   = await cvGet<string>('volume', cacheKey)
       if (cached !== null) {
         publisherMap[volId] = cached
         return
       }
       try {
-        const res  = await fetch(
-          `https://comicvine.gamespot.com/api/volume/4050-${volId}/?api_key=${apiKey}&format=json&field_list=id,publisher`,
-          { headers: { 'User-Agent': 'CatchComics/1.0' } }
+        const res  = await cvFetch(
+          `https://comicvine.gamespot.com/api/volume/4050-${volId}/?api_key=${apiKey}&format=json&field_list=id,publisher`
         )
-        const data = await res.json()
-        const pub  = (data.results?.publisher?.name as string) || ''
-        volumeCache.set(cacheKey, pub)
+        const pub  = res ? ((await res.json()).results?.publisher?.name as string) || '' : ''
+        await cvSet('volume', cacheKey, pub)
         publisherMap[volId] = pub
       } catch {
         publisherMap[volId] = ''
@@ -357,12 +356,14 @@ export async function GET(request: NextRequest) {
 
   try {
     const [volumeRes, issueRes] = await Promise.all([
-      fetch(volumeUrl, { headers: { 'User-Agent': 'CatchComics/1.0' } }),
-      fetch(issueUrl,  { headers: { 'User-Agent': 'CatchComics/1.0' } }),
+      cvFetch(volumeUrl),
+      cvFetch(issueUrl),
     ])
+
+    // Either or both may be null if the circuit is open (429 cooldown)
     const [volumeData, issueData] = await Promise.all([
-      volumeRes.json(),
-      issueRes.json(),
+      volumeRes ? volumeRes.json() : Promise.resolve({ status_code: 0, results: [] }),
+      issueRes  ? issueRes.json()  : Promise.resolve({ status_code: 0, results: [] }),
     ])
     console.log(
       `[/api/search] CV volume status=${volumeData.status_code} count=${Array.isArray(volumeData.results) ? volumeData.results.length : '?'} | issue status=${issueData.status_code} count=${Array.isArray(issueData.results) ? issueData.results.length : '?'}`
