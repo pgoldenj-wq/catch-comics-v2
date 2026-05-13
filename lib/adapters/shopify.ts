@@ -79,6 +79,19 @@ interface ShopifySyncConfig {
   /** Set when the /products.json endpoint returns 404. */
   disabled_reason?: string
   disabled_at?: string
+  /**
+   * When true, only sync products whose Shopify `product_type` is in the comic
+   * allowlist (manga, graphic novel, comic, comics, trade paperback, hardcover,
+   * single issue). All other product types are silently skipped.
+   *
+   * Safe default is false (off) — existing retailers are unaffected unless this
+   * flag is explicitly set in their sync_config via the admin panel or a migration.
+   *
+   * Rationale: general hobby retailers (e.g. Travelling Man) carry board games,
+   * miniatures, and merchandise alongside comics. Without this filter, non-comic
+   * listings pollute the canonical graph.
+   */
+  comic_filter?: boolean
   [key: string]: unknown
 }
 
@@ -117,6 +130,23 @@ const PAGE_SIZE           = 250
 const MAX_PAGES           = 100
 const BETWEEN_PAGE_MS     = 2_000
 const MAX_FETCH_RETRIES   = 3
+
+/**
+ * Shopify product_type values that are definitely comics/manga/graphic novels.
+ * All values are lower-cased for comparison.
+ *
+ * Used by the opt-in comic_filter (sync_config.comic_filter = true).
+ * Mirrors the set in scripts/day5-tm-controlled-sync.ts.
+ */
+const COMIC_PRODUCT_TYPES = new Set([
+  'manga',
+  'graphic novel',
+  'comic',
+  'comics',
+  'trade paperback',
+  'hardcover',
+  'single issue',
+])
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
@@ -475,9 +505,14 @@ export class ShopifyAdapter {
     const syncCfg  = (retailer.syncConfig ?? {}) as ShopifySyncConfig
     const prevMissingSkus = new Set<string>(syncCfg.prev_missing_skus ?? [])
 
-    const seenSkus = new Set<string>()
+    const seenSkus       = new Set<string>()
+    const applyComicFilter = syncCfg.comic_filter === true
+    let   filteredOut    = 0
 
-    console.log(`[shopify] starting sync for ${domain} (retailer ${retailerId})`)
+    console.log(
+      `[shopify] starting sync for ${domain} (retailer ${retailerId})` +
+      (applyComicFilter ? ' [comic_filter=true]' : ''),
+    )
 
     // ── 2. Paginate /products.json ────────────────────────────────────────────
     paginationLoop:
@@ -565,6 +600,16 @@ export class ShopifyAdapter {
 
       // ── 3. Normalise + upsert each product ──────────────────────────────────
       for (const product of products) {
+        // Opt-in comic filter — skip non-comic product types when enabled.
+        // Silently counted; does not generate an error entry.
+        if (applyComicFilter) {
+          const pt = (product.product_type ?? '').toLowerCase().trim()
+          if (!COMIC_PRODUCT_TYPES.has(pt)) {
+            filteredOut++
+            continue
+          }
+        }
+
         let preListings: PreMatchListing[]
         try {
           preListings = expandProduct(product, domain, currency)
@@ -672,8 +717,9 @@ export class ShopifyAdapter {
     const durationMs = Date.now() - startedAt
     console.log(
       `[shopify] sync complete for ${domain}: ` +
-      `${pagesFetched} pages, ${productsFetched} products, ` +
-      `${listingsCreated} created, ${listingsUpdated} updated, ` +
+      `${pagesFetched} pages, ${productsFetched} products` +
+      (applyComicFilter ? `, ${filteredOut} filtered (non-comic)` : '') +
+      `, ${listingsCreated} created, ${listingsUpdated} updated, ` +
       `${priceChanges} price changes, ${errors.length} errors — ${durationMs}ms`,
     )
 

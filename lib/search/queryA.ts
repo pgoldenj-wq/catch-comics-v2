@@ -123,6 +123,7 @@ export async function queryCanonical(
     WHERE
       rl.canonical_product_id = ANY(${productIds}::uuid[])
       AND rl.stock_status IN ('IN_STOCK', 'LOW_STOCK', 'PREORDER')
+      AND rl.deleted_at IS NULL
       AND ret.is_active = true
     ORDER BY rl.canonical_product_id, rl.price_amount ASC
   `

@@ -53,6 +53,7 @@ export async function GET() {
       INNER JOIN retailer_listings rl
         ON rl.canonical_product_id = cp.id
         AND rl.stock_status = 'IN_STOCK'
+        AND rl.deleted_at IS NULL
       GROUP BY cp.id, cp.canonical_slug, cp.title, cp.publisher, cp.format, cp.cover_image_url
       HAVING COUNT(rl.id) >= 1
       ORDER BY listing_count DESC
