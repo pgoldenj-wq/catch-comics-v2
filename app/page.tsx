@@ -345,8 +345,8 @@ export default function Home() {
             const isLive     = liveDeals !== null
             const liveDeal   = isLive ? deal as LiveDeal : null
             const staticDeal = !isLive ? deal as DealItem : null
-            const title      = liveDeal?.title     ?? staticDeal!.title
-            const publisher  = liveDeal?.publisher ?? staticDeal!.publisher
+            const title      = liveDeal?.title     ?? staticDeal?.title     ?? ''
+            const publisher  = liveDeal?.publisher ?? staticDeal?.publisher ?? null
             const price      = isLive
               ? (region === 'uk' ? liveDeal!.lowestPriceGBP : liveDeal!.lowestPriceUSD)
               : (region === 'uk' ? staticDeal!.priceUK : staticDeal!.priceUS)
@@ -655,8 +655,8 @@ export default function Home() {
               const liveDeal = isLive ? deal as LiveDeal : null
               const staticDeal = !isLive ? deal as DealItem : null
 
-              const title     = liveDeal?.title     ?? staticDeal!.title
-              const publisher = liveDeal?.publisher ?? staticDeal!.publisher
+              const title     = liveDeal?.title     ?? staticDeal?.title     ?? ''
+              const publisher = liveDeal?.publisher ?? staticDeal?.publisher ?? null
               const price     = isLive
                 ? (region === 'uk' ? liveDeal!.lowestPriceGBP : liveDeal!.lowestPriceUSD)
                 : (region === 'uk' ? staticDeal!.priceUK : staticDeal!.priceUS)
