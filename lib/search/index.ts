@@ -21,6 +21,13 @@ import type {
   SearchOffer, SearchFacets,
 } from './types'
 
+// ── ISBN detection (mirrors route.ts — kept local to avoid cross-layer import) ─
+
+function isIsbnQuery(q: string): boolean {
+  const stripped = q.replace(/[\s\-]/g, '')
+  return /^\d{13}$/.test(stripped) || /^\d{9}[\dXx]$/.test(stripped)
+}
+
 // ── Facet computation ─────────────────────────────────────────────────────────
 
 function computeFacets(canonicals: CanonicalSearchResult[]): SearchFacets {
@@ -153,7 +160,31 @@ export async function unifiedSearch(sq: SearchQuery): Promise<UnifiedSearchResul
   const merged = mergeEbayMatches(rawCanonicals, ebayResult.matched)
 
   // Score + sort. Stale duds sink to the bottom of the canonical bucket.
-  const scored    = applyScores(merged)
+  let scored = applyScores(merged)
+
+  // ISBN exact-match pinning: when the query is a bare ISBN, the first result
+  // from queryA already has ts_rank=1.0 / trgm_sim=1.0 (set in queryA), but
+  // applyScores weights those against offer count, recency, etc., which can
+  // push the match down when the product is out-of-stock. Force it to rank #1
+  // with a perfect score so the user always sees the ISBN match at the top.
+  if (isIsbnQuery(sq.q) && scored.length > 0) {
+    const isbnClean = sq.q.replace(/[\s\-]/g, '')
+    const isIsbn13  = /^\d{13}$/.test(isbnClean)
+    const matchIdx  = scored.findIndex(r =>
+      isIsbn13
+        ? r.isbn13 === isbnClean
+        : r.isbn13 !== null  // ISBN-10: queryA returned it, first result is the match
+    )
+    if (matchIdx > 0) {
+      // Splice the match out and prepend it with score 1.0
+      const [match] = scored.splice(matchIdx, 1)
+      scored = [{ ...match, score: 1.0 }, ...scored]
+    } else if (matchIdx === 0 && scored[0].score < 1.0) {
+      // Already first but score may be deflated — pin it
+      scored[0] = { ...scored[0], score: 1.0 }
+    }
+  }
+
   const freshOnes = scored.filter(r => !isStaleDud(r))
   const staleOnes = scored.filter(r =>  isStaleDud(r))
   const canonicals = [...freshOnes, ...staleOnes]

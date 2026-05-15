@@ -296,6 +296,18 @@ export async function GET(request: NextRequest) {
         page:     parseInt(searchParams.get('page')     ?? '1',  10),
         pageSize: parseInt(searchParams.get('pageSize') ?? '20', 10),
       })
+      // Structured search analytics log — one line per request, parseable by log aggregators.
+      const d = result.debug
+      console.log('[search] ' + JSON.stringify({
+        q:           query,
+        durationMs:  d?.durationMs  ?? 0,
+        aCount:      d?.queryACount ?? 0,
+        bCount:      d?.queryBCount ?? 0,
+        cCount:      d?.queryCCount ?? 0,
+        zeroResults: result.total === 0,
+        isIsbn:      detectISBN(query) !== null,
+        cacheHit:    d?.cacheHit   ?? false,
+      }))
       return NextResponse.json(result)
     } catch (err) {
       console.error('[/api/search] unified search error:', err)
