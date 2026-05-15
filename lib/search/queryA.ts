@@ -91,10 +91,13 @@ export async function queryCanonical(
         )::float4 AS trgm_sim
       FROM canonical_products
       WHERE
+        -- trgm threshold raised from 0.15 → 0.30 to reduce false positives on short queries.
+        -- 0.15 matched almost any title sharing 2 trigrams (e.g. "Saga" → unrelated results);
+        -- 0.30 requires meaningful trigram overlap while keeping good recall for 6+ char queries.
         to_tsvector('english', coalesce(title,'') || ' ' || coalesce(series_name,'') || ' ' || coalesce(publisher,''))
           @@ websearch_to_tsquery('english', ${q})
-        OR similarity(title, ${q}) > 0.15
-        OR coalesce(similarity(series_name, ${q}), 0) > 0.15
+        OR similarity(title, ${q}) > 0.30
+        OR coalesce(similarity(series_name, ${q}), 0) > 0.30
       ORDER BY ts_rank DESC, trgm_sim DESC
       LIMIT 40
     `
