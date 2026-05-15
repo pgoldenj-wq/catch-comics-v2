@@ -70,16 +70,18 @@ const NON_COMIC_PUBLISHERS_EXACT = new Set([
   'Brill Academic Publishers',
   'Martinus Nijhoff Publishers',   // Brill imprint
   'Creative Media Partners, LLC',  // Public domain reprints (academic/classics)
-  'Melia Publishing Services Limited',
   'Legare Street Press',           // Public domain reprints
   'Kessinger Publishing, LLC',     // Public domain reprints
+  'Kessinger Publishing',          // Public domain reprints (alt spelling in DB)
   'McGill-Queen\'s University Press',
   'Hachette Livre - Bnf',          // French digitized historical texts
-  'Arotahi Agency',                // NZ research publisher
   'IWA Publishing',                // International Water Association
   'Hachette Livre BNF',
-  'Hachette Aotearoa New Zealand', // NZ general trade
-  'Penguin Random House NZ',       // NZ general trade (not comics)
+  // REMOVED — confirmed legitimate manga publishers/distributors (⚠ Day 5C ④ audit):
+  // 'Arotahi Agency'                → NZ manga distributor (One Punch Man, JoJo, Fly Me to the Moon…)
+  // 'Hachette Aotearoa New Zealand' → NZ manga imprint (Battle Royale Deluxe, Re:ZERO…)
+  // 'Penguin Random House NZ'       → NZ comics/manga publisher (Apothecary Diaries, Absolute Flash…)
+  // 'Melia Publishing Services Limited' → manga/BL distributor (Acid Town, Crossplay Love…)
 ])
 
 // Publishers that are borderline / partial — only flag if also format=OTHER and no active listings
@@ -100,6 +102,11 @@ const COMIC_PUBLISHERS = new Set([
   'Antarctic Press', 'Humanoids', 'Lion Forge', 'Papercutz',
   'First Second', 'Graphix', 'Scholastic', 'Abrams ComicArts',
   'NBM Publishing', 'Eurocomics', 'Fanfare', 'Drawn',
+  // NZ distributors/imprints confirmed as comics/manga (Day 5C ④ audit):
+  'Arotahi Agency',                // NZ manga distributor (One Punch Man, JoJo, Fly Me to the Moon…)
+  'Hachette Aotearoa New Zealand', // NZ manga imprint (Battle Royale, Re:ZERO…)
+  'Penguin Random House NZ',       // NZ comics/manga arm (Apothecary Diaries, Absolute Flash…)
+  'Melia Publishing Services Limited', // manga/BL distributor (Acid Town, Crossplay Love…)
 ])
 
 // ── Title keyword signals (non-comic indicators) ──────────────────────────────
