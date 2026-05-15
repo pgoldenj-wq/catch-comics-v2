@@ -35,12 +35,6 @@ const COMIC_PRODUCT_TYPES = new Set([
   'single issue',
 ])
 
-function productTypeOf(rawData: unknown): string {
-  if (!rawData || typeof rawData !== 'object') return ''
-  const raw = rawData as Record<string, unknown>
-  return ((raw.product_type as string) ?? '').toLowerCase().trim()
-}
-
 async function main() {
   console.log(`\n${'═'.repeat(60)}`)
   console.log(`  Travelling Man non-comic soft-delete`)
@@ -55,24 +49,37 @@ async function main() {
   if (!tm) throw new Error('Travelling Man retailer not found — check domain substring')
   console.log(`  Retailer : ${tm.domain}  (${tm.id})\n`)
 
-  // ── 2. Load all active listings ─────────────────────────────────────────────
-  // We load rawData to inspect product_type — it's stored as JSON from Shopify.
-  // For TM's catalog (~25k listings) this is ~30 MB in memory; acceptable.
-  console.log('  Loading active listings …')
-  const allActive = await prisma.retailerListing.findMany({
-    where:  { retailerId: tm.id, deletedAt: null },
-    select: { id: true, title: true, rawData: true },
-  })
+  // ── 2. Load active listings — extract only product_type, NOT full rawData ──────
+  //
+  // ⚠ BANDWIDTH NOTE: Never do findMany({ select: { rawData: true } }) on large
+  // tables — rawData is 3–8 KB per row and will exhaust Neon's free transfer quota.
+  // Use raw SQL to extract only the JSON field you need (raw_data->>'product_type').
+  // This reduces transfer from ~150 MB to ~2–3 MB for 25k rows.
+  console.log('  Loading active listings (low-bandwidth SQL projection) …')
+
+  const allActive = await prisma.$queryRaw<Array<{
+    id:    string
+    title: string
+    pt:    string   // raw_data->>'product_type', lower-cased
+  }>>`
+    SELECT
+      id,
+      title,
+      lower(coalesce(raw_data->>'product_type', '')) AS pt
+    FROM retailer_listings
+    WHERE retailer_id = ${tm.id}::uuid
+      AND deleted_at IS NULL
+  `
   console.log(`  Total active : ${allActive.length.toLocaleString()}\n`)
 
   // ── 3. Partition ────────────────────────────────────────────────────────────
-  const toKeep:   typeof allActive = []
-  const toDelete: typeof allActive = []
+  type Row = typeof allActive[0]
+  const toKeep:   Row[] = []
+  const toDelete: Row[] = []
 
   for (const listing of allActive) {
-    const pt = productTypeOf(listing.rawData)
-    if (COMIC_PRODUCT_TYPES.has(pt)) toKeep.push(listing)
-    else                              toDelete.push(listing)
+    if (COMIC_PRODUCT_TYPES.has(listing.pt.trim())) toKeep.push(listing)
+    else                                             toDelete.push(listing)
   }
 
   console.log(`  Comics (will keep)    : ${toKeep.length.toLocaleString()}`)
@@ -86,7 +93,7 @@ async function main() {
   // ── 4. Product-type breakdown of non-comics ─────────────────────────────────
   const typeCounts = new Map<string, number>()
   for (const listing of toDelete) {
-    const pt = productTypeOf(listing.rawData) || '(blank/null)'
+    const pt = listing.pt || '(blank/null)'
     typeCounts.set(pt, (typeCounts.get(pt) ?? 0) + 1)
   }
 
@@ -102,10 +109,8 @@ async function main() {
   // ── 5. Sample non-comic listings ────────────────────────────────────────────
   console.log('\n  Sample non-comic listings (first 15):')
   for (const listing of toDelete.slice(0, 15)) {
-    const pt = productTypeOf(listing.rawData) || '(none)'
-    const title = listing.title.length > 70
-      ? listing.title.slice(0, 70) + '…'
-      : listing.title
+    const pt    = listing.pt || '(none)'
+    const title = listing.title.length > 70 ? listing.title.slice(0, 70) + '…' : listing.title
     console.log(`    [${pt}] ${title}`)
   }
   if (toDelete.length > 15) {

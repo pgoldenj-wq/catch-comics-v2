@@ -7,6 +7,13 @@ import { prisma } from '@/lib/prisma'
  * Returns up to 12 canonical products that have at least one in-stock listing,
  * ordered by number of listings DESC (most-listed = most popular / best value).
  *
+ * Only comic-native formats appear on the homepage:
+ *   - Any of: SINGLE_ISSUE, MANGA_VOLUME, OMNIBUS, ABSOLUTE, COMPENDIUM, DELUXE
+ *   - TPB / HARDCOVER only when the publisher is a known comics publisher
+ *   (prevents board games, RPG books, and ambiguous OTHER formats from surfacing)
+ *
+ * Also excludes soft-deleted listings (deleted_at IS NULL).
+ *
  * Response shape:
  *   { deals: DealItem[] }
  *
