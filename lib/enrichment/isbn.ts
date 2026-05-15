@@ -408,7 +408,8 @@ export async function applyEnrichment(
 // ── Bulk enrichment ───────────────────────────────────────────────────────────
 
 export async function enrichPendingProducts(
-  batchSize = 50,
+  batchSize  = 50,
+  noCacheMode = false,
 ): Promise<EnrichmentSummary> {
   const summary: EnrichmentSummary = {
     processed: 0, enriched: 0, skipped: 0, notFound: 0, errors: 0,
@@ -430,6 +431,13 @@ export async function enrichPendingProducts(
   for (const product of products) {
     summary.processed++
     try {
+      if (noCacheMode) {
+        await prisma.$executeRaw`
+          UPDATE metadata_cache
+          SET expires_at = NOW() - INTERVAL '1 second'
+          WHERE isbn_13 = ${product.isbn13!}
+        `
+      }
       const result = await enrichByIsbn(product.isbn13!)
       if (result.source === 'none') {
         summary.notFound++

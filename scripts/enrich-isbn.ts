@@ -25,9 +25,10 @@ import { prisma } from '../lib/prisma'
 
 // ── Arg parsing ───────────────────────────────────────────────────────────────
 
-const args      = process.argv.slice(2)
-const batchMode = args.includes('--batch')
-const writeMode = args.includes('--write')
+const args         = process.argv.slice(2)
+const batchMode    = args.includes('--batch')
+const writeMode    = args.includes('--write')
+const noCacheMode  = args.includes('--no-cache')
 
 const batchIdx = args.indexOf('--batch')
 const batchSize =
@@ -38,6 +39,14 @@ const batchSize =
 const isbnArg = args.find(a => /^\d{13}$/.test(a))
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+async function bustCache(isbn13: string): Promise<void> {
+  await prisma.$executeRaw`
+    UPDATE metadata_cache
+    SET expires_at = NOW() - INTERVAL '1 second'
+    WHERE isbn_13 = ${isbn13}
+  `
+}
 
 function fmt(value: unknown): string {
   if (value == null) return '(none)'
@@ -62,6 +71,11 @@ async function main() {
   // ── Single ISBN mode ───────────────────────────────────────────────────────
   if (!batchMode && isbnArg) {
     console.log(`\n🔍  Enriching ISBN ${isbnArg}…\n`)
+
+    if (noCacheMode) {
+      await bustCache(isbnArg)
+      console.log('  (cache busted — forcing fresh API call)\n')
+    }
 
     const result = await enrichByIsbn(isbnArg)
 
@@ -105,7 +119,7 @@ async function main() {
   // ── Batch mode ─────────────────────────────────────────────────────────────
   if (batchMode) {
     console.log(`\n📚  Enriching up to ${batchSize} pending products…\n`)
-    const summary = await enrichPendingProducts(batchSize)
+    const summary = await enrichPendingProducts(batchSize, noCacheMode)
     console.log(`  Processed : ${summary.processed}`)
     console.log(`  Enriched  : ${summary.enriched}`)
     console.log(`  Skipped   : ${summary.skipped}   (already fully enriched)`)

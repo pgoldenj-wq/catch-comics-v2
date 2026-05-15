@@ -742,6 +742,15 @@ export default function Home() {
           affiliate commission at no extra cost to you. Prices are sourced directly from retailers and may
           change at any time — always verify the final price on the retailer&apos;s site before purchasing.
         </p>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginTop: '10px' }}>
+          {[['About', '/about'], ['Privacy', '/privacy'], ['Terms', '/terms']].map(([label, href]) => (
+            <a key={href} href={href} style={{ fontSize: '11px', color: '#9CA3AF', textDecoration: 'none' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.color = '#E8272A'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.color = '#9CA3AF'; }}>
+              {label}
+            </a>
+          ))}
+        </div>
       </footer>
 
     </main>
