@@ -108,6 +108,9 @@ model CanonicalProduct {
   canonicalSlug  String        @unique @map("canonical_slug") @db.Text
   createdAt      DateTime      @default(now()) @map("created_at")
   updatedAt      DateTime      @updatedAt @map("updated_at")
+  /// Soft-delete timestamp. NULL = live. Set to NOW() to hide from all queries.
+  /// Added Week 2A to support reversible canonical cleanup.
+  deletedAt      DateTime?     @map("deleted_at")
 
   listings RetailerListing[]
 

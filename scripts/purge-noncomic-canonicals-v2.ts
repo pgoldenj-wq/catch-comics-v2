@@ -56,10 +56,22 @@
  *
  * Usage:
  *   npx dotenv -e .env.local -- npx tsx scripts/purge-noncomic-canonicals-v2.ts
- *   (dry-run always — no --live flag exists yet; add it after reviewing output)
+ *   npx dotenv -e .env.local -- npx tsx scripts/purge-noncomic-canonicals-v2.ts --soft-delete
+ *   npx dotenv -e .env.local -- npx tsx scripts/purge-noncomic-canonicals-v2.ts --soft-delete --include-tier2
+ *
+ * Flags:
+ *   (none)           dry-run report only, no DB writes
+ *   --soft-delete    sets deleted_at = NOW() for Tier 1 rows (confirmed non-comic publishers)
+ *   --include-tier2  also soft-deletes Tier 2 (title keyword matches) — review Tier 2 first
  */
 
 import { prisma } from '../lib/prisma'
+
+// ── CLI flags ─────────────────────────────────────────────────────────────────
+const ARGS          = process.argv.slice(2)
+const SOFT_DELETE   = ARGS.includes('--soft-delete')   // set deleted_at = NOW()
+const INCLUDE_TIER2 = ARGS.includes('--include-tier2') // also soft-delete Tier 2
+const DRY_RUN       = !SOFT_DELETE
 
 // ── Publisher blocklist ────────────────────────────────────────────────────────
 // These are CONFIRMED non-comic publishers from the data audit.
@@ -382,6 +394,53 @@ async function main() {
   console.log(`  Tier 3 (review first)         : ${tier3.length.toLocaleString()} canonicals`)
   console.log(`  Total potential cleanup       : ${flagged.length.toLocaleString()} of ${total.toLocaleString()} (${((flagged.length / total) * 100).toFixed(1)}%)`)
   console.log(`  Canonicals remaining          : ${(total - flagged.length).toLocaleString()}`)
+  console.log()
+
+  // ── 13. Soft-delete ──────────────────────────────────────────────────────────
+  if (DRY_RUN) {
+    console.log('  Mode: DRY RUN — pass --soft-delete to apply (Tier 1 only by default).')
+    console.log('         Add --include-tier2 to also soft-delete Tier 2 rows.')
+    console.log()
+    return
+  }
+
+  // Build the set of IDs to soft-delete
+  const toDelete = INCLUDE_TIER2
+    ? [...tier1, ...tier2]
+    : tier1
+
+  if (toDelete.length === 0) {
+    console.log('  ✓ Nothing to soft-delete.')
+    return
+  }
+
+  console.log(`── SOFT-DELETE ───────────────────────────────────────────────────────`)
+  console.log()
+  console.log(`  Tiers to process : Tier 1${INCLUDE_TIER2 ? ' + Tier 2' : ' only'}`)
+  console.log(`  Rows to mark     : ${toDelete.length}`)
+  console.log()
+
+  // Skip any already soft-deleted
+  const ids = toDelete.map(f => f.row.id)
+  const already = await prisma.canonicalProduct.count({
+    where: { id: { in: ids }, deletedAt: { not: null } },
+  })
+  if (already > 0) {
+    console.log(`  (${already} already have deletedAt set — will skip those)`)
+  }
+
+  const result = await prisma.canonicalProduct.updateMany({
+    where: { id: { in: ids }, deletedAt: null },
+    data:  { deletedAt: new Date() },
+  })
+
+  console.log(`  ✅ Soft-deleted ${result.count} canonical products.`)
+  console.log()
+
+  // Post-delete stats
+  const remaining = await prisma.canonicalProduct.count({ where: { deletedAt: null } })
+  const totalAll  = await prisma.canonicalProduct.count()
+  console.log(`  Live canonicals  : ${remaining.toLocaleString()} of ${totalAll.toLocaleString()} total`)
   console.log()
 }
 
