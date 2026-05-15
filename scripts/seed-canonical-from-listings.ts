@@ -250,7 +250,7 @@ async function main() {
 
     // ── b. Check for existing canonical ──────────────────────────────────────
     const existing = await prisma.canonicalProduct.findFirst({
-      where : { isbn13 },
+      where : { isbn13, deletedAt: null },
       select: { id: true },
     })
 
@@ -321,7 +321,7 @@ async function main() {
           console.log(`  [${processed}] + ${isbn13}: created "${title}" (${format})`)
         } catch (err) {
           // P2002 race condition — another process created it simultaneously
-          const raceRow = await prisma.canonicalProduct.findFirst({ where: { isbn13 }, select: { id: true } })
+          const raceRow = await prisma.canonicalProduct.findFirst({ where: { isbn13, deletedAt: null }, select: { id: true } })
           if (raceRow) {
             canonicalId = raceRow.id
             alreadyExisted++

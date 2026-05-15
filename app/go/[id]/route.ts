@@ -5,14 +5,15 @@
  *
  * 1. Validates listing_id is a UUID and the listing exists (not stale > 30 days).
  * 2. Reads the anonymous session cookie (__cc_session); generates one if absent.
- * 3. Inserts a click_events row (fire-and-forget — does NOT block the redirect).
+ * 3. Inserts a click_events row via `after()` so the write is guaranteed even
+ *    after the response is flushed (does NOT block the redirect).
  * 4. Wraps retailerUrl through the retailer's affiliate network if configured.
  * 5. Returns 302 to the (possibly wrapped) destination URL.
  */
 
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma }                    from '@/lib/prisma'
-import { wrapAffiliateUrl }          from '@/lib/affiliate'
+import { NextRequest, NextResponse, after } from 'next/server'
+import { prisma }                           from '@/lib/prisma'
+import { wrapAffiliateUrl }                 from '@/lib/affiliate'
 
 // Listings last seen more than 30 days ago are treated as stale.
 const STALE_DAYS = 30
@@ -76,16 +77,20 @@ export async function GET(
   const existingToken = req.cookies.get(cookieName)?.value
   const sessionToken  = existingToken ?? crypto.randomUUID()
 
-  // ── 5. Fire-and-forget click event insert ─────────────────────────────────
-  //    We don't await — the user gets the redirect instantly.
-  prisma.clickEvent.create({
-    data: {
-      listingId:   id,
-      userSession: sessionToken,
-      referrer:    req.headers.get('referer') ?? null,
-      userAgent:   req.headers.get('user-agent') ?? null,
-    },
-  }).catch(err => console.error('[/go] click_event insert failed:', err))
+  // ── 5. Register click event insert with the runtime ───────────────────────
+  //    `after` tells Vercel to keep the serverless function alive until the
+  //    Promise resolves, even after the response has been flushed.  The user
+  //    still gets the redirect instantly — there is no added latency.
+  after(
+    prisma.clickEvent.create({
+      data: {
+        listingId:   id,
+        userSession: sessionToken,
+        referrer:    req.headers.get('referer') ?? null,
+        userAgent:   req.headers.get('user-agent') ?? null,
+      },
+    }).catch(err => console.error('[/go] click_event insert failed:', err))
+  )
 
   // ── 6. Wrap URL through affiliate network if configured ───────────────────
   const destination = wrapAffiliateUrl(

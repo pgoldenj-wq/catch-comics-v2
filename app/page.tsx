@@ -735,6 +735,15 @@ export default function Home() {
 
       </div>{/* end hidden md:block desktop wrapper */}
 
+      {/* ── Affiliate disclosure + legal footer ────────────────────────────── */}
+      <footer style={{ borderTop: '1px solid #E5E7EB', marginTop: '24px', padding: '20px 24px', textAlign: 'center' }}>
+        <p style={{ fontSize: '11px', color: '#9CA3AF', lineHeight: 1.6, maxWidth: '640px', margin: '0 auto' }}>
+          Catch Comics is a price-comparison service. When you click a retailer link we may earn a small
+          affiliate commission at no extra cost to you. Prices are sourced directly from retailers and may
+          change at any time — always verify the final price on the retailer&apos;s site before purchasing.
+        </p>
+      </footer>
+
     </main>
   );
 }

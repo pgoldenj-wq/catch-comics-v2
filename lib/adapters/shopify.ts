@@ -137,8 +137,12 @@ const MAX_FETCH_RETRIES   = 3
  *
  * Used by the opt-in comic_filter (sync_config.comic_filter = true).
  * Mirrors the set in scripts/day5-tm-controlled-sync.ts.
+ *
+ * Extended to cover common UK comic/manga retailer product_type labels,
+ * including collected editions, back issues, format shorthands, and art books.
  */
 const COMIC_PRODUCT_TYPES = new Set([
+  // Original values
   'manga',
   'graphic novel',
   'comic',
@@ -146,6 +150,30 @@ const COMIC_PRODUCT_TYPES = new Set([
   'trade paperback',
   'hardcover',
   'single issue',
+  // Plural / alternate spellings
+  'graphic novels',
+  // Format shorthands
+  'tpb',
+  // Collected edition variants
+  'omnibus',
+  'compendium',
+  'collected edition',
+  'collected editions',
+  'deluxe edition',
+  'absolute edition',
+  'collected volume',
+  // Back issues
+  'back issue',
+  'back issues',
+  // Floppy / single-issue slang
+  'floppies',
+  'floppy',
+  // Bundles
+  'box set',
+  // Manga-specific volume label
+  'manga volume',
+  // Art books (some UK retailers tag these alongside comics)
+  'art book',
 ])
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
@@ -602,9 +630,24 @@ export class ShopifyAdapter {
       for (const product of products) {
         // Opt-in comic filter — skip non-comic product types when enabled.
         // Silently counted; does not generate an error entry.
+        //
+        // When product_type is absent/empty we fall back to scanning the tags
+        // array for a "TYPE|<value>" tag whose value is in COMIC_PRODUCT_TYPES.
+        // This handles retailers that omit product_type but use structured tags
+        // (e.g. ["TYPE|Graphic Novel", "GENRE|Superhero"]).
         if (applyComicFilter) {
           const pt = (product.product_type ?? '').toLowerCase().trim()
-          if (!COMIC_PRODUCT_TYPES.has(pt)) {
+          const isComicType = COMIC_PRODUCT_TYPES.has(pt)
+          const isComicByTag =
+            !isComicType &&
+            pt === '' &&
+            product.tags.some(tag => {
+              const lower = tag.toLowerCase()
+              if (!lower.startsWith('type|')) return false
+              const typeVal = lower.slice(5).trim()
+              return COMIC_PRODUCT_TYPES.has(typeVal)
+            })
+          if (!isComicType && !isComicByTag) {
             filteredOut++
             continue
           }

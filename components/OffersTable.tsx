@@ -125,10 +125,11 @@ export default function OffersTable({ offers }: Props) {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {visible.map(o => {
+              {visible.map((o, i) => {
                 const stale  = isStale(o.lastSeenAt)
                 const stock  = STOCK_LABELS[o.stockStatus] ?? STOCK_LABELS['UNKNOWN']
                 const total  = o.priceAmount + (o.shippingAmount ?? 0)
+                const isBest = i === 0 && visible.length > 1
 
                 return (
                   <tr
@@ -136,9 +137,16 @@ export default function OffersTable({ offers }: Props) {
                     className={`hover:bg-gray-50 transition-colors ${stale ? 'opacity-50' : ''}`}
                   >
                     <td className="py-3 pr-4 font-medium text-gray-900">
-                      {o.retailerName}
+                      <span className="flex items-center gap-2 flex-wrap">
+                        {o.retailerName}
+                        {isBest && (
+                          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#E8272A] text-white leading-none">
+                            Best price
+                          </span>
+                        )}
+                      </span>
                       {stale && (
-                        <span className="ml-2 text-xs text-amber-600 font-normal">(stale)</span>
+                        <span className="ml-0 text-xs text-amber-600 font-normal">(stale)</span>
                       )}
                     </td>
                     <td className="py-3 pr-4 text-gray-700">
@@ -184,7 +192,7 @@ export default function OffersTable({ offers }: Props) {
                             : 'bg-[#E8272A] text-white hover:bg-[#c41f22]'
                         }`}
                       >
-                        View deal ↗
+                        Buy at {o.retailerName} ↗
                       </a>
                     </td>
                   </tr>

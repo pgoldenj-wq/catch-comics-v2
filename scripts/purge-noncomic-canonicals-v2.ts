@@ -119,6 +119,8 @@ const COMIC_PUBLISHERS = new Set([
   'Hachette Aotearoa New Zealand', // NZ manga imprint (Battle Royale, Re:ZERO…)
   'Penguin Random House NZ',       // NZ comics/manga arm (Apothecary Diaries, Absolute Flash…)
   'Melia Publishing Services Limited', // manga/BL distributor (Acid Town, Crossplay Love…)
+  'Aloha Comics LLC',                  // indie comics publisher (confirmed comic-specific)
+  'BOOM! Box',                         // BOOM! Studios imprint (Lumberjanes, Giant Days…)
 ])
 
 // ── Title keyword signals (non-comic indicators) ──────────────────────────────

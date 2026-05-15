@@ -386,7 +386,7 @@ export default async function ProductPage(
                     rel="noopener noreferrer"
                     className="inline-block px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-base transition-colors"
                   >
-                    View deal ↗
+                    Buy at {bestListing.retailer.name} ↗
                   </a>
                 </div>
               </div>

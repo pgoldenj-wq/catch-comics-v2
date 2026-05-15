@@ -131,7 +131,7 @@ export async function matchCanonical(
   if (isbn13) {
     // ── 1. Look up existing canonical product by ISBN ─────────────────────
     const existing = await prisma.canonicalProduct.findFirst({
-      where:  { isbn13 },
+      where:  { isbn13, deletedAt: null },
       select: { id: true },
     })
     if (existing) {
@@ -206,7 +206,7 @@ export async function matchCanonical(
 
       if (isUniqueViolation) {
         const race = await prisma.canonicalProduct.findFirst({
-          where:  { isbn13 },
+          where:  { isbn13, deletedAt: null },
           select: { id: true },
         })
         if (race) {
@@ -220,7 +220,7 @@ export async function matchCanonical(
   // ── EAN-only match (lookup only — no auto-creation) ───────────────────────
   if (ean) {
     const hit = await prisma.canonicalProduct.findFirst({
-      where:  { ean },
+      where:  { ean, deletedAt: null },
       select: { id: true },
     })
     if (hit) {
