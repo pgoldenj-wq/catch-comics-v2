@@ -338,7 +338,9 @@ export default function Home() {
       <div className="md:hidden" style={{ padding: '16px 16px 0' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '14px' }}>
           <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#111', margin: 0 }}>Top deals today</h2>
-          <span style={{ fontSize: '11px', color: '#6B7280' }}>Prices updated daily</span>
+          <span style={{ fontSize: '11px', color: '#6B7280' }}>
+            {liveDeals ? 'Live prices from retailers' : 'Sample prices'}
+          </span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
           {(liveDeals ?? TOP_DEALS).slice(0, 6).map((deal, idx) => {
@@ -580,7 +582,7 @@ export default function Home() {
           <div style={{ flexShrink: 0 }}>
             <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#111', margin: 0 }}>Top deals today</h2>
             <p style={{ fontSize: '11px', color: '#6B7280', margin: '2px 0 0' }}>
-              Prices updated daily
+              {liveDeals ? 'Live prices from retailers' : 'Sample prices'}
             </p>
           </div>
           {/* Right — popular search tags, low visual weight */}

@@ -120,7 +120,8 @@ export async function generateMetadata(
   const title       = product.title
   const description = product.description
     ?? `Compare prices for ${title}${product.publisher ? ` from ${product.publisher}` : ''}.`
-  const url         = `https://catchcomics.co.uk/product/${slug}`
+  const BASE_URL    = (process.env.NEXT_PUBLIC_SITE_URL || 'https://catchcomics.com').replace(/\/$/, '')
+  const url         = `${BASE_URL}/product/${slug}`
   const image       = product.coverImageUrl
 
   return {
@@ -185,9 +186,11 @@ export default async function ProductPage(
   if (amazonOffer && !amazonOffer.fromCache) {
     const alreadyPresent = allListings.some(l => l.id === amazonOffer!.listingId)
     if (!alreadyPresent) {
-      // Re-query to get the freshly upserted listing in the same shape
-      const freshAmazon = await prisma.retailerListing.findUnique({
-        where  : { id: amazonOffer.listingId },
+      // Re-query to get the freshly upserted listing in the same shape.
+      // Guard deletedAt: a listing soft-deleted between upsert and here should
+      // not be surfaced to the user.
+      const freshAmazon = await prisma.retailerListing.findFirst({
+        where  : { id: amazonOffer.listingId, deletedAt: null },
         include: {
           retailer    : { select: { name: true, trustScore: true, affiliateNetwork: true, affiliateId: true } },
           priceHistory: { orderBy: { recordedAt: 'asc' }, take: 90, select: { priceAmount: true, priceCurrency: true, recordedAt: true } },

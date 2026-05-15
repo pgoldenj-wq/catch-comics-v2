@@ -32,6 +32,7 @@ export async function GET(
   let listing: {
     retailerUrl:      string
     lastSeenAt:       Date
+    deletedAt:        Date | null
     retailer: {
       affiliateNetwork: string | null
       affiliateId:      string | null
@@ -44,6 +45,7 @@ export async function GET(
       select: {
         retailerUrl: true,
         lastSeenAt:  true,
+        deletedAt:   true,
         retailer: {
           select: {
             affiliateNetwork: true,
@@ -57,7 +59,8 @@ export async function GET(
     return new NextResponse('Server error', { status: 500 })
   }
 
-  if (!listing) {
+  // Treat missing or soft-deleted listings the same — both return 404
+  if (!listing || listing.deletedAt !== null) {
     return new NextResponse('Listing not found', { status: 404 })
   }
 
