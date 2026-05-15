@@ -54,6 +54,20 @@ export async function GET() {
         ON rl.canonical_product_id = cp.id
         AND rl.stock_status = 'IN_STOCK'
         AND rl.deleted_at IS NULL
+      WHERE (
+        cp.format IN ('SINGLE_ISSUE','MANGA_VOLUME','OMNIBUS','ABSOLUTE','COMPENDIUM','DELUXE')
+        OR (
+          cp.format IN ('TPB','HARDCOVER')
+          AND cp.publisher IN (
+            'DC Comics','Marvel','Image Comics','Dark Horse Comics','Viz Media',
+            'IDW Publishing','BOOM! Studios','Valiant','Dynamite','Oni Press',
+            'Fantagraphics','Drawn & Quarterly','Top Shelf','Archie Comics',
+            'Slave Labor Graphics','Avatar Press','Titan Comics','Rebellion',
+            'Panini','Kodansha','Shueisha','Shogakukan','Square Enix','Yen Press',
+            'Seven Seas','Tokyopop','Del Rey Manga','Vertical','Udon','Antarctic Press'
+          )
+        )
+      )
       GROUP BY cp.id, cp.canonical_slug, cp.title, cp.publisher, cp.format, cp.cover_image_url
       HAVING COUNT(rl.id) >= 1
       ORDER BY listing_count DESC
