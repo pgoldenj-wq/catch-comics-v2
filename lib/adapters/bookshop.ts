@@ -9,9 +9,12 @@
  *   Listings are generated from the known ISBN deep-link URL pattern:
  *     https://uk.bookshop.org/p/books/{isbn13}
  *   Affiliate attribution is applied at click time by /go/[id] via wrapAffiliateUrl()
- *   using the retailer's affiliateNetwork='bookshop' and affiliateId.
+ *   using the retailer's affiliateNetwork='awin' and affiliateId='62675' (Bookshop UK
+ *   Awin merchant ID).
  *
- *   Final click URL: https://uk.bookshop.org/a/{affiliateId}/p/books/{isbn13}
+ *   Final click URL:
+ *     https://www.awin1.com/cread.php?awinmid=62675&awinaffid=2888331&ued={encodedUrl}
+ *   where ued = https://uk.bookshop.org/p/books/{isbn13}
  *
  * API enrichment (optional):
  *   GET https://api.bookshop.org/books/{isbn13}?api_key={KEY}
@@ -24,10 +27,9 @@
  *   API key is configured.
  *
  * Env vars:
- *   BOOKSHOP_AFFILIATE_ID     — Bookshop.org partner/affiliate ID (required for commission)
- *   BOOKSHOP_UK_AFFILIATE_ID  — UK-specific affiliate ID (falls back to BOOKSHOP_AFFILIATE_ID)
- *   BOOKSHOP_API_KEY          — API key for price data (optional)
- *   BOOKSHOP_UK_API_KEY       — UK API key (falls back to BOOKSHOP_API_KEY)
+ *   AWIN_PUBLISHER_ID    — set globally; used by wrapAffiliateUrl() for all Awin links
+ *   BOOKSHOP_API_KEY     — optional; enables real price data from Bookshop API
+ *   BOOKSHOP_UK_API_KEY  — optional UK-specific override (falls back to BOOKSHOP_API_KEY)
  *
  * Trust score: 85 (ethical independent-bookshop affiliate, reliable data).
  */
@@ -63,9 +65,11 @@ interface MarketConfig {
   apiKey       : string | undefined
   /** Query-string param to scope the API request to a specific country */
   countryParam : string | null
-  /** Bookshop.org affiliate partner ID for the /a/{id}/ URL prefix */
-  affiliateId  : string | undefined
 }
+
+// Awin merchant ID for Bookshop.org UK — not a secret, safe to hardcode.
+// Publisher ID (2888331) is read from AWIN_PUBLISHER_ID by wrapAffiliateUrl().
+const BOOKSHOP_UK_AWIN_MID = '62675'
 
 const MARKETS: MarketConfig[] = [
   {
@@ -76,7 +80,6 @@ const MARKETS: MarketConfig[] = [
     countryCode : 'US',
     apiKey      : process.env.BOOKSHOP_API_KEY,
     countryParam: null,
-    affiliateId : process.env.BOOKSHOP_AFFILIATE_ID,
   },
   {
     market      : 'uk',
@@ -86,7 +89,6 @@ const MARKETS: MarketConfig[] = [
     countryCode : 'GB',
     apiKey      : process.env.BOOKSHOP_UK_API_KEY ?? process.env.BOOKSHOP_API_KEY,
     countryParam: 'uk',
-    affiliateId : process.env.BOOKSHOP_UK_AFFILIATE_ID ?? process.env.BOOKSHOP_AFFILIATE_ID,
   },
 ]
 
@@ -103,8 +105,8 @@ const TRUST_SCORE = 85
  *   https://uk.bookshop.org/p/books/{isbn13}
  *
  * Affiliate attribution is NOT included here — it is added at click time by
- * wrapAffiliateUrl() in /go/[id], producing:
- *   https://uk.bookshop.org/a/{affiliateId}/p/books/{isbn13}
+ * wrapAffiliateUrl() in /go/[id] via the Awin case, producing:
+ *   https://www.awin1.com/cread.php?awinmid=62675&awinaffid=2888331&ued={encodedUrl}
  */
 function generateBookshopUrl(isbn13: string, cfg: MarketConfig): string {
   const base = cfg.market === 'uk' ? 'https://uk.bookshop.org' : 'https://bookshop.org'
@@ -144,22 +146,27 @@ function normalizeBookshopUrl(rawUrl: string): string {
  * applies our affiliate token.
  */
 async function ensureRetailer(cfg: MarketConfig): Promise<string> {
-  const affiliateId = cfg.affiliateId ?? null
+  // UK market routes through Awin (merchant 62675).
+  // US market has no Awin relationship — no affiliate wrapping.
+  const affiliateNetwork = cfg.market === 'uk' ? 'awin'            : null
+  const affiliateId      = cfg.market === 'uk' ? BOOKSHOP_UK_AWIN_MID : null
 
   const existing = await prisma.retailer.findUnique({ where: { domain: cfg.domain } })
 
   if (existing) {
-    // Patch records missing affiliateNetwork (created before this fix)
-    if (existing.affiliateNetwork !== 'bookshop' && affiliateId !== null) {
+    // Patch records created before the Awin routing was established.
+    // Condition covers: wrong network ('bookshop'), or missing network (null) on UK records.
+    const needsPatch = cfg.market === 'uk' && existing.affiliateNetwork !== 'awin'
+    if (needsPatch) {
       await prisma.retailer.update({
         where: { id: existing.id },
         data: {
           platform        : 'DYNAMIC_LINK' as unknown as import('@prisma/client').RetailerPlatform,
-          affiliateNetwork: 'bookshop',
-          affiliateId,
+          affiliateNetwork: 'awin',
+          affiliateId     : BOOKSHOP_UK_AWIN_MID,
         },
       })
-      console.log(`[bookshop] patched retailer ${cfg.domain} → DYNAMIC_LINK + affiliateNetwork=bookshop`)
+      console.log(`[bookshop] patched retailer ${cfg.domain} → DYNAMIC_LINK + affiliateNetwork=awin (mid=${BOOKSHOP_UK_AWIN_MID})`)
     }
     return existing.id
   }
@@ -173,7 +180,7 @@ async function ensureRetailer(cfg: MarketConfig): Promise<string> {
       currency        : cfg.currency,
       isActive        : true,
       trustScore      : TRUST_SCORE,
-      affiliateNetwork: affiliateId ? 'bookshop' : null,
+      affiliateNetwork,
       affiliateId,
       syncConfig      : {},
     },
