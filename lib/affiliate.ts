@@ -6,7 +6,8 @@
  *
  * Networks supported:
  *   awin      — Awin (formerly Affiliate Window). Publisher id from AWIN_PUBLISHER_ID env var.
- *   bookshop  — Bookshop.org affiliate programme. affiliateId = their partner ID.
+ *               Accepts an optional `clickref` for Awin transaction-level reporting.
+ *   bookshop  — Bookshop.org native programme (legacy; Bookshop UK now routes via awin).
  *               Deep-link format: https://bookshop.org/a/{affiliateId}/{path}
  *   cj        — Commission Junction (CJ). Placeholder — extend when we have a CJ retailer.
  *   none      — No wrapping; return the original URL unchanged.
@@ -20,11 +21,20 @@ export type AffiliateNetwork = 'awin' | 'cj' | string | null | undefined
 /**
  * Wrap `targetUrl` through the given affiliate network.
  * Returns the original URL if the network is unrecognised or misconfigured.
+ *
+ * @param targetUrl        Bare destination URL (e.g. https://uk.bookshop.org/p/books/…)
+ * @param affiliateNetwork Network identifier ('awin' | 'bookshop' | 'cj' | null)
+ * @param affiliateId      Merchant/partner ID for the network (e.g. '62675' for Bookshop UK on Awin)
+ * @param clickref         Optional Awin tracking tag; appears in Awin Transaction Reports for
+ *                         per-listing commission reconciliation. Recommended format:
+ *                         'cc-{listingId[0..7]}' (e.g. 'cc-3f7a9b2e'). Max 32 chars, URL-safe.
+ *                         Silently omitted when undefined — all existing call sites unaffected.
  */
 export function wrapAffiliateUrl(
   targetUrl:        string,
   affiliateNetwork: AffiliateNetwork,
   affiliateId:      string | null | undefined,
+  clickref?:        string,
 ): string {
   if (!affiliateNetwork || !affiliateId) return targetUrl
 
@@ -36,12 +46,13 @@ export function wrapAffiliateUrl(
         return targetUrl
       }
       // Awin deep-link format:
-      // https://www.awin1.com/cread.php?awinmid={merchantId}&awinaffid={publisherId}&ued={encodedTargetUrl}
+      // https://www.awin1.com/cread.php?awinmid={mid}&awinaffid={pub}&clickref={tag}&ued={encodedUrl}
       const params = new URLSearchParams({
         awinmid:   affiliateId,
         awinaffid: publisherId,
         ued:       targetUrl,
       })
+      if (clickref) params.set('clickref', clickref)
       return `https://www.awin1.com/cread.php?${params.toString()}`
     }
 

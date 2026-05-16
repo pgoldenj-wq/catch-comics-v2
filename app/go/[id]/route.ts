@@ -93,10 +93,15 @@ export async function GET(
   )
 
   // ── 6. Wrap URL through affiliate network if configured ───────────────────
+  // clickref format: 'cc-{first 8 hex chars of listing UUID}'
+  // Appears in Awin Transaction Reports for per-listing commission reconciliation.
+  // Example: cc-3f7a9b2e → join on click_events.listing_id LIKE '3f7a9b2e%'
+  const clickref    = `cc-${id.slice(0, 8)}`
   const destination = wrapAffiliateUrl(
     listing.retailerUrl,
     listing.retailer.affiliateNetwork,
     listing.retailer.affiliateId,
+    clickref,
   )
 
   // ── 7. Redirect, setting session cookie if it's new ───────────────────────
