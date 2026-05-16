@@ -44,7 +44,8 @@ enum RetailerPlatform {
   AWIN_FEED        // Awin affiliate product feed
   CJ_FEED          // Commission Junction feed
   DIRECT_AFFILIATE // Retailer runs their own affiliate programme (no network intermediary)
-  EXTERNAL_API     // On-demand lookup via a paid third-party API (e.g. Rainforest for Amazon, Bookshop.org)
+  EXTERNAL_API     // On-demand lookup via a paid third-party API (e.g. Rainforest for Amazon)
+  DYNAMIC_LINK     // URL generated from known template (e.g. ISBN deep-link). No feed, no API. Affiliate attribution applied at click time.
   MANUAL           // Hand-entered records
 }
 

@@ -5,16 +5,29 @@
  * Each market is represented by a separate retailer record so prices and
  * currencies remain distinct.
  *
- * API:
- *   ISBN lookup: GET https://api.bookshop.org/books/{isbn13}?api_key={KEY}
- *   UK variant:  GET https://api.bookshop.org/books/{isbn13}?api_key={KEY}&country=uk
+ * Platform type: DYNAMIC_LINK
+ *   Listings are generated from the known ISBN deep-link URL pattern:
+ *     https://uk.bookshop.org/p/books/{isbn13}
+ *   Affiliate attribution is applied at click time by /go/[id] via wrapAffiliateUrl()
+ *   using the retailer's affiliateNetwork='bookshop' and affiliateId.
  *
- * The `url` field in the response already contains Bookshop.org's own affiliate
- * attribution — do NOT modify it.  Set retailer_url directly from this field.
+ *   Final click URL: https://uk.bookshop.org/a/{affiliateId}/p/books/{isbn13}
+ *
+ * API enrichment (optional):
+ *   GET https://api.bookshop.org/books/{isbn13}?api_key={KEY}
+ *   UK: GET https://api.bookshop.org/books/{isbn13}?api_key={KEY}&country=uk
+ *
+ *   When BOOKSHOP_API_KEY is set, the API is called and real prices are stored.
+ *   When no API key, dynamic link stubs are created (stockStatus=UNKNOWN, price=0.00).
+ *   Stubs are filtered from the product page display but provide valid affiliate links.
+ *   The daily bookshop-refresh Inngest job promotes stubs to real listings once the
+ *   API key is configured.
  *
  * Env vars:
- *   BOOKSHOP_API_KEY     — required for US lookups
- *   BOOKSHOP_UK_API_KEY  — optional; enables UK listings (can be same key)
+ *   BOOKSHOP_AFFILIATE_ID     — Bookshop.org partner/affiliate ID (required for commission)
+ *   BOOKSHOP_UK_AFFILIATE_ID  — UK-specific affiliate ID (falls back to BOOKSHOP_AFFILIATE_ID)
+ *   BOOKSHOP_API_KEY          — API key for price data (optional)
+ *   BOOKSHOP_UK_API_KEY       — UK API key (falls back to BOOKSHOP_API_KEY)
  *
  * Trust score: 85 (ethical independent-bookshop affiliate, reliable data).
  */
@@ -34,7 +47,7 @@ export interface BookshopBook {
   list_price   : number
   cover_image  : string
   description  : string
-  /** Affiliate URL — already tagged; never modify */
+  /** Product URL — may contain an internal affiliate token; normalised before storage */
   url          : string
 }
 
@@ -48,8 +61,10 @@ interface MarketConfig {
   currency     : string
   countryCode  : string
   apiKey       : string | undefined
-  /** Query-string param to scope the request to a specific country */
+  /** Query-string param to scope the API request to a specific country */
   countryParam : string | null
+  /** Bookshop.org affiliate partner ID for the /a/{id}/ URL prefix */
+  affiliateId  : string | undefined
 }
 
 const MARKETS: MarketConfig[] = [
@@ -61,6 +76,7 @@ const MARKETS: MarketConfig[] = [
     countryCode : 'US',
     apiKey      : process.env.BOOKSHOP_API_KEY,
     countryParam: null,
+    affiliateId : process.env.BOOKSHOP_AFFILIATE_ID,
   },
   {
     market      : 'uk',
@@ -70,32 +86,96 @@ const MARKETS: MarketConfig[] = [
     countryCode : 'GB',
     apiKey      : process.env.BOOKSHOP_UK_API_KEY ?? process.env.BOOKSHOP_API_KEY,
     countryParam: 'uk',
+    affiliateId : process.env.BOOKSHOP_UK_AFFILIATE_ID ?? process.env.BOOKSHOP_AFFILIATE_ID,
   },
 ]
 
 const USER_AGENT  = 'CatchComics/1.0 (+https://catchcomics.com/bot)'
 const TRUST_SCORE = 85
 
+// ── URL helpers ───────────────────────────────────────────────────────────────
+
+/**
+ * Generate a bare Bookshop.org product URL from an ISBN-13.
+ *
+ * Bookshop.org resolves ISBNs as the final path segment, redirecting to the
+ * canonical product page. This is the affiliate deep-link format:
+ *   https://uk.bookshop.org/p/books/{isbn13}
+ *
+ * Affiliate attribution is NOT included here — it is added at click time by
+ * wrapAffiliateUrl() in /go/[id], producing:
+ *   https://uk.bookshop.org/a/{affiliateId}/p/books/{isbn13}
+ */
+function generateBookshopUrl(isbn13: string, cfg: MarketConfig): string {
+  const base = cfg.market === 'uk' ? 'https://uk.bookshop.org' : 'https://bookshop.org'
+  return `${base}/p/books/${isbn13}`
+}
+
+/**
+ * Strip any existing affiliate prefix from a Bookshop.org URL.
+ *
+ * The Bookshop.org API may return URLs pre-tagged with the API caller's
+ * affiliate token:
+ *   https://uk.bookshop.org/a/{token}/p/books/{slug}/{id}
+ * → https://uk.bookshop.org/p/books/{slug}/{id}
+ *
+ * We always store the bare URL and apply our own affiliate token at click
+ * time via wrapAffiliateUrl(), ensuring we earn the commission.
+ */
+function normalizeBookshopUrl(rawUrl: string): string {
+  try {
+    const u     = new URL(rawUrl)
+    const match = u.pathname.match(/^\/a\/[^/]+(\/.+)$/)
+    if (match) u.pathname = match[1]!
+    return u.origin + u.pathname + u.search + u.hash
+  } catch {
+    return rawUrl
+  }
+}
+
 // ── Retailer record management ────────────────────────────────────────────────
 
 /**
  * Get-or-create a retailer row for the given Bookshop.org market.
  * Safe to call on every lookup — upserts on domain conflict.
+ *
+ * Also patches pre-existing records that were created before DYNAMIC_LINK /
+ * affiliateNetwork support was added, ensuring the /go/[id] redirect always
+ * applies our affiliate token.
  */
 async function ensureRetailer(cfg: MarketConfig): Promise<string> {
+  const affiliateId = cfg.affiliateId ?? null
+
   const existing = await prisma.retailer.findUnique({ where: { domain: cfg.domain } })
-  if (existing) return existing.id
+
+  if (existing) {
+    // Patch records missing affiliateNetwork (created before this fix)
+    if (existing.affiliateNetwork !== 'bookshop' && affiliateId !== null) {
+      await prisma.retailer.update({
+        where: { id: existing.id },
+        data: {
+          platform        : 'DYNAMIC_LINK' as unknown as import('@prisma/client').RetailerPlatform,
+          affiliateNetwork: 'bookshop',
+          affiliateId,
+        },
+      })
+      console.log(`[bookshop] patched retailer ${cfg.domain} → DYNAMIC_LINK + affiliateNetwork=bookshop`)
+    }
+    return existing.id
+  }
 
   const created = await prisma.retailer.create({
     data: {
-      name        : cfg.retailerName,
-      domain      : cfg.domain,
-      platform    : 'EXTERNAL_API' as unknown as import('@prisma/client').RetailerPlatform,
-      countryCode : cfg.countryCode,
-      currency    : cfg.currency,
-      isActive    : true,
-      trustScore  : TRUST_SCORE,
-      syncConfig  : {},
+      name            : cfg.retailerName,
+      domain          : cfg.domain,
+      platform        : 'DYNAMIC_LINK' as unknown as import('@prisma/client').RetailerPlatform,
+      countryCode     : cfg.countryCode,
+      currency        : cfg.currency,
+      isActive        : true,
+      trustScore      : TRUST_SCORE,
+      affiliateNetwork: affiliateId ? 'bookshop' : null,
+      affiliateId,
+      syncConfig      : {},
     },
   })
   console.log(`[bookshop] created retailer record for ${cfg.domain} (${created.id})`)
@@ -139,51 +219,87 @@ async function fetchBookshopIsbn(isbn13: string, cfg: MarketConfig): Promise<Boo
 
 // ── DB upsert ─────────────────────────────────────────────────────────────────
 
+/**
+ * Upsert a Bookshop.org listing for the given ISBN.
+ *
+ * @param book  API response data. Pass null for a dynamic-link stub (no API call).
+ *
+ * When book is null, the listing is created with stockStatus=UNKNOWN and
+ * priceAmount=0.00. These stubs are excluded from product page display by the
+ * `priceAmount > 0` filter in getProduct(), but the /go/[id] affiliate redirect
+ * still works correctly once the affiliate ID is configured.
+ *
+ * When a subsequent API call resolves the stub (book !== null), the listing is
+ * promoted: real price, IN_STOCK status, and a price history entry are written.
+ */
 async function upsertBookshopListing(
   retailerId        : string,
   canonicalProductId: string,
-  book              : BookshopBook,
-  currency          : string,
+  isbn13            : string,
+  cfg               : MarketConfig,
+  book              : BookshopBook | null,
   syncAt            : Date,
 ): Promise<'created' | 'updated' | 'price_changed'> {
-  const priceAmount = book.price.toFixed(2)
+  // URL: normalise API URL (strips any pre-existing affiliate prefix) or generate from ISBN
+  const retailerUrl  = book ? normalizeBookshopUrl(book.url) : generateBookshopUrl(isbn13, cfg)
+  const priceAmount  = book ? book.price.toFixed(2) : '0.00'
+  const stockStatus  = book ? StockStatus.IN_STOCK   : StockStatus.UNKNOWN
+  const title        = book?.title ?? isbn13
+  const imageUrl     = book?.cover_image            || null
 
   const existing = await prisma.retailerListing.findUnique({
-    where: { retailerId_retailerSku: { retailerId, retailerSku: book.isbn13 } },
+    where: { retailerId_retailerSku: { retailerId, retailerSku: isbn13 } },
   })
 
   if (!existing) {
     await prisma.retailerListing.create({
       data: {
         retailerId,
-        retailerSku       : book.isbn13,
-        retailerUrl       : book.url,   // affiliate-tagged URL from API — do not modify
-        title             : book.title,
+        retailerSku    : isbn13,
+        retailerUrl,
+        title,
         priceAmount,
-        priceCurrency     : currency,
-        stockStatus       : StockStatus.IN_STOCK,
-        condition         : ListingCondition.NEW,
-        conditionDetail   : null,
-        imageUrl          : book.cover_image || null,
-        rawData           : book as unknown as Prisma.InputJsonValue,
+        priceCurrency  : cfg.currency,
+        stockStatus,
+        condition      : ListingCondition.NEW,
+        conditionDetail: null,
+        imageUrl,
+        isbn13,
+        rawData        : (book ?? {}) as unknown as Prisma.InputJsonValue,
         canonicalProductId,
-        matchMethod       : MatchMethod.ISBN,
-        matchConfidence   : 95,
-        firstSeenAt       : syncAt,
-        lastSeenAt        : syncAt,
-        priceHistory: {
-          create: {
-            priceAmount,
-            priceCurrency: currency,
-            stockStatus  : StockStatus.IN_STOCK,
-            recordedAt   : syncAt,
+        matchMethod    : MatchMethod.ISBN,
+        matchConfidence: 95,
+        firstSeenAt    : syncAt,
+        lastSeenAt     : syncAt,
+        // Only write price history when we have a real price
+        ...(book ? {
+          priceHistory: {
+            create: {
+              priceAmount,
+              priceCurrency: cfg.currency,
+              stockStatus  : StockStatus.IN_STOCK,
+              recordedAt   : syncAt,
+            },
           },
-        },
+        } : {}),
       },
     })
     return 'created'
   }
 
+  // Stub update: just touch lastSeenAt + URL; don't overwrite a real price with 0.00
+  if (!book) {
+    if (existing.stockStatus === StockStatus.UNKNOWN) {
+      await prisma.retailerListing.update({
+        where: { id: existing.id },
+        data : { lastSeenAt: syncAt, retailerUrl, deletedAt: null },
+      })
+    }
+    // If the listing already has a real price, leave it untouched
+    return 'updated'
+  }
+
+  // Full update from API data
   const priceChanged = !existing.priceAmount.equals(new Prisma.Decimal(priceAmount))
 
   await prisma.retailerListing.update({
@@ -192,11 +308,12 @@ async function upsertBookshopListing(
       lastSeenAt : syncAt,
       stockStatus: StockStatus.IN_STOCK,
       priceAmount,
-      title      : book.title,
-      imageUrl   : book.cover_image || null,
+      title,
+      imageUrl,
       rawData    : book as unknown as Prisma.InputJsonValue,
-      retailerUrl: book.url,
-      deletedAt  : null,   // un-delete if it was soft-deleted
+      retailerUrl,
+      isbn13,
+      deletedAt  : null,
       ...(priceChanged ? { lastPriceChangeAt: syncAt } : {}),
     },
   })
@@ -206,7 +323,7 @@ async function upsertBookshopListing(
       data: {
         retailerListingId: existing.id,
         priceAmount,
-        priceCurrency    : currency,
+        priceCurrency    : cfg.currency,
         stockStatus      : StockStatus.IN_STOCK,
         recordedAt       : syncAt,
       },
@@ -230,14 +347,23 @@ export interface BookshopLookupResult {
 /**
  * Look up an ISBN on Bookshop.org and upsert the listing(s) into the DB.
  *
- * @param isbn13            The ISBN-13 to look up.
- * @param canonicalProductId The canonical_products.id to link the listing to.
- * @param markets           Which markets to query. Default: all configured markets.
+ * Behaviour:
+ *   1. If BOOKSHOP_[UK_]API_KEY is set — calls the API to get real price data.
+ *   2. If no API key — creates a dynamic link stub (UNKNOWN stock, £0.00).
+ *      The stub provides a valid affiliate redirect via /go/[id] but is
+ *      excluded from the product page's price comparison table.
+ *
+ * @param isbn13              The ISBN-13 to look up.
+ * @param canonicalProductId  The canonical_products.id to link the listing to.
+ * @param markets             Which markets to query. Default: all configured markets.
+ * @param allowStubs          If true (default), create dynamic link stubs when no API
+ *                            key is configured. Pass false to skip markets with no key.
  */
 export async function lookupByIsbn(
   isbn13            : string,
   canonicalProductId: string,
   markets           : Array<'us' | 'uk'> = ['us', 'uk'],
+  allowStubs        = true,
 ): Promise<BookshopLookupResult[]> {
   const syncAt  = new Date()
   const results : BookshopLookupResult[] = []
@@ -245,29 +371,40 @@ export async function lookupByIsbn(
   for (const marketKey of markets) {
     const cfg = MARKETS.find(m => m.market === marketKey)!
 
-    if (!cfg.apiKey) {
-      results.push({ market: marketKey, found: false, outcome: 'skipped' })
-      continue
-    }
-
     try {
-      const book = await fetchBookshopIsbn(isbn13, cfg)
-      if (!book) {
+      // Attempt API fetch (returns null if no key or 404)
+      const book = cfg.apiKey ? await fetchBookshopIsbn(isbn13, cfg) : null
+
+      // No API key + stubs not wanted → skip this market
+      if (!book && !cfg.apiKey && !allowStubs) {
+        results.push({ market: marketKey, found: false, outcome: 'skipped' })
+        continue
+      }
+
+      // API returned 404 → book not in catalog; only create stub if we have an affiliate ID
+      if (!book && cfg.apiKey && !allowStubs) {
         results.push({ market: marketKey, found: false, outcome: 'not_found' })
         continue
       }
 
       const retailerId = await ensureRetailer(cfg)
-      const outcome    = await upsertBookshopListing(retailerId, canonicalProductId, book, cfg.currency, syncAt)
+      const outcome    = await upsertBookshopListing(
+        retailerId, canonicalProductId, isbn13, cfg, book, syncAt,
+      )
 
       results.push({
         market     : marketKey,
-        found      : true,
+        found      : book !== null,
         outcome,
-        priceAmount: book.price.toFixed(2),
+        priceAmount: book?.price.toFixed(2),
         currency   : cfg.currency,
       })
-      console.log(`[bookshop] ${outcome} listing for ${isbn13} (${cfg.market}) @ ${cfg.currency} ${book.price}`)
+
+      if (book) {
+        console.log(`[bookshop] ${outcome} listing for ${isbn13} (${cfg.market}) @ ${cfg.currency} ${book.price}`)
+      } else {
+        console.log(`[bookshop] ${outcome} dynamic stub for ${isbn13} (${cfg.market})`)
+      }
     } catch (err) {
       console.error(`[bookshop] error for ${isbn13} (${marketKey}):`, err)
       results.push({ market: marketKey, found: false, outcome: 'error' })
@@ -290,14 +427,13 @@ export async function refreshStaleBookshopListings(
   const staleThreshold = new Date(Date.now() - staleAfterDays * 86_400_000)
   const stats = { processed: 0, found: 0, notFound: 0, errors: 0 }
 
-  // Find canonical products with isbn13 that have no Bookshop listing,
-  // or whose Bookshop listing hasn't been seen recently.
   const bookshopDomains = MARKETS.map(m => m.domain)
 
   const products = await prisma.$queryRaw<Array<{ id: string; isbn13: string }>>`
     SELECT cp.id, cp.isbn_13 AS isbn13
     FROM   canonical_products cp
     WHERE  cp.isbn_13 IS NOT NULL
+      AND  cp.deleted_at IS NULL
       AND  NOT EXISTS (
         SELECT 1
         FROM   retailer_listings rl

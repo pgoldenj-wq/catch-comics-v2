@@ -56,7 +56,16 @@ async function getProduct(slug: string) {
     where: { canonicalSlug: slug },
     include: {
       listings: {
-        where: { retailer: { isActive: true }, deletedAt: null },
+        where: {
+          retailer   : { isActive: true },
+          deletedAt  : null,
+          // Exclude dynamic-link stubs that have no real price yet.
+          // Bookshop.org listings created before an API key is configured
+          // are stored with priceAmount=0.00 / stockStatus=UNKNOWN so that
+          // the /go/[id] affiliate redirect still works, but they should not
+          // appear in the price-comparison table.
+          priceAmount: { gt: 0 },
+        },
         include: {
           retailer: {
             select: {

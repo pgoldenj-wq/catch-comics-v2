@@ -26,6 +26,7 @@
     "backfill:isbns": "dotenv -e .env.local -- tsx scripts/backfill-wob-isbns.ts",
     "purge:noncomic": "dotenv -e .env.local -- tsx scripts/purge-noncomic-canonicals.ts",
     "reclassify:formats": "dotenv -e .env.local -- tsx scripts/reclassify-formats.ts",
+    "backfill:bookshop": "dotenv -e .env.local -- tsx scripts/backfill-bookshop-listings.ts",
     "dev:inngest": "npx @inngest/cli@latest dev -u http://localhost:3000/api/inngest"
   },
   "dependencies": {
