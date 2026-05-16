@@ -101,7 +101,7 @@ async function main() {
   })
 
   for (const s of samples) {
-    const urlOk     = s.retailerUrl.startsWith('https://uk.bookshop.org/p/books/')
+    const urlOk     = s.retailerUrl.startsWith('https://uk.bookshop.org/book/')
     const priceOk   = s.priceAmount.toFixed(2) === '0.00'
     const stockOk   = s.stockStatus === 'UNKNOWN'
     const matchOk   = s.matchMethod === 'ISBN'

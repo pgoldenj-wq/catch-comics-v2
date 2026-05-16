@@ -176,8 +176,13 @@ async function main() {
   console.log(`  Updated          : ${updated}  (${priceChange} price changes)`)
   console.log(`  With real price  : ${withPrice}  (remainder are stubs)`)
   console.log(`  Errors           : ${errors}`)
-  if (!HAS_API_KEY) {
-    console.log(`\n  ℹ  All listings are dynamic link stubs — add BOOKSHOP_API_KEY`)
+  if (errors > 0 && created === 0 && updated === 0) {
+    console.log(`\n  ✗ Nothing created — all rows errored. Most likely cause:`)
+    console.log(`    DYNAMIC_LINK enum not yet in PostgreSQL. Run:`)
+    console.log(`    npm run db:migrate:deploy`)
+    console.log(`    then re-run this script.`)
+  } else if (!HAS_API_KEY && created > 0) {
+    console.log(`\n  ℹ  ${created} dynamic link stubs created — add BOOKSHOP_API_KEY`)
     console.log(`     and run again (or wait for the daily bookshop-refresh job)`)
     console.log(`     to populate real prices.`)
   }

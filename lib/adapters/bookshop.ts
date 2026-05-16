@@ -7,14 +7,15 @@
  *
  * Platform type: DYNAMIC_LINK
  *   Listings are generated from the known ISBN deep-link URL pattern:
- *     https://uk.bookshop.org/p/books/{isbn13}
+ *     https://uk.bookshop.org/book/{isbn13}
+ *   This resolves via a 308 redirect to the canonical product page slug.
  *   Affiliate attribution is applied at click time by /go/[id] via wrapAffiliateUrl()
  *   using the retailer's affiliateNetwork='awin' and affiliateId='62675' (Bookshop UK
  *   Awin merchant ID).
  *
  *   Final click URL:
  *     https://www.awin1.com/cread.php?awinmid=62675&awinaffid=2888331&ued={encodedUrl}
- *   where ued = https://uk.bookshop.org/p/books/{isbn13}
+ *   where ued = https://uk.bookshop.org/book/{isbn13}
  *
  * API enrichment (optional):
  *   GET https://api.bookshop.org/books/{isbn13}?api_key={KEY}
@@ -100,9 +101,9 @@ const TRUST_SCORE = 85
 /**
  * Generate a bare Bookshop.org product URL from an ISBN-13.
  *
- * Bookshop.org resolves ISBNs as the final path segment, redirecting to the
- * canonical product page. This is the affiliate deep-link format:
- *   https://uk.bookshop.org/p/books/{isbn13}
+ * Bookshop.org resolves ISBNs via the /book/{isbn13} path, which issues a
+ * 308 redirect to the canonical product page slug. Note: /p/books/{isbn13}
+ * returns 404 and must NOT be used.
  *
  * Affiliate attribution is NOT included here — it is added at click time by
  * wrapAffiliateUrl() in /go/[id] via the Awin case, producing:
@@ -110,7 +111,7 @@ const TRUST_SCORE = 85
  */
 function generateBookshopUrl(isbn13: string, cfg: MarketConfig): string {
   const base = cfg.market === 'uk' ? 'https://uk.bookshop.org' : 'https://bookshop.org'
-  return `${base}/p/books/${isbn13}`
+  return `${base}/book/${isbn13}`
 }
 
 /**
