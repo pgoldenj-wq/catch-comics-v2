@@ -30,6 +30,8 @@
     "backfill:wordery": "dotenv -e .env.local -- tsx scripts/backfill-wordery-listings.ts",
     "fix:bookshop-urls": "dotenv -e .env.local -- tsx scripts/fix-bookshop-urls.ts",
     "verify:stubs": "dotenv -e .env.local -- tsx scripts/verify-bookshop-stubs.ts",
+    "enrich:bookshop": "dotenv -e .env.local -- tsx scripts/enrich-bookshop-prices.ts",
+    "enrich:wordery": "dotenv -e .env.local -- tsx scripts/enrich-wordery-prices.ts",
     "dev:inngest": "npx @inngest/cli@latest dev -u http://localhost:3000/api/inngest"
   },
   "dependencies": {
