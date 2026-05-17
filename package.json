@@ -33,7 +33,8 @@
     "enrich:bookshop": "dotenv -e .env.local -- tsx scripts/enrich-bookshop-prices.ts",
     "enrich:wordery": "dotenv -e .env.local -- tsx scripts/enrich-wordery-prices.ts",
     "enrich:wordery:comics": "dotenv -e .env.local -- tsx scripts/enrich-wordery-comics.ts",
-    "dev:inngest": "npx @inngest/cli@latest dev -u http://localhost:3000/api/inngest"
+    "dev:inngest": "npx @inngest/cli@latest dev -u http://localhost:3000/api/inngest",
+    "ingest:awin-local": "dotenv -e .env.local -- tsx scripts/ingest-awin-local-feed.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
