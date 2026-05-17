@@ -36,7 +36,10 @@
     "dev:inngest": "npx @inngest/cli@latest dev -u http://localhost:3000/api/inngest",
     "ingest:awin-local": "dotenv -e .env.local -- tsx scripts/ingest-awin-local-feed.ts",
     "purge:noncomic:dry": "dotenv -e .env.local -- tsx scripts/purge-noncomic.ts",
-    "purge:noncomic:write": "dotenv -e .env.local -- tsx scripts/purge-noncomic.ts --write"
+    "purge:noncomic:write": "dotenv -e .env.local -- tsx scripts/purge-noncomic.ts --write",
+    "enrich:wordery:priority": "dotenv -e .env.local -- tsx scripts/enrich-wordery-priority.ts",
+    "enrich:wordery:priority:stats": "dotenv -e .env.local -- tsx scripts/enrich-wordery-priority.ts --dry-stats",
+    "dashboard": "dotenv -e .env.local -- tsx scripts/dashboard.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
