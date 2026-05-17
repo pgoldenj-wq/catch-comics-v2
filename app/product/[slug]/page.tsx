@@ -87,6 +87,24 @@ async function getProduct(slug: string) {
   })
 }
 
+/** Returns price=0 active listings (DYNAMIC_LINK retailers like Forbidden Planet). */
+async function getDynamicLinks(canonicalProductId: string) {
+  return prisma.retailerListing.findMany({
+    where: {
+      canonicalProductId,
+      deletedAt  : null,
+      priceAmount: { lte: 0 },
+      retailer   : { isActive: true },
+    },
+    select: {
+      id         : true,
+      retailerUrl: true,
+      retailer   : { select: { name: true, domain: true } },
+    },
+    orderBy: { retailer: { name: 'asc' } },
+  })
+}
+
 async function getRelated(
   productId: string,
   seriesName: string | null,
@@ -162,12 +180,10 @@ export default async function ProductPage(
   const product  = await getProduct(slug)
   if (!product) notFound()
 
-  const related = await getRelated(
-    product.id,
-    product.seriesName,
-    product.publisher,
-    product.format,
-  )
+  const [related, dynamicLinks] = await Promise.all([
+    getRelated(product.id, product.seriesName, product.publisher, product.format),
+    getDynamicLinks(product.id),
+  ])
 
   // ── Amazon on-demand lookup (non-blocking, 800 ms budget) ────────────────
   // Only attempted for canonical products with an ISBN-13.
@@ -417,6 +433,29 @@ export default async function ProductPage(
             <OffersTable offers={offers} />
           )}
         </section>
+
+        {/* ── Section 3b: Also available at (dynamic-link retailers) ──── */}
+        {dynamicLinks.length > 0 && (
+          <section className="max-w-5xl mx-auto px-4 pb-8">
+            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-widest mb-3">
+              Also available at
+            </h2>
+            <div className="flex flex-wrap gap-3">
+              {dynamicLinks.map(l => (
+                <a
+                  key={l.id}
+                  href={`/go/${l.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-900 border border-gray-800 hover:border-indigo-600 hover:text-indigo-300 text-gray-300 text-sm font-medium transition-colors"
+                >
+                  {l.retailer.name}
+                  <span className="text-gray-600 text-xs">Check price ↗</span>
+                </a>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* ── Section 4: Price history ──────────────────────────────────── */}
         <section className="max-w-5xl mx-auto px-4 pb-12">
