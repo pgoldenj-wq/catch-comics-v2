@@ -40,7 +40,9 @@
     "enrich:wordery:priority": "dotenv -e .env.local -- tsx scripts/enrich-wordery-priority.ts",
     "enrich:wordery:priority:stats": "dotenv -e .env.local -- tsx scripts/enrich-wordery-priority.ts --dry-stats",
     "dashboard": "dotenv -e .env.local -- tsx scripts/dashboard.ts",
-    "enrich:wordery:smart": "dotenv -e .env.local -- tsx scripts/enrich-wordery-smart.ts"
+    "enrich:wordery:smart": "dotenv -e .env.local -- tsx scripts/enrich-wordery-smart.ts",
+    "enrich:bookshop:smart": "dotenv -e .env.local -- tsx scripts/enrich-bookshop-smart.ts",
+    "sync:awin": "dotenv -e .env.local -- tsx scripts/sync-awin-feed.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
