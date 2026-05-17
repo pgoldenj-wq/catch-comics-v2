@@ -39,7 +39,8 @@
     "purge:noncomic:write": "dotenv -e .env.local -- tsx scripts/purge-noncomic.ts --write",
     "enrich:wordery:priority": "dotenv -e .env.local -- tsx scripts/enrich-wordery-priority.ts",
     "enrich:wordery:priority:stats": "dotenv -e .env.local -- tsx scripts/enrich-wordery-priority.ts --dry-stats",
-    "dashboard": "dotenv -e .env.local -- tsx scripts/dashboard.ts"
+    "dashboard": "dotenv -e .env.local -- tsx scripts/dashboard.ts",
+    "enrich:wordery:smart": "dotenv -e .env.local -- tsx scripts/enrich-wordery-smart.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

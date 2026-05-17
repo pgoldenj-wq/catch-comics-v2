@@ -47,8 +47,8 @@ async function main() {
   console.log(`  ${'Prefix'.padEnd(9)} ${'Total'.padStart(5)} ${'Priced'.padStart(6)} ${'Hit%'.padStart(5)} ${'AvgPrice'.padStart(9)}  Sample title`)
   console.log(`  ${'─'.repeat(9)} ${'─'.repeat(5)} ${'─'.repeat(6)} ${'─'.repeat(5)} ${'─'.repeat(9)}  ${'─'.repeat(30)}`)
   for (const r of prefixStats) {
-    const hitPct = r.hit_rate?.toString() ?? '0'
-    const bar = hitPct === '0' ? '░░░░░' : hitPct >= 90 ? '█████' : hitPct >= 70 ? '████░' : hitPct >= 50 ? '███░░' : hitPct >= 30 ? '██░░░' : '█░░░░'
+    const hitPct = Number(r.hit_rate ?? 0)
+    const bar = hitPct === 0 ? '░░░░░' : hitPct >= 90 ? '█████' : hitPct >= 70 ? '████░' : hitPct >= 50 ? '███░░' : hitPct >= 30 ? '██░░░' : '█░░░░'
     console.log(`  ${r.prefix.padEnd(9)} ${String(r.total).padStart(5)} ${String(r.priced).padStart(6)} ${String(hitPct).padStart(4)}% ${bar}  £${(r.avg_price ?? '—').padStart(6)}  ${r.sample_title?.slice(0, 40) ?? ''}`)
   }
 

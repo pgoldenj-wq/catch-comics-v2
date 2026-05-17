@@ -17,7 +17,8 @@ https://productdata.awin.com/datafeed/download/apikey/{AWIN_API_KEY}/language/en
 |------------------|------------------------------|
 | Merchant name    | Bookshop.org UK              |
 | Programme ID     | `62675`                      |
-| Feed ID (FID)    | `<!-- PASTE FID HERE -->`    |
+| Feed ID (FID)    | 99173    |
+| Additional ISBN feed FID | 100002 |
 | Feed format      | CSV                          |
 | Feed language    | en                           |
 | Currency         | GBP                          |
@@ -27,7 +28,7 @@ https://productdata.awin.com/datafeed/download/apikey/{AWIN_API_KEY}/language/en
 
 ### Manual download URL
 ```
-https://productdata.awin.com/datafeed/download/apikey/{AWIN_API_KEY}/language/en/fid/<!-- PASTE FID -->/columntypes/all/format/csv/delimiter/%2C/compression/none/
+https://productdata.awin.com/datafeed/download/apikey/{AWIN_API_KEY}/language/en/fid/99173/columntypes/all/format/csv/delimiter/%2C/compression/none/
 ```
 
 ### Selected columns of interest
@@ -60,17 +61,17 @@ https://productdata.awin.com/datafeed/download/apikey/{AWIN_API_KEY}/language/en
 |------------------|--------------------------------|
 | Merchant name    | Lets Buy Books                 |
 | Programme ID     | `122824`                       |
-| Feed ID (FID)    | `<!-- PASTE FID HERE -->`      |
+| Feed ID (FID)    | 112530      |
 | Feed format      | CSV                            |
 | Feed language    | en                             |
 | Currency         | GBP                            |
 | Country          | UK                             |
 | AWIN affiliate   | active                         |
-| Merchant URL     | `<!-- PASTE MERCHANT URL -->`  |
+| Merchant URL     | https://www.letsbuybooks.com  |
 
 ### Manual download URL
 ```
-https://productdata.awin.com/datafeed/download/apikey/{AWIN_API_KEY}/language/en/fid/<!-- PASTE FID -->/columntypes/all/format/csv/delimiter/%2C/compression/none/
+https://productdata.awin.com/datafeed/download/apikey/{AWIN_API_KEY}/language/en/fid/112530/columntypes/all/format/csv/delimiter/%2C/compression/none/
 ```
 
 ### Selected columns of interest
