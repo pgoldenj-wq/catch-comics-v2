@@ -41,3 +41,10 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# AWIN feed downloads — large CSV/XML files, do not commit
+/feeds/awin/*.csv
+/feeds/awin/*.xml
+/feeds/awin/*.json
+/feeds/awin/*.gz
+!/feeds/awin/.gitkeep
