@@ -24,10 +24,10 @@ const WRITE = process.argv.includes('--write')
 const AWIN_PUBLISHER_ID = '2888331'
 const AWIN_MERCHANT_ID  = '2079'
 
-// AWIN deep-link wrapper around the ISBN-direct Waterstones product URL
-const URL_TEMPLATE =
-  `https://www.awin1.com/cread.php?awinmid=${AWIN_MERCHANT_ID}&awinaffid=${AWIN_PUBLISHER_ID}&ued=` +
-  encodeURIComponent('https://www.waterstones.com/book/') + '{ISBN13}'
+// Bare Waterstones ISBN-direct URL. The /go/ redirect handler wraps this with
+// AWIN affiliate tracking + clickref at click time (same pattern as Wordery).
+// Do NOT store the AWIN wrapper in retailerUrl — that double-wraps on redirect.
+const URL_TEMPLATE = 'https://www.waterstones.com/book/{ISBN13}'
 
 const WATERSTONES = {
   domain           : 'waterstones.com',
@@ -43,7 +43,7 @@ const WATERSTONES = {
     awinMerchantId: AWIN_MERCHANT_ID,
     awinPublisherId: AWIN_PUBLISHER_ID,
     confirmedDate : '2026-05-17',
-    note          : 'AWIN merchant 2079. ISBN-direct URL: /book/{ISBN13}. 2-5% commission.',
+    note          : 'AWIN merchant 2079. Bare ISBN URL stored in retailerUrl. /go/ wraps with AWIN+clickref at click time. 2-5% commission.',
   },
 }
 
@@ -51,7 +51,7 @@ async function main() {
   console.log('\n══════════════════════════════════════════════════════════')
   console.log(' Waterstones — Retailer Registration')
   console.log(` Mode        : ${WRITE ? 'WRITE' : 'DRY-RUN'}`)
-  console.log(` URL template: ${URL_TEMPLATE.slice(0, 80)}...`)
+  console.log(` URL template: ${URL_TEMPLATE}`)
   console.log('══════════════════════════════════════════════════════════\n')
 
   const existing = await prisma.retailer.findUnique({ where: { domain: WATERSTONES.domain } })
@@ -61,6 +61,7 @@ async function main() {
     console.log(`    Name      : ${existing.name}`)
     console.log(`    AffNetwork: ${existing.affiliateNetwork ?? 'none'}`)
     console.log(`    SyncConfig: ${JSON.stringify(existing.syncConfig)}`)
+    console.log(`    Note: retailerUrl stubs should be bare waterstones.com URLs (not AWIN-wrapped)`)
 
     if (WRITE) {
       await prisma.retailer.update({

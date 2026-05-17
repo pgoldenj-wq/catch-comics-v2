@@ -47,7 +47,7 @@
     "create:fp:listings": "dotenv -e .env.local -- tsx scripts/create-fp-listings.ts",
     "create:dynamic": "dotenv -e .env.local -- tsx scripts/create-dynamic-links.ts",
     "seed:waterstones": "dotenv -e .env.local -- tsx scripts/seed-waterstones.ts",
-    "create:waterstones": "dotenv -e .env.local -- tsx scripts/create-dynamic-links.ts --domain waterstones.com --url-template \"https://www.awin1.com/cread.php?awinmid=2079&awinaffid=2888331&ued=https%3A%2F%2Fwww.waterstones.com%2Fbook%2F{ISBN13}\"",
+    "create:waterstones": "dotenv -e .env.local -- tsx scripts/create-dynamic-links.ts --domain waterstones.com --url-template \"https://www.waterstones.com/book/{ISBN13}\"",
     "seed:whsmith": "dotenv -e .env.local -- tsx scripts/seed-whsmith.ts",
     "create:whsmith": "dotenv -e .env.local -- tsx scripts/create-dynamic-links.ts --domain whsmith.co.uk --url-template \"https://www.whsmith.co.uk/search?term={ISBN13}\""
   },
