@@ -42,7 +42,9 @@
     "dashboard": "dotenv -e .env.local -- tsx scripts/dashboard.ts",
     "enrich:wordery:smart": "dotenv -e .env.local -- tsx scripts/enrich-wordery-smart.ts",
     "enrich:bookshop:smart": "dotenv -e .env.local -- tsx scripts/enrich-bookshop-smart.ts",
-    "sync:awin": "dotenv -e .env.local -- tsx scripts/sync-awin-feed.ts"
+    "sync:awin": "dotenv -e .env.local -- tsx scripts/sync-awin-feed.ts",
+    "seed:fp": "dotenv -e .env.local -- tsx scripts/seed-forbidden-planet.ts",
+    "create:fp:listings": "dotenv -e .env.local -- tsx scripts/create-fp-listings.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
