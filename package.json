@@ -49,7 +49,9 @@
     "seed:waterstones": "dotenv -e .env.local -- tsx scripts/seed-waterstones.ts",
     "create:waterstones": "dotenv -e .env.local -- tsx scripts/create-dynamic-links.ts --domain waterstones.com --url-template \"https://www.waterstones.com/book/{ISBN13}\"",
     "seed:whsmith": "dotenv -e .env.local -- tsx scripts/seed-whsmith.ts",
-    "create:whsmith": "dotenv -e .env.local -- tsx scripts/create-dynamic-links.ts --domain whsmith.co.uk --url-template \"https://www.whsmith.co.uk/search?term={ISBN13}\""
+    "create:whsmith": "dotenv -e .env.local -- tsx scripts/create-dynamic-links.ts --domain whsmith.co.uk --url-template \"https://www.whsmith.co.uk/search?term={ISBN13}\"",
+    "seed:hive": "dotenv -e .env.local -- tsx scripts/seed-hive.ts",
+    "create:hive": "dotenv -e .env.local -- tsx scripts/create-dynamic-links.ts --domain hive.co.uk --url-template \"https://www.hive.co.uk/Product/Details/{ISBN13}\""
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
