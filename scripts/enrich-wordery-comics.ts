@@ -6,10 +6,14 @@
  * This guarantees we enrich the right ISBNs first: products that TM sells
  * are the comics we want appearing in the multi-retailer comparison table.
  *
+ * Rate limit: Wordery allows ~250 requests/hour at the IP level.
+ * Safe operating parameters: 200 requests/batch, 20s delay = 180 req/hr.
+ * On 429: back off 90s and retry once before skipping.
+ *
  * Usage:
- *   npm run enrich:wordery:comics                    dry-run
+ *   npm run enrich:wordery:comics                        dry-run
  *   npm run enrich:wordery:comics -- --write
- *   npm run enrich:wordery:comics -- --limit 500 --write
+ *   npm run enrich:wordery:comics -- --limit 200 --write
  */
 
 import { prisma } from '../lib/prisma'
@@ -19,7 +23,7 @@ const args   = process.argv.slice(2)
 const WRITE  = args.includes('--write')
 const DRY    = !WRITE
 const limIdx = args.indexOf('--limit')
-const LIMIT  = limIdx !== -1 ? parseInt(args[limIdx + 1] ?? '500', 10) : 500
+const LIMIT  = limIdx !== -1 ? parseInt(args[limIdx + 1] ?? '200', 10) : 200
 
 const HEADERS = {
   'User-Agent'               : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -34,7 +38,12 @@ const HEADERS = {
   'Sec-Fetch-User'           : '?1',
 }
 
-const DELAY_MS = 5000
+// 20s between requests = 180 req/hr, safely under Wordery's ~250 req/hr limit.
+const DELAY_MS      = 20_000
+// On 429: wait this long then retry once before giving up on this ISBN.
+const BACKOFF_MS    = 90_000
+// After this many consecutive 429s, abort the run — limit is fully exhausted.
+const MAX_429_ABORT = 5
 
 interface ExtractedOffer {
   price       : number
@@ -65,7 +74,7 @@ function parseInertiaJson(html: string): ExtractedOffer | null {
   }
 }
 
-async function fetchWorderyOffer(isbn13: string): Promise<ExtractedOffer | null | 'not_found'> {
+async function fetchWorderyOffer(isbn13: string): Promise<ExtractedOffer | null | 'not_found' | '429'> {
   const url = `https://www.wordery.com/search?term=${encodeURIComponent(isbn13)}`
   let res: Response
   try {
@@ -74,6 +83,7 @@ async function fetchWorderyOffer(isbn13: string): Promise<ExtractedOffer | null 
     console.error(`  [net error] ${isbn13}: ${(err as Error).message}`)
     return null
   }
+  if (res.status === 429) { console.warn(`  [429] ${isbn13}`); return '429' }
   if (!res.ok) { console.error(`  [HTTP ${res.status}] ${isbn13}`); return null }
   const finalUrl = res.url
   if (finalUrl.includes('/search?term=') || finalUrl.includes('/search?q=')) return 'not_found'
@@ -117,21 +127,43 @@ async function main() {
 
   console.log(`Found ${stubs.length} comic Wordery stubs to enrich (TM-linked, limit ${LIMIT})\n`)
 
-  const stats = { fetched: 0, priced: 0, notFound: 0, errors: 0 }
+  const stats = { fetched: 0, priced: 0, notFound: 0, errors: 0, rateLimit: 0 }
+  let consecutive429 = 0
 
   for (const stub of stubs) {
     const isbn = stub.isbn13
     stats.fetched++
 
-    const result = await fetchWorderyOffer(isbn)
+    let result = await fetchWorderyOffer(isbn)
 
-    if (result === 'not_found') {
+    // On 429: back off 90s and retry once
+    if (result === '429') {
+      stats.rateLimit++
+      consecutive429++
+      if (consecutive429 >= MAX_429_ABORT) {
+        console.error(`\n  ✗ ${MAX_429_ABORT} consecutive 429s — rate limit exhausted. Stopping early.`)
+        console.error(`    Wait ~60 minutes before running again.\n`)
+        break
+      }
+      console.warn(`    → backing off ${BACKOFF_MS / 1000}s then retrying...`)
+      await new Promise(r => setTimeout(r, BACKOFF_MS))
+      result = await fetchWorderyOffer(isbn)
+    } else {
+      consecutive429 = 0  // reset on any non-429 response
+    }
+
+    if (result === '429') {
+      // Still rate limited after backoff — count as error and continue
+      console.log(`  ✗ 429 (retry failed) ${isbn}`)
+      stats.errors++
+    } else if (result === 'not_found') {
       console.log(`  ✗ not found  ${isbn}`)
       stats.notFound++
     } else if (result === null) {
       console.log(`  ✗ error      ${isbn}`)
       stats.errors++
     } else {
+      consecutive429 = 0
       const { price, currency, availability } = result
       console.log(`  ✓ found      ${isbn}  ${currency} ${price.toFixed(2)}  [${availability}]`)
 
@@ -156,10 +188,15 @@ async function main() {
   }
 
   console.log('\n── Summary ──────────────────────────────────────────────')
-  console.log(`  Fetched   : ${stats.fetched}`)
-  console.log(`  Priced    : ${stats.priced}`)
-  console.log(`  Not found : ${stats.notFound}`)
-  console.log(`  Errors    : ${stats.errors}`)
+  console.log(`  Fetched    : ${stats.fetched}`)
+  console.log(`  Priced     : ${stats.priced}`)
+  console.log(`  Not found  : ${stats.notFound}`)
+  console.log(`  Rate limit : ${stats.rateLimit}  (429s — backed off and retried)`)
+  console.log(`  Errors     : ${stats.errors}`)
+  if (stats.rateLimit > 0) {
+    console.log(`\n  ⚠ Rate limiting detected. Wait 60+ minutes before next batch.`)
+    console.log(`    Next safe batch: npm run enrich:wordery:comics -- --limit 200 --write`)
+  }
   if (DRY) console.log('\n  Run with --write to save prices.')
   console.log('══════════════════════════════════════════════════════════\n')
 }
