@@ -160,6 +160,9 @@ async function main() {
         COALESCE(pr.total, 0) >= ${MIN_ATTEMPTS_TO_SKIP}
         AND COALESCE(pr.hit_rate, 100) < ${MIN_HIT_RATE}
       )
+      -- Skip stubs attempted (and missed) in the last 7 days.
+      -- lastSeenAt is updated on both hits AND misses so we don't re-check cold ISBNs.
+      AND rl.last_seen_at < NOW() - INTERVAL '7 days'
     ORDER BY
       COALESCE(pr.hit_rate, 50) DESC,   -- high-yield first
       rl.first_seen_at ASC               -- within tier: oldest unstale stubs
@@ -222,6 +225,13 @@ async function main() {
     } else if (result === 'not_found') {
       console.log(`  ✗ not found  ${isbn}`)
       stats.notFound++
+      // Touch lastSeenAt so the 7-day cooldown filter skips this ISBN next batch.
+      if (WRITE) {
+        await prisma.retailerListing.update({
+          where: { id: stub.id },
+          data: { lastSeenAt: new Date() },
+        })
+      }
     } else if (result === null) {
       console.log(`  ✗ error      ${isbn}`)
       stats.errors++
@@ -247,7 +257,15 @@ async function main() {
       stats.priced++
     }
 
-    if (stats.fetched < stubs.length) await new Promise(r => setTimeout(r, DELAY_MS))
+    if (stats.fetched < stubs.length) {
+      // Keep Prisma connection alive during the 20s Wordery rate-limit delay.
+      // Supabase kills idle connections (E57P01) if no query fires for ~10s.
+      const pingInterval = setInterval(async () => {
+        try { await prisma.$queryRaw`SELECT 1` } catch { /* ignore — will reconnect on next write */ }
+      }, 8_000)
+      await new Promise(r => setTimeout(r, DELAY_MS))
+      clearInterval(pingInterval)
+    }
   }
 
   const actualYield = stats.fetched > 0 ? Math.round(stats.priced / stats.fetched * 100) : 0
