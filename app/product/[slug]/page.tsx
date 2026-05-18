@@ -18,6 +18,7 @@ import { Suspense }             from 'react'
 import { prisma }               from '@/lib/prisma'
 import OffersTable, { type OfferRow }    from '@/components/OffersTable'
 import PriceSparkline, { type SparkPoint } from '@/components/PriceSparkline'
+import EbaySection                        from '@/components/EbaySection'
 import { lookupByIsbn as lookupAmazon }  from '@/lib/adapters/amazon-rainforest'
 
 export const dynamic = 'force-dynamic'
@@ -456,6 +457,15 @@ export default async function ProductPage(
             </div>
           </section>
         )}
+
+        {/* ── Section 3c: eBay marketplace section ─────────────────────── */}
+        {/* Separate section — never mixed with trusted retailer comparison.  */}
+        {/* Client-side fetch: eBay unavailability never blocks page render.  */}
+        <EbaySection
+          isbn13={product.isbn13 ?? undefined}
+          title={product.title}
+          canonicalProductId={product.id}
+        />
 
         {/* ── Section 4: Price history ──────────────────────────────────── */}
         <section className="max-w-5xl mx-auto px-4 pb-12">
