@@ -22,7 +22,10 @@ import { RetailerPlatform } from '@prisma/client'
 const WRITE = process.argv.includes('--write')
 
 const AWIN_PUBLISHER_ID = '2888331'
-const AWIN_MERCHANT_ID  = '2079'
+// ⚠ mid=2079 is CLOSED on AWIN. mid=3787 returns 403 (not yet approved).
+// Check AWIN publisher dashboard for correct active Waterstones merchant ID.
+// Set affiliateNetwork='awin' + correct affiliateId once approved.
+const AWIN_MERCHANT_ID  = '2079' // UNCONFIRMED — verify in AWIN dashboard
 
 // Bare Waterstones ISBN-direct URL. The /go/ redirect handler wraps this with
 // AWIN affiliate tracking + clickref at click time (same pattern as Wordery).

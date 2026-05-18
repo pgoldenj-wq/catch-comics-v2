@@ -51,7 +51,9 @@
     "seed:whsmith": "dotenv -e .env.local -- tsx scripts/seed-whsmith.ts",
     "create:whsmith": "dotenv -e .env.local -- tsx scripts/create-dynamic-links.ts --domain whsmith.co.uk --url-template \"https://www.whsmith.co.uk/search?term={ISBN13}\"",
     "seed:hive": "dotenv -e .env.local -- tsx scripts/seed-hive.ts",
-    "create:hive": "dotenv -e .env.local -- tsx scripts/create-dynamic-links.ts --domain hive.co.uk --url-template \"https://www.hive.co.uk/Product/Details/{ISBN13}\""
+    "create:hive": "dotenv -e .env.local -- tsx scripts/create-dynamic-links.ts --domain hive.co.uk --url-template \"https://www.hive.co.uk/Product/Details/{ISBN13}\"",
+    "seed:zavvi": "dotenv -e .env.local -- tsx scripts/seed-zavvi.ts",
+    "create:zavvi": "dotenv -e .env.local -- tsx scripts/create-dynamic-links.ts --domain zavvi.com --url-template \"https://www.zavvi.com/search?q={ISBN13}&searchType=products\""
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
