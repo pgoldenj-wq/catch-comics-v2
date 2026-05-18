@@ -1,22 +1,23 @@
 'use client'
 
 /**
- * EbaySection — Marketplace & secondhand listings for a product page.
+ * EbaySection — Marketplace price comparison layer.
  *
- * Renders as a clearly separate section BELOW the trusted retailer price
- * comparison table. Never mixed with clean retailer comparison data.
+ * Core principle: CHEAPEST VALID OFFER WINS.
  *
- * Design decisions:
- *   - Client-side fetch so a slow/failed eBay API never blocks page render
- *   - Renders nothing (null) if zero results or fetch fails
- *   - EPN affiliate links go directly (no /go/ — eBay items are ephemeral)
- *   - Click events logged to /api/ebay-click for analytics
- *   - 8 listings max, sorted cheapest first (done server-side)
+ * If eBay has a cheaper Buy-It-Now price than the best trusted retailer,
+ * that is surfaced clearly as a "Best marketplace price" banner — not buried.
+ * The user sees it, understands the condition context, and can decide.
+ *
+ * eBay is always visually distinct (eBay red branding, marketplace labels,
+ * condition badges prominent) but is never treated as irrelevant.
  *
  * Props:
- *   isbn13             — preferred search key (precise)
- *   title              — fallback / supplementary search term
- *   canonicalProductId — attached to click events for analytics
+ *   isbn13              — preferred eBay search key (ISBN match = high precision)
+ *   title               — fallback / supplementary search term
+ *   canonicalProductId  — attached to click events for analytics
+ *   bestRetailerPrice   — cheapest in-stock trusted retailer price (GBP)
+ *   currency            — currency of bestRetailerPrice
  */
 
 import { useEffect, useState, useCallback } from 'react'
@@ -29,12 +30,15 @@ interface EbayListing {
   imageUrl:   string
   itemWebUrl: string
   seller:     { username: string; feedbackPercentage: number }
+  buyItNow:   boolean
 }
 
 interface Props {
   isbn13?:             string | null
   title:               string
   canonicalProductId:  string
+  bestRetailerPrice?:  number | null   // null = no trusted retailer price known
+  currency?:           string
 }
 
 function fmtPrice(value: number, currency: string) {
@@ -45,12 +49,10 @@ function fmtPrice(value: number, currency: string) {
 
 function conditionColor(condition: string): string {
   const c = condition.toLowerCase()
-  if (c.includes('new'))              return 'bg-emerald-900/50 text-emerald-300 border-emerald-800'
-  if (c.includes('like new') || c.includes('very good'))
-                                      return 'bg-teal-900/50   text-teal-300   border-teal-800'
-  if (c.includes('good'))             return 'bg-yellow-900/50 text-yellow-300  border-yellow-800'
-  if (c.includes('acceptable') || c.includes('fair'))
-                                      return 'bg-orange-900/50 text-orange-300  border-orange-800'
+  if (c.includes('new'))                              return 'bg-emerald-900/50 text-emerald-300 border-emerald-800'
+  if (c.includes('like new') || c.includes('very good')) return 'bg-teal-900/50   text-teal-300   border-teal-800'
+  if (c.includes('good'))                             return 'bg-yellow-900/50 text-yellow-300  border-yellow-800'
+  if (c.includes('acceptable') || c.includes('fair')) return 'bg-orange-900/50 text-orange-300  border-orange-800'
   return 'bg-gray-800 text-gray-400 border-gray-700'
 }
 
@@ -65,8 +67,14 @@ function SkeletonCard() {
   )
 }
 
-export default function EbaySection({ isbn13, title, canonicalProductId }: Props) {
-  const [listings, setListings] = useState<EbayListing[] | null>(null) // null = loading
+export default function EbaySection({
+  isbn13,
+  title,
+  canonicalProductId,
+  bestRetailerPrice,
+  currency = 'GBP',
+}: Props) {
+  const [listings, setListings] = useState<EbayListing[] | null>(null)
   const [error,    setError]    = useState(false)
 
   useEffect(() => {
@@ -81,7 +89,6 @@ export default function EbaySection({ isbn13, title, canonicalProductId }: Props
   }, [isbn13, title])
 
   const handleClick = useCallback((listing: EbayListing) => {
-    // Fire-and-forget click event — never awaited, never blocks navigation
     fetch('/api/ebay-click', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -96,25 +103,104 @@ export default function EbaySection({ isbn13, title, canonicalProductId }: Props
     }).catch(() => { /* ignore */ })
   }, [canonicalProductId])
 
-  // Don't render if no results or error — section vanishes cleanly
-  if (error)                              return null
-  if (listings !== null && listings.length === 0) return null
+  if (error)                                       return null
+  if (listings !== null && listings.length === 0)  return null
+
+  // Cheapest Buy-It-Now listing — this is the one we compare against retailers
+  const cheapestBIN = listings?.find(l => l.buyItNow) ?? listings?.[0] ?? null
+
+  // Does eBay beat the best trusted retailer?
+  const ebayWins =
+    cheapestBIN !== null &&
+    typeof bestRetailerPrice === 'number' &&
+    bestRetailerPrice > 0 &&
+    cheapestBIN.price.value < bestRetailerPrice
+
+  // Does eBay match within 10% (worth surfacing even if not strictly cheapest)?
+  const ebayCompetitive =
+    cheapestBIN !== null &&
+    typeof bestRetailerPrice === 'number' &&
+    bestRetailerPrice > 0 &&
+    cheapestBIN.price.value < bestRetailerPrice * 1.1
+
+  const saving = ebayWins && cheapestBIN
+    ? bestRetailerPrice! - cheapestBIN.price.value
+    : 0
 
   return (
-    <section className="max-w-5xl mx-auto px-4 pb-12">
+    <section className="max-w-5xl mx-auto px-4 pb-10">
 
-      {/* Section header */}
+      {/* ── Winner banner — shown when eBay beats all trusted retailers ── */}
+      {listings !== null && ebayWins && cheapestBIN && (
+        <div className="mb-6 rounded-2xl border border-[#E8272A]/40 bg-[#E8272A]/10 p-5">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xs font-bold px-2 py-0.5 rounded bg-[#E8272A] text-white">
+                  eBay
+                </span>
+                <span className="text-xs font-semibold text-[#E8272A] uppercase tracking-wide">
+                  Cheapest found · Marketplace listing
+                </span>
+              </div>
+              <p className="text-3xl font-bold text-white">
+                {fmtPrice(cheapestBIN.price.value, cheapestBIN.price.currency)}
+              </p>
+              <div className="flex flex-wrap items-center gap-2 mt-1">
+                <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium border ${conditionColor(cheapestBIN.condition)}`}>
+                  {cheapestBIN.condition}
+                </span>
+                <span className="text-sm text-gray-400">
+                  from <span className="text-gray-300">{cheapestBIN.seller.username}</span>
+                  {cheapestBIN.seller.feedbackPercentage > 0 && (
+                    <span className="text-gray-500 ml-1">
+                      ({cheapestBIN.seller.feedbackPercentage.toFixed(0)}% feedback)
+                    </span>
+                  )}
+                </span>
+                {saving > 0.50 && (
+                  <span className="text-xs font-semibold text-emerald-400">
+                    saves {fmtPrice(saving, currency)} vs cheapest retailer
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                {cheapestBIN.buyItNow
+                  ? 'Buy It Now — fixed price, buy immediately'
+                  : 'Note: auction listing — final price may vary'}
+              </p>
+            </div>
+            <div className="sm:ml-auto">
+              <a
+                href={cheapestBIN.itemWebUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => handleClick(cheapestBIN)}
+                className="inline-block px-6 py-3 rounded-xl bg-[#E8272A] hover:bg-[#c01f22] text-white font-semibold text-base transition-colors"
+              >
+                View on eBay ↗
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Section header ── */}
       <div className="flex items-center gap-3 mb-4">
         <h2 className="text-xl font-semibold text-white">
-          Marketplace finds
+          {ebayWins ? 'All marketplace listings' : 'Marketplace finds'}
         </h2>
-        {/* eBay brand badge */}
         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-[#E8272A]/20 text-[#E8272A] border border-[#E8272A]/30">
           eBay
         </span>
-        <span className="text-sm text-gray-500">
-          Secondhand & collector prices
-        </span>
+        {!ebayWins && ebayCompetitive && cheapestBIN && (
+          <span className="text-sm text-gray-500">
+            from {fmtPrice(cheapestBIN.price.value, cheapestBIN.price.currency)} — competitive with retailers
+          </span>
+        )}
+        {!ebayWins && !ebayCompetitive && (
+          <span className="text-sm text-gray-500">Secondhand &amp; collector prices</span>
+        )}
       </div>
 
       {/* Loading skeleton */}
@@ -124,7 +210,7 @@ export default function EbaySection({ isbn13, title, canonicalProductId }: Props
         </div>
       )}
 
-      {/* Results grid */}
+      {/* Listings grid */}
       {listings !== null && listings.length > 0 && (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -137,12 +223,24 @@ export default function EbaySection({ isbn13, title, canonicalProductId }: Props
                 onClick={() => handleClick(listing)}
                 className="group flex flex-col rounded-xl bg-gray-900 border border-gray-800 hover:border-[#E8272A]/60 transition-colors p-4"
               >
+                {/* Buy It Now badge */}
+                {listing.buyItNow && (
+                  <span className="self-start mb-2 px-2 py-0.5 rounded text-xs font-semibold bg-gray-800 text-gray-400 border border-gray-700">
+                    Buy It Now
+                  </span>
+                )}
+                {!listing.buyItNow && (
+                  <span className="self-start mb-2 px-2 py-0.5 rounded text-xs font-semibold bg-amber-900/40 text-amber-400 border border-amber-800/50">
+                    Auction
+                  </span>
+                )}
+
                 {/* Title */}
                 <p className="text-sm font-medium text-gray-200 group-hover:text-white line-clamp-2 mb-2 flex-1">
                   {listing.title}
                 </p>
 
-                {/* Condition badge */}
+                {/* Condition */}
                 <span className={`inline-block self-start px-2 py-0.5 rounded text-xs font-medium border mb-3 ${conditionColor(listing.condition)}`}>
                   {listing.condition}
                 </span>
@@ -152,7 +250,7 @@ export default function EbaySection({ isbn13, title, canonicalProductId }: Props
                   {fmtPrice(listing.price.value, listing.price.currency)}
                 </p>
 
-                {/* Seller info */}
+                {/* Seller */}
                 <p className="text-xs text-gray-500 mb-3">
                   {listing.seller.username}
                   {listing.seller.feedbackPercentage > 0 && (
@@ -162,7 +260,6 @@ export default function EbaySection({ isbn13, title, canonicalProductId }: Props
                   )}
                 </p>
 
-                {/* CTA */}
                 <div className="mt-auto pt-2 border-t border-gray-800">
                   <span className="text-xs font-semibold text-[#E8272A] group-hover:underline">
                     View on eBay ↗
@@ -172,9 +269,8 @@ export default function EbaySection({ isbn13, title, canonicalProductId }: Props
             ))}
           </div>
 
-          {/* Disclaimer */}
           <p className="mt-3 text-xs text-gray-600">
-            Marketplace listings from eBay. Prices, availability and condition vary.
+            Marketplace listings from eBay. Prices, availability and condition vary by seller.
             Catch Comics earns a commission on qualifying purchases.
           </p>
         </>

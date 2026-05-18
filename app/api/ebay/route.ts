@@ -105,9 +105,13 @@ export async function GET(req: NextRequest) {
     // Apply additional product-page filters
     listings = filterListings(listings)
 
-    // Sort by price ascending, cap at 8 (enough for the section without overwhelming)
+    // Sort: Buy-It-Now first (actionable), then by price ascending within each group.
+    // Auctions are surfaced but deprioritised — buyer can't reliably plan on winning them.
     listings = listings
-      .sort((a, b) => a.price.value - b.price.value)
+      .sort((a, b) => {
+        if (a.buyItNow !== b.buyItNow) return a.buyItNow ? -1 : 1
+        return a.price.value - b.price.value
+      })
       .slice(0, 8)
 
     ebayProductCache.set(cacheKey, listings)

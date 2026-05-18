@@ -435,7 +435,19 @@ export default async function ProductPage(
           )}
         </section>
 
-        {/* ── Section 3b: Also available at (dynamic-link retailers) ──── */}
+        {/* ── Section 3b: eBay marketplace section ─────────────────────── */}
+        {/* Kept visually separate from trusted retailer comparison, but     */}
+        {/* surfaces a prominent banner if eBay beats all retailer prices.   */}
+        {/* Client-side fetch: eBay unavailability never blocks page render. */}
+        <EbaySection
+          isbn13={product.isbn13 ?? undefined}
+          title={product.title}
+          canonicalProductId={product.id}
+          bestRetailerPrice={bestListing ? Number(bestListing.priceAmount) : null}
+          currency={primaryCurrency}
+        />
+
+        {/* ── Section 3c: Also available at (dynamic-link retailers) ──── */}
         {dynamicLinks.length > 0 && (
           <section className="max-w-5xl mx-auto px-4 pb-8">
             <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-widest mb-3">
@@ -457,15 +469,6 @@ export default async function ProductPage(
             </div>
           </section>
         )}
-
-        {/* ── Section 3c: eBay marketplace section ─────────────────────── */}
-        {/* Separate section — never mixed with trusted retailer comparison.  */}
-        {/* Client-side fetch: eBay unavailability never blocks page render.  */}
-        <EbaySection
-          isbn13={product.isbn13 ?? undefined}
-          title={product.title}
-          canonicalProductId={product.id}
-        />
 
         {/* ── Section 4: Price history ──────────────────────────────────── */}
         <section className="max-w-5xl mx-auto px-4 pb-12">

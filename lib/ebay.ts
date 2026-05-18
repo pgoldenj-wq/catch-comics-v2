@@ -18,13 +18,15 @@ import { enrichEbayQuery, isNonComicListing } from '@/lib/comicDisambiguation'
 export type Marketplace = 'EBAY_GB' | 'EBAY_US'
 
 export interface EbayListing {
-  itemId:     string
-  title:      string
-  price:      { value: number; currency: string }
-  condition:  string
-  imageUrl:   string
-  itemWebUrl: string
-  seller:     { username: string; feedbackPercentage: number }
+  itemId:      string
+  title:       string
+  price:       { value: number; currency: string }
+  condition:   string
+  imageUrl:    string
+  itemWebUrl:  string
+  seller:      { username: string; feedbackPercentage: number }
+  /** True when listing is Buy It Now / Fixed Price (not an auction). */
+  buyItNow:    boolean
 }
 
 // ── Environment detection ─────────────────────────────────────────────────────
@@ -99,13 +101,15 @@ export async function getAccessToken(): Promise<string> {
 // ── Browse API search ─────────────────────────────────────────────────────────
 
 interface RawBrowseItem {
-  itemId?:     string
-  title?:      string
-  price?:      { value?: string; currency?: string }
-  condition?:  string
-  image?:      { imageUrl?: string }
-  itemWebUrl?: string
-  seller?:     { username?: string; feedbackPercentage?: string }
+  itemId?:        string
+  title?:         string
+  price?:         { value?: string; currency?: string }
+  condition?:     string
+  image?:         { imageUrl?: string }
+  itemWebUrl?:    string
+  seller?:        { username?: string; feedbackPercentage?: string }
+  /** e.g. ["FIXED_PRICE"], ["BEST_OFFER"], ["AUCTION"] */
+  buyingOptions?: string[]
 }
 
 export async function searchListings(
@@ -174,16 +178,31 @@ function isFCBD(title: string): boolean {
   return t.includes('free comic book day') || t.includes('fcbd')
 }
 
+const BROKEN_CONDITIONS = new Set([
+  'for parts or not working',
+  'parts only',
+  'not working',
+])
+
+function isBrokenCondition(condition: string): boolean {
+  return BROKEN_CONDITIONS.has(condition.toLowerCase())
+}
+
 function mapListing(r: RawBrowseItem): EbayListing | null {
   if (!r.itemId || !r.title || !r.price?.value) return null
   if (isFCBD(r.title)) return null
   if (isNonComicListing(r.title)) return null
+  if (isBrokenCondition(r.condition || '')) return null
+
+  const buyingOptions = r.buyingOptions ?? []
+  const buyItNow      = buyingOptions.includes('FIXED_PRICE') || buyingOptions.includes('BEST_OFFER')
+
   return {
     itemId:     r.itemId,
     title:      r.title,
     price:      {
       value:    parseFloat(r.price.value),
-      currency: r.price.currency || 'USD',
+      currency: r.price.currency || 'GBP',
     },
     condition:  r.condition || 'Unspecified',
     imageUrl:   r.image?.imageUrl    || '',
@@ -192,6 +211,7 @@ function mapListing(r: RawBrowseItem): EbayListing | null {
       username:           r.seller?.username || '',
       feedbackPercentage: parseFloat(r.seller?.feedbackPercentage || '0'),
     },
+    buyItNow,
   }
 }
 
