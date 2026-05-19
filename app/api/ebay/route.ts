@@ -37,7 +37,7 @@ const LOT_BUNDLE_PATTERNS = [
   /\bbundle of\b/i,
   /\bset of\b/i,
   /\bcollection of\b/i,
-  /\bx\d+\b/i,            // "x5 comics", "x10 issues"
+  /\s[xX]\d+\b/,          // quantity suffix: "Comics x5", "lot x10" — requires leading space so "X2: X-Men United" and "X-23" are not rejected
   /\b\d+ comics\b/i,
   /\b\d+ books\b/i,
   /\bparts only\b/i,

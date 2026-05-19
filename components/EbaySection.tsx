@@ -72,7 +72,6 @@ export default function EbaySection({
   title,
   canonicalProductId,
   bestRetailerPrice,
-  currency = 'GBP',
 }: Props) {
   const [listings, setListings] = useState<EbayListing[] | null>(null)
   const [error,    setError]    = useState(false)
@@ -106,8 +105,10 @@ export default function EbaySection({
   if (error)                                       return null
   if (listings !== null && listings.length === 0)  return null
 
-  // Cheapest Buy-It-Now listing — this is the one we compare against retailers
-  const cheapestBIN = listings?.find(l => l.buyItNow) ?? listings?.[0] ?? null
+  // Cheapest Buy-It-Now listing — this is the one we compare against retailers.
+  // Deliberately no fallback to auctions: the hero banner must only fire for
+  // fixed-price listings where the stated price is what the buyer actually pays.
+  const cheapestBIN = listings?.find(l => l.buyItNow) ?? null
 
   // Does eBay beat the best trusted retailer?
   const ebayWins =
@@ -123,9 +124,9 @@ export default function EbaySection({
     bestRetailerPrice > 0 &&
     cheapestBIN.price.value < bestRetailerPrice * 1.1
 
-  const saving = ebayWins && cheapestBIN
-    ? bestRetailerPrice! - cheapestBIN.price.value
-    : 0
+  // Saving calculation deliberately suppressed: eBay prices exclude postage,
+  // which is unknown at this point. Claiming "saves £X" without shipping data
+  // would be misleading — a £5 item with £4 postage is not cheaper than £8 free delivery.
 
   return (
     <section className="max-w-5xl mx-auto px-4 pb-10">
@@ -158,11 +159,9 @@ export default function EbaySection({
                     </span>
                   )}
                 </span>
-                {saving > 0.50 && (
-                  <span className="text-xs font-semibold text-emerald-400">
-                    saves {fmtPrice(saving, currency)} vs cheapest retailer
-                  </span>
-                )}
+                <span className="text-xs text-gray-500">
+                  excl. postage — check listing for total
+                </span>
               </div>
               <p className="text-xs text-gray-500 mt-2">
                 {cheapestBIN.buyItNow
