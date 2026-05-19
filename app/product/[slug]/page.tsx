@@ -18,7 +18,6 @@ import { Suspense }             from 'react'
 import { prisma }               from '@/lib/prisma'
 import OffersTable, { type OfferRow }    from '@/components/OffersTable'
 import PriceSparkline, { type SparkPoint } from '@/components/PriceSparkline'
-import EbaySection                        from '@/components/EbaySection'
 import { lookupByIsbn as lookupAmazon }  from '@/lib/adapters/amazon-rainforest'
 
 export const dynamic = 'force-dynamic'
@@ -421,6 +420,9 @@ export default async function ProductPage(
         )}
 
         {/* ── Section 3: All offers ─────────────────────────────────────── */}
+        {/* eBay Buy-It-Now listings are fetched client-side and merged      */}
+        {/* inline by OffersTable — no visual segregation, marketplace rows  */}
+        {/* carry an eBay badge and postage disclaimer.                      */}
         <section className="max-w-5xl mx-auto px-4 pb-12">
           <h2 className="text-xl font-semibold text-white mb-4">
             Price comparison
@@ -429,23 +431,15 @@ export default async function ProductPage(
             </span>
           </h2>
           {offers.length === 0 ? (
-            <p className="text-gray-500">No listings tracked yet for this title.</p>
-          ) : (
-            <OffersTable offers={offers} />
-          )}
+            <p className="text-gray-500 mb-4">No retailer listings tracked yet for this title.</p>
+          ) : null}
+          <OffersTable
+            offers={offers}
+            isbn13={product.isbn13 ?? null}
+            productTitle={product.title}
+            canonicalProductId={product.id}
+          />
         </section>
-
-        {/* ── Section 3b: eBay marketplace section ─────────────────────── */}
-        {/* Kept visually separate from trusted retailer comparison, but     */}
-        {/* surfaces a prominent banner if eBay beats all retailer prices.   */}
-        {/* Client-side fetch: eBay unavailability never blocks page render. */}
-        <EbaySection
-          isbn13={product.isbn13 ?? undefined}
-          title={product.title}
-          canonicalProductId={product.id}
-          bestRetailerPrice={bestListing ? Number(bestListing.priceAmount) : null}
-          currency={primaryCurrency}
-        />
 
         {/* ── Section 3c: Also available at (dynamic-link retailers) ──── */}
         {dynamicLinks.length > 0 && (
