@@ -55,7 +55,8 @@
     "seed:zavvi": "dotenv -e .env.local -- tsx scripts/seed-zavvi.ts",
     "create:zavvi": "dotenv -e .env.local -- tsx scripts/create-dynamic-links.ts --domain zavvi.com --url-template \"https://www.zavvi.com/search?q={ISBN13}&searchType=products\"",
     "seed:abebooks": "dotenv -e .env.local -- tsx scripts/seed-abebooks.ts",
-    "create:abebooks": "dotenv -e .env.local -- tsx scripts/create-dynamic-links.ts --domain abebooks.co.uk --url-template \"https://www.abebooks.co.uk/servlet/SearchResults?isbn={ISBN13}\""
+    "create:abebooks": "dotenv -e .env.local -- tsx scripts/create-dynamic-links.ts --domain abebooks.co.uk --url-template \"https://www.abebooks.co.uk/servlet/SearchResults?isbn={ISBN13}\"",
+    "enrich:amazon": "dotenv -e .env.local -- tsx scripts/enrich-amazon-bulk.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
