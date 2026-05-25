@@ -492,24 +492,35 @@ function SearchResults() {
         } else if (data.type === 'unified') {
           // ── Unified mode ─────────────────────────────────────────────────
           // Map canonical results → ComicResult for the existing card renderer
+          // Filter out Comic Vine / provider placeholder images so they fall through
+          // to the letter-initial fallback rather than showing "image not available".
+          const isBadCoverUrl = (url: string | null): boolean => {
+            if (!url) return true
+            const u = url.toLowerCase()
+            return u.includes('no_image') || u.includes('image_not_available') || u.includes('not_available') || /\/uploads\/[^/]+\/0\/\d+\//.test(u)
+          }
+
           const mapped: ComicResult[] = (data.canonicalResults ?? []).map(
             (r: {
               id: string; title: string; publisher: string | null; format: string
               releaseDate: string | null; coverImageUrl: string | null; isbn13: string | null
               canonicalSlug: string
               offers: Array<{ listingId: string; retailerName: string; retailerUrl: string; priceAmount: number; currency: string; stockStatus: string; condition: string }>
-            }) => ({
-              id:             r.id,
-              name:           r.title,
-              image:          { medium_url: r.coverImageUrl ?? '', original_url: r.coverImageUrl ?? '' },
-              start_year:     r.releaseDate ? r.releaseDate.slice(0, 4) : '',
-              publisher:      { name: r.publisher ?? '' },
-              source:         'canonical',
-              type:           r.format === 'SINGLE_ISSUE' ? 'issue' : 'volume',
-              isbn13:         r.isbn13 ?? undefined,
-              canonicalSlug:  r.canonicalSlug,
-              offers:         r.offers,
-            })
+            }) => {
+              const cleanUrl = isBadCoverUrl(r.coverImageUrl) ? '' : (r.coverImageUrl ?? '')
+              return {
+                id:             r.id,
+                name:           r.title,
+                image:          { medium_url: cleanUrl, original_url: cleanUrl },
+                start_year:     r.releaseDate ? r.releaseDate.slice(0, 4) : '',
+                publisher:      { name: r.publisher ?? '' },
+                source:         'canonical',
+                type:           r.format === 'SINGLE_ISSUE' ? 'issue' : 'volume',
+                isbn13:         r.isbn13 ?? undefined,
+                canonicalSlug:  r.canonicalSlug,
+                offers:         r.offers,
+              }
+            }
           )
           setResults(mapped)
           setUnmatchedListings(
@@ -853,11 +864,13 @@ function SearchResults() {
                       e.currentTarget.style.boxShadow = 'none'
                     }}>
 
-                    {/* Cover frame — subtle zoom on hover. Scale 1.8x with top-center
-                        origin so it expands symmetrically without jumping. */}
+                    {/* Cover frame — 3x zoom on hover. center center origin so the
+                        image expands symmetrically toward the viewer, not downward.
+                        CSS transforms don't affect layout flow — the 80×112 footprint
+                        stays fixed; hover:z-50 paints it above adjacent rows. */}
                     <div
-                      className="transition-transform duration-300 ease-out hover:scale-[1.8] hover:z-50"
-                      style={{ width: '80px', height: '112px', borderRadius: '6px', background: '#F3F4F6', border: '1px solid #EBEBEB', flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', transformOrigin: 'top center' }}>
+                      className="transition-transform duration-300 ease-out hover:scale-[3] hover:z-50"
+                      style={{ width: '80px', height: '112px', borderRadius: '6px', background: '#F3F4F6', border: '1px solid #EBEBEB', flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', transformOrigin: 'center center' }}>
                       <span style={{ color: '#6B7280', fontSize: '26px', fontWeight: 500, position: 'absolute' }}>
                         {comic.name.charAt(0)}
                       </span>

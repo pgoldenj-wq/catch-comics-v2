@@ -72,7 +72,7 @@ const CONDITION_LABELS: Record<string, string> = {
 
 const STOCK_LABELS: Record<string, { label: string; cls: string }> = {
   IN_STOCK:    { label: 'In stock',  cls: 'text-emerald-600' },
-  LOW_STOCK:   { label: 'Low stock', cls: 'text-amber-600'   },
+  LOW_STOCK:   { label: 'Low stock', cls: 'text-gray-400'   },
   PREORDER:    { label: 'Pre-order', cls: 'text-sky-600'      },
   OUT_OF_STOCK:{ label: 'OOS',       cls: 'text-red-500'      },
   UNKNOWN:     { label: 'Unknown',   cls: 'text-gray-400'     },
@@ -265,7 +265,7 @@ export default function OffersTable({ offers, isbn13, productTitle, canonicalPro
                         )}
                       </span>
                       {stale && (
-                        <span className="text-xs text-amber-600 font-normal">(stale)</span>
+                        <span className="text-xs text-gray-400 font-normal">(stale)</span>
                       )}
                     </td>
 
@@ -293,14 +293,14 @@ export default function OffersTable({ offers, isbn13, productTitle, canonicalPro
                         <span className="block text-xs text-emerald-600">Free shipping</span>
                       )}
                       {o.isMarketplace && (
-                        <span className="block text-xs text-amber-600">excl. postage</span>
+                        <span className="block text-xs text-gray-400">excl. postage</span>
                       )}
                     </td>
 
                     {/* Shipping column (sm+) */}
                     <td className="py-3 pr-4 hidden sm:table-cell text-gray-500">
                       {o.isMarketplace
-                        ? <span className="text-amber-600 text-xs">excl. postage</span>
+                        ? <span className="text-gray-400 text-xs">excl. postage</span>
                         : o.shippingAmount === null
                           ? '—'
                           : o.shippingAmount === 0
@@ -328,7 +328,7 @@ export default function OffersTable({ offers, isbn13, productTitle, canonicalPro
                         <a
                           href={href}
                           target="_blank"
-                          rel="noopener noreferrer"
+                          rel="noopener noreferrer sponsored"
                           onClick={() => {
                             // Find the original EbayListing to pass to the click handler.
                             // We reconstruct a minimal object from the OfferRow fields.
@@ -352,7 +352,7 @@ export default function OffersTable({ offers, isbn13, productTitle, canonicalPro
                         <a
                           href={href}
                           target="_blank"
-                          rel="noopener noreferrer"
+                          rel="noopener noreferrer sponsored"
                           className={`inline-block px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                             stale
                               ? 'bg-gray-200 text-gray-500 hover:bg-gray-300'

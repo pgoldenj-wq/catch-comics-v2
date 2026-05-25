@@ -19,6 +19,7 @@ import { prisma }               from '@/lib/prisma'
 import OffersTable, { type OfferRow }    from '@/components/OffersTable'
 import PriceSparkline, { type SparkPoint } from '@/components/PriceSparkline'
 import { lookupByIsbn as lookupAmazon }  from '@/lib/adapters/amazon-rainforest'
+import SearchBar                         from '@/components/SearchBar'
 
 // ISR: cache each product page for 1 hour, then regenerate in the background.
 // Switched from force-dynamic (which hit the DB on every request) now that the
@@ -140,6 +141,32 @@ async function getRelated(
   })
 }
 
+/** Single issues in the same series — for collected edition pages only. */
+async function getSingleIssues(productId: string, seriesName: string | null) {
+  if (!seriesName) return []
+  return prisma.canonicalProduct.findMany({
+    where: {
+      id:         { not: productId },
+      seriesName,
+      format:     'SINGLE_ISSUE',
+      deletedAt:  null,
+    },
+    select: {
+      id:            true,
+      title:         true,
+      coverImageUrl: true,
+      canonicalSlug: true,
+      issueNumber:   true,
+      releaseDate:   true,
+    },
+    orderBy: [
+      // Chronological reading order: by issue number first, then release date
+      { releaseDate: 'asc' },
+    ],
+    take: 20,
+  })
+}
+
 // ── generateMetadata ──────────────────────────────────────────────────────────
 
 export async function generateMetadata(
@@ -185,9 +212,14 @@ export default async function ProductPage(
   const product  = await getProduct(slug)
   if (!product) notFound()
 
-  const [related, dynamicLinks] = await Promise.all([
+  // Collected editions show single issues from the same series in a separate
+  // browseable section. Single issues themselves skip this query (returns []).
+  const isCollectedEdition = !['SINGLE_ISSUE'].includes(product.format)
+
+  const [related, dynamicLinks, singleIssues] = await Promise.all([
     getRelated(product.id, product.seriesName, product.publisher, product.format),
     getDynamicLinks(product.id),
+    isCollectedEdition ? getSingleIssues(product.id, product.seriesName) : Promise.resolve([]),
   ])
 
   // ── Amazon on-demand lookup (non-blocking, 800 ms budget) ────────────────
@@ -338,8 +370,21 @@ export default async function ProductPage(
 
       <main className="min-h-screen bg-[#F8F8F6] text-[#0A0A0A]">
 
+        {/* ── Compact site header with search bar ───────────────────────── */}
+        {/* Always-available search — core behaviour of a comparison engine  */}
+        <header className="bg-white border-b border-gray-100 sticky top-0 z-40">
+          <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-4">
+            <Link href="/" className="flex-shrink-0" aria-label="Catch Comics home">
+              <img src="/logo.png" alt="Catch Comics" className="h-8 w-auto" />
+            </Link>
+            <div className="flex-1 max-w-xl">
+              <SearchBar region="uk" variant="header" />
+            </div>
+          </div>
+        </header>
+
         {/* ── Breadcrumb ─────────────────────────────────────────────────── */}
-        <nav className="max-w-6xl mx-auto px-4 pt-5 pb-2 text-sm text-gray-500" aria-label="Breadcrumb">
+        <nav className="max-w-6xl mx-auto px-4 pt-4 pb-2 text-sm text-gray-500" aria-label="Breadcrumb">
           <Link href="/" className="hover:text-[#E8272A] transition-colors">Home</Link>
           <span className="mx-2 text-gray-300">/</span>
           <Link href="/search" className="hover:text-[#E8272A] transition-colors">Search</Link>
@@ -347,8 +392,84 @@ export default async function ProductPage(
           <span className="text-gray-700 truncate">{product.title}</span>
         </nav>
 
-        {/* ── Two-column layout: main content + related sidebar ─────────── */}
-        <div className="max-w-6xl mx-auto px-4 py-6 lg:grid lg:grid-cols-[1fr_280px] lg:gap-10 lg:items-start">
+        {/* ── Two-column layout: LEFT sidebar + main content ───────────── */}
+        {/* Sidebar (related/issues) on left mirrors Discogs-style discovery  */}
+        <div className="max-w-6xl mx-auto px-4 py-4 lg:grid lg:grid-cols-[260px_1fr] lg:gap-10 lg:items-start">
+
+          {/* ── SIDEBAR: Related + single issues (lg+ only, LEFT rail) ───── */}
+          <aside className="hidden lg:block" aria-label="Related titles">
+            <div className="sticky top-20">
+
+              {/* Related collected editions */}
+              {related.length > 0 && (
+                <div className="mb-6">
+                  <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">You might also like</h2>
+                  <div className="flex flex-col gap-2">
+                    {related.map(r => (
+                      <Link
+                        key={r.id}
+                        href={`/product/${r.canonicalSlug}`}
+                        className="group flex items-center gap-3 bg-white rounded-xl border border-gray-200 hover:border-[#E8272A]/50 hover:shadow-sm p-3 transition-all focus:outline-none focus:ring-2 focus:ring-[#E8272A] focus:ring-offset-1"
+                      >
+                        <div className="flex-shrink-0 w-12 h-[68px] rounded-lg overflow-hidden">
+                          {r.coverImageUrl ? (
+                            <Image src={r.coverImageUrl} alt={r.title} width={48} height={68}
+                              className="w-full h-full object-cover group-hover:opacity-90 transition-opacity" />
+                          ) : (
+                            <NoCoverPlaceholder className="w-full h-full rounded-lg" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-gray-900 line-clamp-3 group-hover:text-[#E8272A] transition-colors leading-snug">
+                            {r.title}
+                          </p>
+                          {r.publisher && (
+                            <p className="text-[10px] text-gray-400 mt-1">{r.publisher}</p>
+                          )}
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Single issues in this series */}
+              {singleIssues.length > 0 && (
+                <div>
+                  <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Issues in this series</h2>
+                  <div className="flex flex-col gap-2 max-h-[60vh] overflow-y-auto pr-1">
+                    {singleIssues.map(issue => (
+                      <Link
+                        key={issue.id}
+                        href={`/product/${issue.canonicalSlug}`}
+                        className="group flex items-center gap-3 bg-white rounded-xl border border-gray-200 hover:border-[#E8272A]/50 hover:shadow-sm p-2.5 transition-all focus:outline-none focus:ring-2 focus:ring-[#E8272A] focus:ring-offset-1"
+                      >
+                        <div className="flex-shrink-0 w-10 h-14 rounded overflow-hidden bg-gray-100">
+                          {issue.coverImageUrl ? (
+                            <Image src={issue.coverImageUrl} alt={issue.title} width={40} height={56}
+                              className="w-full h-full object-cover group-hover:opacity-90 transition-opacity" />
+                          ) : (
+                            <NoCoverPlaceholder className="w-full h-full" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-gray-900 line-clamp-2 group-hover:text-[#E8272A] transition-colors leading-snug">
+                            {issue.issueNumber ? `#${issue.issueNumber}` : issue.title}
+                          </p>
+                          {issue.releaseDate && (
+                            <p className="text-[10px] text-gray-400 mt-0.5">
+                              {new Date(issue.releaseDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
+                            </p>
+                          )}
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+            </div>
+          </aside>
 
           {/* ── MAIN COLUMN ─────────────────────────────────────────────── */}
           <div className="min-w-0">
@@ -520,87 +641,65 @@ export default async function ProductPage(
               </div>
             </section>
 
-            {/* ── Related products (mobile / no-sidebar fallback) ──────── */}
-            {/* Shown below the main content on small screens; hidden on lg+ */}
-            {/* where the sidebar takes over.                                */}
-            {related.length > 0 && (
+            {/* ── Mobile: related + single issues (below main, lg+ uses sidebar) */}
+            {(related.length > 0 || singleIssues.length > 0) && (
               <section className="mb-8 lg:hidden">
-                <h2 className="text-xl font-semibold text-[#0A0A0A] mb-4">You might also like</h2>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  {related.map(r => (
-                    <Link
-                      key={r.id}
-                      href={`/product/${r.canonicalSlug}`}
-                      className="group block rounded-xl overflow-hidden bg-white border border-gray-200 hover:border-[#E8272A]/50 hover:shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#E8272A] focus:ring-offset-1"
-                    >
-                      {r.coverImageUrl ? (
-                        <Image
-                          src={r.coverImageUrl}
-                          alt={r.title}
-                          width={200}
-                          height={280}
-                          className="w-full object-cover aspect-[2/3] group-hover:opacity-90 transition-opacity"
-                        />
-                      ) : (
-                        <NoCoverPlaceholder className="aspect-[2/3] w-full" />
-                      )}
-                      <div className="p-3">
-                        <p className="text-sm font-medium text-gray-900 line-clamp-2 group-hover:text-[#E8272A] transition-colors">
-                          {r.title}
-                        </p>
-                        {r.publisher && (
-                          <p className="text-xs text-gray-400 mt-0.5">{r.publisher}</p>
-                        )}
-                      </div>
-                    </Link>
-                  ))}
-                </div>
+                {related.length > 0 && (
+                  <>
+                    <h2 className="text-lg font-semibold text-[#0A0A0A] mb-4">You might also like</h2>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+                      {related.map(r => (
+                        <Link key={r.id} href={`/product/${r.canonicalSlug}`}
+                          className="group block rounded-xl overflow-hidden bg-white border border-gray-200 hover:border-[#E8272A]/50 hover:shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#E8272A] focus:ring-offset-1">
+                          {r.coverImageUrl ? (
+                            <Image src={r.coverImageUrl} alt={r.title} width={200} height={280}
+                              className="w-full object-cover aspect-[2/3] group-hover:opacity-90 transition-opacity" />
+                          ) : (
+                            <NoCoverPlaceholder className="aspect-[2/3] w-full" />
+                          )}
+                          <div className="p-2.5">
+                            <p className="text-xs font-medium text-gray-900 line-clamp-2 group-hover:text-[#E8272A] transition-colors">{r.title}</p>
+                            {r.publisher && <p className="text-[10px] text-gray-400 mt-0.5">{r.publisher}</p>}
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  </>
+                )}
+                {singleIssues.length > 0 && (
+                  <>
+                    <h2 className="text-lg font-semibold text-[#0A0A0A] mb-4">Issues in this series</h2>
+                    <div className="flex flex-col gap-2">
+                      {singleIssues.slice(0, 8).map(issue => (
+                        <Link key={issue.id} href={`/product/${issue.canonicalSlug}`}
+                          className="group flex items-center gap-3 bg-white rounded-xl border border-gray-200 hover:border-[#E8272A]/50 p-3 transition-all focus:outline-none focus:ring-2 focus:ring-[#E8272A] focus:ring-offset-1">
+                          <div className="flex-shrink-0 w-10 h-14 rounded overflow-hidden bg-gray-100">
+                            {issue.coverImageUrl ? (
+                              <Image src={issue.coverImageUrl} alt={issue.title} width={40} height={56}
+                                className="w-full h-full object-cover group-hover:opacity-90 transition-opacity" />
+                            ) : (
+                              <NoCoverPlaceholder className="w-full h-full" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 line-clamp-2 group-hover:text-[#E8272A] transition-colors">
+                              {issue.issueNumber ? `#${issue.issueNumber}` : issue.title}
+                            </p>
+                            {issue.releaseDate && (
+                              <p className="text-xs text-gray-400 mt-0.5">
+                                {new Date(issue.releaseDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
+                              </p>
+                            )}
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  </>
+                )}
               </section>
             )}
 
           </div>{/* end main column */}
-
-          {/* ── SIDEBAR: Related products (lg+ only) ────────────────────── */}
-          {related.length > 0 && (
-            <aside className="hidden lg:block" aria-label="Related titles">
-              <div className="sticky top-6">
-                <h2 className="text-base font-semibold text-[#0A0A0A] mb-4">You might also like</h2>
-                <div className="flex flex-col gap-3">
-                  {related.map(r => (
-                    <Link
-                      key={r.id}
-                      href={`/product/${r.canonicalSlug}`}
-                      className="group flex items-center gap-3 bg-white rounded-xl border border-gray-200 hover:border-[#E8272A]/50 hover:shadow-sm p-3 transition-all focus:outline-none focus:ring-2 focus:ring-[#E8272A] focus:ring-offset-1"
-                    >
-                      {/* Thumbnail */}
-                      <div className="flex-shrink-0 w-14 h-20 rounded-lg overflow-hidden">
-                        {r.coverImageUrl ? (
-                          <Image
-                            src={r.coverImageUrl}
-                            alt={r.title}
-                            width={56}
-                            height={80}
-                            className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
-                          />
-                        ) : (
-                          <NoCoverPlaceholder className="w-full h-full rounded-lg" />
-                        )}
-                      </div>
-                      {/* Title */}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 line-clamp-3 group-hover:text-[#E8272A] transition-colors leading-snug">
-                          {r.title}
-                        </p>
-                        {r.publisher && (
-                          <p className="text-xs text-gray-400 mt-1">{r.publisher}</p>
-                        )}
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            </aside>
-          )}
 
         </div>{/* end two-column grid */}
 

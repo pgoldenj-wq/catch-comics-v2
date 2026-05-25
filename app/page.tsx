@@ -62,6 +62,18 @@ const DEAL_FALLBACKS: Record<number, string> = {
   72157:  'https://covers.openlibrary.org/b/isbn/1593070942-L.jpg',
 };
 
+// Comic Vine and other sources serve placeholder images at known URL patterns.
+// Filter these out so we fall through to the designed fallback card instead.
+function isPlaceholderCoverUrl(url: string): boolean {
+  if (!url) return true
+  const u = url.toLowerCase()
+  if (u.includes('no_image'))           return true  // CV legacy pattern
+  if (u.includes('image_not_available')) return true  // CV current pattern
+  if (u.includes('not_available'))       return true
+  if (/\/uploads\/[^/]+\/0\/\d+\//.test(u)) return true  // CV user-id 0 = system assets
+  return false
+}
+
 function discountPercent(deal: DealItem, region: 'uk' | 'us'): number {
   const price = region === 'uk' ? deal.priceUK : deal.priceUS;
   const rrp   = region === 'uk' ? deal.rrpUK   : deal.rrpUS;
@@ -662,9 +674,11 @@ export default function Home() {
               const price     = isLive
                 ? (region === 'uk' ? liveDeal!.lowestPriceGBP : liveDeal!.lowestPriceUSD)
                 : (region === 'uk' ? staticDeal!.priceUK : staticDeal!.priceUS)
-              const coverSrc  = isLive
+              const rawCover  = isLive
                 ? (liveDeal!.coverImageUrl ?? '')
                 : (staticDeal ? (dealCovers[staticDeal.id] || DEAL_FALLBACKS[staticDeal.id] || '') : '')
+              // Strip Comic Vine / other provider placeholder images — fall through to designed fallback
+              const coverSrc  = rawCover && !isPlaceholderCoverUrl(rawCover) ? rawCover : ''
 
               const handleClick = () => isLive
                 ? router.push(`/product/${liveDeal!.slug}`)
@@ -676,24 +690,36 @@ export default function Home() {
                   style={{ flexShrink: 0, width: '136px', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
 
                   {/* Cover */}
-                  <div style={{ width: '136px', height: '185px', borderRadius: '10px', overflow: 'hidden', background: '#1a1a2e', position: 'relative', boxShadow: '0 4px 16px rgba(0,0,0,0.1)', marginBottom: '8px' }}>
-                    {coverSrc && (
+                  <div style={{ width: '136px', height: '185px', borderRadius: '10px', overflow: 'hidden', background: coverSrc ? '#1a1a2e' : '#1e1b2e', position: 'relative', boxShadow: '0 4px 16px rgba(0,0,0,0.1)', marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {coverSrc ? (
                       <img
                         src={coverSrc}
                         alt={title}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
                         onError={(e) => {
                           const img = e.target as HTMLImageElement
                           if (!isLive && staticDeal) {
                             const fb = DEAL_FALLBACKS[staticDeal.id]
                             if (fb && img.src !== fb) { img.src = fb; return }
                           }
+                          // Hide broken image — fallback content below becomes visible
                           img.style.display = 'none'
                         }}
                       />
+                    ) : (
+                      /* Designed fallback — book icon + abbreviated title */
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', textAlign: 'center', width: '100%' }}>
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                        </svg>
+                        <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.35)', lineHeight: 1.3, maxWidth: '110px', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                          {title}
+                        </span>
+                      </div>
                     )}
-                    {/* Live deal — DB price badge */}
-                    {isLive && price !== null && (
+                    {/* Price badge — floats above image or fallback */}
+                    {price !== null && price !== undefined && (
                       <div style={{ position: 'absolute', top: '8px', left: '8px', background: '#C41F22', color: '#fff', fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '5px' }}>
                         {region === 'uk' ? '£' : '$'}{price!.toFixed(2)}
                       </div>
