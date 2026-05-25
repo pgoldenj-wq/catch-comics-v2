@@ -22,6 +22,7 @@ import { lookupByIsbn as lookupAmazon }  from '@/lib/adapters/amazon-rainforest'
 import SearchBar                         from '@/components/SearchBar'
 import CVCharacterTags                   from '@/components/CVCharacterTags'
 import CVIssuesGrid                      from '@/components/CVIssuesGrid'
+import CVCoverImage                      from '@/components/CVCoverImage'
 
 // ISR: cache each product page for 1 hour, then regenerate in the background.
 // Switched from force-dynamic (which hit the DB on every request) now that the
@@ -481,20 +482,14 @@ export default async function ProductPage(
             <section className="mb-8">
               <div className="flex flex-col sm:flex-row gap-8">
 
-                {/* Cover image */}
+                {/* Cover image — CVCoverImage handles DB cover → live CV fallback → placeholder */}
                 <div className="flex-shrink-0">
-                  {product.coverImageUrl ? (
-                    <Image
-                      src={product.coverImageUrl}
-                      alt={`Cover of ${product.title}`}
-                      width={200}
-                      height={300}
-                      className="rounded-xl shadow-md object-cover w-[180px] h-[270px] sm:w-[200px] sm:h-[300px]"
-                      priority
-                    />
-                  ) : (
-                    <NoCoverPlaceholder className="w-[180px] h-[270px] sm:w-[200px] sm:h-[300px] rounded-xl" />
-                  )}
+                  <CVCoverImage
+                    dbCoverUrl={product.coverImageUrl}
+                    comicvineId={product.comicvineId}
+                    title={product.title}
+                    className="w-[180px] h-[270px] sm:w-[200px] sm:h-[300px] rounded-xl shadow-md"
+                  />
                 </div>
 
                 {/* Metadata */}
