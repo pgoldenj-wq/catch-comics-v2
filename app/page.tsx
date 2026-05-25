@@ -74,6 +74,16 @@ function isPlaceholderCoverUrl(url: string): boolean {
   return false
 }
 
+// Open Library returns a 1×1 transparent GIF (HTTP 200) when an ISBN isn't in its
+// database — onError never fires.  Appending ?default=false makes OL return 404
+// instead, which does fire onError and lets the fallback layer show through.
+function adjustImgSrc(url: string): string {
+  if (url.includes('covers.openlibrary.org')) {
+    return url + (url.includes('?') ? '&default=false' : '?default=false')
+  }
+  return url
+}
+
 function discountPercent(deal: DealItem, region: 'uk' | 'us'): number {
   const price = region === 'uk' ? deal.priceUK : deal.priceUS;
   const rrp   = region === 'uk' ? deal.rrpUK   : deal.rrpUS;
@@ -690,33 +700,44 @@ export default function Home() {
                   style={{ flexShrink: 0, width: '136px', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
 
                   {/* Cover */}
-                  <div style={{ width: '136px', height: '185px', borderRadius: '10px', overflow: 'hidden', background: coverSrc ? '#1a1a2e' : '#1e1b2e', position: 'relative', boxShadow: '0 4px 16px rgba(0,0,0,0.1)', marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {coverSrc ? (
+                  <div style={{ width: '136px', height: '185px', borderRadius: '10px', overflow: 'hidden', background: '#1e1b2e', position: 'relative', boxShadow: '0 4px 16px rgba(0,0,0,0.1)', marginBottom: '8px' }}>
+                    {/* Fallback — ALWAYS rendered as base layer (book icon + title).
+                        Visible whenever the img above is absent, transparent (OL 1×1 GIF),
+                        or hidden via onError/onLoad.  No conditional — always in the DOM. */}
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', textAlign: 'center' }}>
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                      </svg>
+                      <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.35)', lineHeight: 1.3, maxWidth: '110px', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                        {title}
+                      </span>
+                    </div>
+                    {/* Cover img — sits on top of fallback and hides it when loaded OK.
+                        adjustImgSrc adds ?default=false to OL URLs → OL returns 404 for
+                        missing ISBNs instead of a 1×1 transparent GIF → onError fires.
+                        onLoad hides imgs that report 0 or 1-pixel dimensions (transparent
+                        GIFs / white placeholders that slipped past the URL filter). */}
+                    {coverSrc && (
                       <img
-                        src={coverSrc}
+                        src={adjustImgSrc(coverSrc)}
                         alt={title}
                         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
+                        onLoad={(e) => {
+                          const img = e.currentTarget
+                          if (img.naturalWidth <= 1 || img.naturalHeight <= 1) {
+                            img.style.display = 'none'
+                          }
+                        }}
                         onError={(e) => {
-                          const img = e.target as HTMLImageElement
+                          const img = e.currentTarget
                           if (!isLive && staticDeal) {
                             const fb = DEAL_FALLBACKS[staticDeal.id]
-                            if (fb && img.src !== fb) { img.src = fb; return }
+                            if (fb && img.src !== adjustImgSrc(fb)) { img.src = fb; return }
                           }
-                          // Hide broken image — fallback content below becomes visible
                           img.style.display = 'none'
                         }}
                       />
-                    ) : (
-                      /* Designed fallback — book icon + abbreviated title */
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', textAlign: 'center', width: '100%' }}>
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-                          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-                        </svg>
-                        <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.35)', lineHeight: 1.3, maxWidth: '110px', display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                          {title}
-                        </span>
-                      </div>
                     )}
                     {/* Price badge — floats above image or fallback */}
                     {price !== null && price !== undefined && (

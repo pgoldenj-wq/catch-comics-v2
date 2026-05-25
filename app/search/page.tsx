@@ -132,6 +132,18 @@ interface LooseEbayCard {
 type Format = 'single-issue' | 'graphic-novel' | 'hardcover' | 'omnibus' | 'manga' | 'compact' | 'one-shot'
 type Category = 'comics' | 'manga' | 'indie'
 
+// ─── Image helpers ────────────────────────────────────────────────────────────
+
+// Open Library returns a 1×1 transparent GIF (HTTP 200) for missing ISBNs so
+// onError never fires.  Adding ?default=false makes OL return 404 instead,
+// which does fire onError and lets the letter-initial fallback show through.
+function adjustImgSrc(url: string): string {
+  if (url.includes('covers.openlibrary.org')) {
+    return url + (url.includes('?') ? '&default=false' : '?default=false')
+  }
+  return url
+}
+
 // Validated set used by URL parsing — anything outside this list falls back to 'all'.
 const VALID_FORMATS: string[] = [
   'all', 'single-issue', 'graphic-novel', 'hardcover', 'omnibus', 'manga', 'compact', 'one-shot',
@@ -876,9 +888,13 @@ function SearchResults() {
                       </span>
                       {comic.image?.medium_url && (
                         <img
-                          src={comic.image.medium_url}
+                          src={adjustImgSrc(comic.image.medium_url)}
                           alt={comic.name}
                           style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px' }}
+                          onLoad={e => {
+                            const img = e.currentTarget
+                            if (img.naturalWidth <= 1 || img.naturalHeight <= 1) img.style.display = 'none'
+                          }}
                           onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
                         />
                       )}
