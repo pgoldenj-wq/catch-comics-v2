@@ -20,7 +20,12 @@ import OffersTable, { type OfferRow }    from '@/components/OffersTable'
 import PriceSparkline, { type SparkPoint } from '@/components/PriceSparkline'
 import { lookupByIsbn as lookupAmazon }  from '@/lib/adapters/amazon-rainforest'
 
-export const dynamic = 'force-dynamic'
+// ISR: cache each product page for 1 hour, then regenerate in the background.
+// Switched from force-dynamic (which hit the DB on every request) now that the
+// on-demand Rainforest lookup is effectively disabled (key not set). Price data
+// updates via AWIN feed syncs and the Wordery enrichment script, which run
+// externally — 1h staleness is acceptable and dramatically reduces DB load.
+export const revalidate = 3600
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
