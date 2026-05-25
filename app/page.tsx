@@ -62,15 +62,21 @@ const DEAL_FALLBACKS: Record<number, string> = {
   72157:  'https://covers.openlibrary.org/b/isbn/1593070942-L.jpg',
 };
 
-// Comic Vine and other sources serve placeholder images at known URL patterns.
+// Comic Vine, Google Books, and other sources serve placeholder images that
+// cannot be detected client-side (HTTP 200, real dimensions).
 // Filter these out so we fall through to the designed fallback card instead.
 function isPlaceholderCoverUrl(url: string): boolean {
   if (!url) return true
   const u = url.toLowerCase()
-  if (u.includes('no_image'))           return true  // CV legacy pattern
-  if (u.includes('image_not_available')) return true  // CV current pattern
-  if (u.includes('not_available'))       return true
+  if (u.includes('no_image'))               return true  // CV legacy pattern
+  if (u.includes('image_not_available'))     return true  // CV current pattern
+  if (u.includes('not_available'))           return true
   if (/\/uploads\/[^/]+\/0\/\d+\//.test(u)) return true  // CV user-id 0 = system assets
+  // Google Books serves a full-size "image not available" JPEG (HTTP 200, real
+  // dimensions) when it has no preview — indistinguishable from a real cover
+  // without canvas pixel inspection.  Filter all Google Books URLs until we
+  // have better cover data from a dedicated source.
+  if (u.includes('books.google.com'))        return true
   return false
 }
 

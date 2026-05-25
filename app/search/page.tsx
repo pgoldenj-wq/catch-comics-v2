@@ -509,6 +509,10 @@ function SearchResults() {
           const isBadCoverUrl = (url: string | null): boolean => {
             if (!url) return true
             const u = url.toLowerCase()
+            // Google Books serves a full-size "image not available" JPEG (HTTP 200,
+            // real dimensions) — indistinguishable from a real cover client-side.
+            // Filter all Google Books URLs until better cover data is available.
+            if (u.includes('books.google.com')) return true
             return u.includes('no_image') || u.includes('image_not_available') || u.includes('not_available') || /\/uploads\/[^/]+\/0\/\d+\//.test(u)
           }
 
