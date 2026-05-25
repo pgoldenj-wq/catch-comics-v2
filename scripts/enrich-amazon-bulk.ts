@@ -4,6 +4,20 @@
  *
  * Bulk pre-enrichment of Amazon UK prices for TM-linked canonicals.
  *
+ * ══════════════════════════════════════════════════════════
+ * ⚠  COST WARNING — READ BEFORE RUNNING
+ * ══════════════════════════════════════════════════════════
+ * Rainforest API Hobbyist plan overage rate: $0.092/request
+ * Default --budget cap: $5.00 (≈54 requests at overage rate)
+ *
+ * ALWAYS run dry-run first to see cost projection.
+ * ALWAYS disable overage on Rainforest account:
+ *   https://app.rainforestapi.com/ → Billing → Overage: OFF
+ *
+ * With overage DISABLED, the 402 quota guard hard-stops the run.
+ * With overage ENABLED, every request charges $0.092 without stopping.
+ * ══════════════════════════════════════════════════════════
+ *
  * Strategy:
  *   For every TM-linked canonical with an ISBN-13 that has no Amazon UK listing
  *   (or a stale one > TTL_HOURS old), call Rainforest API (GTIN lookup) and
@@ -14,35 +28,48 @@
  *   This script uses DELAY_MS = 6500ms between calls (≈9.2/min, safely under).
  *   Each iteration also checks canCallRainforest() before firing.
  *
- * Cost estimate:
- *   Rainforest charges ~$0.001/call. Full cold run of ~4,947 ISBNs ≈ $4.95.
- *   With --limit 500: ~$0.50. Default: 200 (safe smoke-test ≈ $0.20).
+ * Cost reality (Hobbyist plan, May 2026):
+ *   Overage rate: $0.092/call (NOT $0.001 — that is enterprise-tier only)
+ *   Bundled credits: ~250–500/month
+ *   Safe batch size: 50–100 calls max before checking spend
+ *   Full catalogue (~9,100 ISBNs): ~$837 at overage rate — DO NOT RUN UNBOUNDED
  *
  * Usage:
- *   npm run enrich:amazon               dry-run, limit 200
- *   npm run enrich:amazon -- --write    write to DB, limit 200
- *   npm run enrich:amazon -- --write --limit 500
- *   npm run enrich:amazon -- --write --limit 0    (unlimited — full run)
- *   npm run enrich:amazon -- --write --stale 12   re-enrich listings >12h old
+ *   npm run enrich:amazon               dry-run, limit 50
+ *   npm run enrich:amazon -- --write    write to DB, limit 50
+ *   npm run enrich:amazon -- --write --limit 100 --budget 5
+ *   npm run enrich:amazon -- --write --limit 0 --budget 20   (budget-capped)
+ *   npm run enrich:amazon -- --write --stale 720   re-enrich listings >30d old
  *
  * Env vars required:
  *   RAINFOREST_API_KEY  — from app.rainforestapi.com
  *   DATABASE_URL        — Supabase connection string (via .env.local)
  */
 
-import { prisma }      from '../lib/prisma'
-import { lookupByIsbn } from '../lib/adapters/amazon-rainforest'
+import { prisma }                              from '../lib/prisma'
+import { lookupByIsbn, RainforestQuotaError } from '../lib/adapters/amazon-rainforest'
 
 // ── CLI args ──────────────────────────────────────────────────────────────────
 const args    = process.argv.slice(2)
 const WRITE   = args.includes('--write')
 
 const limIdx  = args.indexOf('--limit')
-const RAW_LIM = limIdx !== -1 ? parseInt(args[limIdx + 1] ?? '200', 10) : 200
+const RAW_LIM = limIdx !== -1 ? parseInt(args[limIdx + 1] ?? '50', 10) : 50   // default lowered to 50
 const LIMIT   = RAW_LIM === 0 ? 999_999 : RAW_LIM
 
 const staleIdx  = args.indexOf('--stale')
-const TTL_HOURS = staleIdx !== -1 ? parseInt(args[staleIdx + 1] ?? '6', 10) : 6
+// Default TTL raised to 720h (30 days) for bulk enrichment.
+// 6h TTL is appropriate only for real-time on-demand lookups, not batch runs.
+// At $0.092/call overage, re-enriching every 6h is $441/day per 1,200 listings.
+const TTL_HOURS = staleIdx !== -1 ? parseInt(args[staleIdx + 1] ?? '720', 10) : 720
+
+// ── Spending cap ──────────────────────────────────────────────────────────────
+// Hard stop when projected spend exceeds this amount.
+// Assumes overage rate ($0.092) as the conservative/safe estimate.
+// Pass --budget 0 to disable (not recommended).
+const budgetIdx     = args.indexOf('--budget')
+const BUDGET_USD    = budgetIdx !== -1 ? parseFloat(args[budgetIdx + 1] ?? '5') : 5
+const COST_PER_CALL = 0.092   // Hobbyist overage rate — real cost, not $0.001 marketing rate
 
 // Rate limit: Rainforest API cap is 10/min (our process-local sliding window).
 // 6500ms = ~9.2 calls/min — safely under the 10/min limit.
@@ -64,6 +91,9 @@ function fmtElapsed(startMs: number): string {
 
 async function main() {
   const apiKey = process.env.RAINFOREST_API_KEY
+  const maxCallsForBudget = BUDGET_USD > 0 ? Math.floor(BUDGET_USD / COST_PER_CALL) : 999_999
+  const effectiveLimit    = Math.min(LIMIT, maxCallsForBudget)
+
   console.log('\n══════════════════════════════════════════════════════════')
   console.log(' Amazon UK Bulk Enrichment via Rainforest API')
   console.log(` Mode        : ${WRITE ? 'WRITE' : 'DRY-RUN'}`)
@@ -71,6 +101,12 @@ async function main() {
   console.log(` Stale TTL   : ${TTL_HOURS}h (skip listings fresher than this)`)
   console.log(` Rate        : 1 call per ${DELAY_MS / 1000}s (~${(60_000 / DELAY_MS).toFixed(1)}/min)`)
   console.log(` API key     : ${apiKey ? `${apiKey.slice(0, 8)}…` : 'NOT SET ⚠ (dry-run only)'}`)
+  console.log(` Cost/call   : $${COST_PER_CALL} (Hobbyist overage rate — disable overage on Rainforest!)`)
+  if (BUDGET_USD > 0) {
+    console.log(` Budget cap  : $${BUDGET_USD.toFixed(2)} → max ${maxCallsForBudget} calls before hard stop`)
+  } else {
+    console.log(` Budget cap  : DISABLED ⚠`)
+  }
   if (!apiKey && WRITE) {
     console.error('\n  ✗ RAINFOREST_API_KEY is not set. Set it in .env.local and retry.')
     process.exit(1)
@@ -123,7 +159,7 @@ async function main() {
   }
 
   const totalEligible = candidates.length
-  candidates = candidates.slice(0, LIMIT)
+  candidates = candidates.slice(0, effectiveLimit)
 
   // How many already have Amazon pricing (total, including stale)
   const alreadyPriced = amazonRetailerId
@@ -136,8 +172,8 @@ async function main() {
   console.log(`  Already priced     : ${alreadyPriced} (Amazon UK in DB, incl. stale)`)
   console.log(`  Fresh (< ${TTL_HOURS}h)     : ${freshCount} (skipped — within TTL)`)
   console.log(`  Eligible to enrich : ${totalEligible}`)
-  console.log(`  This run (limit)   : ${candidates.length}`)
-  console.log(`  Est. cost          : $${(candidates.length * 0.001).toFixed(2)}`)
+  console.log(`  This run (limit)   : ${candidates.length}  (budget cap: $${BUDGET_USD > 0 ? BUDGET_USD.toFixed(2) : 'none'} → ${maxCallsForBudget} calls max)`)
+  console.log(`  Est. cost          : $${(candidates.length * COST_PER_CALL).toFixed(2)}  @ $${COST_PER_CALL}/call (overage rate)`)
   const estMinutes = Math.ceil(candidates.length * DELAY_MS / 60_000)
   console.log(`  Est. time          : ~${estMinutes} min`)
 
@@ -157,11 +193,15 @@ async function main() {
   }
 
   // ── Enrichment loop ────────────────────────────────────────────────────────
-  const start   = Date.now()
-  let priced    = 0
-  let notFound  = 0
-  let errors    = 0
-  let rateMiss  = 0
+  const start          = Date.now()
+  let priced           = 0
+  let notFound         = 0
+  let errors           = 0
+  let rateMiss         = 0
+  let quotaExhausted   = false
+  let tooManyErrors    = false
+  let budgetHit        = false
+  let callsMade        = 0
 
   console.log('\n  Starting enrichment loop...\n')
 
@@ -170,13 +210,24 @@ async function main() {
     const pct     = ((i / candidates.length) * 100).toFixed(0)
     const elapsed = fmtElapsed(start)
 
+    const spentSoFar = callsMade * COST_PER_CALL
     process.stdout.write(
-      `  [${String(i + 1).padStart(4)}/${candidates.length}] ${pct}% | ${elapsed} | ` +
-      `${canon.isbn13} | ${canon.title.slice(0, 40).padEnd(40)}\r`
+      `  [${String(i + 1).padStart(4)}/${candidates.length}] ${pct}% | ${elapsed} | $${spentSoFar.toFixed(2)} spent | ` +
+      `${canon.isbn13} | ${canon.title.slice(0, 35).padEnd(35)}\r`
     )
+
+    // Hard budget check before each call
+    if (BUDGET_USD > 0 && spentSoFar >= BUDGET_USD) {
+      process.stdout.write('\n')
+      console.log(`\n  ✋ BUDGET CAP REACHED: $${spentSoFar.toFixed(2)} spent (cap: $${BUDGET_USD.toFixed(2)})`)
+      console.log(`     Pass --budget ${(BUDGET_USD * 2).toFixed(0)} to double the cap, or --budget 0 to disable.`)
+      budgetHit = true
+      break
+    }
 
     try {
       const offer = await lookupByIsbn(canon.isbn13, canon.id, 'amazon.co.uk')
+      callsMade++
 
       if (offer && offer.priceAmount > 0) {
         priced++
@@ -186,11 +237,25 @@ async function main() {
         notFound++  // price=0 = OOS or no buybox
       }
     } catch (err) {
+      if (err instanceof RainforestQuotaError) {
+        process.stdout.write('\n')
+        console.error('\n  ✗ QUOTA EXHAUSTED (HTTP 402) — Rainforest credits used up.')
+        console.error('    ⚠  If you are seeing this, overage is DISABLED on your account (good).')
+        console.error('    ⚠  If you are NOT seeing 402 but still being charged, DISABLE overage at:')
+        console.error('         https://app.rainforestapi.com/ → Billing → Overage: OFF')
+        console.error(`    Priced before stop : ${priced}`)
+        console.error(`    Spent before stop  : $${(callsMade * COST_PER_CALL).toFixed(2)}`)
+        console.error(`    Remaining retryable: ${candidates.length - i - 1} ISBNs (safe to re-run once billing is resolved)`)
+        console.error('    Already-priced ISBNs will be skipped on next run (TTL window).')
+        quotaExhausted = true
+        break
+      }
       errors++
       process.stdout.write('\n')
       console.error(`  [error] ${canon.isbn13}: ${(err as Error).message}`)
       if (errors > 10) {
         console.error('\n  Too many errors — aborting.')
+        tooManyErrors = true
         break
       }
     }
@@ -209,14 +274,16 @@ async function main() {
   process.stdout.write('\n')
   const yieldPct = candidates.length > 0 ? ((priced / candidates.length) * 100).toFixed(0) : '0'
 
+  const actualCost = callsMade * COST_PER_CALL
   console.log('\n── Summary ──────────────────────────────────────────────')
-  console.log(`  Attempted : ${candidates.length}`)
+  console.log(`  Attempted : ${callsMade} API calls made`)
   console.log(`  Priced    : ${priced}  (${yieldPct}% yield)`)
   console.log(`  Not found : ${notFound}`)
   console.log(`  Rate miss : ${rateMiss}`)
   console.log(`  Errors    : ${errors}`)
   console.log(`  Elapsed   : ${fmtElapsed(start)}`)
-  console.log(`  Est. cost : $${(candidates.length * 0.001).toFixed(2)}`)
+  console.log(`  API cost  : ~$${actualCost.toFixed(2)}  (${callsMade} calls × $${COST_PER_CALL}/call overage rate)`)
+  if (budgetHit) console.log(`  Budget    : CAP REACHED at $${BUDGET_USD.toFixed(2)}`)
 
   if (priced > 0) {
     console.log(`\n  ✓ Added Amazon UK pricing to ${priced} product pages.`)
@@ -228,6 +295,23 @@ async function main() {
   console.log('\n  Next: if yield > 50%, schedule a nightly cron via Vercel Cron:')
   console.log('    GET /api/cron/amazon-refresh — refreshes stale listings in batches')
   console.log('══════════════════════════════════════════════════════════\n')
+
+  // ── Machine-readable result (parsed by enrich-overnight.ts orchestrator) ──
+  const batchStatus = quotaExhausted ? 'quota_exhausted'
+                    : tooManyErrors  ? 'too_many_errors'
+                    : budgetHit      ? 'budget_cap'
+                    : candidates.length === 0 ? 'nothing_to_do'
+                    : 'ok'
+  console.log(`BATCH_RESULT:${JSON.stringify({ attempted: callsMade, priced, notFound, errors, cost: parseFloat(actualCost.toFixed(3)), status: batchStatus })}`)
+
+  // Exit codes:
+  //   0 = normal (ok or nothing_to_do)
+  //   2 = quota exhausted — orchestrator should stop immediately
+  //   3 = too many errors — orchestrator should stop and alert
+  //   4 = budget cap hit — orchestrator should stop and report
+  if (quotaExhausted) process.exit(2)
+  if (tooManyErrors)  process.exit(3)
+  if (budgetHit)      process.exit(4)
 }
 
 main().catch(console.error).finally(() => prisma.$disconnect())

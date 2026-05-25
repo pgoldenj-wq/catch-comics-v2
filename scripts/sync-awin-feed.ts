@@ -3,7 +3,7 @@
  * sync-awin-feed.ts
  *
  * Downloads a fresh AWIN product feed and ingests it directly into the DB.
- * No manual CSV download required — uses AWIN_API_KEY from .env.local.
+ * No manual CSV download required — uses AWIN_DATAFEED_KEY from .env.local.
  *
  * Supports Bookshop.org UK (FID 99173) and any other AWIN merchant.
  *
@@ -21,10 +21,11 @@
  *   speedyhen     FID ?      (speedyhen.com — add FID when approved)
  */
 
-import * as fs      from 'fs'
-import * as path    from 'path'
-import { Readable } from 'stream'
-import { parse }    from 'csv-parse'
+import * as fs           from 'fs'
+import * as path         from 'path'
+import { Readable }      from 'stream'
+import { gunzipSync }    from 'zlib'
+import { parse }         from 'csv-parse'
 import { prisma }   from '../lib/prisma'
 import { StockStatus, MatchMethod, ListingCondition } from '@prisma/client'
 
@@ -41,11 +42,13 @@ const FID_ARG  = fidIdx !== -1 ? argv[fidIdx + 1] : null
 
 // ── Known merchants ───────────────────────────────────────────────────────────
 const MERCHANTS: Record<string, { fid: string; domain: string; name: string }> = {
-  'bookshop'      : { fid: '99173',  domain: 'uk.bookshop.org',  name: 'Bookshop.org UK' },
-  'bookshop-isbn' : { fid: '100002', domain: 'uk.bookshop.org',  name: 'Bookshop.org UK (ISBN feed)' },
-  'letsbuybooks'  : { fid: '112530', domain: 'letsbuybooks.com', name: 'Lets Buy Books' },
+  'bookshop'      : { fid: '99173',  domain: 'uk.bookshop.org',   name: 'Bookshop.org UK' },
+  'bookshop-isbn' : { fid: '100002', domain: 'uk.bookshop.org',   name: 'Bookshop.org UK (ISBN feed)' },
+  'letsbuybooks'  : { fid: '112530', domain: 'letsbuybooks.com',  name: 'Lets Buy Books' },
+  'waterstones'   : { fid: '3787',   domain: 'waterstones.com',   name: 'Waterstones' },
+  'scholastic'    : { fid: '2957',   domain: 'scholastic.co.uk',  name: 'Scholastic' },
   // Add when AWIN-approved:
-  // 'speedyhen'  : { fid: '???',    domain: 'speedyhen.com',    name: 'SpeedyHen' },
+  // 'speedyhen'  : { fid: '???',    domain: 'speedyhen.com',     name: 'SpeedyHen' },
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -66,7 +69,7 @@ function mapStock(inStock: string, qty: string): StockStatus {
   return StockStatus.OUT_OF_STOCK
 }
 
-// ── Canonical match cache ─────────────────────────────────────────────────────
+// ── Canonical match + create cache ───────────────────────────────────────────
 const canonCache = new Map<string, string>()  // isbn13 → canonical_product_id
 
 async function getCanonicalId(isbn13: string): Promise<string | null> {
@@ -78,6 +81,47 @@ async function getCanonicalId(isbn13: string): Promise<string | null> {
   const id = cp?.id ?? null
   canonCache.set(isbn13, id ?? '')
   return id
+}
+
+// ── Comics relevance filter ───────────────────────────────────────────────────
+const COMICS_KEYWORDS = [
+  'manga', 'manhwa', 'manhua', 'anime',
+  'graphic novel', 'graphic memoir',
+  'omnibus', 'compendium',
+  ' vol.', ' vol ', 'volume ',
+  'collected edition', 'collected works',
+  'trade paperback',
+  ' comics', 'comic book',
+]
+
+function isComicsRelated(title: string): boolean {
+  const t = title.toLowerCase()
+  return COMICS_KEYWORDS.some(k => t.includes(k))
+}
+
+function makeSlug(title: string, isbn13: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 80) + '-' + isbn13
+}
+
+async function createCanonical(isbn13: string, row: Record<string, string>): Promise<string> {
+  const title = (row['product_name'] ?? isbn13).slice(0, 500)
+  const cp = await prisma.canonicalProduct.create({
+    data: {
+      isbn13,
+      title,
+      format        : 'OTHER',
+      canonicalSlug : makeSlug(title, isbn13),
+      publisher     : row['brand']              || null,
+      description   : row['description']        || null,
+      coverImageUrl : row['merchant_image_url'] || row['aw_image_url'] || null,
+    },
+  })
+  canonCache.set(isbn13, cp.id)
+  return cp.id
 }
 
 // ── Retailer cache ────────────────────────────────────────────────────────────
@@ -93,8 +137,11 @@ async function getRetailerId(domain: string): Promise<string | null> {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
-  const apiKey = process.env.AWIN_API_KEY
-  if (!apiKey) throw new Error('AWIN_API_KEY not set in environment')
+  // AWIN uses two separate keys:
+  //   AWIN_API_KEY      — Publisher API (transactions, reports) — NOT for feed downloads
+  //   AWIN_DATAFEED_KEY — product feed downloads from productdata.awin.com (this one)
+  const apiKey = process.env.AWIN_DATAFEED_KEY
+  if (!apiKey) throw new Error('AWIN_DATAFEED_KEY not set in environment (see .env.local — distinct from AWIN_API_KEY)')
 
   let fid    : string
   let domain : string
@@ -121,7 +168,7 @@ async function main() {
   console.log(` Limit  : ${LIMIT === 999_999 ? 'unlimited' : LIMIT}`)
   console.log('══════════════════════════════════════════════════════════\n')
 
-  const url = `https://productdata.awin.com/datafeed/download/apikey/${apiKey}/language/en/fid/${fid}/columntypes/all/format/csv/delimiter/%2C/compression/none/`
+  const url = `https://productdata.awin.com/datafeed/download/apikey/${apiKey}/fid/${fid}/format/csv/language/en/delimiter/%2C/compression/gzip/`
 
   console.log(`  Downloading feed from AWIN...`)
   let feedRes: Response
@@ -145,7 +192,8 @@ async function main() {
 
   console.log(`  Saving feed to ${path.relative(process.cwd(), outFile)}...`)
 
-  const body = await feedRes.text()
+  const compressed = await feedRes.arrayBuffer()
+  const body       = gunzipSync(Buffer.from(compressed)).toString('utf-8')
   fs.writeFileSync(outFile, body, 'utf-8')
   console.log(`  Feed saved (${Math.round(body.length / 1024)}KB)\n`)
 
@@ -157,8 +205,8 @@ async function main() {
 
   // Parse CSV
   const stats = {
-    rows: 0, matched: 0, upserted: 0, priced: 0, skippedNoIsbn: 0,
-    skippedNoMatch: 0, skippedNoPrice: 0, errors: 0,
+    rows: 0, matched: 0, created: 0, upserted: 0, priced: 0,
+    skippedNoIsbn: 0, skippedNotComics: 0, wouldCreate: 0, skippedNoPrice: 0, errors: 0,
   }
 
   const parser = parse(body, {
@@ -179,8 +227,9 @@ async function main() {
 
     // Extract ISBN
     const isbn13 =
-      isIsbn13(row['isbn'] ?? '')          ? row['isbn'].trim()                  :
-      isIsbn13(row['product_barcode'] ?? '') ? row['product_barcode'].trim()     :
+      isIsbn13(row['isbn'] ?? '')               ? row['isbn'].trim()               :
+      isIsbn13(row['ean'] ?? '')                ? row['ean'].trim()                :
+      isIsbn13(row['product_barcode'] ?? '')    ? row['product_barcode'].trim()    :
       isIsbn13(row['merchant_product_id'] ?? '') ? row['merchant_product_id'].trim() :
       null
 
@@ -190,13 +239,25 @@ async function main() {
     const price = parsePrice(row['search_price'] ?? row['price'] ?? row['rrp_price'] ?? '')
     if (price <= 0) { stats.skippedNoPrice++; continue }
 
-    // Match canonical
-    const canonicalId = await getCanonicalId(isbn13)
-    if (!canonicalId) { stats.skippedNoMatch++; continue }
+    // Match canonical — create new if missing and comics-relevant (write mode only)
+    let canonicalId = await getCanonicalId(isbn13)
+    if (!canonicalId) {
+      const title = row['product_name'] ?? ''
+      if (!isComicsRelated(title)) { stats.skippedNotComics++; continue }
+      if (DRY) {
+        stats.wouldCreate++
+        if (stats.wouldCreate <= 5) {
+          console.log(`  + would create: ${isbn13}  "${title.slice(0, 40)}"`)
+        }
+        continue
+      }
+      canonicalId = await createCanonical(isbn13, row)
+      stats.created++
+    }
 
     stats.matched++
 
-    if (!WRITE) {
+    if (DRY) {
       if (stats.matched <= 10) {
         console.log(`  ✓ ${isbn13}  GBP ${price.toFixed(2)}  "${(row['product_name'] ?? '').slice(0, 40)}"`)
       }
@@ -267,7 +328,12 @@ async function main() {
   console.log(`  Upserted       : ${stats.upserted.toLocaleString()}`)
   console.log(`  Priced         : ${stats.priced.toLocaleString()}`)
   console.log(`  No ISBN        : ${stats.skippedNoIsbn.toLocaleString()}`)
-  console.log(`  No match       : ${stats.skippedNoMatch.toLocaleString()}`)
+  console.log(`  Not comics     : ${stats.skippedNotComics.toLocaleString()}`)
+  if (DRY) {
+    console.log(`  Would create   : ${stats.wouldCreate.toLocaleString()}`)
+  } else {
+    console.log(`  Created (new)  : ${stats.created.toLocaleString()}`)
+  }
   console.log(`  No price       : ${stats.skippedNoPrice.toLocaleString()}`)
   console.log(`  Errors         : ${stats.errors.toLocaleString()}`)
   if (DRY) {

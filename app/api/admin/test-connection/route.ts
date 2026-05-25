@@ -211,8 +211,9 @@ async function testAutoDetect(domain: string): Promise<NextResponse> {
 
 /**
  * Preview the first 100 rows of an Awin feed without writing to the DB.
- * Body must include feedId and optionally apiKey (falls back to AWIN_API_KEY).
+ * Body must include feedId and optionally apiKey (falls back to AWIN_DATAFEED_KEY).
  * Body: { domain: string; feedId: string; apiKey?: string; feedFormat?: 'xml'|'csv' }
+ * Note: AWIN_DATAFEED_KEY is the product data download key — distinct from AWIN_API_KEY (Publisher API).
  */
 async function testAwinFeed(req: NextRequest): Promise<NextResponse> {
   const body = await req.json() as {
@@ -223,14 +224,14 @@ async function testAwinFeed(req: NextRequest): Promise<NextResponse> {
   }
 
   const feedId     = body.feedId
-  const apiKey     = body.apiKey ?? process.env.AWIN_API_KEY
+  const apiKey     = body.apiKey ?? process.env.AWIN_DATAFEED_KEY
   const feedFormat = body.feedFormat ?? 'csv'
 
   if (!feedId) {
     return NextResponse.json({ ok: false, message: 'feedId is required for AWIN_FEED connection test' }, { status: 400 })
   }
   if (!apiKey) {
-    return NextResponse.json({ ok: false, message: 'No API key — set AWIN_API_KEY env var or pass apiKey in the request body' }, { status: 400 })
+    return NextResponse.json({ ok: false, message: 'No datafeed key — set AWIN_DATAFEED_KEY env var or pass apiKey in the request body' }, { status: 400 })
   }
 
   try {

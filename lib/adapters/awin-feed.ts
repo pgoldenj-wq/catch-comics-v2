@@ -15,11 +15,11 @@
  *
  * sync_config fields (stored on the retailer row):
  *   feed_id      : string   — Awin feed ID
- *   api_key      : string   — per-retailer API key (or use env AWIN_API_KEY)
+ *   api_key      : string   — per-retailer datafeed key (or use env AWIN_DATAFEED_KEY)
  *   feed_format  : "xml" | "csv"
  *
  * Env vars:
- *   AWIN_API_KEY — master API key (used as fallback if sync_config.api_key absent)
+ *   AWIN_DATAFEED_KEY — product datafeed download key (distinct from AWIN_API_KEY Publisher key)
  *
  * Standard Awin CSV/XML column names used here:
  *   product_name, merchant_product_id, aw_product_id, merchant_image_url,
@@ -27,6 +27,7 @@
  *   aw_deep_link, in_stock, condition, isbn, ean, upc, brand, author
  */
 
+import { createGunzip } from 'zlib'
 import { Readable } from 'stream'
 import { pipeline } from 'stream/promises'
 import { prisma }   from '@/lib/prisma'
@@ -268,7 +269,10 @@ async function downloadFeed(url: string): Promise<ReadableStream<Uint8Array>> {
   })
   if (!res.ok) throw new Error(`Feed download failed: HTTP ${res.status} ${res.statusText}`)
   if (!res.body) throw new Error('Feed response has no body')
-  return res.body
+  // AWIN feeds are always gzip-compressed — decompress before parsing
+  const nodeStream  = Readable.fromWeb(res.body as Parameters<typeof Readable.fromWeb>[0])
+  const decompressed = nodeStream.pipe(createGunzip())
+  return Readable.toWeb(decompressed) as ReadableStream<Uint8Array>
 }
 
 // ── XML feed parser (streaming) ───────────────────────────────────────────────
@@ -423,13 +427,14 @@ export class AwinFeedAdapter {
 
     const cfg        = (retailer.syncConfig ?? {}) as AwinSyncConfig
     const feedId     = cfg.feed_id
-    const apiKey     = cfg.api_key ?? process.env.AWIN_API_KEY
+    // AWIN_DATAFEED_KEY is the product data download key — different from AWIN_API_KEY (Publisher API)
+    const apiKey     = cfg.api_key ?? process.env.AWIN_DATAFEED_KEY
     const feedFormat = cfg.feed_format ?? 'csv'
 
     if (!feedId) throw new Error(`retailer ${retailer.domain} has no feed_id in sync_config`)
-    if (!apiKey) throw new Error(`no api_key for retailer ${retailer.domain} and AWIN_API_KEY env var not set`)
+    if (!apiKey) throw new Error(`no datafeed key for retailer ${retailer.domain} — set AWIN_DATAFEED_KEY env var (distinct from AWIN_API_KEY)`)
 
-    const feedUrl = `https://productdata.awin.com/datafeed/download/apikey/${apiKey}/language/en/fid/${feedId}/columntypes/all/format/${feedFormat}/delimiter/%2C/compression/none/`
+    const feedUrl = `https://productdata.awin.com/datafeed/download/apikey/${apiKey}/fid/${feedId}/format/${feedFormat}/language/en/delimiter/%2C/compression/gzip/`
 
     console.log(`[awin] starting feed sync for ${retailer.domain} (feed ${feedId}, format ${feedFormat})`)
 
@@ -536,7 +541,7 @@ export class AwinFeedAdapter {
     withEan    : number
     unmatched  : number
   }> {
-    const feedUrl = `https://productdata.awin.com/datafeed/download/apikey/${apiKey}/language/en/fid/${feedId}/columntypes/all/format/${feedFormat}/delimiter/%2C/compression/none/`
+    const feedUrl = `https://productdata.awin.com/datafeed/download/apikey/${apiKey}/fid/${feedId}/format/${feedFormat}/language/en/delimiter/%2C/compression/gzip/`
     const feedStream = await downloadFeed(feedUrl)
 
     const productGen = feedFormat === 'xml'

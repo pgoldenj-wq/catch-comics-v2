@@ -96,6 +96,18 @@ const TRUST_SCORE        = 90
 const COST_PER_CALL_USD  = 0.001    // Rainforest standard tier estimate
 const USER_AGENT         = 'CatchComics/1.0 (+https://catchcomics.com/bot)'
 
+// ── Quota sentinel ────────────────────────────────────────────────────────────
+// Thrown (not returned null) when Rainforest returns 402 Payment Required.
+// Callers that want to hard-stop on quota exhaustion should catch this type.
+// lookupByIsbn re-throws it so enrich-amazon-bulk.ts can detect and abort.
+
+export class RainforestQuotaError extends Error {
+  constructor() {
+    super('Rainforest API returned 402 — credits exhausted or payment required. Check app.rainforestapi.com.')
+    this.name = 'RainforestQuotaError'
+  }
+}
+
 // ── In-memory rate limiter ────────────────────────────────────────────────────
 // 10 calls per 60-second sliding window.
 // NOTE: This is process-local. On multi-instance Vercel, each instance has its
@@ -227,6 +239,11 @@ async function fetchRainforest(isbn13: string, amazonDomain: AmazonDomain): Prom
 
   if (!res.ok) {
     await logUsage(isbn13, url, false, latencyMs)
+    if (res.status === 402) {
+      // 402 = credits exhausted / payment required — no point retrying any ISBN.
+      // Throw a typed error so callers can hard-stop the run immediately.
+      throw new RainforestQuotaError()
+    }
     console.warn(`[amazon] HTTP ${res.status} for ${isbn13} on ${amazonDomain}`)
     return null
   }
@@ -420,6 +437,7 @@ export async function lookupByIsbn(
       fromCache   : false,
     }
   } catch (err) {
+    if (err instanceof RainforestQuotaError) throw err  // propagate — caller should hard-stop
     console.error(`[amazon] unhandled error for ${isbn13}:`, err)
     return null
   }

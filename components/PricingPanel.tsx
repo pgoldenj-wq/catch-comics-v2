@@ -377,7 +377,7 @@ export default function PricingPanel({ query, region, formatFilter = 'all', onFo
                 <a
                   href={l.itemWebUrl || '#'}
                   target="_blank"
-                  rel="noopener noreferrer"
+                  rel="noopener noreferrer sponsored"
                   className="shrink-0 px-4 py-2 text-white text-xs font-semibold rounded-xl transition-colors"
                   style={{ background: '#0A0A0A' }}
                   onMouseEnter={e => (e.currentTarget.style.background = '#E8272A')}

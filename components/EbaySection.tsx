@@ -173,7 +173,7 @@ export default function EbaySection({
               <a
                 href={cheapestBIN.itemWebUrl}
                 target="_blank"
-                rel="noopener noreferrer"
+                rel="noopener noreferrer sponsored"
                 onClick={() => handleClick(cheapestBIN)}
                 className="inline-block px-6 py-3 rounded-xl bg-[#E8272A] hover:bg-[#c01f22] text-white font-semibold text-base transition-colors"
               >
@@ -218,7 +218,7 @@ export default function EbaySection({
                 key={listing.itemId}
                 href={listing.itemWebUrl}
                 target="_blank"
-                rel="noopener noreferrer"
+                rel="noopener noreferrer sponsored"
                 onClick={() => handleClick(listing)}
                 className="group flex flex-col rounded-xl bg-gray-900 border border-gray-800 hover:border-[#E8272A]/60 transition-colors p-4"
               >

@@ -12,7 +12,7 @@
  *   npm run test:awin-feed -- --feed-id 12345 --api-key MY_KEY --limit 200
  *
  * Env vars:
- *   AWIN_API_KEY — used if --api-key is not passed
+ *   AWIN_DATAFEED_KEY — used if --api-key is not passed (distinct from AWIN_API_KEY Publisher key)
  */
 
 import { AwinFeedAdapter } from '../lib/adapters/awin-feed'
@@ -25,7 +25,7 @@ function arg(flag: string): string | undefined {
 }
 
 const feedId     = arg('--feed-id')
-const apiKey     = arg('--api-key') ?? process.env.AWIN_API_KEY
+const apiKey     = arg('--api-key') ?? process.env.AWIN_DATAFEED_KEY
 const feedFormat = (arg('--format') ?? 'csv') as 'xml' | 'csv'
 const limit      = parseInt(arg('--limit') ?? '500', 10)
 
@@ -36,7 +36,7 @@ if (!feedId) {
 }
 
 if (!apiKey) {
-  console.error('Error: no API key — pass --api-key or set AWIN_API_KEY env var')
+  console.error('Error: no API key — pass --api-key or set AWIN_DATAFEED_KEY env var')
   process.exit(1)
 }
 

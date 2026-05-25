@@ -16,18 +16,7 @@ import { pricesCache } from '@/lib/cache'
 // the in-memory token cache. Edge runtime does not have Buffer.
 export const runtime = 'nodejs'
 
-// Temporary env-var presence check — visible directly in the API response.
-// Remove once credentials are confirmed working in production.
-const ENV_DEBUG = {
-  hasClientId:     !!process.env.EBAY_CLIENT_ID,
-  hasClientSecret: !!process.env.EBAY_CLIENT_SECRET,
-  hasMarketplaceUK: !!process.env.EBAY_MARKETPLACE_ID_UK,
-  hasMarketplaceUS: !!process.env.EBAY_MARKETPLACE_ID_US,
-  nodeEnv:          process.env.NODE_ENV ?? 'unknown',
-}
-
 export async function GET(request: NextRequest) {
-  console.log('[/api/prices] env debug:', ENV_DEBUG)
   const { searchParams } = request.nextUrl
   const query  = (searchParams.get('q')      || '').trim()
   const region = (searchParams.get('region') || 'uk').toLowerCase()
@@ -38,7 +27,7 @@ export async function GET(request: NextRequest) {
   const format = (searchParams.get('format') || 'all').toLowerCase()
 
   if (!query) {
-    return NextResponse.json({ error: 'No query provided', _env: ENV_DEBUG }, { status: 400 })
+    return NextResponse.json({ error: 'No query provided' }, { status: 400 })
   }
   if (region !== 'uk' && region !== 'us') {
     return NextResponse.json({ error: 'Invalid region (must be uk or us)' }, { status: 400 })
@@ -78,7 +67,7 @@ export async function GET(request: NextRequest) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('[/api/prices] eBay error:', message)
     return NextResponse.json(
-      { error: message, listings: [], count: 0, _env: ENV_DEBUG },
+      { error: message, listings: [], count: 0 },
       { status: 502 }
     )
   }
