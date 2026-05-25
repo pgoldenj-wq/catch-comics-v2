@@ -295,42 +295,58 @@ export function extractSeriesVolume(title: string): SeriesVolume {
 }
 
 // ── Core enrichment ───────────────────────────────────────────────────────────
+//
+// Source priority for comics (updated — previously Google Books was first):
+//
+//   1. Open Library  — community-maintained comic database, better cover
+//                      coverage for comics than Google Books.
+//   2. Google Books  — fills gaps for publisher/description/date only;
+//                      its cover images are NOT stored (frequently placeholder).
+//
+// Note: Comic Vine covers are the highest priority overall, but they are
+// populated by a separate dedicated script (scripts/enrich-cv-covers.ts)
+// because CV requires title-based matching rather than a simple ISBN lookup.
+// applyEnrichment() will not overwrite a CV cover with an OL/GB one because
+// it only fills null fields.
 
 export async function enrichByIsbn(isbn13: string): Promise<EnrichmentResult> {
-  // Try Google Books first
   let partial: Partial<EnrichmentResult> | null = null
 
+  // ── Step 1: Open Library (better comic cover coverage) ───────────────────
   try {
-    const gbData = await fetchGoogleBooks(isbn13)
-    if (gbData) {
-      partial = normalizeGoogleBooks(gbData, isbn13)
+    const olData = await fetchOpenLibrary(isbn13)
+    if (olData) {
+      partial = { ...normalizeOpenLibrary(olData, isbn13), source: 'open_library' }
     }
   } catch (err) {
-    console.warn(`[enrich] Google Books failed for ${isbn13}:`, err)
+    console.warn(`[enrich] Open Library failed for ${isbn13}:`, err)
   }
 
-  // Fall back to Open Library if Google didn't give us cover or description
-  const needsCover       = !partial?.coverImageUrl
+  // ── Step 2: Google Books — fills any gaps EXCEPT cover image ─────────────
+  // Google Books serves full-size placeholder JPEGs for comics it doesn't
+  // have previews for — indistinguishable from real covers client-side.
+  // We use GB for publisher/description/date only, never for coverImageUrl.
   const needsDescription = !partial?.description
   const needsPublisher   = !partial?.publisher
+  const needsDate        = !partial?.releaseDate
 
-  if (!partial || needsCover || needsDescription || needsPublisher) {
+  if (!partial || needsDescription || needsPublisher || needsDate) {
     try {
-      const olData = await fetchOpenLibrary(isbn13)
-      if (olData) {
-        const olPartial = normalizeOpenLibrary(olData, isbn13)
+      const gbData = await fetchGoogleBooks(isbn13)
+      if (gbData) {
+        const gbPartial = normalizeGoogleBooks(gbData, isbn13)
         if (!partial) {
-          partial = { ...olPartial, source: 'open_library' }
+          // Use GB as base but blank the cover — GB covers are unreliable for comics
+          partial = { ...gbPartial, coverImageUrl: null, source: 'google_books' }
         } else {
-          // Merge: fill gaps from Open Library
-          if (needsCover       && olPartial.coverImageUrl) partial.coverImageUrl = olPartial.coverImageUrl
-          if (needsDescription && olPartial.description)   partial.description   = olPartial.description
-          if (needsPublisher   && olPartial.publisher)     partial.publisher     = olPartial.publisher
-          if (!partial.releaseDate && olPartial.releaseDate) partial.releaseDate = olPartial.releaseDate
+          // Merge metadata only — never overwrite OL cover with GB cover
+          if (needsDescription && gbPartial.description) partial.description = gbPartial.description
+          if (needsPublisher   && gbPartial.publisher)   partial.publisher   = gbPartial.publisher
+          if (needsDate        && gbPartial.releaseDate) partial.releaseDate = gbPartial.releaseDate
         }
       }
     } catch (err) {
-      console.warn(`[enrich] Open Library failed for ${isbn13}:`, err)
+      console.warn(`[enrich] Google Books failed for ${isbn13}:`, err)
     }
   }
 
