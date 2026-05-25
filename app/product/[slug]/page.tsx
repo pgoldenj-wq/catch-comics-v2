@@ -268,28 +268,65 @@ export default async function ProductPage(
   const primaryCurrency = bestListing?.priceCurrency ?? (allListings[0]?.priceCurrency ?? 'GBP')
 
   // ── JSON-LD ──────────────────────────────────────────────────────────────
+  // Using @type: Book (not Product) because:
+  //   1. Comics/graphic novels/manga are ISBNed books — semantically correct
+  //   2. Google's Book rich results support price comparison per retailer
+  //   3. Individual Offer items per retailer allow each to surface in Shopping
+  // Schema: https://schema.org/Book
   const inStockOffers = allListings.filter(l => IN_STOCK_STATUSES.has(l.stockStatus))
+  const BASE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://catchcomics.com').replace(/\/$/, '')
+
   const jsonLd = {
     '@context': 'https://schema.org',
-    '@type':    'Product',
+    '@type':    'Book',
     name:       product.title,
     ...(product.description  ? { description: product.description }  : {}),
     ...(product.coverImageUrl ? { image: product.coverImageUrl }     : {}),
-    ...(product.isbn13       ? { isbn: product.isbn13 }              : {}),
-    ...(product.publisher    ? { brand: { '@type': 'Brand', name: product.publisher } } : {}),
+    ...(product.isbn13        ? { isbn: product.isbn13 }             : {}),
+    ...(product.publisher
+      ? { publisher: { '@type': 'Organization', name: product.publisher } }
+      : {}),
+    // Individual Offer per retailer — lets Google surface each source's price.
+    // Falls back to AggregateOffer summary when no in-stock offers exist.
     ...(inStockOffers.length > 0
       ? {
-          offers: {
-            '@type':       'AggregateOffer',
-            offerCount:    inStockOffers.length,
-            lowPrice:      Math.min(...inStockOffers.map(l => Number(l.priceAmount))).toFixed(2),
-            highPrice:     Math.max(...inStockOffers.map(l => Number(l.priceAmount))).toFixed(2),
-            priceCurrency: primaryCurrency,
-            availability:  'https://schema.org/InStock',
-          },
+          offers: [
+            // AggregateOffer for the price range summary (rich snippet)
+            {
+              '@type':       'AggregateOffer',
+              offerCount:    inStockOffers.length,
+              lowPrice:      Math.min(...inStockOffers.map(l => Number(l.priceAmount))).toFixed(2),
+              highPrice:     Math.max(...inStockOffers.map(l => Number(l.priceAmount))).toFixed(2),
+              priceCurrency: primaryCurrency,
+              availability:  'https://schema.org/InStock',
+            },
+            // Per-retailer Offer items
+            ...inStockOffers.map(l => ({
+              '@type':        'Offer',
+              price:          Number(l.priceAmount).toFixed(2),
+              priceCurrency:  l.priceCurrency,
+              availability:   'https://schema.org/InStock',
+              url:            `${BASE_URL}/go/${l.id}`,
+              seller: {
+                '@type': 'Organization',
+                name:    l.retailer.name,
+              },
+            })),
+          ],
         }
       : {}),
   }
+
+  // ── No-cover SVG placeholder ────────────────────────────────────────────────
+  const NoCoverPlaceholder = ({ className }: { className?: string }) => (
+    <div className={`flex flex-col items-center justify-center gap-2 bg-gray-100 text-gray-400 ${className ?? ''}`}>
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+      </svg>
+      <span className="text-xs font-medium">No cover</span>
+    </div>
+  )
 
   return (
     <>
@@ -299,223 +336,273 @@ export default async function ProductPage(
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      <main className="min-h-screen bg-gray-950 text-gray-100">
+      <main className="min-h-screen bg-[#F8F8F6] text-[#0A0A0A]">
 
         {/* ── Breadcrumb ─────────────────────────────────────────────────── */}
-        <nav className="max-w-5xl mx-auto px-4 pt-6 pb-2 text-sm text-gray-500">
-          <Link href="/" className="hover:text-gray-300">Home</Link>
-          <span className="mx-2">/</span>
-          <Link href="/search" className="hover:text-gray-300">Search</Link>
-          <span className="mx-2">/</span>
-          <span className="text-gray-300 truncate">{product.title}</span>
+        <nav className="max-w-6xl mx-auto px-4 pt-5 pb-2 text-sm text-gray-500" aria-label="Breadcrumb">
+          <Link href="/" className="hover:text-[#E8272A] transition-colors">Home</Link>
+          <span className="mx-2 text-gray-300">/</span>
+          <Link href="/search" className="hover:text-[#E8272A] transition-colors">Search</Link>
+          <span className="mx-2 text-gray-300">/</span>
+          <span className="text-gray-700 truncate">{product.title}</span>
         </nav>
 
-        {/* ── Section 1: Hero ───────────────────────────────────────────── */}
-        <section className="max-w-5xl mx-auto px-4 py-8">
-          <div className="flex flex-col sm:flex-row gap-8">
+        {/* ── Two-column layout: main content + related sidebar ─────────── */}
+        <div className="max-w-6xl mx-auto px-4 py-6 lg:grid lg:grid-cols-[1fr_280px] lg:gap-10 lg:items-start">
 
-            {/* Cover image */}
-            <div className="flex-shrink-0">
-              {product.coverImageUrl ? (
-                <Image
-                  src={product.coverImageUrl}
-                  alt={`Cover of ${product.title}`}
-                  width={200}
-                  height={300}
-                  className="rounded-lg shadow-2xl object-cover"
-                  priority
-                />
-              ) : (
-                <div className="w-[200px] h-[300px] rounded-lg bg-gray-800 flex items-center justify-center text-gray-600 text-sm">
-                  No cover
-                </div>
-              )}
-            </div>
+          {/* ── MAIN COLUMN ─────────────────────────────────────────────── */}
+          <div className="min-w-0">
 
-            {/* Metadata */}
-            <div className="flex-1 min-w-0">
-              {/* Format badge */}
-              <span className="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-indigo-900 text-indigo-300 mb-3">
-                {FORMAT_LABELS[product.format] ?? product.format}
-              </span>
+            {/* ── Section 1: Hero ─────────────────────────────────────── */}
+            <section className="mb-8">
+              <div className="flex flex-col sm:flex-row gap-8">
 
-              {/* Series */}
-              {product.seriesName && (
-                <p className="text-sm text-gray-400 mb-1">
-                  {product.seriesName}
-                  {product.volumeNumber ? ` · Vol. ${product.volumeNumber}` : ''}
-                  {product.issueNumber  ? ` · #${product.issueNumber}`      : ''}
-                </p>
-              )}
-
-              <h1 className="text-3xl sm:text-4xl font-bold text-white leading-tight mb-1">
-                {product.title}
-              </h1>
-
-              {product.subtitle && (
-                <p className="text-lg text-gray-400 mb-3">{product.subtitle}</p>
-              )}
-
-              {/* Publisher + release date */}
-              <div className="flex flex-wrap gap-4 text-sm text-gray-400 mb-4">
-                {product.publisher && (
-                  <span>Published by <span className="text-gray-200">{product.publisher}</span></span>
-                )}
-                {product.releaseDate && (
-                  <span>Released <span className="text-gray-200">{fmtDate(product.releaseDate)}</span></span>
-                )}
-              </div>
-
-              {/* ISBNs */}
-              {(product.isbn13 || product.isbn10) && (
-                <div className="flex flex-wrap gap-3 text-xs text-gray-500 mb-4">
-                  {product.isbn13 && <span>ISBN-13: <span className="font-mono text-gray-400">{product.isbn13}</span></span>}
-                  {product.isbn10 && <span>ISBN-10: <span className="font-mono text-gray-400">{product.isbn10}</span></span>}
-                </div>
-              )}
-
-              {/* Description */}
-              {product.description && (
-                <p className="text-gray-400 text-sm leading-relaxed line-clamp-4">
-                  {product.description}
-                </p>
-              )}
-            </div>
-          </div>
-        </section>
-
-        {/* ── Section 2: Best offer ─────────────────────────────────────── */}
-        {bestListing && (
-          <section className="max-w-5xl mx-auto px-4 pb-8">
-            <div className="rounded-2xl bg-gradient-to-r from-indigo-900/50 to-indigo-800/30 border border-indigo-700/40 p-6">
-              <p className="text-xs text-indigo-300 uppercase tracking-widest font-semibold mb-1">
-                Best price
-              </p>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                <div>
-                  <p className="text-4xl font-bold text-white">
-                    {fmtPrice(Number(bestListing.priceAmount), bestListing.priceCurrency)}
-                  </p>
-                  {bestListing.shippingAmount !== null && (
-                    <p className="text-sm text-gray-400 mt-0.5">
-                      {Number(bestListing.shippingAmount) === 0
-                        ? '+ Free shipping'
-                        : `+ ${fmtPrice(Number(bestListing.shippingAmount), bestListing.priceCurrency)} shipping`}
-                    </p>
-                  )}
-                  <p className="text-sm text-gray-400 mt-1">
-                    from <span className="text-gray-200">{bestListing.retailer.name}</span>
-                    {' · '}
-                    {bestListing.condition === 'NEW' ? 'New' : bestListing.condition.replace(/_/g, ' ')}
-                  </p>
-                </div>
-                <div className="sm:ml-auto">
-                  <a
-                    href={`/go/${bestListing.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-block px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-base transition-colors"
-                  >
-                    Buy at {bestListing.retailer.name} ↗
-                  </a>
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* ── Section 3: All offers ─────────────────────────────────────── */}
-        {/* eBay Buy-It-Now listings are fetched client-side and merged      */}
-        {/* inline by OffersTable — no visual segregation, marketplace rows  */}
-        {/* carry an eBay badge and postage disclaimer.                      */}
-        <section className="max-w-5xl mx-auto px-4 pb-12">
-          <h2 className="text-xl font-semibold text-white mb-4">
-            Price comparison
-            <span className="ml-2 text-sm font-normal text-gray-500">
-              ({offers.length} listing{offers.length !== 1 ? 's' : ''})
-            </span>
-          </h2>
-          {offers.length === 0 ? (
-            <p className="text-gray-500 mb-4">No retailer listings tracked yet for this title.</p>
-          ) : null}
-          <OffersTable
-            offers={offers}
-            isbn13={product.isbn13 ?? null}
-            productTitle={product.title}
-            canonicalProductId={product.id}
-          />
-        </section>
-
-        {/* ── Section 3c: Also available at (dynamic-link retailers) ──── */}
-        {dynamicLinks.length > 0 && (
-          <section className="max-w-5xl mx-auto px-4 pb-8">
-            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-widest mb-3">
-              Also available at
-            </h2>
-            <div className="flex flex-wrap gap-3">
-              {dynamicLinks.map(l => (
-                <a
-                  key={l.id}
-                  href={`/go/${l.id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-900 border border-gray-800 hover:border-indigo-600 hover:text-indigo-300 text-gray-300 text-sm font-medium transition-colors"
-                >
-                  {l.retailer.name}
-                  <span className="text-gray-600 text-xs">Check price ↗</span>
-                </a>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* ── Section 4: Price history ──────────────────────────────────── */}
-        <section className="max-w-5xl mx-auto px-4 pb-12">
-          <h2 className="text-xl font-semibold text-white mb-4">Price history</h2>
-          <div className="bg-gray-900 rounded-xl p-4 border border-gray-800">
-            <Suspense fallback={<div className="h-40 animate-pulse bg-gray-800 rounded" />}>
-              <PriceSparkline points={sparkPoints} currency={primaryCurrency} />
-            </Suspense>
-          </div>
-        </section>
-
-        {/* ── Section 5: Related products ───────────────────────────────── */}
-        {related.length > 0 && (
-          <section className="max-w-5xl mx-auto px-4 pb-16">
-            <h2 className="text-xl font-semibold text-white mb-4">You might also like</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {related.map(r => (
-                <Link
-                  key={r.id}
-                  href={`/product/${r.canonicalSlug}`}
-                  className="group block rounded-xl overflow-hidden bg-gray-900 border border-gray-800 hover:border-indigo-600 transition-colors"
-                >
-                  {r.coverImageUrl ? (
+                {/* Cover image */}
+                <div className="flex-shrink-0">
+                  {product.coverImageUrl ? (
                     <Image
-                      src={r.coverImageUrl}
-                      alt={r.title}
+                      src={product.coverImageUrl}
+                      alt={`Cover of ${product.title}`}
                       width={200}
-                      height={280}
-                      className="w-full object-cover aspect-[2/3] group-hover:opacity-90 transition-opacity"
+                      height={300}
+                      className="rounded-xl shadow-md object-cover w-[180px] h-[270px] sm:w-[200px] sm:h-[300px]"
+                      priority
                     />
                   ) : (
-                    <div className="aspect-[2/3] bg-gray-800 flex items-center justify-center text-gray-600 text-xs p-2 text-center">
-                      {r.title}
-                    </div>
+                    <NoCoverPlaceholder className="w-[180px] h-[270px] sm:w-[200px] sm:h-[300px] rounded-xl" />
                   )}
-                  <div className="p-3">
-                    <p className="text-sm font-medium text-gray-200 line-clamp-2 group-hover:text-white transition-colors">
-                      {r.title}
+                </div>
+
+                {/* Metadata */}
+                <div className="flex-1 min-w-0">
+                  {/* Format badge */}
+                  <span className="inline-block px-2.5 py-1 rounded-full text-xs font-semibold bg-[#E8272A]/10 text-[#E8272A] mb-3">
+                    {FORMAT_LABELS[product.format] ?? product.format}
+                  </span>
+
+                  {/* Series */}
+                  {product.seriesName && (
+                    <p className="text-sm text-gray-500 mb-1">
+                      {product.seriesName}
+                      {product.volumeNumber ? ` · Vol. ${product.volumeNumber}` : ''}
+                      {product.issueNumber  ? ` · #${product.issueNumber}`      : ''}
                     </p>
-                    {r.publisher && (
-                      <p className="text-xs text-gray-500 mt-0.5">{r.publisher}</p>
+                  )}
+
+                  <h1 className="text-3xl sm:text-4xl font-bold text-[#0A0A0A] leading-tight mb-1">
+                    {product.title}
+                  </h1>
+
+                  {product.subtitle && (
+                    <p className="text-lg text-gray-500 mb-3">{product.subtitle}</p>
+                  )}
+
+                  {/* Publisher + release date */}
+                  <div className="flex flex-wrap gap-4 text-sm text-gray-500 mb-4">
+                    {product.publisher && (
+                      <span>Published by <span className="text-gray-800 font-medium">{product.publisher}</span></span>
+                    )}
+                    {product.releaseDate && (
+                      <span>Released <span className="text-gray-800 font-medium">{fmtDate(product.releaseDate)}</span></span>
                     )}
                   </div>
-                </Link>
-              ))}
-            </div>
-          </section>
-        )}
+
+                  {/* ISBNs */}
+                  {(product.isbn13 || product.isbn10) && (
+                    <div className="flex flex-wrap gap-3 text-xs text-gray-400 mb-4">
+                      {product.isbn13 && <span>ISBN-13: <span className="font-mono text-gray-600">{product.isbn13}</span></span>}
+                      {product.isbn10 && <span>ISBN-10: <span className="font-mono text-gray-600">{product.isbn10}</span></span>}
+                    </div>
+                  )}
+
+                  {/* Description */}
+                  {product.description && (
+                    <p className="text-gray-600 text-sm leading-relaxed line-clamp-4">
+                      {product.description}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            {/* ── Section 2: Best offer ───────────────────────────────── */}
+            {bestListing && (
+              <section className="mb-8">
+                <div className="rounded-2xl bg-white border-l-4 border-[#E8272A] shadow-sm p-6">
+                  <p className="text-xs text-[#E8272A] uppercase tracking-widest font-semibold mb-2">
+                    Best price
+                  </p>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                    <div>
+                      <p className="text-4xl font-bold text-[#0A0A0A]">
+                        {fmtPrice(Number(bestListing.priceAmount), bestListing.priceCurrency)}
+                      </p>
+                      {bestListing.shippingAmount !== null && (
+                        <p className="text-sm text-gray-500 mt-0.5">
+                          {Number(bestListing.shippingAmount) === 0
+                            ? '+ Free shipping'
+                            : `+ ${fmtPrice(Number(bestListing.shippingAmount), bestListing.priceCurrency)} shipping`}
+                        </p>
+                      )}
+                      <p className="text-sm text-gray-500 mt-1">
+                        from <span className="text-gray-800 font-medium">{bestListing.retailer.name}</span>
+                        {' · '}
+                        {bestListing.condition === 'NEW' ? 'New' : bestListing.condition.replace(/_/g, ' ')}
+                      </p>
+                    </div>
+                    <div className="sm:ml-auto">
+                      <a
+                        href={`/go/${bestListing.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer sponsored"
+                        className="inline-block px-6 py-3 rounded-xl bg-[#E8272A] hover:bg-[#c41f22] text-white font-semibold text-base transition-colors focus:outline-none focus:ring-2 focus:ring-[#E8272A] focus:ring-offset-2"
+                      >
+                        Buy at {bestListing.retailer.name} ↗
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* ── Section 3: All offers ───────────────────────────────── */}
+            {/* eBay BIN listings fetched client-side, merged by OffersTable */}
+            <section className="mb-8">
+              <h2 className="text-xl font-semibold text-[#0A0A0A] mb-4">
+                Price comparison
+                <span className="ml-2 text-sm font-normal text-gray-400">
+                  ({offers.length} listing{offers.length !== 1 ? 's' : ''})
+                </span>
+              </h2>
+              <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6">
+                {offers.length === 0 ? (
+                  <p className="text-gray-500 text-sm">No retailer listings tracked yet for this title.</p>
+                ) : null}
+                <OffersTable
+                  offers={offers}
+                  isbn13={product.isbn13 ?? null}
+                  productTitle={product.title}
+                  canonicalProductId={product.id}
+                />
+              </div>
+            </section>
+
+            {/* ── Section 3c: Also available at (dynamic-link retailers) */}
+            {dynamicLinks.length > 0 && (
+              <section className="mb-8">
+                <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-3">
+                  Also available at
+                </h2>
+                <div className="flex flex-wrap gap-3">
+                  {dynamicLinks.map(l => (
+                    <a
+                      key={l.id}
+                      href={`/go/${l.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer sponsored"
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-gray-200 hover:border-[#E8272A] hover:text-[#E8272A] text-gray-700 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[#E8272A] focus:ring-offset-1"
+                    >
+                      {l.retailer.name}
+                      <span className="text-gray-400 text-xs">Check price ↗</span>
+                    </a>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* ── Section 4: Price history ────────────────────────────── */}
+            <section className="mb-8">
+              <h2 className="text-xl font-semibold text-[#0A0A0A] mb-4">Price history</h2>
+              <div className="bg-white rounded-xl p-4 border border-gray-200">
+                <Suspense fallback={<div className="h-40 animate-pulse bg-gray-100 rounded" />}>
+                  <PriceSparkline points={sparkPoints} currency={primaryCurrency} />
+                </Suspense>
+              </div>
+            </section>
+
+            {/* ── Related products (mobile / no-sidebar fallback) ──────── */}
+            {/* Shown below the main content on small screens; hidden on lg+ */}
+            {/* where the sidebar takes over.                                */}
+            {related.length > 0 && (
+              <section className="mb-8 lg:hidden">
+                <h2 className="text-xl font-semibold text-[#0A0A0A] mb-4">You might also like</h2>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  {related.map(r => (
+                    <Link
+                      key={r.id}
+                      href={`/product/${r.canonicalSlug}`}
+                      className="group block rounded-xl overflow-hidden bg-white border border-gray-200 hover:border-[#E8272A]/50 hover:shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#E8272A] focus:ring-offset-1"
+                    >
+                      {r.coverImageUrl ? (
+                        <Image
+                          src={r.coverImageUrl}
+                          alt={r.title}
+                          width={200}
+                          height={280}
+                          className="w-full object-cover aspect-[2/3] group-hover:opacity-90 transition-opacity"
+                        />
+                      ) : (
+                        <NoCoverPlaceholder className="aspect-[2/3] w-full" />
+                      )}
+                      <div className="p-3">
+                        <p className="text-sm font-medium text-gray-900 line-clamp-2 group-hover:text-[#E8272A] transition-colors">
+                          {r.title}
+                        </p>
+                        {r.publisher && (
+                          <p className="text-xs text-gray-400 mt-0.5">{r.publisher}</p>
+                        )}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            )}
+
+          </div>{/* end main column */}
+
+          {/* ── SIDEBAR: Related products (lg+ only) ────────────────────── */}
+          {related.length > 0 && (
+            <aside className="hidden lg:block" aria-label="Related titles">
+              <div className="sticky top-6">
+                <h2 className="text-base font-semibold text-[#0A0A0A] mb-4">You might also like</h2>
+                <div className="flex flex-col gap-3">
+                  {related.map(r => (
+                    <Link
+                      key={r.id}
+                      href={`/product/${r.canonicalSlug}`}
+                      className="group flex items-center gap-3 bg-white rounded-xl border border-gray-200 hover:border-[#E8272A]/50 hover:shadow-sm p-3 transition-all focus:outline-none focus:ring-2 focus:ring-[#E8272A] focus:ring-offset-1"
+                    >
+                      {/* Thumbnail */}
+                      <div className="flex-shrink-0 w-14 h-20 rounded-lg overflow-hidden">
+                        {r.coverImageUrl ? (
+                          <Image
+                            src={r.coverImageUrl}
+                            alt={r.title}
+                            width={56}
+                            height={80}
+                            className="w-full h-full object-cover group-hover:opacity-90 transition-opacity"
+                          />
+                        ) : (
+                          <NoCoverPlaceholder className="w-full h-full rounded-lg" />
+                        )}
+                      </div>
+                      {/* Title */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 line-clamp-3 group-hover:text-[#E8272A] transition-colors leading-snug">
+                          {r.title}
+                        </p>
+                        {r.publisher && (
+                          <p className="text-xs text-gray-400 mt-1">{r.publisher}</p>
+                        )}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </aside>
+          )}
+
+        </div>{/* end two-column grid */}
 
       </main>
     </>

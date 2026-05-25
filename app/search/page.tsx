@@ -158,7 +158,9 @@ function matchesFormat(comic: ComicResult, filter: string): boolean {
     case 'single-issue':
       if (detected === 'single-issue') return true
       if (/\bissue\b/.test(name))      return true
-      if (/#\d+/.test(name))           return true
+      // Match standalone issue numbers like "#5" or "# 5" but NOT "Vol. #1",
+      // "Book #3", "Part #2", etc., which are collection numbering conventions.
+      if (/(?<![Vv]ol\.?\s*)(?<![Bb]ook\s*)(?<![Pp]art\s*)#\d+/.test(name)) return true
       return false
     case 'manga':
       if (detected === 'manga')   return true
@@ -851,11 +853,11 @@ function SearchResults() {
                       e.currentTarget.style.boxShadow = 'none'
                     }}>
 
-                    {/* Cover frame — 3x zoom on hover. transformOrigin:top-left so the
-                        zoom expands rightward/downward rather than into the left margin. */}
+                    {/* Cover frame — subtle zoom on hover. Scale 1.8x with top-center
+                        origin so it expands symmetrically without jumping. */}
                     <div
-                      className="transition-transform duration-300 ease-out hover:scale-[3] hover:z-50"
-                      style={{ width: '80px', height: '112px', borderRadius: '6px', background: '#F3F4F6', border: '1px solid #EBEBEB', flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', transformOrigin: 'top left' }}>
+                      className="transition-transform duration-300 ease-out hover:scale-[1.8] hover:z-50"
+                      style={{ width: '80px', height: '112px', borderRadius: '6px', background: '#F3F4F6', border: '1px solid #EBEBEB', flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', transformOrigin: 'top center' }}>
                       <span style={{ color: '#6B7280', fontSize: '26px', fontWeight: 500, position: 'absolute' }}>
                         {comic.name.charAt(0)}
                       </span>
