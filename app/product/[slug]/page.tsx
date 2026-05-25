@@ -20,6 +20,8 @@ import OffersTable, { type OfferRow }    from '@/components/OffersTable'
 import PriceSparkline, { type SparkPoint } from '@/components/PriceSparkline'
 import { lookupByIsbn as lookupAmazon }  from '@/lib/adapters/amazon-rainforest'
 import SearchBar                         from '@/components/SearchBar'
+import CVCharacterTags                   from '@/components/CVCharacterTags'
+import CVIssuesGrid                      from '@/components/CVIssuesGrid'
 
 // ISR: cache each product page for 1 hour, then regenerate in the background.
 // Switched from force-dynamic (which hit the DB on every request) now that the
@@ -392,9 +394,10 @@ export default async function ProductPage(
           <span className="text-gray-700 truncate">{product.title}</span>
         </nav>
 
-        {/* ── Two-column layout: LEFT sidebar + main content ───────────── */}
-        {/* Sidebar (related/issues) on left mirrors Discogs-style discovery  */}
-        <div className="max-w-6xl mx-auto px-4 py-4 lg:grid lg:grid-cols-[260px_1fr] lg:gap-10 lg:items-start">
+        {/* ── Layout: LEFT sidebar + main content + optional RIGHT CV issues col ── */}
+        {/* Third column appears when the product has a comicvineId so we can        */}
+        {/* fetch and display the issue-by-issue grid from Comic Vine.               */}
+        <div className={`max-w-6xl mx-auto px-4 py-4 lg:grid lg:gap-10 lg:items-start ${product.comicvineId ? 'lg:grid-cols-[260px_1fr_216px]' : 'lg:grid-cols-[260px_1fr]'}`}>
 
           {/* ── SIDEBAR: Related + single issues (lg+ only, LEFT rail) ───── */}
           <aside className="hidden lg:block" aria-label="Related titles">
@@ -541,6 +544,11 @@ export default async function ProductPage(
                     <p className="text-gray-600 text-sm leading-relaxed line-clamp-4">
                       {product.description}
                     </p>
+                  )}
+
+                  {/* Character tags — fetched live from Comic Vine when available */}
+                  {product.comicvineId && (
+                    <CVCharacterTags comicvineId={product.comicvineId} />
                   )}
                 </div>
               </div>
@@ -701,7 +709,21 @@ export default async function ProductPage(
 
           </div>{/* end main column */}
 
-        </div>{/* end two-column grid */}
+          {/* ── RIGHT COLUMN: CV issues grid (lg+, volumes only) ────────────────
+              Only rendered when comicvineId is available. The CVIssuesGrid
+              component fetches from /api/comic/{id}/issues client-side and
+              renders a 3-column thumbnail grid matching /comic/[id] design.
+              Hidden on mobile — issues appear in the left sidebar on mobile. */}
+          {product.comicvineId && (
+            <div className="hidden lg:block" style={{ position: 'sticky', top: '80px' }}>
+              <CVIssuesGrid
+                comicvineId={product.comicvineId}
+                comicTitle={product.title}
+              />
+            </div>
+          )}
+
+        </div>{/* end layout grid */}
 
       </main>
     </>
