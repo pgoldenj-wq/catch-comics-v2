@@ -106,9 +106,15 @@ export default function CVCoverImage({ dbCoverUrl, comicvineId, title, className
           loading="eager"
           onLoad={e => {
             const img = e.currentTarget
-            if (img.naturalWidth <= 1 || img.naturalHeight <= 1) img.style.display = 'none'
+            if (!img.dataset.err && (img.naturalWidth <= 1 || img.naturalHeight <= 1)) img.style.display = 'none'
           }}
-          onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+          onError={e => {
+            const img = e.currentTarget
+            if (img.dataset.err) return
+            img.dataset.err = '1'
+            img.src = '/images/cover-placeholder.svg'
+            img.style.objectFit = 'contain'
+          }}
         />
       )}
     </div>

@@ -7,6 +7,9 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'books.google.com' },
       // Open Library cover images
       { protocol: 'https', hostname: 'covers.openlibrary.org' },
+      // Comic Vine cover images
+      { protocol: 'https', hostname: 'comicvine.gamespot.com' },
+      { protocol: 'https', hostname: 'comicstatic.com' },
     ],
   },
 };
