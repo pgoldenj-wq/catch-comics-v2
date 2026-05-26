@@ -438,6 +438,25 @@ function sourceLabel(coverImageUrl: string | null): string {
   return 'other'
 }
 
+// ── Neon wake-up ─────────────────────────────────────────────────────────────
+// Neon free tier auto-suspends after 5 min inactivity. The first connection
+// after the hourly sleep may hit a suspended endpoint. We retry up to 3 times
+// with a 10-second gap — enough time for Neon's cold-start (~3–5 s).
+
+async function wakeDb(maxAttempts = 3, delayMs = 10_000): Promise<void> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await prisma.$queryRaw`SELECT 1`
+      if (attempt > 1) console.log(`  ✓ DB connected (attempt ${attempt})`)
+      return
+    } catch (err) {
+      if (attempt === maxAttempts) throw err
+      console.log(`  ⚠ DB not ready (attempt ${attempt}/${maxAttempts}), retrying in ${delayMs / 1000}s…`)
+      await new Promise(r => setTimeout(r, delayMs))
+    }
+  }
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -456,6 +475,9 @@ async function main() {
   console.log(' Rate limit : 1.5 s / request')
   console.log('══════════════════════════════════════════════════════════')
   console.log('')
+
+  // Wake Neon if it auto-suspended during the hourly sleep
+  await wakeDb()
 
   const products = await selectProducts(LIMIT)
 
