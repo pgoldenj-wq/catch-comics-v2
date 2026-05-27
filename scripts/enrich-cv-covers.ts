@@ -38,6 +38,7 @@
 
 import { prisma } from '../lib/prisma'
 import { titleMatchScore } from '../lib/parseComicQuery'
+import { downloadAndStoreCover } from '../lib/images/download'
 
 // ── CLI args ──────────────────────────────────────────────────────────────────
 
@@ -544,6 +545,9 @@ async function main() {
         await writeEnrichment(p.id, match.cvId, match.coverUrl)
         console.log(`      → saved`)
         stats.written++
+        // Non-blocking R2 upload — self-host the cover immediately after writing to DB
+        downloadAndStoreCover(p.id, match.coverUrl)
+          .catch(err => console.warn(`      ⚠ R2 upload failed: ${(err as Error).message}`))
       } catch (err) {
         console.warn(`      ✗ DB write failed: ${(err as Error).message}`)
         stats.errors++

@@ -15,6 +15,7 @@
 
 import { prisma }         from '../prisma'
 import { ProductFormat }  from '@prisma/client'
+import { downloadAndStoreCover } from '../images/download'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -418,6 +419,13 @@ export async function applyEnrichment(
   if (Object.keys(update).length === 0) return false  // nothing to update
 
   await prisma.canonicalProduct.update({ where: { id: productId }, data: update })
+
+  // Non-blocking R2 upload — self-host cover immediately after writing to DB
+  if (update.coverImageUrl && typeof update.coverImageUrl === 'string') {
+    downloadAndStoreCover(productId, update.coverImageUrl)
+      .catch(err => console.warn('[isbn] R2 upload failed:', err))
+  }
+
   return true
 }
 

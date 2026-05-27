@@ -59,9 +59,11 @@
     "enrich:amazon": "dotenv -e .env.local -- tsx scripts/enrich-amazon-bulk.ts",
     "ops:xlsx": "tsx scripts/generate-retailer-ops-xlsx.ts",
     "enrich:overnight": "dotenv -e .env.local -- tsx scripts/enrich-overnight.ts",
-    "enrich:cv:covers": "dotenv -e .env.local -- tsx scripts/enrich-cv-covers.ts"
+    "enrich:cv:covers": "dotenv -e .env.local -- tsx scripts/enrich-cv-covers.ts",
+    "migrate:covers": "dotenv -e .env.local -- tsx scripts/migrate-covers.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1055.0",
     "@prisma/client": "^5.22.0",
     "@vercel/kv": "^3.0.0",
     "csv-parse": "^5.6.0",
@@ -71,7 +73,8 @@
     "next": "16.2.4",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "recharts": "^3.8.1"
+    "recharts": "^3.8.1",
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
