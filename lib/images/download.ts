@@ -80,6 +80,14 @@ export async function downloadAndStoreCover(
     }
 
     // ── Process with sharp ──────────────────────────────────────────────────
+    // Reject tiny images (1×1 OL placeholders, corrupt files, etc.)
+    const meta = await sharp(buffer).metadata()
+    const { width = 0, height = 0 } = meta
+    if (width < 50 || height < 50) {
+      console.warn(`[r2] Image too small (${width}×${height}px) — skipping: ${fetchUrl}`)
+      return null
+    }
+
     const processed = await sharp(buffer)
       .resize(MAX_WIDTH, undefined, {
         fit:        'inside',
