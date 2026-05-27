@@ -398,7 +398,7 @@ export default async function ProductPage(
         {/* ── Layout: LEFT sidebar + main content + optional RIGHT CV issues col ── */}
         {/* Third column appears when the product has a comicvineId so we can        */}
         {/* fetch and display the issue-by-issue grid from Comic Vine.               */}
-        <div className={`max-w-6xl mx-auto px-4 py-4 lg:grid lg:gap-10 lg:items-start ${product.comicvineId ? 'lg:grid-cols-[260px_1fr_216px]' : 'lg:grid-cols-[260px_1fr]'}`}>
+        <div className="max-w-6xl mx-auto px-4 py-4 lg:grid lg:gap-10 lg:items-start lg:grid-cols-[260px_1fr_216px]">
 
           {/* ── SIDEBAR: Related + single issues (lg+ only, LEFT rail) ───── */}
           <aside className="hidden lg:block" aria-label="Related titles">
@@ -704,19 +704,20 @@ export default async function ProductPage(
 
           </div>{/* end main column */}
 
-          {/* ── RIGHT COLUMN: CV issues grid (lg+, volumes only) ────────────────
-              Only rendered when comicvineId is available. The CVIssuesGrid
-              component fetches from /api/comic/{id}/issues client-side and
-              renders a 3-column thumbnail grid matching /comic/[id] design.
-              Hidden on mobile — issues appear in the left sidebar on mobile. */}
-          {product.comicvineId && (
-            <div className="hidden lg:block" style={{ position: 'sticky', top: '80px' }}>
-              <CVIssuesGrid
-                comicvineId={product.comicvineId}
-                comicTitle={product.title}
-              />
-            </div>
-          )}
+          {/* ── RIGHT COLUMN: CV issues grid (lg+, always mounted) ──────────────
+              CVIssuesGrid resolves its own volume ID:
+                1. comicvineId from DB (instant)
+                2. Title search via /api/comic/search (fallback — also self-heals DB)
+              Renders nothing when no issues are found, so the column is invisible.
+              Hidden on mobile — related titles appear in the left sidebar instead. */}
+          <div className="hidden lg:block" style={{ position: 'sticky', top: '80px' }}>
+            <CVIssuesGrid
+              comicvineId={product.comicvineId}
+              searchTitle={product.title}
+              productSlug={slug}
+              comicTitle={product.title}
+            />
+          </div>
 
         </div>{/* end layout grid */}
 
