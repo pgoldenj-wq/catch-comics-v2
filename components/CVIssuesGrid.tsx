@@ -174,10 +174,12 @@ export default function CVIssuesGrid({
               onClick={() => router.push(`/comic/i${issue.id}`)}
               style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', textAlign: 'left' }}
             >
-              {/* Cover — 3× zoom on hover; transformOrigin top-left so it expands inward */}
+              {/* Cover — 3× zoom on hover; transformOrigin center so it BLOOMS outward
+                  from the thumbnail (rather than sliding down-right from top-left).
+                  z-50 + ring keep the enlarged cover layered above its grid siblings. */}
               <div
-                className="relative bg-gray-100 border border-gray-200 rounded-md transition-transform duration-300 ease-out hover:scale-[3] hover:z-50"
-                style={{ aspectRatio: '2 / 3', position: 'relative', transformOrigin: 'top left' }}
+                className="relative bg-gray-100 border border-gray-200 rounded-md transition-transform duration-200 ease-out hover:scale-[3] hover:z-50 hover:shadow-2xl"
+                style={{ aspectRatio: '2 / 3', position: 'relative', transformOrigin: 'center center' }}
               >
                 <span className="absolute inset-0 flex items-center justify-center text-gray-400 text-[10px] font-medium">
                   {label}

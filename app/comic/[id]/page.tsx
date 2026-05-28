@@ -207,10 +207,10 @@ function ComicPage() {
               Back
             </button>
 
-            {/* Cover — w-[132px] h-[198px] exact 2:3 ratio */}
+            {/* Cover — w-[132px] h-[198px] exact 2:3 ratio. Centre-origin bloom. */}
             <div
               className="relative rounded-lg border border-white/10 shadow-xl bg-white/5 flex items-center justify-center transition-transform duration-300 ease-out hover:scale-[2] hover:z-50"
-              style={{ width: '132px', height: '198px', marginTop: '6px', flexShrink: 0, transformOrigin: 'top center' }}
+              style={{ width: '132px', height: '198px', marginTop: '6px', flexShrink: 0, transformOrigin: 'center center' }}
             >
               <span className="text-white/30 text-3xl font-medium absolute">{comic.name.charAt(0)}</span>
               {comic.image?.medium_url && (
@@ -674,12 +674,11 @@ function ComicPage() {
                       onClick={() => router.push(`/comic/i${issue.id}?region=${market}`)}
                       style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', textAlign: 'left' }}
                     >
-                      {/* Cover — 3× zoom on hover, z-50 pops above siblings.
-                          transformOrigin:top-left so zoom expands inward (left of column) rather than
-                          off the right edge of the viewport. */}
+                      {/* Cover — 3× zoom on hover, blooms outward from centre,
+                          z-50 + shadow keep the enlarged cover floating above siblings. */}
                       <div
-                        className="relative bg-gray-100 border border-gray-200 rounded-md transition-transform duration-300 ease-out hover:scale-[3] hover:z-50"
-                        style={{ aspectRatio: '2 / 3', position: 'relative', transformOrigin: 'top left' }}
+                        className="relative bg-gray-100 border border-gray-200 rounded-md transition-transform duration-200 ease-out hover:scale-[3] hover:z-50 hover:shadow-2xl"
+                        style={{ aspectRatio: '2 / 3', position: 'relative', transformOrigin: 'center center' }}
                       >
                         <span className="absolute inset-0 flex items-center justify-center text-gray-400 text-[10px] font-medium">
                           {label}

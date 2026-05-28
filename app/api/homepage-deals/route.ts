@@ -12,7 +12,18 @@ import { prisma } from '@/lib/prisma'
  *   - TPB / HARDCOVER only when the publisher is a known comics publisher
  *   (prevents board games, RPG books, and ambiguous OTHER formats from surfacing)
  *
- * Also excludes soft-deleted listings (deleted_at IS NULL).
+ * Filters:
+ *   - cover_image_url IS NOT NULL  (a visual carousel demands images)
+ *   - deleted_at IS NULL           (live products only)
+ *
+ * Series dedup: many series have several canonical_products that share
+ * essentially the same title ("Destroy All Humans" Vol 1/2/3 etc.). The
+ * CTE picks ONE representative per series (best per dedup_key), so the
+ * carousel shows 12 distinct series rather than 12 near-duplicate cards.
+ *
+ * dedup_key = normalised series_name when present, otherwise first 40
+ * normalised chars of the title. Within a key, the highest listing_count
+ * (then newest release date) wins.
  *
  * Response shape:
  *   { deals: DealItem[] }
@@ -34,9 +45,10 @@ export interface HomepageDeal {
 
 export async function GET() {
   try {
-    // Raw SQL — joins canonical_products with in-stock retailer_listings,
-    // picks the cheapest GBP and USD price for each product,
-    // orders by listing count (popularity proxy) DESC.
+    // Two-stage CTE:
+    //   per_product  — one row per canonical product, with listing_count + prices
+    //   ranked       — assigns rank within each series dedup_key
+    // Final select keeps rank=1 per series, ordered by listing_count.
     const rows = await prisma.$queryRaw<Array<{
       slug:          string
       title:         string
@@ -47,36 +59,73 @@ export async function GET() {
       lowest_gbp:    number | null
       lowest_usd:    number | null
     }>>`
-      SELECT
-        cp.canonical_slug          AS slug,
-        cp.title,
-        cp.publisher,
-        cp.format,
-        cp.cover_image_url,
-        COUNT(rl.id)               AS listing_count,
-        MIN(CASE WHEN rl.price_currency = 'GBP' THEN rl.price_amount::numeric ELSE NULL END) AS lowest_gbp,
-        MIN(CASE WHEN rl.price_currency = 'USD' THEN rl.price_amount::numeric ELSE NULL END) AS lowest_usd
-      FROM canonical_products cp
-      INNER JOIN retailer_listings rl
-        ON rl.canonical_product_id = cp.id
-        AND rl.stock_status = 'IN_STOCK'
-        AND rl.deleted_at IS NULL
-      WHERE (
-        cp.format IN ('SINGLE_ISSUE','MANGA_VOLUME','OMNIBUS','ABSOLUTE','COMPENDIUM','DELUXE')
-        OR (
-          cp.format IN ('TPB','HARDCOVER')
-          AND cp.publisher IN (
-            'DC Comics','Marvel','Image Comics','Dark Horse Comics','Viz Media',
-            'IDW Publishing','BOOM! Studios','Valiant','Dynamite','Oni Press',
-            'Fantagraphics','Drawn & Quarterly','Top Shelf','Archie Comics',
-            'Slave Labor Graphics','Avatar Press','Titan Comics','Rebellion',
-            'Panini','Kodansha','Shueisha','Shogakukan','Square Enix','Yen Press',
-            'Seven Seas','Tokyopop','Del Rey Manga','Vertical','Udon','Antarctic Press'
+      WITH per_product AS (
+        SELECT
+          cp.id,
+          cp.canonical_slug,
+          cp.title,
+          cp.publisher,
+          cp.format,
+          cp.cover_image_url,
+          cp.release_date,
+          -- Dedup key: normalised series_name when present, else first 40
+          -- normalised chars of the title. Strips punctuation/whitespace so
+          -- "Destroy All Humans -" and "Destroy All Humans-" collapse together.
+          SUBSTRING(
+            LOWER(REGEXP_REPLACE(
+              COALESCE(NULLIF(TRIM(cp.series_name), ''), TRIM(cp.title)),
+              '[^a-zA-Z0-9]+', '', 'g'
+            )),
+            1, 40
+          ) AS dedup_key,
+          COUNT(rl.id) AS listing_count,
+          MIN(CASE WHEN rl.price_currency = 'GBP' THEN rl.price_amount::numeric END) AS lowest_gbp,
+          MIN(CASE WHEN rl.price_currency = 'USD' THEN rl.price_amount::numeric END) AS lowest_usd
+        FROM canonical_products cp
+        INNER JOIN retailer_listings rl
+          ON rl.canonical_product_id = cp.id
+          AND rl.stock_status = 'IN_STOCK'
+          AND rl.deleted_at IS NULL
+        WHERE cp.deleted_at IS NULL
+          AND cp.cover_image_url IS NOT NULL   -- Issue 4: visual carousel demands images
+          AND (
+            cp.format IN ('SINGLE_ISSUE','MANGA_VOLUME','OMNIBUS','ABSOLUTE','COMPENDIUM','DELUXE')
+            OR (
+              cp.format IN ('TPB','HARDCOVER')
+              AND cp.publisher IN (
+                'DC Comics','Marvel','Image Comics','Dark Horse Comics','Viz Media',
+                'IDW Publishing','BOOM! Studios','Valiant','Dynamite','Oni Press',
+                'Fantagraphics','Drawn & Quarterly','Top Shelf','Archie Comics',
+                'Slave Labor Graphics','Avatar Press','Titan Comics','Rebellion',
+                'Panini','Kodansha','Shueisha','Shogakukan','Square Enix','Yen Press',
+                'Seven Seas','Tokyopop','Del Rey Manga','Vertical','Udon','Antarctic Press'
+              )
+            )
           )
-        )
+        GROUP BY cp.id, cp.canonical_slug, cp.title, cp.publisher, cp.format,
+                 cp.cover_image_url, cp.release_date, cp.series_name
+        HAVING COUNT(rl.id) >= 1
+      ),
+      ranked AS (
+        SELECT
+          *,
+          ROW_NUMBER() OVER (
+            PARTITION BY dedup_key
+            ORDER BY listing_count DESC, release_date DESC NULLS LAST
+          ) AS series_rank
+        FROM per_product
       )
-      GROUP BY cp.id, cp.canonical_slug, cp.title, cp.publisher, cp.format, cp.cover_image_url
-      HAVING COUNT(rl.id) >= 1
+      SELECT
+        canonical_slug   AS slug,
+        title,
+        publisher,
+        format,
+        cover_image_url,
+        listing_count,
+        lowest_gbp,
+        lowest_usd
+      FROM ranked
+      WHERE series_rank = 1                    -- Issue 3: one row per series
       ORDER BY listing_count DESC
       LIMIT 12
     `
