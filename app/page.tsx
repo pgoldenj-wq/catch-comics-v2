@@ -3,8 +3,9 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import SearchBar from '../components/SearchBar';
+import SearchBar   from '../components/SearchBar';
 import MobileHeader from '../components/MobileHeader';
+import Navbar       from '../components/Navbar';
 
 type HoverZone = 'left' | 'right' | null;
 
@@ -461,26 +462,8 @@ export default function Home() {
           ══════════════════════════════════════════════════════════════════════ */}
       <div className="hidden md:block">
 
-      {/* ── HEADER ──────────────────────────────────────────────────────────── */}
-      <header style={{ background: '#fff', borderBottom: '1px solid #F0F0F0', position: 'relative', zIndex: 10 }}>
-        <div className="max-w-6xl mx-auto px-8 h-20 flex items-center justify-between">
-          <a href="/"><img src="/logo.png" alt="Catch Comics" className="h-12 w-auto" /></a>
-          <div className="flex items-center gap-3">
-            <button onClick={() => setRegion('uk')}
-              className="flex items-center gap-2.5 pl-2 pr-4 py-1.5 rounded-full border-2 transition-all"
-              style={{ borderColor: region === 'uk' ? '#0A0A0A' : '#E5E7EB', background: region === 'uk' ? '#0A0A0A' : '#fff' }}>
-              <span className="flex items-center justify-center rounded-full overflow-hidden shrink-0" style={{ width: '32px', height: '32px', background: '#f3f4f6' }}><UKFlag /></span>
-              <span className="text-sm font-medium" style={{ color: region === 'uk' ? '#fff' : '#6B7280' }}>United Kingdom</span>
-            </button>
-            <button onClick={() => setRegion('us')}
-              className="flex items-center gap-2.5 pl-2 pr-4 py-1.5 rounded-full border-2 transition-all"
-              style={{ borderColor: region === 'us' ? '#0A0A0A' : '#E5E7EB', background: region === 'us' ? '#0A0A0A' : '#fff' }}>
-              <span className="flex items-center justify-center rounded-full overflow-hidden shrink-0" style={{ width: '32px', height: '32px', background: '#f3f4f6' }}><USFlag /></span>
-              <span className="text-sm font-medium" style={{ color: region === 'us' ? '#fff' : '#6B7280' }}>United States</span>
-            </button>
-          </div>
-        </div>
-      </header>
+      {/* ── HEADER — shared Navbar component ────────────────────────────── */}
+      <Navbar region={region} onRegionChange={setRegion} />
 
       {/* ── HERO CARD ───────────────────────────────────────────────────────── */}
       <div className="max-w-6xl mx-auto px-6 pt-8 pb-4">

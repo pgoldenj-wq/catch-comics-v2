@@ -19,7 +19,7 @@ import { prisma }               from '@/lib/prisma'
 import OffersTable, { type OfferRow }    from '@/components/OffersTable'
 import PriceSparkline, { type SparkPoint } from '@/components/PriceSparkline'
 import { lookupByIsbn as lookupAmazon }  from '@/lib/adapters/amazon-rainforest'
-import SearchBar                         from '@/components/SearchBar'
+import Navbar                            from '@/components/Navbar'
 import CVCharacterTags                   from '@/components/CVCharacterTags'
 import CVIssuesGrid                      from '@/components/CVIssuesGrid'
 import CVCoverImage                      from '@/components/CVCoverImage'
@@ -373,18 +373,8 @@ export default async function ProductPage(
 
       <main className="min-h-screen bg-[#F8F8F6] text-[#0A0A0A]">
 
-        {/* ── Compact site header with search bar ───────────────────────── */}
-        {/* Always-available search — core behaviour of a comparison engine  */}
-        <header className="bg-white border-b border-gray-100 sticky top-0 z-40">
-          <div className="max-w-6xl mx-auto px-4 h-14 flex items-center gap-4">
-            <Link href="/" className="flex-shrink-0" aria-label="Catch Comics home">
-              <img src="/logo.png" alt="Catch Comics" className="h-8 w-auto" />
-            </Link>
-            <div className="flex-1 max-w-xl">
-              <SearchBar region="uk" variant="header" />
-            </div>
-          </div>
-        </header>
+        {/* ── Site header — shared Navbar component ─────────────────────── */}
+        <Navbar />
 
         {/* ── Breadcrumb ─────────────────────────────────────────────────── */}
         <nav className="max-w-6xl mx-auto px-4 pt-4 pb-2 text-sm text-gray-500" aria-label="Breadcrumb">
