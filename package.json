@@ -60,6 +60,7 @@
     "ops:xlsx": "tsx scripts/generate-retailer-ops-xlsx.ts",
     "enrich:overnight": "dotenv -e .env.local -- tsx scripts/enrich-overnight.ts",
     "enrich:cv:covers": "dotenv -e .env.local -- tsx scripts/enrich-cv-covers.ts",
+    "ingest:cv-series": "dotenv -e .env.local -- tsx scripts/ingest-cv-series.ts",
     "migrate:covers": "dotenv -e .env.local -- tsx scripts/migrate-covers.ts",
     "fix:ext-covers": "dotenv -e .env.local -- tsx scripts/fix-external-covers.ts"
   },

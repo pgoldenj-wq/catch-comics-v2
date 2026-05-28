@@ -4,10 +4,18 @@
  * downloadAndStoreCover():
  *   1. Skip if already on R2
  *   2. Download from external CDN (10s timeout, 5MB cap)
+ *      — uses browser-like headers to defeat anti-scraping (CV Cloudflare etc.)
  *   3. Process with sharp → WebP 400px max-width, quality 85
  *   4. Upload to R2 at covers/{productId}.webp
  *   5. Update canonical_products.cover_image_url
  *   6. Return new R2 URL, or null on any failure (never throws)
+ *
+ * downloadAndStoreCoverWithFallback():
+ *   Try multiple sources in priority order until one succeeds:
+ *     1. Primary URL (CV / retailer-provided cover) with browser headers
+ *     2. Open Library by ISBN-13
+ *     3. Google Books by ISBN-13 (size-validated)
+ *   Returns the R2 URL of whichever source worked, or null.
  */
 
 import { PutObjectCommand }  from '@aws-sdk/client-s3'
@@ -19,6 +27,26 @@ const MAX_BYTES   = 5 * 1024 * 1024   // 5 MB
 const MAX_WIDTH   = 400
 const WEBP_Q      = 85
 const TIMEOUT_MS  = 10_000
+
+// Browser-like headers — defeats Cloudflare anti-scraping on CV and similar CDNs.
+// Tested 2026-05-28: CV currently returns 200 to plain requests, but this is
+// defensive against the documented late-2025 ComicVine Cloudflare tightening.
+const BROWSER_HEADERS: Record<string, string> = {
+  'User-Agent':      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Accept':          'image/avif,image/webp,image/png,image/jpeg,*/*',
+  'Accept-Language': 'en-US,en;q=0.9',
+  'Sec-Fetch-Dest':  'image',
+  'Sec-Fetch-Mode':  'no-cors',
+  'Sec-Fetch-Site':  'same-origin',
+}
+
+/** Pick the most appropriate referer for a given image host. */
+function refererFor(url: string): string {
+  if (url.includes('comicvine.gamespot.com')) return 'https://comicvine.gamespot.com/'
+  if (url.includes('books.google.com'))       return 'https://books.google.com/'
+  if (url.includes('covers.openlibrary.org')) return 'https://openlibrary.org/'
+  return 'https://catchcomics.com'
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -55,10 +83,7 @@ export async function downloadAndStoreCover(
     // ── Download ────────────────────────────────────────────────────────────
     const res = await fetch(fetchUrl, {
       signal:  AbortSignal.timeout(TIMEOUT_MS),
-      headers: {
-        'User-Agent': 'CatchComics/1.0 (+https://catchcomics.com)',
-        'Referer':    'https://catchcomics.com',
-      },
+      headers: { ...BROWSER_HEADERS, 'Referer': refererFor(fetchUrl) },
     })
 
     if (!res.ok) {
@@ -123,4 +148,59 @@ export async function downloadAndStoreCover(
     console.error(`[r2] Error storing cover for ${canonicalProductId} (${sourceUrl}):`, err)
     return null
   }
+}
+
+// ── Fallback chain ────────────────────────────────────────────────────────────
+//
+// downloadAndStoreCoverWithFallback() tries multiple sources in priority order.
+// Used by the CV ingest script and any future enrichment job. First success wins
+// — if none of the sources return a valid image, returns null and the product
+// keeps its placeholder.
+
+interface FallbackOpts {
+  /** Comic Vine cover URL if known (tried first) */
+  cvUrl?:    string | null
+  /** ISBN-13 (no hyphens) — enables Open Library + Google Books fallbacks */
+  isbn13?:   string | null
+}
+
+/**
+ * Try CV → Open Library → Google Books in order. Returns the new R2 URL,
+ * or null if none worked. Each source is attempted via downloadAndStoreCover()
+ * so all images are validated by sharp (dimensions ≥ 50×50) and stored as WebP.
+ */
+export async function downloadAndStoreCoverWithFallback(
+  canonicalProductId: string,
+  opts:               FallbackOpts,
+): Promise<string | null> {
+  const sources: Array<{ name: string; url: string }> = []
+
+  if (opts.cvUrl) {
+    sources.push({ name: 'comicvine', url: opts.cvUrl })
+  }
+
+  if (opts.isbn13) {
+    // Open Library — ?default=false makes it return 404 instead of a 1×1 GIF
+    // when there's no cover for the ISBN.
+    sources.push({
+      name: 'openlibrary',
+      url:  `https://covers.openlibrary.org/b/isbn/${opts.isbn13}-L.jpg?default=false`,
+    })
+    // Google Books — full URL with zoom 2 (medium); sharp's ≥50×50 check
+    // rejects their tiny "no preview" placeholder if it slips through.
+    sources.push({
+      name: 'googlebooks',
+      url:  `https://books.google.com/books/content?vid=ISBN${opts.isbn13}&printsec=frontcover&img=1&zoom=2&edge=curl`,
+    })
+  }
+
+  for (const { name, url } of sources) {
+    const result = await downloadAndStoreCover(canonicalProductId, url)
+    if (result) {
+      console.log(`[r2] Cover for ${canonicalProductId} sourced from ${name}`)
+      return result
+    }
+  }
+
+  return null
 }

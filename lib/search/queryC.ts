@@ -14,6 +14,7 @@ import { searchListings } from '@/lib/ebay'
 import { prisma } from '@/lib/prisma'
 import type { SearchQuery, LooseEbayResult } from './types'
 import type { EbayListing } from '@/lib/ebay'
+import { isLikelyComic } from './isLikelyComic'
 
 // Matched eBay listing tied back to a canonical product
 export interface MatchedEbayListing {
@@ -103,8 +104,11 @@ export async function queryEbay(sq: SearchQuery): Promise<QueryCResult> {
     }
   }
 
-  // Unmatched (no ISBN in title) become loose results; cap total loose at 10
+  // Unmatched (no ISBN in title) become loose results; cap total loose at 10.
+  // Filter out non-comic eBay results (random books that share a title token).
+  // Matched results bypass the filter — they already tied back to a canonical product.
   const allLoose = [...loose, ...noIsbn.map(mapToLoose)]
+    .filter(l => isLikelyComic(l.title))
   return {
     matched,
     loose: allLoose.slice(0, 10),

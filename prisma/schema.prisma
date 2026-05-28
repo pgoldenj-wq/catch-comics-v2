@@ -113,6 +113,12 @@ model CanonicalProduct {
   /// Added Week 2A to support reversible canonical cleanup.
   deletedAt      DateTime?     @map("deleted_at")
 
+  /// Comic Vine structured metadata — creators, characters, cover_date,
+  /// synopsis, etc. JSONB lets us add new CV fields without per-field columns.
+  /// Populated by scripts/ingest-cv-series.ts and cover enrichment jobs.
+  /// Phase 2 of the database-first migration (added 2026-05-28).
+  cvMetadata     Json?         @map("cv_metadata") @db.JsonB
+
   listings RetailerListing[]
 
   @@index([isbn13])

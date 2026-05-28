@@ -5,11 +5,16 @@
  * on the title field. These are products ingested from retailers but not yet
  * matched to a canonical product. Shown as "Other listings" in the UI.
  *
- * Cap: 20 results.
+ * Non-comic filter: General book retailers (WoB, Bookshop) feed cookbooks,
+ * Latin texts, etc. into retailer_listings. isLikelyComic() removes those
+ * before they hit the UI — a sample showed ~97% pollution otherwise.
+ *
+ * Cap: 20 results (post-filter).
  */
 
 import { prisma } from '@/lib/prisma'
 import type { SearchQuery, UnmatchedListing } from './types'
+import { isLikelyComic } from './isLikelyComic'
 
 interface UnmatchedRow {
   id:             string
@@ -31,6 +36,8 @@ export async function queryUnmatched(
   const q = sq.q.trim()
   if (!q) return []
 
+  // Over-fetch (60 rows) because isLikelyComic() typically removes the bulk
+  // of WoB-style pollution. The post-filter slice caps at 20.
   const rows = await prisma.$queryRaw<UnmatchedRow[]>`
     SELECT
       rl.id,
@@ -56,21 +63,24 @@ export async function queryUnmatched(
       )
     ORDER BY
       ts_rank(to_tsvector('english', rl.title), websearch_to_tsquery('english', ${q})) DESC
-    LIMIT 20
+    LIMIT 60
   `
 
-  return rows.map(r => ({
-    type:         'unmatched' as const,
-    id:           r.id,
-    title:        r.title,
-    retailerId:   r.retailer_id,
-    retailerName: r.retailer_name,
-    retailerUrl:  r.retailer_url,
-    priceAmount:  parseFloat(r.price_amount),
-    currency:     r.price_currency,
-    condition:    r.condition,
-    stockStatus:  r.stock_status,
-    imageUrl:     r.image_url,
-    lastSeenAt:   r.last_seen_at.toISOString(),
-  }))
+  return rows
+    .filter(r => isLikelyComic(r.title))
+    .slice(0, 20)
+    .map(r => ({
+      type:         'unmatched' as const,
+      id:           r.id,
+      title:        r.title,
+      retailerId:   r.retailer_id,
+      retailerName: r.retailer_name,
+      retailerUrl:  r.retailer_url,
+      priceAmount:  parseFloat(r.price_amount),
+      currency:     r.price_currency,
+      condition:    r.condition,
+      stockStatus:  r.stock_status,
+      imageUrl:     r.image_url,
+      lastSeenAt:   r.last_seen_at.toISOString(),
+    }))
 }
