@@ -67,7 +67,10 @@ export async function downloadAndStoreCover(
     }
 
     const contentType = res.headers.get('content-type') ?? ''
-    if (!contentType.startsWith('image/')) {
+    // Allow octet-stream — some CDNs (CV, S3) serve images with this type.
+    // sharp will reject it if it turns out not to be a real image.
+    const isImage = contentType.startsWith('image/') || contentType === 'application/octet-stream'
+    if (!isImage) {
       console.warn(`[r2] Non-image content-type "${contentType}" for ${fetchUrl}`)
       return null
     }
