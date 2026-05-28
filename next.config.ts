@@ -12,6 +12,8 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'covers.openlibrary.org' },
       // Comic Vine covers (until migration complete)
       { protocol: 'https', hostname: 'comicvine.gamespot.com' },
+      // Bookshop.org cover CDN — 190 products still on this domain pending R2 migration
+      { protocol: 'https', hostname: 'images-eu.bookshop.org' },
     ],
   },
 };
