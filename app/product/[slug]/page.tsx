@@ -219,6 +219,18 @@ export default async function ProductPage(
   // browseable section. Single issues themselves skip this query (returns []).
   const isCollectedEdition = !['SINGLE_ISSUE'].includes(product.format)
 
+  // CV Volume ID resolution for CVIssuesGrid.
+  // For collected editions, comicvine_id IS the volume id — pass it directly.
+  // For SINGLE_ISSUE products (created by scripts/ingest-cv-series.ts),
+  // comicvine_id holds the ISSUE id; the volume id lives in cv_metadata.cv_volume_id.
+  // Without this distinction CVIssuesGrid would fetch /api/comic/{issueId}/issues
+  // and return wrong or broken data on every ingested single-issue page.
+  const cvMeta       = (product as { cvMetadata?: { cv_volume_id?: number | string } | null }).cvMetadata
+  const cvVolumeIdRaw = product.format === 'SINGLE_ISSUE'
+    ? (cvMeta?.cv_volume_id ?? null)
+    : product.comicvineId
+  const cvVolumeId    = cvVolumeIdRaw !== null && cvVolumeIdRaw !== undefined ? String(cvVolumeIdRaw) : null
+
   const [related, dynamicLinks, singleIssues] = await Promise.all([
     getRelated(product.id, product.seriesName, product.publisher, product.format),
     getDynamicLinks(product.id),
@@ -708,10 +720,10 @@ export default async function ProductPage(
               Hidden on mobile — related titles appear in the left sidebar instead. */}
           <div className="hidden lg:block" style={{ position: 'sticky', top: '80px' }}>
             <CVIssuesGrid
-              comicvineId={product.comicvineId}
-              searchTitle={product.title}
+              comicvineId={cvVolumeId}
+              searchTitle={product.seriesName ?? product.title}
               productSlug={slug}
-              comicTitle={product.title}
+              comicTitle={product.seriesName ?? product.title}
             />
           </div>
 
