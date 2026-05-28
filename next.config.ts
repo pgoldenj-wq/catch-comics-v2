@@ -4,6 +4,7 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       // Cloudflare R2 — self-hosted covers (primary, permanent)
+      { protocol: 'https', hostname: 'images.catchcomics.com' },
       { protocol: 'https', hostname: '*.r2.dev' },
       { protocol: 'https', hostname: 'pub-*.r2.dev' },
       // Google Books cover images (used by enrichment pipeline)
