@@ -62,6 +62,8 @@
     "enrich:cv:covers": "dotenv -e .env.local -- tsx scripts/enrich-cv-covers.ts",
     "ingest:cv-series": "dotenv -e .env.local -- tsx scripts/ingest-cv-series.ts",
     "cleanup:noncomics:dry": "dotenv -e .env.local -- tsx scripts/cleanup-non-comics.ts",
+    "cleanup:noncomics:execute-a": "dotenv -e .env.local -- tsx scripts/cleanup-non-comics.ts --execute-a",
+    "cleanup:noncomics:execute-b-plus": "dotenv -e .env.local -- tsx scripts/cleanup-non-comics.ts --execute-b-plus",
     "migrate:covers": "dotenv -e .env.local -- tsx scripts/migrate-covers.ts",
     "fix:ext-covers": "dotenv -e .env.local -- tsx scripts/fix-external-covers.ts"
   },

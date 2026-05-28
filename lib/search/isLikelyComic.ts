@@ -108,3 +108,87 @@ export function isLikelyComic(title: string): boolean {
 
 // Re-export constants for tooling (cleanup script, audits)
 export { COMIC_SIGNALS, NON_COMIC_FLAGS }
+
+// ── Strict signals (Bucket B+ classifier) ─────────────────────────────────────
+//
+// COMIC_SIGNALS above is permissive — it includes generic terms like 'vol.',
+// 'volume ', 'omnibus', 'annual' that catch many non-comics by accident
+// (poetry omnibuses, financial annuals, biography "Volume 1" series).
+//
+// STRONG_COMIC_SIGNALS contains only highly-specific markers: explicit comic
+// format words, named comic publishers, and iconic character/series names.
+// A title matching one of these is almost certainly a comic.
+
+export const STRONG_COMIC_SIGNALS: readonly string[] = [
+  // Unambiguous format words
+  'comic', 'comics', 'graphic novel', 'manga',
+  'tpb', 'trade paperback', 'compendium',
+  // Comic publishers — high precision
+  'marvel comics', 'dc comics', 'image comics',
+  'dark horse comics', 'dark horse comic',
+  'idw publishing', 'idw comics',
+  'boom! studios', 'boom studios',
+  'titan comics', 'oni press', 'fantagraphics',
+  'aftershock comics', 'vault comics', 'valiant entertainment',
+  // Manga publishers
+  'viz media', 'viz comics', 'kodansha comics',
+  'yen press', 'seven seas entertainment', 'tokyopop',
+  'square enix manga',
+  // Iconic character/series — highly specific to comics
+  'batman', 'superman', 'spider-man', 'spiderman',
+  'x-men', 'wonder woman', 'justice league',
+  'the avengers', 'fantastic four', 'iron man',
+  'deadpool', 'wolverine', 'captain america',
+  'daredevil', 'teenage mutant ninja turtles', 'tmnt',
+  'star wars: the', 'star wars adventures',
+  'watchmen', 'sandman', 'invincible', 'walking dead',
+  'sin city', 'preacher', 'hellboy', 'maus',
+]
+
+// Publisher-field exact matches (normalised lowercase). Used against the
+// canonical_products.publisher column, not the title — high-precision.
+export const COMIC_PUBLISHERS_EXACT: ReadonlySet<string> = new Set([
+  'marvel', 'marvel comics', 'marvel worldwide',
+  'dc', 'dc comics', 'dc black label',
+  'image', 'image comics',
+  'dark horse', 'dark horse comics', 'dark horse books',
+  'idw', 'idw publishing',
+  'boom!', 'boom! studios', 'boom studios',
+  'titan comics', 'titan books',
+  'oni press', 'oni-lion forge',
+  'fantagraphics', 'fantagraphics books',
+  'aftershock', 'aftershock comics',
+  'vault comics', 'valiant entertainment', 'valiant',
+  'viz', 'viz media', 'viz media llc',
+  'kodansha', 'kodansha comics', 'kodansha usa',
+  'yen press', 'yen on',
+  'seven seas', 'seven seas entertainment',
+  'tokyopop',
+  'square enix', 'square enix manga',
+  'shueisha', 'shogakukan',
+  'drawn & quarterly', 'drawn and quarterly',
+  'first second', 'first second books',
+  'abrams', 'abrams comicarts',
+  'top shelf', 'top shelf productions',
+  'humanoids', 'humanoids inc',
+])
+
+/**
+ * Strict comic check — true only when there's a high-confidence comic signal
+ * in either the title (STRONG_COMIC_SIGNALS) or the publisher field
+ * (COMIC_PUBLISHERS_EXACT). Used by the cleanup script's Bucket B+ to gate
+ * which products are safe for bulk format reclassification.
+ */
+export function isStrongComic(title: string, publisher: string | null): boolean {
+  if (publisher) {
+    const p = publisher.toLowerCase().trim()
+    if (COMIC_PUBLISHERS_EXACT.has(p)) return true
+  }
+  if (title) {
+    const t = title.toLowerCase()
+    for (const s of STRONG_COMIC_SIGNALS) {
+      if (t.includes(s)) return true
+    }
+  }
+  return false
+}
