@@ -2,19 +2,26 @@
  * Unified Search — composite result scoring.
  *
  * Formula (weights sum to 1.0):
- *   textRank    × 0.40  — FTS + trgm signal from Postgres
- *   offerCount  × 0.20  — log-damped in-stock offer count
- *   recency     × 0.10  — how recently the product was released (or last seen)
- *   stockAvail  × 0.15  — fraction of offers that are in-stock
- *   trustScore  × 0.15  — average retailer trust score across offers
+ *   textRank    × 0.55  — FTS + trgm signal from Postgres (primary signal)
+ *   recency     × 0.15  — how recently the product was released
+ *   offerCount  × 0.12  — log-damped in-stock offer count (boost, not gate)
+ *   stockAvail  × 0.10  — fraction of offers that are in-stock
+ *   trustScore  × 0.08  — average retailer trust score across offers
  *
- * Sanity floor: products with zero in-stock offers and last-seen > 7 days
- * ago are demoted below unmatched listings and loose eBay results.
+ * Philosophy: text relevance drives ranking. Pricing signals are a boost
+ * for products that happen to be priced, not a penalty for unlisted ones.
+ * A well-matched catalogue entry (no current price) should outrank a
+ * weakly-matched priced result.
+ *
+ * isStaleDud: products with no in-stock offers are catalogue entries and
+ * are NOT demoted below eBay scrapes. They sort by score like everything
+ * else. Only products with offer records that are all stale (> 30 days
+ * since last seen) are demoted.
  */
 
 import type { CanonicalSearchResult } from './types'
 
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000
 
 function clamp01(n: number): number {
   return Math.max(0, Math.min(1, n))
@@ -79,32 +86,45 @@ export function scoreCanonical(result: CanonicalSearchResult): number {
   const stockAvail = stockAvailSignal(result.offers)
   const trust      = trustSignal(result.offers)
 
+  // Weights sum to 1.0: 0.55 + 0.15 + 0.12 + 0.10 + 0.08 = 1.00
   return (
-    textRank   * 0.40 +
-    offerCount * 0.20 +
-    recency    * 0.10 +
-    stockAvail * 0.15 +
-    trust      * 0.15
+    textRank   * 0.55 +
+    recency    * 0.15 +
+    offerCount * 0.12 +
+    stockAvail * 0.10 +
+    trust      * 0.08
   )
 }
 
 /**
- * isStaleDud: true when a canonical product has no in-stock offers
- * AND all offers were last seen more than 7 days ago.
- * Stale duds are sorted below loose eBay results.
+ * isStaleDud: true only when a product has offer records that are all
+ * out-of-stock AND were last seen more than 30 days ago.
+ *
+ * Products with ZERO offers are catalogue entries (never listed, or not yet
+ * in any feed). They are NOT duds — they should surface on text relevance.
+ * Previously returning true immediately for offers.length === 0 caused all
+ * unlisted comics to be buried below eBay scrapes. That was wrong for a
+ * database-first model.
+ *
+ * Note: queryA.ts only hydrates IN_STOCK/LOW_STOCK/PREORDER offers, so
+ * offers.length > 0 already implies current availability. The inStock check
+ * is defensive for when queryA is extended to include OOS offers.
  */
 export function isStaleDud(result: CanonicalSearchResult): boolean {
-  if (result.offers.length === 0) return true
+  // Zero offers = catalogue entry, not a stale listing. Never a dud.
+  if (result.offers.length === 0) return false
 
+  // Has in-stock/preorder offers — definitely not stale.
   const inStock = result.offers.some(
-    o => o.stockStatus === 'IN_STOCK' || o.stockStatus === 'LOW_STOCK'
+    o => o.stockStatus === 'IN_STOCK' || o.stockStatus === 'LOW_STOCK' || o.stockStatus === 'PREORDER'
   )
   if (inStock) return false
 
+  // Has offer records but none are in-stock. Check staleness.
   const mostRecentMs = Math.max(
     ...result.offers.map(o => new Date(o.lastSeenAt).getTime())
   )
-  return Date.now() - mostRecentMs > SEVEN_DAYS_MS
+  return Date.now() - mostRecentMs > THIRTY_DAYS_MS
 }
 
 /**
