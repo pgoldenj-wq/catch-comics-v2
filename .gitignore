@@ -48,3 +48,7 @@ next-env.d.ts
 /feeds/awin/*.json
 /feeds/awin/*.gz
 !/feeds/awin/.gitkeep
+
+# cleanup-non-comics output — regenerated each run, not source
+/scripts/delete-candidates.json
+/scripts/reclassify-candidates.json

@@ -65,24 +65,46 @@ const NON_COMIC_FLAGS: readonly string[] = [
   'theology', 'theological', 'reformation',
 ]
 
+// ── Classifier ────────────────────────────────────────────────────────────────
+
+export type ComicClassification = 'comic' | 'non-comic' | 'uncertain'
+
+/**
+ * Three-state classifier — returns 'non-comic' when a NON_COMIC_FLAG matches,
+ * 'comic' when a COMIC_SIGNAL matches without any non-comic flag, otherwise
+ * 'uncertain'. The cleanup script uses this directly; isLikelyComic() below
+ * collapses 'comic' → true and the other two → false for the search filter.
+ *
+ * Accepts a single text input — callers can concatenate title + publisher
+ * (e.g. `${title} ${publisher ?? ''}`) so publisher signals (Marvel, DC, etc.)
+ * help classify products whose title alone is ambiguous.
+ */
+export function classifyText(text: string): ComicClassification {
+  if (!text) return 'uncertain'
+  const t = text.toLowerCase()
+
+  // Non-comic flag is dominant — anything matching a hard negative is rejected
+  // regardless of other signals (e.g. "A Cookbook of Marvel Recipes" → non-comic).
+  for (const flag of NON_COMIC_FLAGS) {
+    if (t.includes(flag)) return 'non-comic'
+  }
+
+  for (const signal of COMIC_SIGNALS) {
+    if (t.includes(signal)) return 'comic'
+  }
+
+  return 'uncertain'
+}
+
 /**
  * Returns true if a listing title looks like a comic. Conservative: requires
- * at least ONE positive signal AND zero strong negative signals.
+ * at least ONE positive signal AND zero strong negative signals. Uncertain
+ * titles return false — better to lose a real comic than show pollution in
+ * search results.
  */
 export function isLikelyComic(title: string): boolean {
-  if (!title) return false
-  const t = title.toLowerCase()
-
-  // Hard reject if any non-comic flag is present
-  for (const flag of NON_COMIC_FLAGS) {
-    if (t.includes(flag)) return false
-  }
-
-  // Accept if any comic signal is present
-  for (const signal of COMIC_SIGNALS) {
-    if (t.includes(signal)) return true
-  }
-
-  // No positive signal → reject. Better to lose a real comic than show pollution.
-  return false
+  return classifyText(title) === 'comic'
 }
+
+// Re-export constants for tooling (cleanup script, audits)
+export { COMIC_SIGNALS, NON_COMIC_FLAGS }

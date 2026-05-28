@@ -61,6 +61,7 @@
     "enrich:overnight": "dotenv -e .env.local -- tsx scripts/enrich-overnight.ts",
     "enrich:cv:covers": "dotenv -e .env.local -- tsx scripts/enrich-cv-covers.ts",
     "ingest:cv-series": "dotenv -e .env.local -- tsx scripts/ingest-cv-series.ts",
+    "cleanup:noncomics:dry": "dotenv -e .env.local -- tsx scripts/cleanup-non-comics.ts",
     "migrate:covers": "dotenv -e .env.local -- tsx scripts/migrate-covers.ts",
     "fix:ext-covers": "dotenv -e .env.local -- tsx scripts/fix-external-covers.ts"
   },
