@@ -17,6 +17,28 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 
+/**
+ * Mirrors the word-overlap similarity from /api/comic/search — used as an
+ * extra client-side guard before firing the self-healing PATCH.
+ * Returns a value in [0, 1].
+ */
+function titleSimilarity(query: string, candidate: string): number {
+  const STOP = new Set(['the', 'a', 'an', 'of', 'and', 'vol', 'volume',
+    'edition', 'book', 'part', 'absolute', 'omnibus', 'deluxe', 'complete'])
+  const tokenise = (s: string) =>
+    s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+      .filter(w => w.length > 1 && !STOP.has(w))
+  const qWords = new Set(tokenise(query))
+  const cWords = new Set(tokenise(candidate))
+  if (qWords.size === 0 || cWords.size === 0) return 0
+  let hits = 0
+  for (const w of qWords) if (cWords.has(w)) hits++
+  const precision = hits / qWords.size
+  const recall    = hits / cWords.size
+  if (precision + recall === 0) return 0
+  return (2 * precision * recall) / (precision + recall)
+}
+
 interface Issue {
   id: number
   issue_number: string
@@ -59,11 +81,22 @@ export default function CVIssuesGrid({
         try {
           const r = await fetch(`/api/comic/search?q=${encodeURIComponent(searchTitle)}`)
           if (r.ok) {
-            const data = await r.json() as { volumeId: string | null }
+            const data = await r.json() as { volumeId: string | null; name: string | null }
             volumeId = data.volumeId ?? null
 
             // ── Step 2: Self-heal — write ID back to DB (fire-and-forget) ─
-            if (volumeId && productSlug) {
+            // Only fire when the returned name has reasonable overlap with our
+            // search title. This prevents writing wrong IDs for new series where
+            // CV returns an unrelated high-issue-count volume as the top result.
+            const SELF_HEAL_THRESHOLD = 0.45
+            const returnedName = data.name ?? ''
+            const confident =
+              volumeId &&
+              productSlug &&
+              searchTitle &&
+              titleSimilarity(searchTitle, returnedName) >= SELF_HEAL_THRESHOLD
+
+            if (confident) {
               fetch(`/api/product/${productSlug}/comicvine-id`, {
                 method:  'PATCH',
                 headers: { 'Content-Type': 'application/json' },

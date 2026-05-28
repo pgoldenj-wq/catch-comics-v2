@@ -664,9 +664,9 @@ function SearchResults() {
         {/* Results column */}
         <div style={{ flex: 1, minWidth: 0 }}>
 
-          {/* ── FORMAT PILLS — single-select, clicking active pill clears to 'all' */}
+          {/* ── FORMAT PILLS — mobile only; desktop pills live in the sort row below */}
           {!loading && !error && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
+            <div className="flex md:hidden" style={{ flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
               {([
                 { id: 'all',           label: 'All' },
                 { id: 'graphic-novel', label: 'Graphic Novels' },
@@ -731,6 +731,8 @@ function SearchResults() {
           )}
 
           {/* ── FILTERS + SORT ROW — shared height, aligned baseline */}
+          {/* Desktop: [Format pills ···] [Sort dropdown]  */}
+          {/* Mobile:  [Filters button] [Sort dropdown]    */}
           {!loading && !error && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', gap: '10px' }}>
               {/* Filters button — mobile only */}
@@ -751,8 +753,34 @@ function SearchResults() {
                 </svg>
                 {hasActiveFilters ? 'Filters ·' : 'Filters'}
               </button>
-              {/* Spacer on desktop (no filter button) */}
-              <div className="hidden md:block" />
+              {/* Format pills — desktop only (same row as sort) */}
+              <div className="hidden md:flex" style={{ flexWrap: 'wrap', gap: '8px' }}>
+                {([
+                  { id: 'all',           label: 'All' },
+                  { id: 'graphic-novel', label: 'Graphic Novels' },
+                  { id: 'single-issue',  label: 'Single Issues' },
+                  { id: 'manga',         label: 'Manga' },
+                ] as { id: string; label: string }[]).map(({ id, label }) => {
+                  const active = id === format
+                  return (
+                    <button
+                      key={id}
+                      onClick={() => setFormatFilter(id)}
+                      aria-pressed={active}
+                      style={{
+                        height: '36px', padding: '0 14px',
+                        borderRadius: '999px', fontSize: '13px', fontWeight: 500,
+                        fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap',
+                        background: active ? '#0A0A0A' : '#fff',
+                        color:      active ? '#fff'    : '#374151',
+                        border:     `1px solid ${active ? '#0A0A0A' : '#E5E7EB'}`,
+                        transition: 'background 0.12s, color 0.12s, border-color 0.12s',
+                      }}>
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
 
               {/* Sort dropdown — same height as pills */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

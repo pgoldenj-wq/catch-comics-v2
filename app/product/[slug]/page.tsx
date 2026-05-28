@@ -233,10 +233,16 @@ export default async function ProductPage(
   // always wins the race; a live API call may not.
   let amazonOffer: Awaited<ReturnType<typeof lookupAmazon>> = null
   if (product.isbn13) {
-    amazonOffer = await Promise.race([
-      lookupAmazon(product.isbn13, product.id, 'amazon.co.uk'),
-      new Promise<null>(resolve => setTimeout(() => resolve(null), 800)),
-    ])
+    try {
+      amazonOffer = await Promise.race([
+        lookupAmazon(product.isbn13, product.id, 'amazon.co.uk'),
+        new Promise<null>(resolve => setTimeout(() => resolve(null), 800)),
+      ])
+    } catch (err) {
+      // RainforestQuotaError (402) or other transient failures — skip gracefully.
+      // The page renders without an Amazon offer rather than crashing.
+      console.warn('[product] Amazon lookup failed for ISBN', product.isbn13, err instanceof Error ? err.message : err)
+    }
   }
 
   // ── Offer processing ─────────────────────────────────────────────────────
