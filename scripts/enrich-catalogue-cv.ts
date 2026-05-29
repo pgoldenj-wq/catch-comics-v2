@@ -63,7 +63,7 @@ interface Args {
 
 function parseArgs(): Args {
   const argv = process.argv.slice(2)
-  const args: Args = { limit: 300, priority: 'cover', rateMs: 18000, reset: false, dryRun: false, report: false }
+  const args: Args = { limit: 300, priority: 'cover', rateMs: 25000, reset: false, dryRun: false, report: false }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--limit')               args.limit = parseInt(argv[++i] ?? '300', 10)
@@ -144,29 +144,53 @@ interface CVVolume {
 // converts to a logged null, the outer loop continues to the next product.
 const CV_TIMEOUT_MS = 30_000
 
+// 420 "Enhance Your Calm" backoff. The v3 run hit 50/300 HTTP 420s at
+// 18s/call — CV's per-window enforcement is tighter than the documented
+// 200/hr cap. On 420 we sleep 60s and retry up to MAX_420_RETRIES times;
+// only after all retries fail do we return null (treat as unmatched).
+const RETRY_BACKOFF_MS = 60_000
+const MAX_420_RETRIES  = 3
+
 async function cvFetch<T>(path: string): Promise<T | null> {
   const sep = path.includes('?') ? '&' : '?'
   const url = `${CV_BASE}${path}${sep}api_key=${CV_KEY}&format=json`
-  try {
-    const res = await fetch(url, {
-      signal:  AbortSignal.timeout(CV_TIMEOUT_MS),
-      headers: { 'User-Agent': 'CatchComics/1.0 catalogue-enrich' },
-    })
-    if (!res.ok) {
-      console.warn(`  [cv] ${res.status} ${res.statusText} for ${path.slice(0,80)}`)
+
+  for (let attempt = 0; attempt <= MAX_420_RETRIES; attempt++) {
+    try {
+      const res = await fetch(url, {
+        signal:  AbortSignal.timeout(CV_TIMEOUT_MS),
+        headers: { 'User-Agent': 'CatchComics/1.0 catalogue-enrich' },
+      })
+
+      // 420 = "Enhance Your Calm" — Cloudflare/CV rate limit. Wait and retry.
+      if (res.status === 420 || res.status === 429) {
+        if (attempt < MAX_420_RETRIES) {
+          console.warn(`  [cv] ${res.status} — backing off ${RETRY_BACKOFF_MS/1000}s (attempt ${attempt+1}/${MAX_420_RETRIES})`)
+          await new Promise(r => setTimeout(r, RETRY_BACKOFF_MS))
+          continue
+        }
+        console.warn(`  [cv] ${res.status} — gave up after ${MAX_420_RETRIES} retries on ${path.slice(0,80)}`)
+        return null
+      }
+
+      if (!res.ok) {
+        console.warn(`  [cv] ${res.status} ${res.statusText} for ${path.slice(0,80)}`)
+        return null
+      }
+
+      const json = await res.json()
+      if (json.status_code && json.status_code !== 1) {
+        console.warn(`  [cv] status_code=${json.status_code} error=${json.error}`)
+        return null
+      }
+      return json.results as T
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      console.warn(`  [cv] fetch failed (${msg}) for ${path.slice(0,80)}`)
       return null
     }
-    const json = await res.json()
-    if (json.status_code && json.status_code !== 1) {
-      console.warn(`  [cv] status_code=${json.status_code} error=${json.error}`)
-      return null
-    }
-    return json.results as T
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    console.warn(`  [cv] fetch failed (${msg}) for ${path.slice(0,80)}`)
-    return null
   }
+  return null
 }
 
 // ── Matching ──────────────────────────────────────────────────────────────────
