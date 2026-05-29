@@ -109,6 +109,40 @@ export function isLikelyComic(title: string): boolean {
 // Re-export constants for tooling (cleanup script, audits)
 export { COMIC_SIGNALS, NON_COMIC_FLAGS }
 
+// ── Enrichment-only signal list (stricter than search-time) ───────────────────
+//
+// The search-time COMIC_SIGNALS is permissive on purpose — letting "Volume 1"
+// or "#3" through there only affects what appears in "Other listings", a
+// transient render. The enrichment pre-filter writes comicvine_id +
+// cv_metadata permanently to the DB; false positives there mean polluting
+// real history/biography books with bogus CV links.
+//
+// 300-product test (commit cb06918) wrote 4 wrong matches, all to non-comic
+// books titled "Abraham Lincoln Volume 2" / "History of the American People
+// Volume 02" / etc. They passed the pre-filter solely on 'volume '. Stripping
+// 'volume '/'vol.'/'volume:' from the enrichment signal list blocks that
+// pattern.
+//
+// '#1'…'#5' are kept because in a long-tail product title, a hash-number
+// pattern is far more often a comic issue number than a coincidental token.
+
+const ENRICHMENT_COMIC_SIGNALS: readonly string[] = COMIC_SIGNALS.filter(
+  s => s !== 'vol.' && s !== 'volume ' && s !== 'volume:'
+)
+
+/** Stricter classifier for the catalogue-enrich pipeline. */
+export function classifyTextForEnrichment(text: string): ComicClassification {
+  if (!text) return 'uncertain'
+  const t = text.toLowerCase()
+  for (const flag of NON_COMIC_FLAGS) {
+    if (t.includes(flag)) return 'non-comic'
+  }
+  for (const signal of ENRICHMENT_COMIC_SIGNALS) {
+    if (t.includes(signal)) return 'comic'
+  }
+  return 'uncertain'
+}
+
 // ── Strict signals (Bucket B+ classifier) ─────────────────────────────────────
 //
 // COMIC_SIGNALS above is permissive — it includes generic terms like 'vol.',

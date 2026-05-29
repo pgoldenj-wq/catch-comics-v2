@@ -46,7 +46,7 @@ import { PrismaClient } from '@prisma/client'
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { join, dirname } from 'path'
 import { downloadAndStoreCoverWithFallback } from '../lib/images/download'
-import { classifyText } from '../lib/search/isLikelyComic'
+import { classifyTextForEnrichment } from '../lib/search/isLikelyComic'
 
 const prisma = new PrismaClient()
 
@@ -221,18 +221,32 @@ async function findCvMatch(
   )
   if (!results || results.length === 0) return null
 
-  // Two-tier acceptance:
-  //   - sim >= 0.85 : accept regardless of publisher (very strong title match)
-  //   - sim >= 0.55 AND publisher match : accept (medium title match, publisher confirms)
-  //   - otherwise   : reject
-  // Pure F1 at 0.5 with no publisher check produced wrong matches on the test
-  // run (German academic books → unrelated comics on single-word overlap).
+  // Acceptance gates:
+  //   Tier 1: sim >= 0.85                             → accept (very strong title match)
+  //   Tier 2: sim >= 0.55 AND pubOk                   → accept (medium + publisher confirms)
+  //   Then THREE additional rejects (from 300-test post-mortem):
+  //     R1: count_of_issues <= 1 AND !pubOk AND sim < 0.95
+  //         → one-issue specials without publisher confirmation are almost
+  //           always graphic-novel adaptations of unrelated history/bio works
+  //           ("History of the American People" → "A People's History of
+  //            American Empire" wrong match)
+  //     R2: significantWords(productTitle) <= 2 AND (!pubOk OR issues <= 1)
+  //         → short product titles collide on single rare tokens. Abraham
+  //           Lincoln Volume 2 matched at sim=1.00 because both titles
+  //           reduce to "lincoln" alone. Require BOTH publisher AND multi-
+  //           issue evidence when the product title is this terse.
+  //     R3: (already covered by Tier 1+2 — kept implicit)
   const SIM_STRONG = 0.85
   const SIM_MEDIUM = 0.55
+  const SIM_VERY_STRONG = 0.95
 
   const norm = (s: string | null | undefined) => (s ?? '').toLowerCase().trim()
   const dbPubNorm = norm(publisher)
   const dbPubFirstWord = dbPubNorm.split(/[\s,]/).filter(w => w.length > 2)[0] ?? ''
+
+  // Count significant (non-stopword) tokens in the cleaned query — used by R2.
+  const queryWords = tokenise(q)
+  const productSignificantWordCount = queryWords.length
 
   const scored = results.map(v => {
     const cvPubNorm = norm(v.publisher?.name)
@@ -242,14 +256,20 @@ async function findCvMatch(
       (cvPubFirstWord && dbPubNorm.includes(cvPubFirstWord))
     )
     return { v, sim: f1Similarity(q, v.name ?? ''), pubOk: !!pubOk }
-  }).filter(s =>
-    (s.sim >= SIM_STRONG) ||
-    (s.sim >= SIM_MEDIUM && s.pubOk)
-  )
+  })
+    // Tier 1 / Tier 2 base acceptance
+    .filter(s => (s.sim >= SIM_STRONG) || (s.sim >= SIM_MEDIUM && s.pubOk))
+    // R1: reject one-issue specials without publisher confirmation
+    .filter(s => !(
+      (s.v.count_of_issues ?? 0) <= 1 && !s.pubOk && s.sim < SIM_VERY_STRONG
+    ))
+    // R2: reject short-title matches without strong corroboration
+    .filter(s => !(
+      productSignificantWordCount <= 2 && (!s.pubOk || (s.v.count_of_issues ?? 0) <= 1)
+    ))
 
   if (scored.length === 0) return null
 
-  // Publisher match preferred, then sim desc, then issue count desc
   scored.sort((a, b) =>
     Number(b.pubOk) - Number(a.pubOk)
     || b.sim - a.sim
@@ -257,7 +277,7 @@ async function findCvMatch(
   )
 
   const best = scored[0]
-  const reason = `sim=${best.sim.toFixed(2)} pubOk=${best.pubOk} issues=${best.v.count_of_issues ?? '?'}`
+  const reason = `sim=${best.sim.toFixed(2)} pubOk=${best.pubOk} issues=${best.v.count_of_issues ?? '?'} words=${productSignificantWordCount}`
   return { volume: best.v, similarity: best.sim, reason }
 }
 
@@ -358,12 +378,12 @@ async function main() {
     LIMIT ${Math.min(args.limit * 30, 200000)}
   `)
 
-  // Pre-filter: skip products whose (title+publisher) doesn't pass the comic
-  // classifier. Prevents wasted CV calls + wrong matches against the WoB
-  // academic-book pollution. Products with 'comic'/'manga'/known-publisher
-  // signals pass; anything else is left alone (won't be CV-matched here).
+  // Pre-filter: enrichment-specific classifier — STRICTER than search-time.
+  // The 'volume '/'vol.' signals are stripped from this list because they
+  // let through history/biography books with "Volume N" titles (the four
+  // wrong matches in the previous 300-test all came in this way).
   const looksLikeComic = (c: { title: string; publisher: string | null }) =>
-    classifyText(`${c.title} ${c.publisher ?? ''}`) === 'comic'
+    classifyTextForEnrichment(`${c.title} ${c.publisher ?? ''}`) === 'comic'
 
   const filtered = candidates.filter(c => !processedSet.has(c.id) && looksLikeComic(c))
   const pool     = filtered.slice(0, args.limit)
