@@ -138,11 +138,20 @@ interface CVVolume {
   characters?:      CVCharacter[]
 }
 
+// Hard 30s timeout per CV request. Without this an unresponsive CV connection
+// hangs forever — the first 300-test run died at product #254 this way after
+// 1.5h of progress. AbortSignal.timeout throws TimeoutError which the catch
+// converts to a logged null, the outer loop continues to the next product.
+const CV_TIMEOUT_MS = 30_000
+
 async function cvFetch<T>(path: string): Promise<T | null> {
   const sep = path.includes('?') ? '&' : '?'
   const url = `${CV_BASE}${path}${sep}api_key=${CV_KEY}&format=json`
   try {
-    const res = await fetch(url, { headers: { 'User-Agent': 'CatchComics/1.0 catalogue-enrich' } })
+    const res = await fetch(url, {
+      signal:  AbortSignal.timeout(CV_TIMEOUT_MS),
+      headers: { 'User-Agent': 'CatchComics/1.0 catalogue-enrich' },
+    })
     if (!res.ok) {
       console.warn(`  [cv] ${res.status} ${res.statusText} for ${path.slice(0,80)}`)
       return null
@@ -154,7 +163,8 @@ async function cvFetch<T>(path: string): Promise<T | null> {
     }
     return json.results as T
   } catch (e) {
-    console.warn(`  [cv] fetch failed: ${e instanceof Error ? e.message : e}`)
+    const msg = e instanceof Error ? e.message : String(e)
+    console.warn(`  [cv] fetch failed (${msg}) for ${path.slice(0,80)}`)
     return null
   }
 }
