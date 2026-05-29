@@ -37,6 +37,7 @@ import { join } from 'path'
 import {
   classifyText,
   isStrongComic,
+  COMIC_SIGNALS,
   type ComicClassification,
 } from '../lib/search/isLikelyComic'
 
@@ -45,8 +46,38 @@ const prisma = new PrismaClient()
 // ── CLI ───────────────────────────────────────────────────────────────────────
 
 const argv = process.argv.slice(2)
-const EXECUTE_A      = argv.includes('--execute-a')
-const EXECUTE_B_PLUS = argv.includes('--execute-b-plus')
+const EXECUTE_A           = argv.includes('--execute-a')
+const EXECUTE_B_PLUS      = argv.includes('--execute-b-plus')
+const EXECUTE_C_PRUNED    = argv.includes('--execute-c-pruned')
+const DRY_C_PRUNED        = argv.includes('--dry-c-pruned')
+
+// Publishers that are confirmed public-domain reprint mills / print-on-demand
+// outfits — their entire WoB-fed inventory is non-comic. Approved by user
+// after publisher-distribution review (see Step 2 dry-run report).
+const DELETE_PUBLISHERS: readonly string[] = [
+  'Creative Media Partners, LLC',
+  'Legare Street Press',
+  'Kessinger Publishing, LLC',
+  'Wentworth Press',
+  'Palala Press',
+  'Nabu Press',
+  'BoD - Books on Demand',
+  'Tradd Street Press',
+  'Anson Street Press',
+  'Hassell Street Press',
+]
+
+// Title-level final safety net. If any product slated for delete has a
+// comic-signal substring in its title, spare it regardless of publisher.
+// Uses the BROAD COMIC_SIGNALS (includes 'vol.', 'volume ', '#1' etc.) —
+// for cleanup we want max generosity in sparing potential comics.
+function titleHasComicSignal(title: string): boolean {
+  const t = title.toLowerCase()
+  for (const s of COMIC_SIGNALS) {
+    if (t.includes(s)) return true
+  }
+  return false
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -300,6 +331,73 @@ async function main() {
     }
   }
 
+  // ── C-pruned: format=OTHER + no CV id + no live listings + (NULL pub or
+  //   approved reprint mill) + no comic-signal in title.
+  //   Final safety net is the title comic-signal check — even with NULL
+  //   publisher, a title containing 'manga'/'omnibus'/'batman'/'vol.' etc.
+  //   spares the row. Approved 2026-05-29.
+  if (DRY_C_PRUNED || EXECUTE_C_PRUNED) {
+    const pubList = DELETE_PUBLISHERS.map(p => `'${p.replace(/'/g, "''")}'`).join(',')
+    const cRows = await prisma.$queryRawUnsafe<Array<{
+      id: string; title: string; publisher: string | null
+    }>>(`
+      SELECT cp.id, cp.title, cp.publisher
+      FROM canonical_products cp
+      WHERE cp.format::text = 'OTHER'
+        AND cp.comicvine_id IS NULL
+        AND cp.deleted_at IS NULL
+        AND (cp.publisher IS NULL OR cp.publisher IN (${pubList}))
+        AND NOT EXISTS (
+          SELECT 1 FROM retailer_listings rl
+          JOIN retailers ret ON ret.id = rl.retailer_id
+          WHERE rl.canonical_product_id = cp.id
+            AND rl.price_amount > 0
+            AND rl.deleted_at IS NULL
+            AND ret.is_active = true
+        )
+    `)
+
+    // Apply title-level comic-signal guard (final safety net)
+    const beforeGuard = cRows.length
+    const cToDelete   = cRows.filter(r => !titleHasComicSignal(r.title))
+    const spared      = cRows.filter(r =>  titleHasComicSignal(r.title))
+
+    console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    console.log('C-PRUNED — format=OTHER, no CV, no live listings, junk publishers')
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+    console.log(`Raw match (pub criterion + no-listings):     ${beforeGuard}`)
+    console.log(`  ↳ spared by title comic-signal guard:      ${spared.length}`)
+    console.log(`  ↳ to delete:                                ${cToDelete.length}`)
+    console.log('\nSample of 20 spared (title comic-signal hit):')
+    spared.slice(0, 20).forEach(r => {
+      console.log(`  ${r.title.slice(0, 70)}${r.publisher ? ` [${r.publisher}]` : ''}`)
+    })
+
+    const auditPath = join(__dirname, 'c-pruned-delete-candidates.json')
+    writeFileSync(auditPath, JSON.stringify(cToDelete, null, 2))
+    console.log(`\n  JSON audit written: ${auditPath} (${cToDelete.length} rows)`)
+
+    if (EXECUTE_C_PRUNED) {
+      if (cToDelete.length === 0) {
+        console.log('\n[execute-c-pruned] Nothing to delete.')
+      } else if (cToDelete.length > 5000) {
+        console.error(`\n[execute-c-pruned] REFUSING: ${cToDelete.length} > 5000 row safety limit.`)
+        process.exit(1)
+      } else {
+        console.log(`\n[execute-c-pruned] Soft-deleting ${cToDelete.length} rows …`)
+        const ids = cToDelete.map(r => r.id)
+        const updated = await prisma.$executeRaw`
+          UPDATE canonical_products
+          SET deleted_at = NOW(), updated_at = NOW()
+          WHERE id = ANY(${ids}::uuid[])
+            AND deleted_at IS NULL
+        `
+        console.log(`[execute-c-pruned] Rows soft-deleted: ${updated}`)
+        console.log(`[execute-c-pruned] Reversible — set deleted_at = NULL to restore.`)
+      }
+    }
+  }
+
   console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
   console.log('SUMMARY')
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
@@ -308,7 +406,7 @@ async function main() {
   console.log(`  Bucket B:      ${buckets.B.length}  (broad)`)
   console.log(`  Bucket B+:     ${buckets.BPlus.length}  (strict — strong signal)`)
   console.log(`  Bucket C:      ${buckets.C.length}  (incl. ${safetyOverrideCount} safety-held)`)
-  if (!EXECUTE_A && !EXECUTE_B_PLUS) {
+  if (!EXECUTE_A && !EXECUTE_B_PLUS && !EXECUTE_C_PRUNED) {
     console.log('\nDry run — NO DATA MODIFIED.')
   }
 

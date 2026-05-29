@@ -70,6 +70,8 @@
     "cleanup:noncomics:dry": "dotenv -e .env.local -- tsx scripts/cleanup-non-comics.ts",
     "cleanup:noncomics:execute-a": "dotenv -e .env.local -- tsx scripts/cleanup-non-comics.ts --execute-a",
     "cleanup:noncomics:execute-b-plus": "dotenv -e .env.local -- tsx scripts/cleanup-non-comics.ts --execute-b-plus",
+    "cleanup:noncomics:dry-c": "dotenv -e .env.local -- tsx scripts/cleanup-non-comics.ts --dry-c-pruned",
+    "cleanup:noncomics:execute-c": "dotenv -e .env.local -- tsx scripts/cleanup-non-comics.ts --execute-c-pruned",
     "migrate:covers": "dotenv -e .env.local -- tsx scripts/migrate-covers.ts",
     "fix:ext-covers": "dotenv -e .env.local -- tsx scripts/fix-external-covers.ts"
   },

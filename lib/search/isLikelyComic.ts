@@ -58,11 +58,30 @@ const NON_COMIC_FLAGS: readonly string[] = [
   // Latin/Greek classical texts (heavily over-represented in WoB feed)
   'm. tulli ciceronis', 'm.tullii ciceronis', 'c. iulii caesaris',
   'bellum gallicum', 'bellum catilinae', 'de amicitia', 'cato major',
+  'opera quae supersunt', 'opera omnia', 'tractatus',
   // Foreign-language indicators (high false-positive rate from WoB)
   'gesammelte schriften', 'gesammelte werke', 'auflage',
   'généalogies', 'satires',
   // Religious/philosophical that aren't comics
   'theology', 'theological', 'reformation',
+  // Added 2026-05-29 after v3 300-test surfaced more WoB patterns:
+  // German academic / reference
+  'wörterbuch', 'worterbuch', 'lehrbuch', 'jahrbuch',
+  'geschichte der', 'geschichte des',
+  'kirchengeschichte', 'wissenschaft', 'philosophie ',
+  // English academic
+  'proceedings of', 'year-book', 'yearbook', 'year book',
+  'philosophical society', 'philosophical transactions',
+  'statistical year', 'statistical abstract',
+  'reminiscences of', 'archaeologist',
+  // Government / official publications
+  's. hrg.', 'h. rep.', 'public hearing',
+  // Spanish/Portuguese/Italian academic
+  'teatro historico', 'teatro histórico',
+  // Anthology phrasing that's almost always non-comic when present
+  'selected works of', 'selected essays', 'collected poems',
+  // Pure prose / poetry markers
+  'novellas', 'short stories', 'sonnets',
 ]
 
 // ── Classifier ────────────────────────────────────────────────────────────────
