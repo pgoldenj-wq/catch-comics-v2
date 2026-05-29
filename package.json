@@ -61,6 +61,8 @@
     "enrich:overnight": "dotenv -e .env.local -- tsx scripts/enrich-overnight.ts",
     "enrich:cv:covers": "dotenv -e .env.local -- tsx scripts/enrich-cv-covers.ts",
     "ingest:cv-series": "dotenv -e .env.local -- tsx scripts/ingest-cv-series.ts",
+    "enrich:catalogue": "dotenv -e .env.local -- tsx scripts/enrich-catalogue-cv.ts",
+    "enrich:catalogue:dry": "dotenv -e .env.local -- tsx scripts/enrich-catalogue-cv.ts --dry-run",
     "cleanup:noncomics:dry": "dotenv -e .env.local -- tsx scripts/cleanup-non-comics.ts",
     "cleanup:noncomics:execute-a": "dotenv -e .env.local -- tsx scripts/cleanup-non-comics.ts --execute-a",
     "cleanup:noncomics:execute-b-plus": "dotenv -e .env.local -- tsx scripts/cleanup-non-comics.ts --execute-b-plus",
