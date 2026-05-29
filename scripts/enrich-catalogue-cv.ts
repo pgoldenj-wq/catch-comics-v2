@@ -48,6 +48,28 @@ import { join, dirname } from 'path'
 import { downloadAndStoreCoverWithFallback } from '../lib/images/download'
 import { classifyTextForEnrichment } from '../lib/search/isLikelyComic'
 
+// ── DB resilience ─────────────────────────────────────────────────────────────
+// Long unattended runs hit Neon's serverless connection lifecycle — the v4 run
+// crashed at product 88/221 after Neon issued an admin-terminate (E57P01).
+// Wrap every Prisma call site with a retry that detects connection-loss errors,
+// reconnects, and re-runs the operation once. Per-product checkpoint still
+// fires before sleep so a real crash only ever loses the in-flight product.
+async function withDbRetry<T>(label: string, op: () => Promise<T>): Promise<T> {
+  try {
+    return await op()
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    const isConn = /E57P01|terminating connection|Connection terminated|Closed|administrator command/i.test(msg)
+    if (!isConn) throw e
+    console.warn(`  [db] connection lost (${label}); reconnecting…`)
+    try { await prisma.$disconnect() } catch {}
+    await new Promise(r => setTimeout(r, 2000))
+    await prisma.$connect()
+    console.warn(`  [db] reconnected; retrying ${label}`)
+    return await op()
+  }
+}
+
 const prisma = new PrismaClient()
 
 // ── CLI parsing ────────────────────────────────────────────────────────────────
@@ -481,8 +503,8 @@ async function main() {
     // Use existing description if present and non-trivial; otherwise CV's synopsis.
     const newDesc       = (!p.description || p.description.trim().length < 20) ? (detail.description ?? null) : p.description
 
-    // Patch the row
-    await prisma.$executeRaw`
+    // Patch the row (wrapped in DB-retry for Neon serverless connection drops)
+    await withDbRetry('UPDATE canonical_products', () => prisma.$executeRaw`
       UPDATE canonical_products SET
         comicvine_id  = ${String(match.volume.id)},
         cv_metadata   = ${JSON.stringify(cvMeta)}::jsonb,
@@ -491,13 +513,15 @@ async function main() {
         description   = ${newDesc},
         updated_at    = NOW()
       WHERE id = ${p.id}::uuid
-    `
+    `)
 
-    // Cover backfill if missing
+    // Cover backfill if missing — downloadAndStoreCoverWithFallback writes to
+    // canonical_products too, so wrap it in the same DB-retry guard.
     if (!p.cover_image_url) {
       const cvCover = pickCover(detail)
       if (cvCover) {
-        const result = await downloadAndStoreCoverWithFallback(p.id, { cvUrl: cvCover })
+        const result = await withDbRetry('downloadAndStoreCoverWithFallback',
+          () => downloadAndStoreCoverWithFallback(p.id, { cvUrl: cvCover }))
         if (result) {
           cp.stats.coversRecovered++
           console.log(`  ↳ cover stored to R2`)
