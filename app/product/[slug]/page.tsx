@@ -23,6 +23,7 @@ import Navbar                            from '@/components/Navbar'
 import CVCharacterTags                   from '@/components/CVCharacterTags'
 import CVIssuesGrid                      from '@/components/CVIssuesGrid'
 import CVCoverImage                      from '@/components/CVCoverImage'
+import { isBadCoverUrl }                 from '@/lib/images/url-filters'
 
 // ISR: cache each product page for 1 hour, then regenerate in the background.
 // Switched from force-dynamic (which hit the DB on every request) now that the
@@ -424,7 +425,7 @@ export default async function ProductPage(
                         className="group flex items-center gap-3 bg-white rounded-xl border border-gray-200 hover:border-[#E8272A]/50 hover:shadow-sm p-3 transition-all focus:outline-none focus:ring-2 focus:ring-[#E8272A] focus:ring-offset-1"
                       >
                         <div className="flex-shrink-0 w-12 h-[68px] rounded-lg overflow-hidden">
-                          {r.coverImageUrl ? (
+                          {r.coverImageUrl && !isBadCoverUrl(r.coverImageUrl) ? (
                             <Image src={r.coverImageUrl} alt={r.title} width={48} height={68}
                               className="w-full h-full object-cover group-hover:opacity-90 transition-opacity" />
                           ) : (
@@ -457,7 +458,7 @@ export default async function ProductPage(
                         className="group flex items-center gap-3 bg-white rounded-xl border border-gray-200 hover:border-[#E8272A]/50 hover:shadow-sm p-2.5 transition-all focus:outline-none focus:ring-2 focus:ring-[#E8272A] focus:ring-offset-1"
                       >
                         <div className="flex-shrink-0 w-10 h-14 rounded overflow-hidden bg-gray-100">
-                          {issue.coverImageUrl ? (
+                          {issue.coverImageUrl && !isBadCoverUrl(issue.coverImageUrl) ? (
                             <Image src={issue.coverImageUrl} alt={issue.title} width={40} height={56}
                               className="w-full h-full object-cover group-hover:opacity-90 transition-opacity" />
                           ) : (

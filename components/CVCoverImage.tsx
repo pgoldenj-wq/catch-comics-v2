@@ -20,27 +20,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react'
-
-// Mirrors isBadCoverUrl / isPlaceholderCoverUrl used elsewhere in the codebase.
-function isBadCoverUrl(url: string | null | undefined): boolean {
-  if (!url) return true
-  const u = url.toLowerCase()
-  if (u.includes('books.google.com'))        return true   // GB placeholder JPEGs
-  if (u.includes('no_image'))                return true
-  if (u.includes('image_not_available'))     return true
-  if (u.includes('not_available'))           return true
-  if (/\/uploads\/[^/]+\/0\/\d+\//.test(u)) return true   // CV system placeholder
-  return false
-}
-
-// Append ?default=false to Open Library URLs so missing ISBNs return 404
-// instead of a 1×1 transparent GIF.
-function adjustSrc(url: string): string {
-  if (url.includes('covers.openlibrary.org')) {
-    return url + (url.includes('?') ? '&default=false' : '?default=false')
-  }
-  return url
-}
+import { isBadCoverUrl, adjustImgSrc as adjustSrc } from '@/lib/images/url-filters'
 
 interface Props {
   dbCoverUrl:  string | null

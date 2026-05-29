@@ -16,6 +16,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { isBadCoverUrl } from '@/lib/images/url-filters'
 
 /**
  * Mirrors the word-overlap similarity from /api/comic/search — used as an
@@ -166,8 +167,9 @@ export default function CVIssuesGrid({
       </div>
       <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
         {issues.map(issue => {
-          const cover = issue.image?.medium_url || issue.image?.small_url || ''
-          const label = issue.issue_number ? `#${issue.issue_number}` : (issue.name || 'Issue')
+          const rawCover = issue.image?.medium_url || issue.image?.small_url || ''
+          const cover    = rawCover && !isBadCoverUrl(rawCover) ? rawCover : ''
+          const label    = issue.issue_number ? `#${issue.issue_number}` : (issue.name || 'Issue')
           return (
             <button
               key={issue.id}
@@ -190,6 +192,10 @@ export default function CVIssuesGrid({
                     alt={`${comicTitle} ${label}`}
                     className="absolute inset-0 w-full h-full object-cover rounded-md"
                     loading="lazy"
+                    onLoad={e => {
+                      const img = e.currentTarget
+                      if (img.naturalWidth <= 1 || img.naturalHeight <= 1) img.style.display = 'none'
+                    }}
                     onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
                   />
                 )}

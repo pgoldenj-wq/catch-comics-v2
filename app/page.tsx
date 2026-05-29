@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import SearchBar   from '../components/SearchBar';
 import MobileHeader from '../components/MobileHeader';
 import Navbar       from '../components/Navbar';
+import { isBadCoverUrl, adjustImgSrc } from '../lib/images/url-filters';
 
 type HoverZone = 'left' | 'right' | null;
 
@@ -63,33 +64,13 @@ const DEAL_FALLBACKS: Record<number, string> = {
   72157:  'https://covers.openlibrary.org/b/isbn/1593070942-L.jpg',
 };
 
-// Comic Vine, Google Books, and other sources serve placeholder images that
-// cannot be detected client-side (HTTP 200, real dimensions).
-// Filter these out so we fall through to the designed fallback card instead.
-function isPlaceholderCoverUrl(url: string): boolean {
-  if (!url) return true
-  const u = url.toLowerCase()
-  if (u.includes('no_image'))               return true  // CV legacy pattern
-  if (u.includes('image_not_available'))     return true  // CV current pattern
-  if (u.includes('not_available'))           return true
-  if (/\/uploads\/[^/]+\/0\/\d+\//.test(u)) return true  // CV user-id 0 = system assets
-  // Google Books serves a full-size "image not available" JPEG (HTTP 200, real
-  // dimensions) when it has no preview — indistinguishable from a real cover
-  // without canvas pixel inspection.  Filter all Google Books URLs until we
-  // have better cover data from a dedicated source.
-  if (u.includes('books.google.com'))        return true
-  return false
-}
+// isBadCoverUrl + adjustImgSrc are imported from lib/images/url-filters (line ~6) —
+// shared with CVCoverImage, search page, product page sidebar, and CVIssuesGrid so
+// every surface filters the same set of placeholder URLs.
+// Local alias kept for the existing call site below.
+const isPlaceholderCoverUrl = (url: string) => isBadCoverUrl(url)
 
-// Open Library returns a 1×1 transparent GIF (HTTP 200) when an ISBN isn't in its
-// database — onError never fires.  Appending ?default=false makes OL return 404
-// instead, which does fire onError and lets the fallback layer show through.
-function adjustImgSrc(url: string): string {
-  if (url.includes('covers.openlibrary.org')) {
-    return url + (url.includes('?') ? '&default=false' : '?default=false')
-  }
-  return url
-}
+// adjustImgSrc lives in lib/images/url-filters (imported above).
 
 function discountPercent(deal: DealItem, region: 'uk' | 'us'): number {
   const price = region === 'uk' ? deal.priceUK : deal.priceUS;

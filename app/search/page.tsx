@@ -6,6 +6,7 @@ import { useEffect, useState, useMemo, useRef, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import MobileHeader from '@/components/MobileHeader'
 import Navbar       from '@/components/Navbar'
+import { isBadCoverUrl, adjustImgSrc } from '@/lib/images/url-filters'
 
 // ─── PriceTag — live "From £X.XX" badge per result card ──────────────────────
 // Fetches /api/price-hint for one comic at a time, staggered by index so we
@@ -134,15 +135,7 @@ type Category = 'comics' | 'manga' | 'indie'
 
 // ─── Image helpers ────────────────────────────────────────────────────────────
 
-// Open Library returns a 1×1 transparent GIF (HTTP 200) for missing ISBNs so
-// onError never fires.  Adding ?default=false makes OL return 404 instead,
-// which does fire onError and lets the letter-initial fallback show through.
-function adjustImgSrc(url: string): string {
-  if (url.includes('covers.openlibrary.org')) {
-    return url + (url.includes('?') ? '&default=false' : '?default=false')
-  }
-  return url
-}
+// adjustImgSrc + isBadCoverUrl are imported from lib/images/url-filters (top).
 
 // Validated set used by URL parsing — anything outside this list falls back to 'all'.
 const VALID_FORMATS: string[] = [
@@ -503,18 +496,10 @@ function SearchResults() {
           setError(data.error)
         } else if (data.type === 'unified') {
           // ── Unified mode ─────────────────────────────────────────────────
-          // Map canonical results → ComicResult for the existing card renderer
-          // Filter out Comic Vine / provider placeholder images so they fall through
-          // to the letter-initial fallback rather than showing "image not available".
-          const isBadCoverUrl = (url: string | null): boolean => {
-            if (!url) return true
-            const u = url.toLowerCase()
-            // Google Books serves a full-size "image not available" JPEG (HTTP 200,
-            // real dimensions) — indistinguishable from a real cover client-side.
-            // Filter all Google Books URLs until better cover data is available.
-            if (u.includes('books.google.com')) return true
-            return u.includes('no_image') || u.includes('image_not_available') || u.includes('not_available') || /\/uploads\/[^/]+\/0\/\d+\//.test(u)
-          }
+          // Map canonical results → ComicResult for the existing card renderer.
+          // Bad cover URLs (CV placeholders, Google Books "no preview", OL 1×1 GIFs)
+          // are filtered via the shared isBadCoverUrl so the letter-initial fallback
+          // shows instead of a broken placeholder image.
 
           const mapped: ComicResult[] = (data.canonicalResults ?? []).map(
             (r: {

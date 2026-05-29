@@ -1,0 +1,48 @@
+/**
+ * Shared cover image URL filters.
+ *
+ * Some cover sources (Comic Vine system assets, Google Books "no preview"
+ * placeholders, Open Library 1×1 GIFs) serve images that LOOK valid at the
+ * HTTP layer (200, real dimensions) but render as placeholder graphics in
+ * the UI. We filter these at the URL level so the designed fallback shows
+ * instead.
+ *
+ * Three call sites used to duplicate this logic — product hero (CVCoverImage),
+ * Top Deals carousel, and search results. Extracting here ensures every
+ * surface (related cards, issue grid, sidebars) applies the same rules.
+ */
+
+/**
+ * Returns true if the URL is a known placeholder / "no image available"
+ * source that should not be rendered as a cover.
+ *
+ * Filters:
+ *   - Comic Vine system assets:   /uploads/{anything}/0/{numeric}/   (user-id 0)
+ *   - Comic Vine legacy markers:  contains "no_image"
+ *   - Comic Vine current markers: contains "image_not_available" / "not_available"
+ *   - Google Books:                full books.google.com URLs (their "no preview"
+ *                                 placeholder is a real-sized JPEG, undetectable
+ *                                 at the pixel level — easier to drop the host)
+ */
+export function isBadCoverUrl(url: string | null | undefined): boolean {
+  if (!url) return true
+  const u = url.toLowerCase()
+  if (u.includes('no_image'))                return true
+  if (u.includes('image_not_available'))     return true
+  if (u.includes('not_available'))           return true
+  if (/\/uploads\/[^/]+\/0\/\d+\//.test(u)) return true   // CV system placeholder
+  if (u.includes('books.google.com'))        return true   // GB "no preview" JPEG
+  return false
+}
+
+/**
+ * Open Library serves a 1×1 transparent GIF (HTTP 200) when an ISBN isn't in
+ * its cover database. Appending ?default=false makes OL return 404 instead,
+ * which lets <img onError> + the letter-initial fallback fire correctly.
+ */
+export function adjustImgSrc(url: string): string {
+  if (url.includes('covers.openlibrary.org')) {
+    return url + (url.includes('?') ? '&default=false' : '?default=false')
+  }
+  return url
+}
