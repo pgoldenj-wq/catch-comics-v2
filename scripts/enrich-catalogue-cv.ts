@@ -58,11 +58,12 @@ interface Args {
   rateMs:   number
   reset:    boolean
   dryRun:   boolean
+  report:   boolean
 }
 
 function parseArgs(): Args {
   const argv = process.argv.slice(2)
-  const args: Args = { limit: 300, priority: 'cover', rateMs: 18000, reset: false, dryRun: false }
+  const args: Args = { limit: 300, priority: 'cover', rateMs: 18000, reset: false, dryRun: false, report: false }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--limit')               args.limit = parseInt(argv[++i] ?? '300', 10)
@@ -73,6 +74,7 @@ function parseArgs(): Args {
     else if (a.startsWith('--rate-ms='))      args.rateMs = parseInt(a.split('=')[1], 10)
     else if (a === '--reset')   args.reset = true
     else if (a === '--dry-run') args.dryRun = true
+    else if (a === '--report')  args.report = true
   }
   return args
 }
@@ -263,9 +265,56 @@ async function fetchVolumeDetail(volId: number): Promise<CVVolume | null> {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
+async function reportProgress() {
+  const cp = loadCheckpoint()
+  const total = await prisma.$queryRaw<Array<{ cnt: number }>>`
+    SELECT COUNT(*)::int AS cnt FROM canonical_products WHERE deleted_at IS NULL
+  `
+  const enriched = await prisma.$queryRaw<Array<{ cnt: number }>>`
+    SELECT COUNT(*)::int AS cnt FROM canonical_products WHERE comicvine_id IS NOT NULL AND deleted_at IS NULL
+  `
+  const todayMatches = cp.processedIds.length
+  const remainingRaw = await prisma.$queryRaw<Array<{ cnt: number }>>`
+    SELECT COUNT(*)::int AS cnt FROM canonical_products
+    WHERE comicvine_id IS NULL AND deleted_at IS NULL
+  `
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+  console.log('ENRICHMENT CHECKPOINT REPORT')
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
+  console.log(`  Started at:                  ${cp.startedAt}`)
+  console.log(`  Last update:                 ${cp.lastUpdatedAt}`)
+  console.log(`  Products attempted:          ${todayMatches}`)
+  console.log(`  Cumulative matched:          ${cp.stats.matched}`)
+  console.log(`  Cumulative unmatched:        ${cp.stats.unmatched}`)
+  console.log(`  Cumulative covers recovered: ${cp.stats.coversRecovered}`)
+  console.log(`  Cumulative CV API errors:    ${cp.stats.cvApiErrors}`)
+  console.log('')
+  console.log(`  Catalogue total (live):      ${total[0].cnt}`)
+  console.log(`  With comicvine_id:           ${enriched[0].cnt} (${((enriched[0].cnt/total[0].cnt)*100).toFixed(1)}%)`)
+  console.log(`  Remaining without CV link:   ${remainingRaw[0].cnt}`)
+
+  // Rough completion estimate
+  const matchRate = cp.stats.matched + cp.stats.unmatched > 0
+    ? cp.stats.matched / (cp.stats.matched + cp.stats.unmatched)
+    : 0
+  if (matchRate > 0 && cp.stats.matched > 0) {
+    // ~36s per product when matched (search + detail), 18s when unmatched
+    const avgSec = matchRate * 36 + (1 - matchRate) * 18
+    const remainingSec = remainingRaw[0].cnt * avgSec
+    const days = remainingSec / 86400
+    console.log(`  Est. days to finish (24/7):  ${days.toFixed(1)}`)
+  }
+
+  await prisma.$disconnect()
+}
+
 async function main() {
   if (!CV_KEY) { console.error('COMIC_VINE_API_KEY not set'); process.exit(1) }
   const args = parseArgs()
+  if (args.report) {
+    await reportProgress()
+    return
+  }
   console.log(`Mode: limit=${args.limit} priority=${args.priority} rate=${args.rateMs}ms dryRun=${args.dryRun}`)
 
   let cp = loadCheckpoint()
