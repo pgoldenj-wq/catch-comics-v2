@@ -220,17 +220,52 @@ export default async function ProductPage(
   // browseable section. Single issues themselves skip this query (returns []).
   const isCollectedEdition = !['SINGLE_ISSUE'].includes(product.format)
 
-  // CV Volume ID resolution for CVIssuesGrid.
-  // For collected editions, comicvine_id IS the volume id — pass it directly.
-  // For SINGLE_ISSUE products (created by scripts/ingest-cv-series.ts),
-  // comicvine_id holds the ISSUE id; the volume id lives in cv_metadata.cv_volume_id.
-  // Without this distinction CVIssuesGrid would fetch /api/comic/{issueId}/issues
-  // and return wrong or broken data on every ingested single-issue page.
-  const cvMeta       = (product as { cvMetadata?: { cv_volume_id?: number | string } | null }).cvMetadata
+  // CV metadata extraction. Three things we pull out for the editorial hero:
+  //   - cv_volume_id: the parent volume for SINGLE_ISSUE products
+  //   - synopsis:     CV's full description (often richer than retailer-fed)
+  //   - creators:     [{ id, name, role }] — writer / artist / cover etc.
+  //
+  // For collected editions, comicvine_id IS the volume id — pass it directly to
+  // CVIssuesGrid. For SINGLE_ISSUE products (created by scripts/ingest-cv-series.ts),
+  // comicvine_id holds the ISSUE id and the volume id lives in cv_metadata.cv_volume_id.
+  interface CvMetaShape {
+    cv_volume_id?: number | string
+    synopsis?:     string | null
+    creators?:     Array<{ id?: number; name: string; role?: string }>
+  }
+  const cvMeta = (product as { cvMetadata?: CvMetaShape | null }).cvMetadata ?? null
+
   const cvVolumeIdRaw = product.format === 'SINGLE_ISSUE'
     ? (cvMeta?.cv_volume_id ?? null)
     : product.comicvineId
   const cvVolumeId    = cvVolumeIdRaw !== null && cvVolumeIdRaw !== undefined ? String(cvVolumeIdRaw) : null
+
+  // Description: prefer CV's synopsis when it's substantively longer than the
+  // retailer-fed description. CV synopses often include HTML — strip tags for
+  // safe server rendering.
+  const stripHtml = (s: string) => s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+  const cvSynopsis = cvMeta?.synopsis ? stripHtml(cvMeta.synopsis) : ''
+  const dbDesc     = product.description?.trim() ?? ''
+  const displayDescription = cvSynopsis.length > dbDesc.length + 40 ? cvSynopsis : dbDesc
+
+  // Creators grouped by role for the hero block. CV roles use slash separators
+  // like "writer, penciler" for multi-role credits — split them out.
+  const creatorsByRole = new Map<string, string[]>()
+  for (const c of (cvMeta?.creators ?? [])) {
+    if (!c?.name) continue
+    const roles = (c.role ?? 'creator').split(/\s*[,/]\s*/).filter(Boolean)
+    for (const r of roles) {
+      const key = r.toLowerCase().trim()
+      const list = creatorsByRole.get(key) ?? []
+      if (!list.includes(c.name)) list.push(c.name)
+      creatorsByRole.set(key, list)
+    }
+  }
+  // Order roles editorially — writer first, then visual roles
+  const ROLE_ORDER = ['writer','penciler','penciller','artist','inker','colorist','cover','letterer','editor']
+  const orderedCreators = ROLE_ORDER
+    .filter(r => creatorsByRole.has(r))
+    .map(r => ({ role: r, names: creatorsByRole.get(r)! }))
 
   const [related, dynamicLinks, singleIssues] = await Promise.all([
     getRelated(product.id, product.seriesName, product.publisher, product.format),
@@ -404,75 +439,49 @@ export default async function ProductPage(
           <span className="text-gray-700 truncate">{product.title}</span>
         </nav>
 
-        {/* ── Layout: LEFT sidebar + main content + optional RIGHT CV issues col ── */}
-        {/* Third column appears when the product has a comicvineId so we can        */}
-        {/* fetch and display the issue-by-issue grid from Comic Vine.               */}
-        <div className="max-w-6xl mx-auto px-4 py-4 lg:grid lg:gap-10 lg:items-start lg:grid-cols-[260px_1fr_216px]">
+        {/* ── Layout ───────────────────────────────────────────────────────
+            Two-column on collected editions: [260px sidebar] [1fr main]
+              — the issues grid promotes to a full-width section inside main
+            Three-column on single issues:  [260px sidebar] [1fr main] [216px right]
+              — the right column shows "More issues in this series" as side nav
+            grid-template-columns is selected at render time via isCollectedEdition. */}
+        <div className={`max-w-6xl mx-auto px-4 py-4 lg:grid lg:gap-10 lg:items-start ${
+          isCollectedEdition
+            ? 'lg:grid-cols-[260px_1fr]'
+            : 'lg:grid-cols-[260px_1fr_240px]'
+        }`}>
 
-          {/* ── SIDEBAR: Related + single issues (lg+ only, LEFT rail) ───── */}
+          {/* ── SIDEBAR (lg+ LEFT rail) ─────────────────────────────────
+              "You might also like" — related collected editions / siblings.
+              On SINGLE_ISSUE pages, sibling issues live in the right column,
+              not here, so this sidebar shows only related products. */}
           <aside className="hidden lg:block" aria-label="Related titles">
             <div className="sticky top-20">
 
-              {/* Related collected editions */}
               {related.length > 0 && (
                 <div className="mb-6">
-                  <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">You might also like</h2>
-                  <div className="flex flex-col gap-2">
+                  <h2 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.12em] mb-3 px-1">You might also like</h2>
+                  <div className="flex flex-col">
                     {related.map(r => (
                       <Link
                         key={r.id}
                         href={`/product/${r.canonicalSlug}`}
-                        className="group flex items-center gap-3 bg-white rounded-xl border border-gray-200 hover:border-[#E8272A]/50 hover:shadow-sm p-3 transition-all focus:outline-none focus:ring-2 focus:ring-[#E8272A] focus:ring-offset-1"
+                        className="group flex items-center gap-3.5 rounded-lg px-2 py-2 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-[#E8272A] focus:ring-offset-1"
                       >
-                        <div className="flex-shrink-0 w-12 h-[68px] rounded-lg overflow-hidden">
+                        <div className="flex-shrink-0 w-[60px] h-[84px] rounded overflow-hidden bg-gray-100 shadow-sm">
                           {r.coverImageUrl && !isBadCoverUrl(r.coverImageUrl) ? (
-                            <Image src={r.coverImageUrl} alt={r.title} width={48} height={68}
-                              className="w-full h-full object-cover group-hover:opacity-90 transition-opacity" />
-                          ) : (
-                            <NoCoverPlaceholder className="w-full h-full rounded-lg" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium text-gray-900 line-clamp-3 group-hover:text-[#E8272A] transition-colors leading-snug">
-                            {r.title}
-                          </p>
-                          {r.publisher && (
-                            <p className="text-[10px] text-gray-400 mt-1">{r.publisher}</p>
-                          )}
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Single issues in this series */}
-              {singleIssues.length > 0 && (
-                <div>
-                  <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Issues in this series</h2>
-                  <div className="flex flex-col gap-2 max-h-[60vh] overflow-y-auto pr-1">
-                    {singleIssues.map(issue => (
-                      <Link
-                        key={issue.id}
-                        href={`/product/${issue.canonicalSlug}`}
-                        className="group flex items-center gap-3 bg-white rounded-xl border border-gray-200 hover:border-[#E8272A]/50 hover:shadow-sm p-2.5 transition-all focus:outline-none focus:ring-2 focus:ring-[#E8272A] focus:ring-offset-1"
-                      >
-                        <div className="flex-shrink-0 w-10 h-14 rounded overflow-hidden bg-gray-100">
-                          {issue.coverImageUrl && !isBadCoverUrl(issue.coverImageUrl) ? (
-                            <Image src={issue.coverImageUrl} alt={issue.title} width={40} height={56}
-                              className="w-full h-full object-cover group-hover:opacity-90 transition-opacity" />
+                            <Image src={r.coverImageUrl} alt={r.title} width={60} height={84}
+                              className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-200" />
                           ) : (
                             <NoCoverPlaceholder className="w-full h-full" />
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium text-gray-900 line-clamp-2 group-hover:text-[#E8272A] transition-colors leading-snug">
-                            {issue.issueNumber ? `#${issue.issueNumber}` : issue.title}
+                          <p className="text-[13px] font-semibold text-gray-900 line-clamp-3 group-hover:text-[#E8272A] transition-colors leading-snug">
+                            {r.title}
                           </p>
-                          {issue.releaseDate && (
-                            <p className="text-[10px] text-gray-400 mt-0.5">
-                              {new Date(issue.releaseDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
-                            </p>
+                          {r.publisher && (
+                            <p className="text-[11px] text-gray-400 mt-1">{r.publisher}</p>
                           )}
                         </div>
                       </Link>
@@ -480,6 +489,13 @@ export default async function ProductPage(
                   </div>
                 </div>
               )}
+
+              {/* On COLLECTED-EDITION pages the "Issues in this series" sidebar
+                  panel is removed — those issues are promoted to a full-width
+                  gallery in the main column ("Inside this collection"). The
+                  sidebar would just be a duplicate.  On SINGLE_ISSUE pages
+                  there's no sidebar issues block either — they live in the
+                  right column as a sticky side nav. */}
 
             </div>
           </aside>
@@ -487,70 +503,91 @@ export default async function ProductPage(
           {/* ── MAIN COLUMN ─────────────────────────────────────────────── */}
           <div className="min-w-0">
 
-            {/* ── Section 1: Hero ─────────────────────────────────────── */}
-            <section className="mb-8">
-              <div className="flex flex-col sm:flex-row gap-8">
+            {/* ── Section 1: Hero ───────────────────────────────────────
+                Editorial hero — large cover (320×480 desktop, 260×390 mobile)
+                anchors the page. Metadata flows right of the cover with format
+                in small-caps tracking, prominent title, then series/publisher/
+                creator credits, then full description. */}
+            <section className="mb-10">
+              <div className="flex flex-col sm:flex-row gap-6 sm:gap-10">
 
-                {/* Cover image — CVCoverImage handles DB cover → live CV fallback → placeholder */}
-                <div className="flex-shrink-0">
+                {/* Cover — bigger than before for editorial weight */}
+                <div className="flex-shrink-0 mx-auto sm:mx-0">
                   <CVCoverImage
                     dbCoverUrl={product.coverImageUrl}
                     comicvineId={product.comicvineId}
                     title={product.title}
-                    className="w-[180px] h-[270px] sm:w-[200px] sm:h-[300px] rounded-xl shadow-md"
+                    sizes="(min-width: 640px) 320px, 260px"
+                    priority
+                    className="w-[260px] h-[390px] sm:w-[320px] sm:h-[480px] rounded-xl shadow-lg"
                   />
                 </div>
 
-                {/* Metadata */}
+                {/* Metadata column */}
                 <div className="flex-1 min-w-0">
-                  {/* Format badge */}
-                  <span className="inline-block px-2.5 py-1 rounded-full text-xs font-semibold bg-[#E8272A]/10 text-[#E8272A] mb-3">
+                  {/* Format treatment — small-caps tracking, no chip, sits as
+                      eyebrow above the title with publisher dot-separated. */}
+                  <p className="text-[11px] font-bold text-[#E8272A] uppercase tracking-[0.14em] mb-3">
                     {FORMAT_LABELS[product.format] ?? product.format}
-                  </span>
+                    {product.publisher && (
+                      <span className="text-gray-400 font-bold"> · {product.publisher}</span>
+                    )}
+                  </p>
 
-                  {/* Series */}
-                  {product.seriesName && (
-                    <p className="text-sm text-gray-500 mb-1">
+                  {/* Series (when distinct from title) */}
+                  {product.seriesName && product.seriesName !== product.title && (
+                    <p className="text-sm text-gray-500 mb-2">
                       {product.seriesName}
                       {product.volumeNumber ? ` · Vol. ${product.volumeNumber}` : ''}
                       {product.issueNumber  ? ` · #${product.issueNumber}`      : ''}
                     </p>
                   )}
 
-                  <h1 className="text-3xl sm:text-4xl font-bold text-[#0A0A0A] leading-tight mb-1">
+                  <h1 className="text-3xl sm:text-4xl font-bold text-[#0A0A0A] leading-tight mb-2">
                     {product.title}
                   </h1>
 
                   {product.subtitle && (
-                    <p className="text-lg text-gray-500 mb-3">{product.subtitle}</p>
+                    <p className="text-lg text-gray-500 mb-4">{product.subtitle}</p>
                   )}
 
-                  {/* Publisher + release date */}
-                  <div className="flex flex-wrap gap-4 text-sm text-gray-500 mb-4">
-                    {product.publisher && (
-                      <span>Published by <span className="text-gray-800 font-medium">{product.publisher}</span></span>
-                    )}
-                    {product.releaseDate && (
-                      <span>Released <span className="text-gray-800 font-medium">{fmtDate(product.releaseDate)}</span></span>
-                    )}
-                  </div>
-
-                  {/* ISBNs */}
-                  {(product.isbn13 || product.isbn10) && (
-                    <div className="flex flex-wrap gap-3 text-xs text-gray-400 mb-4">
-                      {product.isbn13 && <span>ISBN-13: <span className="font-mono text-gray-600">{product.isbn13}</span></span>}
-                      {product.isbn10 && <span>ISBN-10: <span className="font-mono text-gray-600">{product.isbn10}</span></span>}
+                  {/* Creators — populated by CV enrichment (cv_metadata.creators)
+                      Rendered as "WRITER  Name1, Name2  ·  ARTIST  Name3" rows */}
+                  {orderedCreators.length > 0 && (
+                    <div className="mb-4 space-y-1">
+                      {orderedCreators.slice(0, 4).map(({ role, names }) => (
+                        <div key={role} className="flex items-baseline gap-3 text-sm">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.12em] w-[64px] flex-shrink-0">
+                            {role}
+                          </span>
+                          <span className="text-gray-800">{names.slice(0, 4).join(', ')}{names.length > 4 ? '…' : ''}</span>
+                        </div>
+                      ))}
                     </div>
                   )}
 
-                  {/* Description */}
-                  {product.description && (
-                    <p className="text-gray-600 text-sm leading-relaxed line-clamp-4">
-                      {product.description}
+                  {/* Release + ISBN — compact line */}
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500 mb-4">
+                    {product.releaseDate && (
+                      <span>Released <span className="text-gray-800 font-medium">{fmtDate(product.releaseDate)}</span></span>
+                    )}
+                    {product.isbn13 && (
+                      <span className="text-xs text-gray-400">ISBN <span className="font-mono text-gray-600">{product.isbn13}</span></span>
+                    )}
+                  </div>
+
+                  {/* Description — full text on collected editions (rich CV
+                      synopses unlock here), clamped on single issues to avoid
+                      eating the page. Prefers cv_metadata.synopsis when richer. */}
+                  {displayDescription && (
+                    <p className={`text-gray-700 text-[15px] leading-relaxed ${
+                      isCollectedEdition ? '' : 'line-clamp-4'
+                    }`}>
+                      {displayDescription}
                     </p>
                   )}
 
-                  {/* Character tags — fetched live from Comic Vine when available */}
+                  {/* Character tags — fetched live from Comic Vine */}
                   {product.comicvineId && (
                     <CVCharacterTags comicvineId={product.comicvineId} />
                   )}
@@ -653,80 +690,86 @@ export default async function ProductPage(
               </div>
             </section>
 
-            {/* ── Mobile: related + single issues (below main, lg+ uses sidebar) */}
-            {(related.length > 0 || singleIssues.length > 0) && (
+            {/* ── Section 5: Inside this collection ─────────────────────
+                COLLECTED EDITIONS ONLY. Full-width editorial gallery of every
+                issue this volume reprints. The "umbrella → nested" relationship
+                lives here — large covers (~150 px each), 6 columns on desktop,
+                horizontal scroller on mobile.  CVIssuesGrid resolves its own
+                issue list from CV via the volume id we pass.  Renders nothing
+                if CV returns no issues (silent collapse). */}
+            {isCollectedEdition && (
+              <section className="mb-10">
+                {/* Desktop: 6-col grid. Hidden on mobile (the horizontal
+                    scroller below takes over). */}
+                <div className="hidden md:block">
+                  <CVIssuesGrid
+                    comicvineId={cvVolumeId}
+                    searchTitle={product.seriesName ?? product.title}
+                    productSlug={slug}
+                    comicTitle={product.seriesName ?? product.title}
+                    label="Inside this collection"
+                    columns={6}
+                  />
+                </div>
+                {/* Mobile: same component but 3 columns (wider thumbnails) */}
+                <div className="md:hidden">
+                  <CVIssuesGrid
+                    comicvineId={cvVolumeId}
+                    searchTitle={product.seriesName ?? product.title}
+                    productSlug={slug}
+                    comicTitle={product.seriesName ?? product.title}
+                    label="Inside this collection"
+                    columns={3}
+                  />
+                </div>
+              </section>
+            )}
+
+            {/* ── Mobile: related (below main; lg+ uses sidebar)
+                Issues for collected editions appear in the "Inside this
+                collection" section above, so mobile here only needs related. */}
+            {related.length > 0 && (
               <section className="mb-8 lg:hidden">
-                {related.length > 0 && (
-                  <>
-                    <h2 className="text-lg font-semibold text-[#0A0A0A] mb-4">You might also like</h2>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-                      {related.map(r => (
-                        <Link key={r.id} href={`/product/${r.canonicalSlug}`}
-                          className="group block rounded-xl overflow-hidden bg-white border border-gray-200 hover:border-[#E8272A]/50 hover:shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#E8272A] focus:ring-offset-1">
-                          {r.coverImageUrl ? (
-                            <Image src={r.coverImageUrl} alt={r.title} width={200} height={280}
-                              className="w-full object-cover aspect-[2/3] group-hover:opacity-90 transition-opacity" />
-                          ) : (
-                            <NoCoverPlaceholder className="aspect-[2/3] w-full" />
-                          )}
-                          <div className="p-2.5">
-                            <p className="text-xs font-medium text-gray-900 line-clamp-2 group-hover:text-[#E8272A] transition-colors">{r.title}</p>
-                            {r.publisher && <p className="text-[10px] text-gray-400 mt-0.5">{r.publisher}</p>}
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
-                  </>
-                )}
-                {singleIssues.length > 0 && (
-                  <>
-                    <h2 className="text-lg font-semibold text-[#0A0A0A] mb-4">Issues in this series</h2>
-                    <div className="flex flex-col gap-2">
-                      {singleIssues.slice(0, 8).map(issue => (
-                        <Link key={issue.id} href={`/product/${issue.canonicalSlug}`}
-                          className="group flex items-center gap-3 bg-white rounded-xl border border-gray-200 hover:border-[#E8272A]/50 p-3 transition-all focus:outline-none focus:ring-2 focus:ring-[#E8272A] focus:ring-offset-1">
-                          <div className="flex-shrink-0 w-10 h-14 rounded overflow-hidden bg-gray-100">
-                            {issue.coverImageUrl ? (
-                              <Image src={issue.coverImageUrl} alt={issue.title} width={40} height={56}
-                                className="w-full h-full object-cover group-hover:opacity-90 transition-opacity" />
-                            ) : (
-                              <NoCoverPlaceholder className="w-full h-full" />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 line-clamp-2 group-hover:text-[#E8272A] transition-colors">
-                              {issue.issueNumber ? `#${issue.issueNumber}` : issue.title}
-                            </p>
-                            {issue.releaseDate && (
-                              <p className="text-xs text-gray-400 mt-0.5">
-                                {new Date(issue.releaseDate).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
-                              </p>
-                            )}
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
-                  </>
-                )}
+                <h2 className="text-lg font-semibold text-[#0A0A0A] mb-4">You might also like</h2>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {related.map(r => (
+                    <Link key={r.id} href={`/product/${r.canonicalSlug}`}
+                      className="group block rounded-lg overflow-hidden hover:opacity-95 transition-opacity focus:outline-none focus:ring-2 focus:ring-[#E8272A] focus:ring-offset-1">
+                      <div className="aspect-[2/3] bg-gray-100 rounded-lg overflow-hidden shadow-sm">
+                        {r.coverImageUrl && !isBadCoverUrl(r.coverImageUrl) ? (
+                          <Image src={r.coverImageUrl} alt={r.title} width={200} height={300}
+                            className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-200" />
+                        ) : (
+                          <NoCoverPlaceholder className="w-full h-full" />
+                        )}
+                      </div>
+                      <p className="text-[12px] font-semibold text-gray-900 line-clamp-2 group-hover:text-[#E8272A] transition-colors mt-2 px-0.5">{r.title}</p>
+                      {r.publisher && <p className="text-[10px] text-gray-400 mt-0.5 px-0.5">{r.publisher}</p>}
+                    </Link>
+                  ))}
+                </div>
               </section>
             )}
 
           </div>{/* end main column */}
 
-          {/* ── RIGHT COLUMN: CV issues grid (lg+, always mounted) ──────────────
-              CVIssuesGrid resolves its own volume ID:
-                1. comicvineId from DB (instant)
-                2. Title search via /api/comic/search (fallback — also self-heals DB)
-              Renders nothing when no issues are found, so the column is invisible.
-              Hidden on mobile — related titles appear in the left sidebar instead. */}
-          <div className="hidden lg:block" style={{ position: 'sticky', top: '80px' }}>
-            <CVIssuesGrid
-              comicvineId={cvVolumeId}
-              searchTitle={product.seriesName ?? product.title}
-              productSlug={slug}
-              comicTitle={product.seriesName ?? product.title}
-            />
-          </div>
+          {/* ── RIGHT COLUMN: SINGLE_ISSUE pages only ────────────────────
+              For single-issue product pages, the issues grid is sideways
+              navigation ("more in this series") — sticky narrow panel works.
+              Collected editions don't render this column (their issues are
+              promoted to the full-width "Inside this collection" section). */}
+          {!isCollectedEdition && (
+            <div className="hidden lg:block" style={{ position: 'sticky', top: '80px' }}>
+              <CVIssuesGrid
+                comicvineId={cvVolumeId}
+                searchTitle={product.seriesName ?? product.title}
+                productSlug={slug}
+                comicTitle={product.seriesName ?? product.title}
+                label="More issues in this series"
+                columns={3}
+              />
+            </div>
+          )}
 
         </div>{/* end layout grid */}
 

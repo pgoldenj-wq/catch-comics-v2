@@ -20,6 +20,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react'
+import Image from 'next/image'
 import { isBadCoverUrl, adjustImgSrc as adjustSrc } from '@/lib/images/url-filters'
 
 interface Props {
@@ -28,9 +29,32 @@ interface Props {
   title:       string
   /** Tailwind classes for sizing + shape — applied to the outer container */
   className?:  string
+  /** next/image `sizes` hint for the R2 fast-path. Defaults to 320px. */
+  sizes?:      string
+  /** Render priority for next/image (eager + fetchpriority=high). */
+  priority?:   boolean
 }
 
-export default function CVCoverImage({ dbCoverUrl, comicvineId, title, className }: Props) {
+// next/image is only safe for hosts in next.config.ts → images.remotePatterns.
+// CVCoverImage's src can be R2 (allowlisted), CV (allowlisted), OL (allowlisted),
+// Google Books (allowlisted), or Bookshop (allowlisted) — so all our sources
+// qualify. We still need the raw <img> path for the `naturalWidth ≤ 1` hide
+// trick, because next/image swallows onLoad's currentTarget dimensions and the
+// CV/GB placeholder detection relies on that pixel-level check.
+const NEXT_IMAGE_HOSTS = [
+  'images.catchcomics.com',
+  'r2.dev',
+  'pub-',  // pub-*.r2.dev legacy
+]
+function canUseNextImage(url: string): boolean {
+  return NEXT_IMAGE_HOSTS.some(h => url.includes(h))
+}
+
+export default function CVCoverImage({
+  dbCoverUrl, comicvineId, title, className,
+  sizes = '(min-width: 640px) 320px, 260px',
+  priority = true,
+}: Props) {
   const dbGood         = !isBadCoverUrl(dbCoverUrl)
   const needsLiveFetch = !dbGood && !!comicvineId
 
@@ -76,13 +100,26 @@ export default function CVCoverImage({ dbCoverUrl, comicvineId, title, className
         <span className="text-xs font-medium">No cover</span>
       </div>
 
-      {/* Image — overlays placeholder. Hidden via display:none if it fails or is 1×1 */}
-      {src && (
+      {/* Image — overlays placeholder. Two render paths:
+          • next/image for R2 hosts — gets automatic srcset / optimization,
+            crisp retina output, and webp/avif negotiation
+          • raw <img> for CV / OL / GB / Bookshop — keeps the naturalWidth ≤ 1
+            hide-trick that catches placeholder GIFs from those sources */}
+      {src && canUseNextImage(src) ? (
+        <Image
+          src={src}
+          alt={`Cover of ${title}`}
+          fill
+          sizes={sizes}
+          priority={priority}
+          className="object-cover"
+          unoptimized={false}
+        />
+      ) : src ? (
         <img
           src={src}
           alt={`Cover of ${title}`}
           className="absolute inset-0 w-full h-full object-cover"
-          // fetchpriority="high" equivalent — hint browser to load this early (above the fold)
           loading="eager"
           onLoad={e => {
             const img = e.currentTarget
@@ -90,7 +127,7 @@ export default function CVCoverImage({ dbCoverUrl, comicvineId, title, className
           }}
           onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
         />
-      )}
+      ) : null}
     </div>
   )
 }

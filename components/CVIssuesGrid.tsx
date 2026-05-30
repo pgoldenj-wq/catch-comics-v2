@@ -57,6 +57,17 @@ interface Props {
   productSlug?: string | null
   /** Display title for alt text and the section label. */
   comicTitle: string
+  /** Section header label. Default "Issues in this series". Use
+   *  "Inside this collection" on collected-edition pages where the grid
+   *  represents nested-children rather than sibling-navigation. */
+  label?: string
+  /** Grid columns at the resting layout. 3 for narrow side panel,
+   *  6 for full-width editorial gallery. Default 3. */
+  columns?: number
+  /** Optional callback fired once the issue list is fetched, with the
+   *  total count. Lets the parent surface "Collects N issues" labels
+   *  in the hero block. */
+  onLoaded?: (count: number) => void
 }
 
 export default function CVIssuesGrid({
@@ -64,10 +75,18 @@ export default function CVIssuesGrid({
   searchTitle,
   productSlug,
   comicTitle,
+  label   = 'Issues in this series',
+  columns = 3,
+  onLoaded,
 }: Props) {
   const router = useRouter()
   const [issues, setIssues] = useState<Issue[] | null>(null)
   const fetchedRef = useRef(false)
+  const onLoadedRef = useRef(onLoaded)
+  useEffect(() => { onLoadedRef.current = onLoaded }, [onLoaded])
+  useEffect(() => {
+    if (issues) onLoadedRef.current?.(issues.length)
+  }, [issues])
 
   useEffect(() => {
     // Guard against double-invocation in React StrictMode / dev
@@ -139,10 +158,10 @@ export default function CVIssuesGrid({
     return (
       <div>
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
-          Issues in this series
+          {label}
         </h2>
-        <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-          {[...Array(6)].map((_, i) => (
+        <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}>
+          {[...Array(columns * 2)].map((_, i) => (
             <div key={i} className="animate-pulse">
               <div className="bg-gray-100 rounded-md" style={{ aspectRatio: '2 / 3' }} />
               <div className="h-2.5 bg-gray-100 rounded mt-1.5 w-1/2" />
@@ -161,11 +180,11 @@ export default function CVIssuesGrid({
     <div>
       <div className="flex items-baseline justify-between mb-3">
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
-          Issues in this series
+          {label}
         </h2>
-        <span className="text-xs text-gray-400">{issues.length}</span>
+        <span className="text-xs text-gray-400">{issues.length} issue{issues.length === 1 ? '' : 's'}</span>
       </div>
-      <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+      <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}>
         {issues.map(issue => {
           const rawCover = issue.image?.medium_url || issue.image?.small_url || ''
           const cover    = rawCover && !isBadCoverUrl(rawCover) ? rawCover : ''
