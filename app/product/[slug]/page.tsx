@@ -23,6 +23,7 @@ import Navbar                            from '@/components/Navbar'
 import CVCharacterTags                   from '@/components/CVCharacterTags'
 import CVIssuesGrid                      from '@/components/CVIssuesGrid'
 import CVCoverImage                      from '@/components/CVCoverImage'
+import IssueCountLine                    from '@/components/IssueCountLine'
 import { isBadCoverUrl }                 from '@/lib/images/url-filters'
 
 // ISR: cache each product page for 1 hour, then regenerate in the background.
@@ -440,16 +441,14 @@ export default async function ProductPage(
         </nav>
 
         {/* ── Layout ───────────────────────────────────────────────────────
-            Two-column on collected editions: [260px sidebar] [1fr main]
-              — the issues grid promotes to a full-width section inside main
-            Three-column on single issues:  [260px sidebar] [1fr main] [216px right]
-              — the right column shows "More issues in this series" as side nav
-            grid-template-columns is selected at render time via isCollectedEdition. */}
-        <div className={`max-w-6xl mx-auto px-4 py-4 lg:grid lg:gap-10 lg:items-start ${
-          isCollectedEdition
-            ? 'lg:grid-cols-[260px_1fr]'
-            : 'lg:grid-cols-[260px_1fr_240px]'
-        }`}>
+            Always three columns:
+              [260px LEFT sidebar — You might also like]
+              [1fr   CENTRE/MAIN — hero, pricing, history]
+              [240px RIGHT sidebar — Issues in this series (sticky)]
+            The right column houses the issues gallery as a scrolling side
+            panel for both collected editions ("Inside this collection") and
+            single issues ("More issues in this series"). */}
+        <div className="max-w-6xl mx-auto px-4 py-4 lg:grid lg:gap-10 lg:items-start lg:grid-cols-[260px_1fr_240px]">
 
           {/* ── SIDEBAR (lg+ LEFT rail) ─────────────────────────────────
               "You might also like" — related collected editions / siblings.
@@ -490,12 +489,9 @@ export default async function ProductPage(
                 </div>
               )}
 
-              {/* On COLLECTED-EDITION pages the "Issues in this series" sidebar
-                  panel is removed — those issues are promoted to a full-width
-                  gallery in the main column ("Inside this collection"). The
-                  sidebar would just be a duplicate.  On SINGLE_ISSUE pages
-                  there's no sidebar issues block either — they live in the
-                  right column as a sticky side nav. */}
+              {/* The "Issues in this series" gallery lives in the RIGHT
+                  column (sticky side panel) for all formats. Putting it in
+                  the left sidebar too would just be a duplicate. */}
 
             </div>
           </aside>
@@ -546,6 +542,15 @@ export default async function ProductPage(
                   <h1 className="text-3xl sm:text-4xl font-bold text-[#0A0A0A] leading-tight mb-2">
                     {product.title}
                   </h1>
+
+                  {/* "Collects N issues" — appears on collected editions when
+                      CVIssuesGrid resolves a non-empty issue list. Fetched
+                      client-side to share KV cache with the gallery below. */}
+                  <IssueCountLine
+                    comicvineId={cvVolumeId}
+                    searchTitle={product.seriesName ?? product.title}
+                    enabled={isCollectedEdition}
+                  />
 
                   {product.subtitle && (
                     <p className="text-lg text-gray-500 mb-4">{product.subtitle}</p>
@@ -690,44 +695,10 @@ export default async function ProductPage(
               </div>
             </section>
 
-            {/* ── Section 5: Inside this collection ─────────────────────
-                COLLECTED EDITIONS ONLY. Full-width editorial gallery of every
-                issue this volume reprints. The "umbrella → nested" relationship
-                lives here — large covers (~150 px each), 6 columns on desktop,
-                horizontal scroller on mobile.  CVIssuesGrid resolves its own
-                issue list from CV via the volume id we pass.  Renders nothing
-                if CV returns no issues (silent collapse). */}
-            {isCollectedEdition && (
-              <section className="mb-10">
-                {/* Desktop: 6-col grid. Hidden on mobile (the horizontal
-                    scroller below takes over). */}
-                <div className="hidden md:block">
-                  <CVIssuesGrid
-                    comicvineId={cvVolumeId}
-                    searchTitle={product.seriesName ?? product.title}
-                    productSlug={slug}
-                    comicTitle={product.seriesName ?? product.title}
-                    label="Inside this collection"
-                    columns={6}
-                  />
-                </div>
-                {/* Mobile: same component but 3 columns (wider thumbnails) */}
-                <div className="md:hidden">
-                  <CVIssuesGrid
-                    comicvineId={cvVolumeId}
-                    searchTitle={product.seriesName ?? product.title}
-                    productSlug={slug}
-                    comicTitle={product.seriesName ?? product.title}
-                    label="Inside this collection"
-                    columns={3}
-                  />
-                </div>
-              </section>
-            )}
-
             {/* ── Mobile: related (below main; lg+ uses sidebar)
-                Issues for collected editions appear in the "Inside this
-                collection" section above, so mobile here only needs related. */}
+                The issues gallery itself lives in the right column (lg+ only),
+                so mobile currently shows only related. Mobile gallery is a
+                future-work item if needed. */}
             {related.length > 0 && (
               <section className="mb-8 lg:hidden">
                 <h2 className="text-lg font-semibold text-[#0A0A0A] mb-4">You might also like</h2>
@@ -753,23 +724,22 @@ export default async function ProductPage(
 
           </div>{/* end main column */}
 
-          {/* ── RIGHT COLUMN: SINGLE_ISSUE pages only ────────────────────
-              For single-issue product pages, the issues grid is sideways
-              navigation ("more in this series") — sticky narrow panel works.
-              Collected editions don't render this column (their issues are
-              promoted to the full-width "Inside this collection" section). */}
-          {!isCollectedEdition && (
-            <div className="hidden lg:block" style={{ position: 'sticky', top: '80px' }}>
-              <CVIssuesGrid
-                comicvineId={cvVolumeId}
-                searchTitle={product.seriesName ?? product.title}
-                productSlug={slug}
-                comicTitle={product.seriesName ?? product.title}
-                label="More issues in this series"
-                columns={3}
-              />
-            </div>
-          )}
+          {/* ── RIGHT COLUMN: Issues gallery (sticky side panel) ─────────
+              Always rendered on lg+. Label depends on the product format:
+                - Collected editions  → "Inside this collection"
+                - Single issues       → "More issues in this series"
+              CVIssuesGrid renders nothing on empty/failed CV lookups, so the
+              column silently collapses when there's nothing to show. */}
+          <div className="hidden lg:block" style={{ position: 'sticky', top: '80px' }}>
+            <CVIssuesGrid
+              comicvineId={cvVolumeId}
+              searchTitle={product.seriesName ?? product.title}
+              productSlug={slug}
+              comicTitle={product.seriesName ?? product.title}
+              label={isCollectedEdition ? 'Inside this collection' : 'More issues in this series'}
+              columns={3}
+            />
+          </div>
 
         </div>{/* end layout grid */}
 

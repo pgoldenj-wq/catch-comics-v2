@@ -157,9 +157,11 @@ export default function CVIssuesGrid({
   if (issues === null) {
     return (
       <div>
-        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
-          {label}
-        </h2>
+        {label && (
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
+            {label}
+          </h2>
+        )}
         <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}>
           {[...Array(columns * 2)].map((_, i) => (
             <div key={i} className="animate-pulse">
@@ -176,14 +178,18 @@ export default function CVIssuesGrid({
   if (issues.length === 0) return null
 
   // ── Issue grid ───────────────────────────────────────────────────────────
+  // Header is skipped when label is empty — the caller is providing its own
+  // section-level eyebrow (see app/product/[slug]/page.tsx).
   return (
     <div>
-      <div className="flex items-baseline justify-between mb-3">
-        <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
-          {label}
-        </h2>
-        <span className="text-xs text-gray-400">{issues.length} issue{issues.length === 1 ? '' : 's'}</span>
-      </div>
+      {label && (
+        <div className="flex items-baseline justify-between mb-3">
+          <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
+            {label}
+          </h2>
+          <span className="text-xs text-gray-400">{issues.length} issue{issues.length === 1 ? '' : 's'}</span>
+        </div>
+      )}
       <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}>
         {issues.map(issue => {
           const rawCover = issue.image?.medium_url || issue.image?.small_url || ''

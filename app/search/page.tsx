@@ -828,9 +828,11 @@ function SearchResults() {
                 const fmtStyle = FORMAT_STYLES[fmt]
                 const isbn = comic.isbn13 || comic.isbn10 || ''
                 const issueCount = comic.count_of_issues && comic.count_of_issues > 1 ? `${comic.count_of_issues} issues` : ''
+                // meta line no longer duplicates publisher — it moved to the
+                // FORMAT · PUBLISHER eyebrow below.
                 const meta = isIsbnResult
                   ? [comic.authors?.join(', '), comic.start_year].filter(Boolean).join(' · ')
-                  : [comic.publisher?.name, comic.start_year, issueCount].filter(Boolean).join(' · ')
+                  : [comic.start_year, issueCount].filter(Boolean).join(' · ')
 
                 return (
                   <div
@@ -872,11 +874,13 @@ function SearchResults() {
 
                     {/* Cover frame — 3x zoom on hover. center center origin so the
                         image expands symmetrically toward the viewer, not downward.
-                        CSS transforms don't affect layout flow — the 80×112 footprint
-                        stays fixed; hover:z-50 paints it above adjacent rows. */}
+                        CSS transforms don't affect layout flow — the 100×150
+                        footprint stays fixed; hover:z-50 paints it above adjacent
+                        rows. Resting shadow-sm gives the result row a gallery feel
+                        rather than a spreadsheet feel. */}
                     <div
                       className="transition-transform duration-300 ease-out hover:scale-[3] hover:z-50"
-                      style={{ width: '80px', height: '112px', borderRadius: '6px', background: '#F3F4F6', border: '1px solid #EBEBEB', flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', transformOrigin: 'center center' }}>
+                      style={{ width: '100px', height: '150px', borderRadius: '6px', background: '#F3F4F6', border: '1px solid #EBEBEB', boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.06)', flexShrink: 0, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', transformOrigin: 'center center' }}>
                       <span style={{ color: '#6B7280', fontSize: '26px', fontWeight: 500, position: 'absolute' }}>
                         {comic.name.charAt(0)}
                       </span>
@@ -906,14 +910,18 @@ function SearchResults() {
                         </p>
                       )}
 
-                      {/* Format badge */}
+                      {/* Format eyebrow — replaces the prior chip. Tracked-caps
+                          treatment matching the product-page hero, with publisher
+                          dot-separated. Publisher is no longer also shown in the
+                          meta line above (moved here to avoid duplication). */}
                       <span style={{
-                        display: 'inline-block', fontSize: '10px', fontWeight: 600,
-                        padding: '2px 8px', borderRadius: '999px',
-                        background: isIsbnResult ? '#F3F4F6' : fmtStyle.bg,
-                        color: isIsbnResult ? '#6B7280' : fmtStyle.color,
+                        display: 'inline-block', fontSize: '10px', fontWeight: 700,
+                        color: '#9CA3AF',
+                        textTransform: 'uppercase', letterSpacing: '0.12em',
                       }}>
-                        {isIsbnResult ? 'ISBN Match' : FORMAT_LABELS[fmt]}
+                        {isIsbnResult
+                          ? 'ISBN MATCH'
+                          : `${FORMAT_LABELS[fmt]}${comic.publisher?.name ? ` · ${comic.publisher.name}` : ''}`}
                       </span>
 
                       {/* ISBN — subtle, grey, monospace */}
