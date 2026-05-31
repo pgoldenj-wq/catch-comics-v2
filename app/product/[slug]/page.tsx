@@ -1,13 +1,25 @@
 /**
- * /product/[slug] — Product detail page.
+ * /product/[slug] — Product detail page (v1 redesign 2026-05-30).
  *
- * Server-rendered. Sections:
- *   1. Hero          — cover image, title, series/publisher/format/ISBN
- *   2. Best offer    — cheapest in-stock listing, "View deal" CTA
- *   3. All offers    — OffersTable client component with NEW/USED/ALL tabs
- *   4. Price history — PriceSparkline client component (7+ point threshold)
- *   5. Related       — same series OR same publisher+format (up to 4)
- *   6. SEO           — generateMetadata, JSON-LD, OpenGraph, canonical URL
+ * Three full-width sections, comic-database first:
+ *   Section 1 — Dark hero band (#111827, matches homepage hero): cover
+ *               (160x240/180x270), title, series, "Collects N issues",
+ *               labeled rows for Format / Publisher / Release Date /
+ *               Creators / Status / Character Tags
+ *   Section 2 — Content discovery (white bg, [1fr_320px] grid):
+ *                 LEFT  IssueCarousel — collected-edition issues or
+ *                       sibling issues with "you are here" highlight
+ *                 RIGHT Description (full)
+ *   Section 3 — Pricing + related (off-white #F8F8F6, [1fr_320px] grid):
+ *                 LEFT  Price Comparison heading + Best Price pill,
+ *                       OffersTable (unchanged data), Also Available At,
+ *                       Price History sparkline
+ *                 RIGHT You Might Also Like (cards)
+ *
+ * Sections 2 + 3 share the same grid template so the right sidebar reads
+ * as a continuous column across both.
+ *
+ * Pricing layer, /go redirect, scoring, schema — all untouched.
  */
 
 import type { Metadata }        from 'next'
@@ -21,8 +33,8 @@ import PriceSparkline, { type SparkPoint } from '@/components/PriceSparkline'
 import { lookupByIsbn as lookupAmazon }  from '@/lib/adapters/amazon-rainforest'
 import Navbar                            from '@/components/Navbar'
 import CVCharacterTags                   from '@/components/CVCharacterTags'
-import CVIssuesGrid                      from '@/components/CVIssuesGrid'
 import CVCoverImage                      from '@/components/CVCoverImage'
+import IssueCarousel                     from '@/components/IssueCarousel'
 import IssueCountLine                    from '@/components/IssueCountLine'
 import { isBadCoverUrl }                 from '@/lib/images/url-filters'
 
@@ -426,7 +438,7 @@ export default async function ProductPage(
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      <main className="min-h-screen bg-[#F8F8F6] text-[#0A0A0A]">
+      <main className="min-h-screen bg-white text-[#0A0A0A]">
 
         {/* ── Site header — shared Navbar component ─────────────────────── */}
         <Navbar />
@@ -440,310 +452,347 @@ export default async function ProductPage(
           <span className="text-gray-700 truncate">{product.title}</span>
         </nav>
 
-        {/* ── Layout ───────────────────────────────────────────────────────
-            Always three columns:
-              [260px LEFT sidebar — You might also like]
-              [1fr   CENTRE/MAIN — hero, pricing, history]
-              [240px RIGHT sidebar — Issues in this series (sticky)]
-            The right column houses the issues gallery as a scrolling side
-            panel for both collected editions ("Inside this collection") and
-            single issues ("More issues in this series"). */}
-        <div className="max-w-6xl mx-auto px-4 py-4 lg:grid lg:gap-10 lg:items-start lg:grid-cols-[260px_1fr_240px]">
+        {/* ── SECTION 1: Dark hero band ───────────────────────────────────
+            Full-width band. Background colour #111827 matches the homepage
+            hero card so the brand reads consistently across pages. Subtle
+            red radial glow in the top-right echoes the homepage accent. */}
+        <section className="relative bg-[#111827] text-white overflow-hidden">
+          {/* Soft red glow — same recipe as the homepage hero accent */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -top-20 -right-20 w-[420px] h-[420px]"
+            style={{ background: 'radial-gradient(circle, rgba(232,39,42,0.14) 0%, transparent 65%)' }}
+          />
+          <div className="relative max-w-6xl mx-auto px-4 py-8 sm:py-12">
+            <div className="flex flex-col sm:flex-row gap-6 sm:gap-10 items-start">
 
-          {/* ── SIDEBAR (lg+ LEFT rail) ─────────────────────────────────
-              "You might also like" — related collected editions / siblings.
-              On SINGLE_ISSUE pages, sibling issues live in the right column,
-              not here, so this sidebar shows only related products. */}
-          <aside className="hidden lg:block" aria-label="Related titles">
-            <div className="sticky top-20">
+              {/* Cover — medium-sized */}
+              <div className="flex-shrink-0 mx-auto sm:mx-0">
+                <CVCoverImage
+                  dbCoverUrl={product.coverImageUrl}
+                  comicvineId={product.comicvineId}
+                  title={product.title}
+                  sizes="(min-width: 640px) 180px, 160px"
+                  priority
+                  className="w-[160px] h-[240px] sm:w-[180px] sm:h-[270px] rounded-lg shadow-2xl"
+                />
+              </div>
 
-              {related.length > 0 && (
-                <div className="mb-6">
-                  <h2 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.12em] mb-3 px-1">You might also like</h2>
-                  <div className="flex flex-col">
-                    {related.map(r => (
-                      <Link
-                        key={r.id}
-                        href={`/product/${r.canonicalSlug}`}
-                        className="group flex items-center gap-3.5 rounded-lg px-2 py-2 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-[#E8272A] focus:ring-offset-1"
-                      >
-                        <div className="flex-shrink-0 w-[60px] h-[84px] rounded overflow-hidden bg-gray-100 shadow-sm">
-                          {r.coverImageUrl && !isBadCoverUrl(r.coverImageUrl) ? (
-                            <Image src={r.coverImageUrl} alt={r.title} width={60} height={84}
-                              className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-200" />
-                          ) : (
-                            <NoCoverPlaceholder className="w-full h-full" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[13px] font-semibold text-gray-900 line-clamp-3 group-hover:text-[#E8272A] transition-colors leading-snug">
-                            {r.title}
-                          </p>
-                          {r.publisher && (
-                            <p className="text-[11px] text-gray-400 mt-1">{r.publisher}</p>
-                          )}
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* Metadata column — uniform "Label: value" rows matching the
+                  v1 mockup. Title + series + collects-count sit above the
+                  labeled block as the editorial top of the hero. */}
+              <div className="flex-1 min-w-0">
+                {/* Title */}
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white leading-tight mb-2">
+                  {product.title}
+                </h1>
 
-              {/* The "Issues in this series" gallery lives in the RIGHT
-                  column (sticky side panel) for all formats. Putting it in
-                  the left sidebar too would just be a duplicate. */}
-
-            </div>
-          </aside>
-
-          {/* ── MAIN COLUMN ─────────────────────────────────────────────── */}
-          <div className="min-w-0">
-
-            {/* ── Section 1: Hero ───────────────────────────────────────
-                Editorial hero — large cover (320×480 desktop, 260×390 mobile)
-                anchors the page. Metadata flows right of the cover with format
-                in small-caps tracking, prominent title, then series/publisher/
-                creator credits, then full description. */}
-            <section className="mb-10">
-              <div className="flex flex-col sm:flex-row gap-6 sm:gap-10">
-
-                {/* Cover — bigger than before for editorial weight */}
-                <div className="flex-shrink-0 mx-auto sm:mx-0">
-                  <CVCoverImage
-                    dbCoverUrl={product.coverImageUrl}
-                    comicvineId={product.comicvineId}
-                    title={product.title}
-                    sizes="(min-width: 640px) 320px, 260px"
-                    priority
-                    className="w-[260px] h-[390px] sm:w-[320px] sm:h-[480px] rounded-xl shadow-lg"
-                  />
-                </div>
-
-                {/* Metadata column */}
-                <div className="flex-1 min-w-0">
-                  {/* Format treatment — small-caps tracking, no chip, sits as
-                      eyebrow above the title with publisher dot-separated. */}
-                  <p className="text-[11px] font-bold text-[#E8272A] uppercase tracking-[0.14em] mb-3">
-                    {FORMAT_LABELS[product.format] ?? product.format}
-                    {product.publisher && (
-                      <span className="text-gray-400 font-bold"> · {product.publisher}</span>
-                    )}
-                  </p>
-
-                  {/* Series (when distinct from title) */}
-                  {product.seriesName && product.seriesName !== product.title && (
-                    <p className="text-sm text-gray-500 mb-2">
-                      {product.seriesName}
+                {/* Series subtitle (cleaned of trailing punctuation so a
+                    series_name like "Absolute Batman," renders as
+                    "Absolute Batman · Vol. 2" not "Absolute Batman, · Vol. 2") */}
+                {product.seriesName && product.seriesName !== product.title && (() => {
+                  const cleanSeries = product.seriesName.replace(/[,;:.\s]+$/, '').trim()
+                  return (
+                    <p className="text-sm text-white/60 mb-2">
+                      {cleanSeries}
                       {product.volumeNumber ? ` · Vol. ${product.volumeNumber}` : ''}
                       {product.issueNumber  ? ` · #${product.issueNumber}`      : ''}
                     </p>
+                  )
+                })()}
+
+                {/* "Collects N issues" — dark-bg variant via className prop */}
+                <IssueCountLine
+                  comicvineId={cvVolumeId}
+                  searchTitle={product.seriesName ?? product.title}
+                  enabled={isCollectedEdition}
+                  className="text-[13px] text-white/60 mt-1 mb-5"
+                />
+
+                {/* Labeled metadata rows — uniform "Label: value" format.
+                    Replaces the previous mix of chip + scattered key-values. */}
+                <dl className="space-y-1.5 text-sm">
+                  <LabeledRow label="Format" value={FORMAT_LABELS[product.format] ?? product.format} />
+                  {product.publisher && (
+                    <LabeledRow label="Publisher" value={product.publisher} />
                   )}
-
-                  <h1 className="text-3xl sm:text-4xl font-bold text-[#0A0A0A] leading-tight mb-2">
-                    {product.title}
-                  </h1>
-
-                  {/* "Collects N issues" — appears on collected editions when
-                      CVIssuesGrid resolves a non-empty issue list. Fetched
-                      client-side to share KV cache with the gallery below. */}
-                  <IssueCountLine
-                    comicvineId={cvVolumeId}
-                    searchTitle={product.seriesName ?? product.title}
-                    enabled={isCollectedEdition}
-                  />
-
-                  {product.subtitle && (
-                    <p className="text-lg text-gray-500 mb-4">{product.subtitle}</p>
+                  {product.releaseDate && (
+                    <LabeledRow label="Release Date" value={fmtDate(product.releaseDate)} />
                   )}
-
-                  {/* Creators — populated by CV enrichment (cv_metadata.creators)
-                      Rendered as "WRITER  Name1, Name2  ·  ARTIST  Name3" rows */}
                   {orderedCreators.length > 0 && (
-                    <div className="mb-4 space-y-1">
-                      {orderedCreators.slice(0, 4).map(({ role, names }) => (
-                        <div key={role} className="flex items-baseline gap-3 text-sm">
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.12em] w-[64px] flex-shrink-0">
-                            {role}
-                          </span>
-                          <span className="text-gray-800">{names.slice(0, 4).join(', ')}{names.length > 4 ? '…' : ''}</span>
-                        </div>
-                      ))}
-                    </div>
+                    <LabeledRow label="Creators">
+                      <InlineCreators creators={orderedCreators} />
+                    </LabeledRow>
                   )}
-
-                  {/* Release + ISBN — compact line */}
-                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500 mb-4">
-                    {product.releaseDate && (
-                      <span>Released <span className="text-gray-800 font-medium">{fmtDate(product.releaseDate)}</span></span>
-                    )}
-                    {product.isbn13 && (
-                      <span className="text-xs text-gray-400">ISBN <span className="font-mono text-gray-600">{product.isbn13}</span></span>
-                    )}
-                  </div>
-
-                  {/* Description — full text on collected editions (rich CV
-                      synopses unlock here), clamped on single issues to avoid
-                      eating the page. Prefers cv_metadata.synopsis when richer. */}
-                  {displayDescription && (
-                    <p className={`text-gray-700 text-[15px] leading-relaxed ${
-                      isCollectedEdition ? '' : 'line-clamp-4'
-                    }`}>
-                      {displayDescription}
-                    </p>
-                  )}
-
-                  {/* Character tags — fetched live from Comic Vine */}
+                  <LabeledRow label="Status" value={statusLabel(bestListing)} />
                   {product.comicvineId && (
-                    <CVCharacterTags comicvineId={product.comicvineId} />
+                    <LabeledRow label="Character Tags">
+                      <CVCharacterTags comicvineId={product.comicvineId} darkBg />
+                    </LabeledRow>
                   )}
-                </div>
+                </dl>
               </div>
-            </section>
+            </div>
+          </div>
+        </section>
 
-            {/* ── Section 2: Best offer ───────────────────────────────── */}
-            {bestListing && (
-              <section className="mb-8">
-                <div className="rounded-2xl bg-white border-l-4 border-[#E8272A] shadow-sm p-6">
-                  <p className="text-xs text-[#E8272A] uppercase tracking-widest font-semibold mb-2">
-                    Best price
-                  </p>
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                    <div>
-                      <p className="text-4xl font-bold text-[#0A0A0A]">
-                        {fmtPrice(Number(bestListing.priceAmount), bestListing.priceCurrency)}
-                      </p>
-                      {bestListing.shippingAmount !== null && (
-                        <p className="text-sm text-gray-500 mt-0.5">
-                          {Number(bestListing.shippingAmount) === 0
-                            ? '+ Free shipping'
-                            : `+ ${fmtPrice(Number(bestListing.shippingAmount), bestListing.priceCurrency)} shipping`}
-                        </p>
-                      )}
-                      <p className="text-sm text-gray-500 mt-1">
-                        from <span className="text-gray-800 font-medium">{bestListing.retailer.name}</span>
-                        {' · '}
-                        {bestListing.condition === 'NEW' ? 'New' : bestListing.condition.replace(/_/g, ' ')}
-                      </p>
-                    </div>
-                    <div className="sm:ml-auto">
-                      <a
-                        href={`/go/${bestListing.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer sponsored"
-                        className="inline-block px-6 py-3 rounded-xl bg-[#E8272A] hover:bg-[#c41f22] text-white font-semibold text-base transition-colors focus:outline-none focus:ring-2 focus:ring-[#E8272A] focus:ring-offset-2"
-                      >
-                        Buy at {bestListing.retailer.name} ↗
-                      </a>
-                    </div>
-                  </div>
-                </div>
-              </section>
-            )}
+        {/* ── SECTION 2: Content discovery row ─────────────────────────────
+            White bg. LEFT carousel + RIGHT description / related. lg+ uses a
+            [1fr_320px] grid; mobile stacks (description below carousel). */}
+        <section className="bg-white">
+          <div className="max-w-6xl mx-auto px-4 py-10 sm:py-14">
+            <div className="grid lg:grid-cols-[1fr_320px] gap-10">
 
-            {/* ── Section 3: All offers ───────────────────────────────── */}
-            {/* eBay BIN listings fetched client-side, merged by OffersTable */}
-            <section className="mb-8">
-              <h2 className="text-xl font-semibold text-[#0A0A0A] mb-4">
-                Price comparison
-                <span className="ml-2 text-sm font-normal text-gray-400">
-                  ({offers.length} listing{offers.length !== 1 ? 's' : ''})
-                </span>
-              </h2>
-              <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6">
-                {offers.length === 0 ? (
-                  <p className="text-gray-500 text-sm">No retailer listings tracked yet for this title.</p>
-                ) : null}
-                <OffersTable
-                  offers={offers}
-                  isbn13={product.isbn13 ?? null}
-                  productTitle={product.title}
-                  canonicalProductId={product.id}
+              {/* LEFT — Issue carousel (reuses CVIssuesGrid's data fetch via
+                  the shared useIssueList hook). Label and current-issue
+                  highlight switch by product format. */}
+              <div className="min-w-0">
+                <IssueCarousel
+                  comicvineId={cvVolumeId}
+                  searchTitle={product.seriesName ?? product.title}
+                  productSlug={slug}
+                  comicTitle={product.seriesName ?? product.title}
+                  label={isCollectedEdition ? 'Issues in this collection' : 'Issues in this series'}
+                  currentIssueId={product.format === 'SINGLE_ISSUE' ? product.comicvineId : null}
                 />
               </div>
-            </section>
 
-            {/* ── Section 3c: Also available at (dynamic-link retailers) */}
-            {dynamicLinks.length > 0 && (
-              <section className="mb-8">
-                <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-widest mb-3">
-                  Also available at
+              {/* RIGHT — Description only. "You Might Also Like" lives in
+                  Section 3's right sidebar (matches the mockup which keeps
+                  the 2-column layout flowing through pricing). */}
+              <aside>
+                <h2 className="text-xl font-semibold text-[#0A0A0A] mb-3">
+                  Description
                 </h2>
-                <div className="flex flex-wrap gap-3">
-                  {dynamicLinks.map(l => (
-                    <a
-                      key={l.id}
-                      href={`/go/${l.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer sponsored"
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-gray-200 hover:border-[#E8272A] hover:text-[#E8272A] text-gray-700 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[#E8272A] focus:ring-offset-1"
-                    >
-                      {l.retailer.name}
-                      <span className="text-gray-400 text-xs">Check price ↗</span>
-                    </a>
-                  ))}
-                </div>
-              </section>
-            )}
+                {displayDescription ? (
+                  <p className="text-[14px] text-gray-700 leading-relaxed">
+                    {displayDescription}
+                  </p>
+                ) : (
+                  <p className="text-[13px] text-gray-400 italic">
+                    No description available.
+                  </p>
+                )}
+                {product.isbn13 && (
+                  <p className="mt-3 text-[11px] text-gray-400">
+                    ISBN <span className="font-mono text-gray-600">{product.isbn13}</span>
+                  </p>
+                )}
+              </aside>
 
-            {/* ── Section 4: Price history ────────────────────────────── */}
-            <section className="mb-8">
-              <h2 className="text-xl font-semibold text-[#0A0A0A] mb-4">Price history</h2>
-              <div className="bg-white rounded-xl p-4 border border-gray-200">
-                <Suspense fallback={<div className="h-40 animate-pulse bg-gray-100 rounded" />}>
-                  <PriceSparkline points={sparkPoints} currency={primaryCurrency} />
-                </Suspense>
-              </div>
-            </section>
-
-            {/* ── Mobile: related (below main; lg+ uses sidebar)
-                The issues gallery itself lives in the right column (lg+ only),
-                so mobile currently shows only related. Mobile gallery is a
-                future-work item if needed. */}
-            {related.length > 0 && (
-              <section className="mb-8 lg:hidden">
-                <h2 className="text-lg font-semibold text-[#0A0A0A] mb-4">You might also like</h2>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {related.map(r => (
-                    <Link key={r.id} href={`/product/${r.canonicalSlug}`}
-                      className="group block rounded-lg overflow-hidden hover:opacity-95 transition-opacity focus:outline-none focus:ring-2 focus:ring-[#E8272A] focus:ring-offset-1">
-                      <div className="aspect-[2/3] bg-gray-100 rounded-lg overflow-hidden shadow-sm">
-                        {r.coverImageUrl && !isBadCoverUrl(r.coverImageUrl) ? (
-                          <Image src={r.coverImageUrl} alt={r.title} width={200} height={300}
-                            className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-200" />
-                        ) : (
-                          <NoCoverPlaceholder className="w-full h-full" />
-                        )}
-                      </div>
-                      <p className="text-[12px] font-semibold text-gray-900 line-clamp-2 group-hover:text-[#E8272A] transition-colors mt-2 px-0.5">{r.title}</p>
-                      {r.publisher && <p className="text-[10px] text-gray-400 mt-0.5 px-0.5">{r.publisher}</p>}
-                    </Link>
-                  ))}
-                </div>
-              </section>
-            )}
-
-          </div>{/* end main column */}
-
-          {/* ── RIGHT COLUMN: Issues gallery (sticky side panel) ─────────
-              Always rendered on lg+. Label depends on the product format:
-                - Collected editions  → "Inside this collection"
-                - Single issues       → "More issues in this series"
-              CVIssuesGrid renders nothing on empty/failed CV lookups, so the
-              column silently collapses when there's nothing to show. */}
-          <div className="hidden lg:block" style={{ position: 'sticky', top: '80px' }}>
-            <CVIssuesGrid
-              comicvineId={cvVolumeId}
-              searchTitle={product.seriesName ?? product.title}
-              productSlug={slug}
-              comicTitle={product.seriesName ?? product.title}
-              label={isCollectedEdition ? 'Inside this collection' : 'More issues in this series'}
-              columns={3}
-            />
+            </div>
           </div>
+        </section>
 
-        </div>{/* end layout grid */}
+        {/* ── SECTION 3: Price comparison + You Might Also Like ────────────
+            Same 2-column grid as Section 2 so the right sidebar reads as a
+            continuous column across both sections. LEFT = pricing block,
+            RIGHT = related products. Off-white bg distinguishes pricing
+            from the editorial sections above. OffersTable data layer
+            untouched. */}
+        <section className="bg-[#F8F8F6]">
+          <div className="max-w-6xl mx-auto px-4 py-10 sm:py-14">
+            <div className="grid lg:grid-cols-[1fr_320px] gap-10">
+
+              {/* LEFT — Pricing block */}
+              <div className="min-w-0">
+
+                <div className="flex flex-wrap items-baseline justify-between gap-3 mb-5">
+                  <h2 className="text-2xl font-bold text-[#0A0A0A]">
+                    Price Comparison
+                    <span className="ml-2 text-sm font-normal text-gray-400">
+                      ({offers.length} listing{offers.length !== 1 ? 's' : ''})
+                    </span>
+                  </h2>
+                  {bestListing && <BestPriceBadge />}
+                </div>
+
+                <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6">
+                  {offers.length === 0 ? (
+                    <p className="text-gray-500 text-sm">No retailer listings tracked yet for this title.</p>
+                  ) : null}
+                  <OffersTable
+                    offers={offers}
+                    isbn13={product.isbn13 ?? null}
+                    productTitle={product.title}
+                    canonicalProductId={product.id}
+                  />
+                </div>
+
+                {dynamicLinks.length > 0 && (
+                  <div className="mt-8">
+                    <h3 className="text-[11px] font-bold uppercase tracking-[0.14em] text-gray-400 mb-3">
+                      Also Available At
+                    </h3>
+                    <div className="flex flex-wrap gap-3">
+                      {dynamicLinks.map(l => (
+                        <a
+                          key={l.id}
+                          href={`/go/${l.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer sponsored"
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-gray-200 hover:border-[#E8272A] hover:text-[#E8272A] text-gray-700 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[#E8272A] focus:ring-offset-1"
+                        >
+                          {l.retailer.name}
+                          <span className="text-gray-400 text-xs">Check price ↗</span>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="mt-10">
+                  <h3 className="text-[11px] font-bold uppercase tracking-[0.14em] text-gray-400 mb-3">
+                    Price History
+                  </h3>
+                  <div className="bg-white rounded-xl p-4 border border-gray-200">
+                    <Suspense fallback={<div className="h-40 animate-pulse bg-gray-100 rounded" />}>
+                      <PriceSparkline points={sparkPoints} currency={primaryCurrency} />
+                    </Suspense>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* RIGHT — You Might Also Like */}
+              {related.length > 0 && (
+                <aside>
+                  <h2 className="text-xl font-semibold text-[#0A0A0A] mb-3">
+                    You Might Also Like
+                  </h2>
+                  <div className="flex flex-col gap-3">
+                    {related.slice(0, 3).map(r => (
+                      <RelatedCard key={r.id} r={r} />
+                    ))}
+                  </div>
+                </aside>
+              )}
+
+            </div>
+          </div>
+        </section>
+
 
       </main>
     </>
+  )
+}
+
+// ── Helper components for the v1 redesign hero + sections ───────────────────
+
+/** "Field: value" labeled row used throughout the dark hero metadata block.
+ *  Pass `value` as a string OR drop arbitrary JSX as children. The label
+ *  column is fixed-width on sm+ so values align in a clean column. Label
+ *  weight is full-bold white to match the mockup's contrast level. */
+function LabeledRow({ label, value, children }: {
+  label: string
+  value?: string | null
+  children?: React.ReactNode
+}) {
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3">
+      <dt className="text-white font-bold text-sm sm:w-[120px] sm:flex-shrink-0">
+        {label}:
+      </dt>
+      <dd className="text-white/85 text-sm min-w-0 flex-1">
+        {children ?? value ?? ''}
+      </dd>
+    </div>
+  )
+}
+
+/** Inline creators line — "Writer: [A] Scott Snyder | Artist: [B] Greg Capullo"
+ *  Sits inside a LabeledRow as the value. Avatars are colored initials
+ *  (no real photos in cv_metadata). */
+function InlineCreators({ creators }: { creators: Array<{ role: string; names: string[] }> }) {
+  return (
+    <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1.5">
+      {creators.slice(0, 3).map(({ role, names }, i) => {
+        const primary = names[0] ?? ''
+        const initial = (primary[0] || '?').toUpperCase()
+        const extra   = names.length > 1 ? ` +${names.length - 1}` : ''
+        const hue     = [...primary].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 0) % 360
+        const roleLabel = role.charAt(0).toUpperCase() + role.slice(1)
+        return (
+          <span key={role} className="inline-flex items-center gap-1.5">
+            {i > 0 && <span className="text-white/30 mx-1">|</span>}
+            <span className="text-white/60">{roleLabel}:</span>
+            <span
+              className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold text-white"
+              style={{ background: `hsl(${hue}, 45%, 38%)` }}
+              aria-hidden="true"
+            >
+              {initial}
+            </span>
+            <span className="text-white">{primary}{extra && <span className="text-white/50">{extra}</span>}</span>
+          </span>
+        )
+      })}
+    </span>
+  )
+}
+
+/** Status string derived from the best current listing's stock — fed into
+ *  the LabeledRow as plain text (no chip, no dot, matches mockup spec). */
+function statusLabel(bestListing: { stockStatus: string } | null | undefined): string {
+  switch (bestListing?.stockStatus) {
+    case 'IN_STOCK':     return 'In Stock'
+    case 'LOW_STOCK':    return 'Low Stock'
+    case 'PREORDER':     return 'Pre-order'
+    case 'OUT_OF_STOCK': return 'Out of Stock'
+    default:             return 'Check Availability'
+  }
+}
+
+/** Small card used in the "You Might Also Like" sidebar — cover thumb +
+ *  title + format/publisher line. Inline no-cover SVG to avoid pulling
+ *  the page's local NoCoverPlaceholder. */
+function RelatedCard({ r }: {
+  r: { id: string; title: string; coverImageUrl: string | null; canonicalSlug: string; format: string; publisher: string | null }
+}) {
+  const fmt = FORMAT_LABELS[r.format] ?? r.format
+  return (
+    <Link
+      href={`/product/${r.canonicalSlug}`}
+      className="group flex gap-3 rounded-lg p-2 -mx-2 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-[#E8272A] focus:ring-offset-1"
+    >
+      <div className="flex-shrink-0 w-[56px] h-[80px] rounded overflow-hidden bg-gray-100 shadow-sm">
+        {r.coverImageUrl && !isBadCoverUrl(r.coverImageUrl) ? (
+          <Image
+            src={r.coverImageUrl}
+            alt={r.title}
+            width={56}
+            height={80}
+            className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-200"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-gray-300">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+            </svg>
+          </div>
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-[13px] font-semibold text-gray-900 line-clamp-2 group-hover:text-[#E8272A] transition-colors leading-snug">
+          {r.title}
+        </p>
+        <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-[0.1em] font-medium">
+          {fmt}
+          {r.publisher && <span> · {r.publisher}</span>}
+        </p>
+      </div>
+    </Link>
+  )
+}
+
+/** Red "Best Price" pill for the Price Comparison heading — matches the
+ *  mockup spec exactly: just the label, no embedded price (the price lives
+ *  in the table row beneath, so duplicating it here adds noise). */
+function BestPriceBadge() {
+  return (
+    <span className="inline-flex items-center px-3.5 py-1.5 rounded-full bg-[#E8272A] text-white text-[12px] font-bold uppercase tracking-[0.08em] shadow-sm">
+      Best Price
+    </span>
   )
 }

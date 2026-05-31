@@ -21,9 +21,12 @@ interface Props {
   searchTitle: string | null
   /** Only render on collected editions. Single-issue pages pass false. */
   enabled:     boolean
+  /** Tailwind className for the wrapper. Default suits a light bg; pass
+   *  a dark-bg variant like "text-white/70" for the new dark hero. */
+  className?:  string
 }
 
-export default function IssueCountLine({ comicvineId, searchTitle, enabled }: Props) {
+export default function IssueCountLine({ comicvineId, searchTitle, enabled, className }: Props) {
   const [count, setCount] = useState<number | null>(null)
 
   useEffect(() => {
