@@ -51,3 +51,19 @@ input:focus-visible,
 select:focus-visible {
   outline-offset: 1px;
 }
+
+/* ─── Reduced motion respect ────────────────────────────────────────────────
+   Global safety net for animations / transitions. Components that own bouncy
+   hover behaviour (IssueListGrid) also disable their transform locally, but
+   this catches anything else that uses a `transition:` shorthand without
+   explicit reduced-motion handling. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

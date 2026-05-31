@@ -1,23 +1,22 @@
 /**
  * /product/[slug] — Product detail page (v1 redesign 2026-05-30).
  *
- * Three full-width sections, comic-database first:
- *   Section 1 — Dark hero band (#111827, matches homepage hero): cover
- *               (160x240/180x270), title, series, "Collects N issues",
- *               labeled rows for Format / Publisher / Release Date /
- *               Creators / Status / Character Tags
- *   Section 2 — Content discovery (white bg, [1fr_320px] grid):
- *                 LEFT  IssueCarousel — collected-edition issues or
- *                       sibling issues with "you are here" highlight
- *                 RIGHT Description (full)
- *   Section 3 — Pricing + related (off-white #F8F8F6, [1fr_320px] grid):
- *                 LEFT  Price Comparison heading + Best Price pill,
- *                       OffersTable (unchanged data), Also Available At,
- *                       Price History sparkline
- *                 RIGHT You Might Also Like (cards)
- *
- * Sections 2 + 3 share the same grid template so the right sidebar reads
- * as a continuous column across both.
+ * Layout (v1.1 — 2026-05-30):
+ *   Section 1 — Dark hero band (#111827, matches homepage hero):
+ *                 cover (160x240/180x270), title, series, "Collects N
+ *                 issues", labeled rows for Format / Publisher / Release
+ *                 Date / Creators / Status / Character Tags
+ *   Section 2 — Single 3-column row (md+):
+ *                 LEFT   IssueListGrid — vertical 2-col grid of issue
+ *                        covers, 3x bouncy center-origin hover scale,
+ *                        Next.js <Link> per card
+ *                 CENTRE Price Comparison heading + Best Price pill,
+ *                        OffersTable (unchanged data layer), Also
+ *                        Available At chips, Price History sparkline
+ *                 RIGHT  Description (full) + You Might Also Like cards
+ *               Below 768px: collapses to single column in order
+ *                 pricing → issues → description → related (via Tailwind
+ *                 order- classes).
  *
  * Pricing layer, /go redirect, scoring, schema — all untouched.
  */
@@ -34,7 +33,7 @@ import { lookupByIsbn as lookupAmazon }  from '@/lib/adapters/amazon-rainforest'
 import Navbar                            from '@/components/Navbar'
 import CVCharacterTags                   from '@/components/CVCharacterTags'
 import CVCoverImage                      from '@/components/CVCoverImage'
-import IssueCarousel                     from '@/components/IssueCarousel'
+import IssueListGrid                     from '@/components/IssueListGrid'
 import IssueCountLine                    from '@/components/IssueCountLine'
 import { isBadCoverUrl }                 from '@/lib/images/url-filters'
 
@@ -536,66 +535,36 @@ export default async function ProductPage(
           </div>
         </section>
 
-        {/* ── SECTION 2: Content discovery row ─────────────────────────────
-            White bg. LEFT carousel + RIGHT description / related. lg+ uses a
-            [1fr_320px] grid; mobile stacks (description below carousel). */}
+        {/* ── SECTION 2: Single 3-column content row ────────────────────────
+            Three columns on md+ (768px and above):
+              [240px LEFT  ] IssueListGrid — 2-col vertical issue covers
+              [1fr   CENTRE] Price Comparison + OffersTable + history
+              [320px RIGHT ] Description + You Might Also Like
+
+            Below md: collapses to a single column.  Source order is issues
+            → pricing → description+YMAL, but Tailwind `order-` classes flip
+            mobile to pricing → issues → description → related per spec. */}
         <section className="bg-white">
           <div className="max-w-6xl mx-auto px-4 py-10 sm:py-14">
-            <div className="grid lg:grid-cols-[1fr_320px] gap-10">
+            <div className="md:grid md:grid-cols-[240px_1fr_320px] md:gap-8 md:items-start">
 
-              {/* LEFT — Issue carousel (reuses CVIssuesGrid's data fetch via
-                  the shared useIssueList hook). Label and current-issue
-                  highlight switch by product format. */}
-              <div className="min-w-0">
-                <IssueCarousel
+              {/* LEFT — Issue grid (issues / collects).  order-2 on mobile
+                  so pricing appears first, order-1 on md+ for left column. */}
+              <div className="order-2 md:order-1 min-w-0 mt-10 md:mt-0">
+                <IssueListGrid
                   comicvineId={cvVolumeId}
                   searchTitle={product.seriesName ?? product.title}
                   productSlug={slug}
                   comicTitle={product.seriesName ?? product.title}
-                  label={isCollectedEdition ? 'Issues in this collection' : 'Issues in this series'}
+                  label={isCollectedEdition ? 'Collects Issues' : 'Issues in this series'}
+                  columns={2}
                   currentIssueId={product.format === 'SINGLE_ISSUE' ? product.comicvineId : null}
                 />
               </div>
 
-              {/* RIGHT — Description only. "You Might Also Like" lives in
-                  Section 3's right sidebar (matches the mockup which keeps
-                  the 2-column layout flowing through pricing). */}
-              <aside>
-                <h2 className="text-xl font-semibold text-[#0A0A0A] mb-3">
-                  Description
-                </h2>
-                {displayDescription ? (
-                  <p className="text-[14px] text-gray-700 leading-relaxed">
-                    {displayDescription}
-                  </p>
-                ) : (
-                  <p className="text-[13px] text-gray-400 italic">
-                    No description available.
-                  </p>
-                )}
-                {product.isbn13 && (
-                  <p className="mt-3 text-[11px] text-gray-400">
-                    ISBN <span className="font-mono text-gray-600">{product.isbn13}</span>
-                  </p>
-                )}
-              </aside>
-
-            </div>
-          </div>
-        </section>
-
-        {/* ── SECTION 3: Price comparison + You Might Also Like ────────────
-            Same 2-column grid as Section 2 so the right sidebar reads as a
-            continuous column across both sections. LEFT = pricing block,
-            RIGHT = related products. Off-white bg distinguishes pricing
-            from the editorial sections above. OffersTable data layer
-            untouched. */}
-        <section className="bg-[#F8F8F6]">
-          <div className="max-w-6xl mx-auto px-4 py-10 sm:py-14">
-            <div className="grid lg:grid-cols-[1fr_320px] gap-10">
-
-              {/* LEFT — Pricing block */}
-              <div className="min-w-0">
+              {/* CENTRE — Price Comparison block.  order-1 on mobile (shows
+                  first), order-2 on md+ for centre column. */}
+              <div className="order-1 md:order-2 min-w-0">
 
                 <div className="flex flex-wrap items-baseline justify-between gap-3 mb-5">
                   <h2 className="text-2xl font-bold text-[#0A0A0A]">
@@ -654,19 +623,42 @@ export default async function ProductPage(
 
               </div>
 
-              {/* RIGHT — You Might Also Like */}
-              {related.length > 0 && (
-                <aside>
+              {/* RIGHT — Description + You Might Also Like.  order-3 always
+                  (last on both mobile and desktop). */}
+              <aside className="order-3 mt-10 md:mt-0 space-y-8">
+                <div>
                   <h2 className="text-xl font-semibold text-[#0A0A0A] mb-3">
-                    You Might Also Like
+                    Description
                   </h2>
-                  <div className="flex flex-col gap-3">
-                    {related.slice(0, 3).map(r => (
-                      <RelatedCard key={r.id} r={r} />
-                    ))}
+                  {displayDescription ? (
+                    <p className="text-[14px] text-gray-700 leading-relaxed">
+                      {displayDescription}
+                    </p>
+                  ) : (
+                    <p className="text-[13px] text-gray-400 italic">
+                      No description available.
+                    </p>
+                  )}
+                  {product.isbn13 && (
+                    <p className="mt-3 text-[11px] text-gray-400">
+                      ISBN <span className="font-mono text-gray-600">{product.isbn13}</span>
+                    </p>
+                  )}
+                </div>
+
+                {related.length > 0 && (
+                  <div>
+                    <h2 className="text-xl font-semibold text-[#0A0A0A] mb-3">
+                      You Might Also Like
+                    </h2>
+                    <div className="grid grid-cols-2 md:grid-cols-1 gap-3">
+                      {related.slice(0, 4).map(r => (
+                        <RelatedCard key={r.id} r={r} />
+                      ))}
+                    </div>
                   </div>
-                </aside>
-              )}
+                )}
+              </aside>
 
             </div>
           </div>
