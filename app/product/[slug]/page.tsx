@@ -36,6 +36,7 @@ import CVCoverImage                      from '@/components/CVCoverImage'
 import IssueListGrid                     from '@/components/IssueListGrid'
 import IssueCountLine                    from '@/components/IssueCountLine'
 import { isBadCoverUrl }                 from '@/lib/images/url-filters'
+import { seriesNameToSlug, getSeriesEntry } from '@/lib/series/registry'
 
 // ISR: cache each product page for 1 hour, then regenerate in the background.
 // Switched from force-dynamic (which hit the DB on every request) now that the
@@ -231,6 +232,10 @@ export default async function ProductPage(
   // Collected editions show single issues from the same series in a separate
   // browseable section. Single issues themselves skip this query (returns []).
   const isCollectedEdition = !['SINGLE_ISSUE'].includes(product.format)
+
+  // Series back-link: derive slug from seriesName and check registry
+  const seriesSlug  = product.seriesName ? seriesNameToSlug(product.seriesName) : null
+  const seriesEntry = seriesSlug ? getSeriesEntry(seriesSlug) : null
 
   // CV metadata extraction. Three things we pull out for the editorial hero:
   //   - cv_volume_id: the parent volume for SINGLE_ISSUE products
@@ -511,6 +516,16 @@ export default async function ProductPage(
                 {/* Labeled metadata rows — uniform "Label: value" format.
                     Replaces the previous mix of chip + scattered key-values. */}
                 <dl className="space-y-1.5 text-sm">
+                  {seriesEntry && seriesSlug && (
+                    <LabeledRow label="Series">
+                      <Link
+                        href={`/series/${seriesSlug}`}
+                        className="text-white/85 hover:text-[#E8272A] transition-colors underline underline-offset-2 decoration-white/30 hover:decoration-[#E8272A]"
+                      >
+                        {seriesEntry.displayName}
+                      </Link>
+                    </LabeledRow>
+                  )}
                   <LabeledRow label="Format" value={FORMAT_LABELS[product.format] ?? product.format} />
                   {product.publisher && (
                     <LabeledRow label="Publisher" value={product.publisher} />
