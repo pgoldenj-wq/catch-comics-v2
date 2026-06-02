@@ -1,5 +1,5 @@
 export const metadata = {
-  title: 'Privacy Policy — Catch Comics',
+  title: 'Privacy Policy',
   description: 'How Catch Comics collects, uses, and protects your data.',
 }
 

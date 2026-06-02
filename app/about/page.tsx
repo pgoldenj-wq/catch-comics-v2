@@ -1,5 +1,5 @@
 export const metadata = {
-  title: 'About — Catch Comics',
+  title: 'About',
   description: 'What Catch Comics is and how it works.',
 }
 

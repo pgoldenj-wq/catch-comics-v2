@@ -201,7 +201,7 @@ export async function generateMetadata(
   const image       = product.coverImageUrl
 
   return {
-    title:       `${title} — Catch Comics`,
+    title:       `${title}`,
     description,
     alternates:  { canonical: url },
     openGraph: {

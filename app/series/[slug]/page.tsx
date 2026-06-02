@@ -42,7 +42,7 @@ export async function generateMetadata(
   const url      = `${BASE_URL}/series/${slug}`
 
   return {
-    title:       `${entry.displayName} Reading Order & Complete Buying Guide — Catch Comics`,
+    title:       `${entry.displayName} Reading Order & Complete Buying Guide`,
     description,
     alternates:  { canonical: url },
     openGraph: {

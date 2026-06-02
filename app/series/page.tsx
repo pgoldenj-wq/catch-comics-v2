@@ -15,7 +15,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const url      = `${BASE_URL}/series`
 
   return {
-    title:       `Reading Orders — ${count} Series — Catch Comics`,
+    title:       `Reading Orders — ${count} Series`,
     description: `Complete reading orders and UK price comparison for ${count} comic and manga series. Find the right volume, compare prices across UK retailers.`,
     alternates:  { canonical: url },
     openGraph: {
