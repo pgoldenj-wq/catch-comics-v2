@@ -142,8 +142,9 @@ async function getRelated(
 
   return prisma.canonicalProduct.findMany({
     where: {
-      id:  { not: productId },
-      OR:  orClauses,
+      id:        { not: productId },
+      deletedAt: null,
+      OR:        orClauses,
     },
     select: {
       id:            true,

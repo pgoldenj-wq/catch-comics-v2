@@ -51,6 +51,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Fetch all canonical slugs — ordered by updatedAt so recently-changed
     // products appear near the top of the sitemap (helps crawl prioritisation).
     const products = await prisma.canonicalProduct.findMany({
+      where:   { deletedAt: null },
       select:  { canonicalSlug: true, updatedAt: true },
       orderBy: { updatedAt: 'desc' },
     })
