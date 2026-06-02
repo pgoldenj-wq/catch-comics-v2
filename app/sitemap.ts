@@ -7,8 +7,9 @@
  * Revalidates every 24 hours (ISR). Re-runs on each Vercel deployment.
  */
 
-import type { MetadataRoute } from 'next'
-import { prisma }             from '@/lib/prisma'
+import type { MetadataRoute }             from 'next'
+import { prisma }                          from '@/lib/prisma'
+import { getAllSeriesSlugs }               from '@/lib/series/registry'
 
 export const revalidate = 86_400 // 24 hours
 
@@ -29,6 +30,18 @@ const STATIC_ROUTES: MetadataRoute.Sitemap = [
     changeFrequency:  'weekly',
     priority:         0.8,
   },
+  {
+    url:              `${BASE_URL}/series`,
+    lastModified:     new Date(),
+    changeFrequency:  'weekly',
+    priority:         0.9,
+  },
+  ...getAllSeriesSlugs().map(slug => ({
+    url:              `${BASE_URL}/series/${slug}`,
+    lastModified:     new Date(),
+    changeFrequency:  'weekly' as const,
+    priority:         0.85,
+  })),
 ]
 
 // ── Dynamic product pages ─────────────────────────────────────────────────────
