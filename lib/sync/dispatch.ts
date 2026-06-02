@@ -16,8 +16,12 @@ import { WooCommerceAdapter }  from '@/lib/adapters/woocommerce'
 import { AwinFeedAdapter }     from '@/lib/adapters/awin-feed'
 import type { SyncResult }     from '@/lib/adapters/shared/matching'
 
-// Platforms we skip in the scheduled cron (eBay is queried live; MANUAL is hand-entry).
-export const SKIP_PLATFORMS = new Set(['EBAY', 'MANUAL'])
+// Platforms we skip in the scheduled cron.
+// EBAY: queried live at request time, no batch sync needed.
+// MANUAL: hand-entry only.
+// DIRECT_AFFILIATE / CJ_FEED: no feed adapter implemented — sync throws, creating
+// stuck "running" SyncLog rows. These are synced via dedicated CLI scripts instead.
+export const SKIP_PLATFORMS = new Set(['EBAY', 'MANUAL', 'DIRECT_AFFILIATE', 'CJ_FEED'])
 
 // Default refresh interval in hours, by platform.
 export const DEFAULT_REFRESH_HOURS: Record<string, number> = {

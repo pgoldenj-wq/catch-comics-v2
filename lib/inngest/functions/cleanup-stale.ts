@@ -5,7 +5,8 @@
  *
  *   Pass 1 — OUT_OF_STOCK: mark listings as OUT_OF_STOCK if:
  *     - stock_status is IN_STOCK, LOW_STOCK, or PREORDER
- *     - last_seen_at is more than 7 days ago
+ *     - last_seen_at is more than 30 days ago  (raised from 7 — AWIN/direct feeds
+ *       are synced manually and were being wiped too aggressively)
  *     - not already soft-deleted
  *
  *   Pass 2 — Soft-delete: set deleted_at on listings where:
@@ -21,7 +22,7 @@
 import { inngest }  from '@/lib/inngest/client'
 import { prisma }   from '@/lib/prisma'
 
-const STALE_OOS_DAYS   = 7
+const STALE_OOS_DAYS   = 30
 const SOFT_DELETE_DAYS = 30
 
 function daysAgo(n: number): Date {
@@ -56,7 +57,7 @@ export const cleanupStale = inngest.createFunction(
       }),
     )
 
-    console.log(`[cleanup-stale] marked ${markedOos} listings OUT_OF_STOCK (>7 days stale)`)
+    console.log(`[cleanup-stale] marked ${markedOos} listings OUT_OF_STOCK (>${STALE_OOS_DAYS} days stale)`)
 
     // ── Step 3: soft-delete very old listings ────────────────────────────────
     const { count: softDeleted } = await step.run('soft-delete-old', () =>
