@@ -81,11 +81,12 @@ interface Args {
   reset:    boolean
   dryRun:   boolean
   report:   boolean
+  workerId: 1 | 2   // which worker instance — controls API key and checkpoint file
 }
 
 function parseArgs(): Args {
   const argv = process.argv.slice(2)
-  const args: Args = { limit: 300, priority: 'cover', rateMs: 25000, reset: false, dryRun: false, report: false }
+  const args: Args = { limit: 300, priority: 'cover', rateMs: 25000, reset: false, dryRun: false, report: false, workerId: 1 }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--limit')               args.limit = parseInt(argv[++i] ?? '300', 10)
@@ -97,13 +98,16 @@ function parseArgs(): Args {
     else if (a === '--reset')   args.reset = true
     else if (a === '--dry-run') args.dryRun = true
     else if (a === '--report')  args.report = true
+    else if (a === '--worker-id')               args.workerId = (parseInt(argv[++i] ?? '1', 10) === 2 ? 2 : 1)
+    else if (a.startsWith('--worker-id='))      args.workerId = (parseInt(a.split('=')[1], 10) === 2 ? 2 : 1)
   }
   return args
 }
 
 // ── Checkpoint ────────────────────────────────────────────────────────────────
 
-const CHECKPOINT_PATH = join(__dirname, '.enrich-catalogue-checkpoint.json')
+// Resolved in main() based on --worker-id (default: existing single-worker path for backward compat)
+let CHECKPOINT_PATH = join(__dirname, '.enrich-catalogue-checkpoint.json')
 
 interface Checkpoint {
   startedAt:        string
@@ -142,7 +146,8 @@ function saveCheckpoint(c: Checkpoint) {
 // ── CV API ────────────────────────────────────────────────────────────────────
 
 const CV_BASE = 'https://comicvine.gamespot.com/api'
-const CV_KEY  = process.env.COMIC_VINE_API_KEY
+// Resolved in main() — worker 1 → COMIC_VINE_API_KEY, worker 2 → COMIC_VINE_API_KEY_2
+let CV_KEY: string | undefined = process.env.COMIC_VINE_API_KEY
 
 interface CVImage { small_url?: string; medium_url?: string; original_url?: string; super_url?: string }
 interface CVCreator { id: number; name: string; role: string }
@@ -385,8 +390,26 @@ async function reportProgress() {
 }
 
 async function main() {
-  if (!CV_KEY) { console.error('COMIC_VINE_API_KEY not set'); process.exit(1) }
   const args = parseArgs()
+
+  // ── Worker resolution ────────────────────────────────────────────────────────
+  // Worker 1 (default, no --worker-id): existing behaviour, existing checkpoint path.
+  // Worker 2 (--worker-id 2): uses COMIC_VINE_API_KEY_2 and a separate checkpoint.
+  if (args.workerId === 2) {
+    CV_KEY          = process.env.COMIC_VINE_API_KEY_2
+    CHECKPOINT_PATH = join(__dirname, '.enrich-catalogue-checkpoint-w2.json')
+    console.log('[worker] id=2  key=COMIC_VINE_API_KEY_2  checkpoint=.enrich-catalogue-checkpoint-w2.json')
+  } else {
+    // Worker 1 — no change. CHECKPOINT_PATH already set to the legacy path above.
+    console.log('[worker] id=1  key=COMIC_VINE_API_KEY  checkpoint=.enrich-catalogue-checkpoint.json')
+  }
+
+  if (!CV_KEY) {
+    const varName = args.workerId === 2 ? 'COMIC_VINE_API_KEY_2' : 'COMIC_VINE_API_KEY'
+    console.error(`${varName} not set in environment`)
+    process.exit(1)
+  }
+
   if (args.report) {
     await reportProgress()
     return
@@ -416,6 +439,9 @@ async function main() {
     WHERE comicvine_id IS NULL
       AND deleted_at IS NULL
       ${args.priority === 'cover' ? 'AND cover_image_url IS NULL' : ''}
+      ${args.workerId === 2
+        ? "AND format::text IN ('TPB','HARDCOVER','OTHER')"
+        : ''}
     ORDER BY (format::text IN ('SINGLE_ISSUE','MANGA_VOLUME','OMNIBUS','ABSOLUTE','COMPENDIUM','DELUXE')) DESC,
              (format::text IN ('TPB','HARDCOVER')) DESC,
              (publisher IS NOT NULL) DESC,
@@ -496,6 +522,7 @@ async function main() {
       characters:    Array.isArray(detail.characters) ? detail.characters.map(c => ({ id: c.id, name: c.name })) : [],
       match_sim:     match.similarity,
       enriched_at:   new Date().toISOString(),
+      worker_id:     args.workerId,   // enables per-worker rollback if needed
     }
 
     const newSeriesName = (!p.series_name || p.series_name.trim().length < 2) ? detail.name : p.series_name

@@ -498,8 +498,9 @@ export class ShopifyAdapter {
    * Sync a retailer's entire Shopify catalog into the database.
    *
    * @param retailerId  UUID from the retailers table.
+   * @param maxPages    Optional page cap for controlled tests (default: MAX_PAGES).
    */
-  async syncRetailer(retailerId: string): Promise<SyncResult> {
+  async syncRetailer(retailerId: string, maxPages = MAX_PAGES): Promise<SyncResult> {
     const startedAt = Date.now()
     const syncStart = new Date()
 
@@ -537,6 +538,18 @@ export class ShopifyAdapter {
     const applyComicFilter = syncCfg.comic_filter === true
     let   filteredOut    = 0
 
+    // Tracks whether pagination was aborted early due to a fatal fetch error
+    // (404/403/5xx).  Used in section 4 to suppress lastSyncedAt updates when
+    // the sync did not complete normally — prevents a failed sync from looking
+    // like a successful one in the retailer record.
+    let paginationAborted = false
+
+    // Collects syncConfig fields written during the pagination loop (e.g.
+    // disabled_reason / disabled_at set by the 404 handler).  Merged into
+    // section 4's syncConfig update so they are not silently overwritten by
+    // the old syncCfg spread.
+    let runtimeSyncCfgOverrides: Partial<ShopifySyncConfig> = {}
+
     console.log(
       `[shopify] starting sync for ${domain} (retailer ${retailerId})` +
       (applyComicFilter ? ' [comic_filter=true]' : ''),
@@ -544,7 +557,7 @@ export class ShopifyAdapter {
 
     // ── 2. Paginate /products.json ────────────────────────────────────────────
     paginationLoop:
-    for (let page = 1; page <= MAX_PAGES; page++) {
+    for (let page = 1; page <= maxPages; page++) {
       const url = `https://${domain}/products.json?limit=${PAGE_SIZE}&page=${page}`
 
       let res: Response
@@ -566,18 +579,23 @@ export class ShopifyAdapter {
       // 404 — endpoint removed; mark retailer inactive
       if (res.status === 404) {
         console.warn(`[shopify] 404 on ${domain} — marking retailer inactive`)
+        runtimeSyncCfgOverrides = {
+          ...runtimeSyncCfgOverrides,
+          disabled_reason: 'products.json returned 404 — endpoint removed',
+          disabled_at:     new Date().toISOString(),
+        }
         await prisma.retailer.update({
           where: { id: retailerId },
           data: {
             isActive:  false,
             syncConfig: {
               ...syncCfg,
-              disabled_reason: 'products.json returned 404 — endpoint removed',
-              disabled_at:     new Date().toISOString(),
+              ...runtimeSyncCfgOverrides,
             } satisfies ShopifySyncConfig as unknown as Prisma.InputJsonValue,
           },
         })
         errors.push({ type: 'fetch', message: '404 — retailer marked inactive', context: url })
+        paginationAborted = true
         break paginationLoop
       }
 
@@ -588,13 +606,17 @@ export class ShopifyAdapter {
       // know why syncs are failing.
       if (res.status === 403) {
         console.warn(`[shopify] 403 on ${domain} — /products.json is blocked`)
+        runtimeSyncCfgOverrides = {
+          ...runtimeSyncCfgOverrides,
+          disabled_reason: 'products.json returned 403 — store has blocked the public catalog endpoint',
+          disabled_at:     new Date().toISOString(),
+        }
         await prisma.retailer.update({
           where: { id: retailerId },
           data: {
             syncConfig: {
               ...syncCfg,
-              disabled_reason: 'products.json returned 403 — store has blocked the public catalog endpoint',
-              disabled_at:     new Date().toISOString(),
+              ...runtimeSyncCfgOverrides,
             } satisfies ShopifySyncConfig as unknown as Prisma.InputJsonValue,
           },
         })
@@ -603,6 +625,7 @@ export class ShopifyAdapter {
           message: '403 — /products.json is blocked by this store; sync_config updated',
           context: url,
         })
+        paginationAborted = true
         break paginationLoop
       }
 
@@ -613,6 +636,7 @@ export class ShopifyAdapter {
           context: url,
         })
         // For persistent 5xx after retries, abort this sync run
+        paginationAborted = true
         break paginationLoop
       }
 
@@ -698,7 +722,7 @@ export class ShopifyAdapter {
       }
 
       // Pause between pages to be polite to the store's server
-      if (page < MAX_PAGES && products.length === PAGE_SIZE) {
+      if (page < maxPages && products.length === PAGE_SIZE) {
         await sleep(BETWEEN_PAGE_MS)
       }
     }
@@ -740,12 +764,18 @@ export class ShopifyAdapter {
       }
 
       // ── 5. Update retailer ────────────────────────────────────────────────────
+      // Only advance lastSyncedAt when pagination completed normally — a fatal
+      // fetch error (404/403/5xx) sets paginationAborted and the timestamp must
+      // not be updated, otherwise a failed sync looks like a successful one.
+      // runtimeSyncCfgOverrides carries any fields set during the run (e.g.
+      // disabled_reason) so they are not silently overwritten here.
       await prisma.retailer.update({
         where: { id: retailerId },
         data: {
-          lastSyncedAt: syncStart,
+          ...(!paginationAborted && { lastSyncedAt: syncStart }),
           syncConfig: {
             ...syncCfg,
+            ...runtimeSyncCfgOverrides,
             prev_missing_skus: Array.from(currentMissingSkus),
           } satisfies ShopifySyncConfig as unknown as Prisma.InputJsonValue,
         },

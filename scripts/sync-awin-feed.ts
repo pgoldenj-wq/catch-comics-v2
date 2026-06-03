@@ -107,21 +107,31 @@ function makeSlug(title: string, isbn13: string): string {
     .slice(0, 80) + '-' + isbn13
 }
 
-async function createCanonical(isbn13: string, row: Record<string, string>): Promise<string> {
+async function createCanonical(isbn13: string, row: Record<string, string>): Promise<string | null> {
   const title = (row['product_name'] ?? isbn13).slice(0, 500)
-  const cp = await prisma.canonicalProduct.create({
-    data: {
-      isbn13,
-      title,
-      format        : 'OTHER',
-      canonicalSlug : makeSlug(title, isbn13),
-      publisher     : row['brand']              || null,
-      description   : row['description']        || null,
-      coverImageUrl : row['merchant_image_url'] || row['aw_image_url'] || null,
-    },
-  })
-  canonCache.set(isbn13, cp.id)
-  return cp.id
+  try {
+    const cp = await prisma.canonicalProduct.create({
+      data: {
+        isbn13,
+        title,
+        format        : 'OTHER',
+        canonicalSlug : makeSlug(title, isbn13),
+        publisher     : row['brand']              || null,
+        description   : row['description']        || null,
+        coverImageUrl : row['merchant_image_url'] || row['aw_image_url'] || null,
+      },
+    })
+    canonCache.set(isbn13, cp.id)
+    return cp.id
+  } catch (err: unknown) {
+    // P2002 = unique constraint — ISBN already exists as a soft-deleted canonical.
+    // Skip rather than crash; the listing is omitted for this ISBN.
+    if (err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === 'P2002') {
+      canonCache.set(isbn13, '')  // prevent retrying this ISBN
+      return null
+    }
+    throw err
+  }
 }
 
 // ── Retailer cache ────────────────────────────────────────────────────────────
@@ -206,7 +216,7 @@ async function main() {
   // Parse CSV
   const stats = {
     rows: 0, matched: 0, created: 0, upserted: 0, priced: 0,
-    skippedNoIsbn: 0, skippedNotComics: 0, wouldCreate: 0, skippedNoPrice: 0, errors: 0,
+    skippedNoIsbn: 0, skippedNotComics: 0, skippedNoMatch: 0, wouldCreate: 0, skippedNoPrice: 0, errors: 0,
   }
 
   const parser = parse(body, {
@@ -252,6 +262,7 @@ async function main() {
         continue
       }
       canonicalId = await createCanonical(isbn13, row)
+      if (!canonicalId) { stats.skippedNoMatch++; continue }
       stats.created++
     }
 
