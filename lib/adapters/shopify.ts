@@ -12,7 +12,7 @@
  *
  * Design notes:
  * - Pagination: /products.json?limit=250&page=N, stop on empty array.
- *   Hard cap at MAX_PAGES (100) ≈ 25 000 products.
+ *   Hard cap at MAX_PAGES (150) ≈ 37 500 products.
  * - Rate limiting: 2 s delay between pages; 429/5xx → exponential back-off
  *   (2 s, 4 s, 8 s … max 60 s), up to 3 retries.
  * - Two-consecutive-syncs rule: products missing from a single sync are NOT
@@ -127,7 +127,7 @@ export type { SyncResult, SyncError }
 
 const USER_AGENT          = 'CatchComics/1.0 (+https://catchcomics.com/bot)'
 const PAGE_SIZE           = 250
-const MAX_PAGES           = 100
+const MAX_PAGES           = 150
 const BETWEEN_PAGE_MS     = 2_000
 const MAX_FETCH_RETRIES   = 3
 
