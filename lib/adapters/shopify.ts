@@ -630,6 +630,12 @@ export class ShopifyAdapter {
       }
 
       if (!res.ok) {
+        // Shopify legacy pagination signals "no more pages" with a 400 after all
+        // valid pages have been returned. Treat it as a clean end-of-catalogue when
+        // at least one page already succeeded; only error if this is the very first request.
+        if (res.status === 400 && pagesFetched > 0) {
+          break paginationLoop
+        }
         errors.push({
           type:    'fetch',
           message: `HTTP ${res.status} ${res.statusText}`,
