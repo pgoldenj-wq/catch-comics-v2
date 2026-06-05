@@ -135,11 +135,17 @@ async function getRelated(
   format:     string,
 ) {
   const orClauses: object[] = []
-  if (seriesName) orClauses.push({ seriesName })
-  // Omit publisher+format clause for single issues: it matches all issues from
-  // the same publisher (thousands for DC/Marvel), producing noisy unrelated results.
-  // seriesName alone is sufficient and precise for single issue pages.
-  if (publisher && format !== 'SINGLE_ISSUE') orClauses.push({ publisher, format })
+
+  if (format === 'SINGLE_ISSUE') {
+    // For single issues, skip seriesName (same-series issues are in the left
+    // column; same-series volumes are in "Collected In"). Instead surface
+    // collected editions from the same publisher — different series — for
+    // genuine discovery (e.g., Absolute Superman for an AB reader).
+    if (publisher) orClauses.push({ publisher, format: { notIn: ['SINGLE_ISSUE'] } })
+  } else {
+    if (seriesName) orClauses.push({ seriesName })
+    if (publisher)  orClauses.push({ publisher, format })
+  }
 
   if (orClauses.length === 0) return []
 
@@ -148,6 +154,10 @@ async function getRelated(
       id:        { not: productId },
       deletedAt: null,
       OR:        orClauses,
+      // For single issues: exclude same-series volumes already in "Collected In"
+      ...(format === 'SINGLE_ISSUE' && seriesName
+        ? { NOT: { seriesName } }
+        : {}),
     },
     select: {
       id:            true,
@@ -205,6 +215,7 @@ async function getCollectedEditions(productId: string, seriesName: string | null
       title:         true,
       canonicalSlug: true,
       format:        true,
+      coverImageUrl: true,
       listings: {
         where: {
           deletedAt  : null,
@@ -231,7 +242,7 @@ async function getSiblingIssues(
 ) {
   if (!seriesName || !releaseDate) return { prev: null, next: null }
   const base = { seriesName, format: 'SINGLE_ISSUE', deletedAt: null, id: { not: productId } } as const
-  const sel  = { canonicalSlug: true, issueNumber: true, title: true } as const
+  const sel  = { canonicalSlug: true, issueNumber: true, title: true, coverImageUrl: true } as const
   const [prev, next] = await Promise.all([
     prisma.canonicalProduct.findFirst({
       where:   { ...base, releaseDate: { lt: releaseDate } },
@@ -717,28 +728,27 @@ export default async function ProductPage(
                   sticky navbar (h-20 = 80px). */}
               <div id="price-comparison" className="order-1 md:order-2 min-w-0 scroll-mt-20">
 
-                {/* Single-issue only: prev/next navigation between adjacent issues.
-                    Derived from releaseDate — no extra queries when siblings are null. */}
-                {!isCollectedEdition && (siblingIssues.prev || siblingIssues.next) && (
-                  <PrevNextNav prev={siblingIssues.prev} next={siblingIssues.next} />
-                )}
-
                 <div className="mb-5">
                   <h2 className="text-2xl font-bold text-[#0A0A0A]">
                     Price Comparison
-                    <span className="ml-2 text-sm font-normal text-gray-400">
-                      ({offers.length} listing{offers.length !== 1 ? 's' : ''})
-                    </span>
+                    {/* Only show count when SSR-tracked retailer listings exist.
+                        When offers.length === 0, eBay marketplace rows may still
+                        load client-side — hiding (0) avoids a confusing mismatch. */}
+                    {offers.length > 0 && (
+                      <span className="ml-2 text-sm font-normal text-gray-400">
+                        ({offers.length} listing{offers.length !== 1 ? 's' : ''})
+                      </span>
+                    )}
                   </h2>
-                  {/* T1-G: Removed BestPriceBadge — the hero now shows the best
-                      price (T1-A) and the table badge marks it inline. One signal,
-                      one location, one colour. */}
+                  {/* Single-issue only: prev/next navigation sits below the heading so
+                      all three column headings (Issues / Price Comparison / Description)
+                      stay vertically aligned at the top of Section 2. */}
+                  {!isCollectedEdition && (siblingIssues.prev || siblingIssues.next) && (
+                    <PrevNextNav prev={siblingIssues.prev} next={siblingIssues.next} />
+                  )}
                 </div>
 
                 <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6">
-                  {offers.length === 0 ? (
-                    <p className="text-gray-500 text-sm">No retailer listings tracked yet for this title.</p>
-                  ) : null}
                   <OffersTable
                     offers={offers}
                     isbn13={product.isbn13 ?? null}
@@ -820,7 +830,9 @@ export default async function ProductPage(
                 {related.length > 0 && (
                   <div>
                     <h2 className="text-xl font-semibold text-[#0A0A0A] mb-3">
-                      {isCollectedEdition ? 'You Might Also Like' : 'More in this series'}
+                      {isCollectedEdition
+                        ? 'You might also like'
+                        : (product.publisher ? `More from ${product.publisher}` : 'You might also like')}
                     </h2>
                     <div className="grid grid-cols-2 md:grid-cols-1 gap-3">
                       {related.slice(0, 4).map(r => (
@@ -952,50 +964,78 @@ function RelatedCard({ r }: {
 // ── Single-issue-specific components ────────────────────────────────────────
 
 /** Prev/Next navigation between adjacent single issues in the same series.
- *  Placed above the Price Comparison heading so it's visible without scrolling.
- *  Uses releaseDate-ordered siblings from getSiblingIssues(). */
+ *  Styled as bordered pill cards with cover thumbnail so they feel like
+ *  comic-native navigation, not generic text links. */
 function PrevNextNav({ prev, next }: {
-  prev: { canonicalSlug: string; issueNumber: string | null; title: string } | null
-  next: { canonicalSlug: string; issueNumber: string | null; title: string } | null
+  prev: { canonicalSlug: string; issueNumber: string | null; title: string; coverImageUrl: string | null } | null
+  next: { canonicalSlug: string; issueNumber: string | null; title: string; coverImageUrl: string | null } | null
 }) {
-  const prevLabel = prev?.issueNumber ? `Issue #${prev.issueNumber}` : prev?.title ?? ''
-  const nextLabel = next?.issueNumber ? `Issue #${next.issueNumber}` : next?.title ?? ''
+  const prevNum  = prev?.issueNumber ? `Issue #${prev.issueNumber}` : prev?.title ?? ''
+  const nextNum  = next?.issueNumber ? `Issue #${next.issueNumber}` : next?.title ?? ''
+  const hasCovers = (prev?.coverImageUrl && !isBadCoverUrl(prev.coverImageUrl))
+                 || (next?.coverImageUrl && !isBadCoverUrl(next.coverImageUrl))
+
   return (
     <nav
-      className="flex items-center justify-between mb-5 text-sm gap-3"
+      className="flex items-stretch gap-2 mt-3"
       aria-label="Issue navigation"
     >
       {prev ? (
         <Link
           href={`/product/${prev.canonicalSlug}`}
-          className="flex items-center gap-1.5 text-gray-500 hover:text-[#E8272A] transition-colors group min-w-0"
+          className="group flex items-center gap-2.5 flex-1 min-w-0 px-3 py-2 rounded-lg border border-gray-200 hover:border-[#E8272A] hover:bg-red-50/30 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#E8272A]"
+          aria-label={`Previous issue: ${prevNum}`}
         >
-          <span aria-hidden="true" className="text-gray-400 group-hover:text-[#E8272A] shrink-0">←</span>
-          <span className="group-hover:underline underline-offset-2 truncate">{prevLabel}</span>
+          <span aria-hidden="true" className="text-gray-400 group-hover:text-[#E8272A] transition-colors shrink-0 text-base">←</span>
+          {prev.coverImageUrl && !isBadCoverUrl(prev.coverImageUrl) && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={prev.coverImageUrl}
+              alt=""
+              className="w-7 h-10 object-cover rounded shrink-0 opacity-80 group-hover:opacity-100 transition-opacity"
+            />
+          )}
+          <div className="min-w-0">
+            <p className="text-[10px] text-gray-400 uppercase tracking-wide font-medium leading-none mb-0.5">Previous</p>
+            <p className="text-[12px] font-semibold text-gray-700 group-hover:text-[#E8272A] transition-colors truncate">{prevNum}</p>
+          </div>
         </Link>
-      ) : <span />}
+      ) : <span className="flex-1" />}
       {next ? (
         <Link
           href={`/product/${next.canonicalSlug}`}
-          className="flex items-center gap-1.5 text-gray-500 hover:text-[#E8272A] transition-colors group ml-auto min-w-0"
+          className="group flex items-center gap-2.5 flex-1 min-w-0 px-3 py-2 rounded-lg border border-gray-200 hover:border-[#E8272A] hover:bg-red-50/30 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#E8272A] justify-end text-right"
+          aria-label={`Next issue: ${nextNum}`}
         >
-          <span className="group-hover:underline underline-offset-2 truncate">{nextLabel}</span>
-          <span aria-hidden="true" className="text-gray-400 group-hover:text-[#E8272A] shrink-0">→</span>
+          <div className="min-w-0">
+            <p className="text-[10px] text-gray-400 uppercase tracking-wide font-medium leading-none mb-0.5">Next</p>
+            <p className="text-[12px] font-semibold text-gray-700 group-hover:text-[#E8272A] transition-colors truncate">{nextNum}</p>
+          </div>
+          {next.coverImageUrl && !isBadCoverUrl(next.coverImageUrl) && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={next.coverImageUrl}
+              alt=""
+              className="w-7 h-10 object-cover rounded shrink-0 opacity-80 group-hover:opacity-100 transition-opacity"
+            />
+          )}
+          <span aria-hidden="true" className="text-gray-400 group-hover:text-[#E8272A] transition-colors shrink-0 text-base">→</span>
         </Link>
       ) : null}
     </nav>
   )
 }
 
-/** "Collected In" module — shows volumes/omnibuses that collect this issue,
- *  with the lowest tracked price per edition. Placed in the right column.
- *  Empty state: component not rendered (caller checks editions.length > 0). */
+/** "Collected In" module — shows volumes/omnibuses that collect this issue.
+ *  Cover thumbnail + title + lowest tracked price. "Out of stock" is not
+ *  surfaced — price is always a useful reference even when OOS. */
 function CollectedInModule({ editions }: {
   editions: Array<{
     id:            string
     title:         string
     canonicalSlug: string
     format:        string
+    coverImageUrl: string | null
     listings:      Array<{ priceAmount: unknown; priceCurrency: string; stockStatus: string }>
   }>
 }) {
@@ -1004,21 +1044,36 @@ function CollectedInModule({ editions }: {
       <h2 className="text-xl font-semibold text-[#0A0A0A] mb-3">Collected in</h2>
       <div className="space-y-2">
         {editions.map(e => {
-          const listing     = e.listings[0] ?? null
-          const price       = listing ? Number(listing.priceAmount) : null
-          const isInStock   = listing?.stockStatus === 'IN_STOCK' || listing?.stockStatus === 'LOW_STOCK'
-          const fmtLabel    = FORMAT_LABELS[e.format] ?? e.format
-          const priceText   = price !== null
+          const listing   = e.listings[0] ?? null
+          const price     = listing ? Number(listing.priceAmount) : null
+          const fmtLabel  = FORMAT_LABELS[e.format] ?? e.format
+          const priceText = price !== null
             ? new Intl.NumberFormat('en-GB', { style: 'currency', currency: listing!.priceCurrency, maximumFractionDigits: 2 }).format(price)
             : null
+          const hasCover  = e.coverImageUrl && !isBadCoverUrl(e.coverImageUrl)
 
           return (
             <Link
               key={e.id}
               href={`/product/${e.canonicalSlug}`}
-              className="group flex items-center justify-between gap-3 p-3 rounded-lg border border-gray-200 hover:border-[#E8272A] hover:bg-gray-50 transition-all focus:outline-none focus:ring-2 focus:ring-[#E8272A] focus:ring-offset-1"
+              className="group flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-[#E8272A] hover:bg-gray-50 transition-all focus:outline-none focus:ring-2 focus:ring-[#E8272A] focus:ring-offset-1"
             >
-              <div className="min-w-0">
+              {/* Cover thumbnail */}
+              <div className="cover-card-sm w-10 h-14 rounded overflow-hidden bg-gray-100 shrink-0">
+                {hasCover ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={e.coverImageUrl!} alt="" className="w-full h-full object-cover" /* eslint-disable-line @next/next/no-img-element */ />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-300">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+                      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                    </svg>
+                  </div>
+                )}
+              </div>
+
+              {/* Metadata */}
+              <div className="flex-1 min-w-0">
                 <p className="text-[13px] font-semibold text-gray-900 group-hover:text-[#E8272A] transition-colors leading-snug line-clamp-2">
                   {e.title}
                 </p>
@@ -1026,20 +1081,17 @@ function CollectedInModule({ editions }: {
                   {fmtLabel}
                 </p>
               </div>
+
+              {/* Price — shown always; omit stock status to avoid negative signals */}
               <div className="text-right shrink-0">
                 {priceText ? (
-                  <>
-                    <p className={`text-[13px] font-semibold ${isInStock ? 'text-[#E8272A]' : 'text-gray-500'}`}>
-                      From {priceText}
-                    </p>
-                    {!isInStock && (
-                      <p className="text-[10px] text-gray-400">out of stock</p>
-                    )}
-                  </>
+                  <p className="text-[13px] font-semibold text-gray-700 group-hover:text-[#E8272A] transition-colors">
+                    {priceText}
+                  </p>
                 ) : (
-                  <p className="text-[12px] text-gray-400">Check price</p>
+                  <p className="text-[12px] text-gray-400">Check</p>
                 )}
-                <span className="text-gray-300 group-hover:text-[#E8272A] text-xs transition-colors">→</span>
+                <span className="text-gray-300 group-hover:text-[#E8272A] text-xs transition-colors" aria-hidden="true">→</span>
               </div>
             </Link>
           )

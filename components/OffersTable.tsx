@@ -325,7 +325,9 @@ export default function OffersTable({ offers, isbn13, productTitle, canonicalPro
                       {o.isMarketplace
                         ? o.condition
                         : (CONDITION_LABELS[o.condition] ?? o.condition)}
-                      {o.conditionDetail && (
+                      {/* Never show seller usernames/ratings in the condition
+                          column — they belong to the marketplace label, not here */}
+                      {o.conditionDetail && !o.isMarketplace && (
                         <span className="block text-xs text-gray-400">{o.conditionDetail}</span>
                       )}
                     </span>
