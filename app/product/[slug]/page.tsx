@@ -694,6 +694,22 @@ export default async function ProductPage(
           </div>
         </section>
 
+        {/* ── Issue navigation strip (single issues only) ──────────────────
+            Sits between the hero and the three-column content area so that
+            keyboard / screen-reader focus order is:
+              hero → issue navigation → Section 2 content
+
+            Full-width band with max-w-6xl inner wrapper to match Section 2.
+            Only rendered when prev or next sibling exists. Never shown on
+            collected edition pages. */}
+        {!isCollectedEdition && (siblingIssues.prev || siblingIssues.next) && (
+          <div className="bg-gray-50 border-y border-gray-100">
+            <div className="max-w-6xl mx-auto px-4 py-3">
+              <PrevNextNav prev={siblingIssues.prev} next={siblingIssues.next} />
+            </div>
+          </div>
+        )}
+
         {/* ── SECTION 2: Single 3-column content row ────────────────────────
             Three columns on md+ (768px and above):
               [240px LEFT  ] IssueListGrid — 2-col vertical issue covers
@@ -740,12 +756,6 @@ export default async function ProductPage(
                       </span>
                     )}
                   </h2>
-                  {/* Single-issue only: prev/next navigation sits below the heading so
-                      all three column headings (Issues / Price Comparison / Description)
-                      stay vertically aligned at the top of Section 2. */}
-                  {!isCollectedEdition && (siblingIssues.prev || siblingIssues.next) && (
-                    <PrevNextNav prev={siblingIssues.prev} next={siblingIssues.next} />
-                  )}
                 </div>
 
                 <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6">
