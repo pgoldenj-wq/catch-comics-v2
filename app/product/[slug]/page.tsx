@@ -374,6 +374,13 @@ export default async function ProductPage(
 
   const primaryCurrency = bestListing?.priceCurrency ?? (allListings[0]?.priceCurrency ?? 'GBP')
 
+  // T1-A: Show best price in hero only when the listing is fresh, in-stock,
+  // and not stale. Guards against surfacing an outdated price prominently.
+  const STALE_MS = 30 * 24 * 60 * 60 * 1000
+  const showHeroPrice = bestListing != null
+    && IN_STOCK_STATUSES.has(bestListing.stockStatus)
+    && (Date.now() - new Date(bestListing.lastSeenAt).getTime()) < STALE_MS
+
   // ── JSON-LD ──────────────────────────────────────────────────────────────
   // Using @type: Book (not Product) because:
   //   1. Comics/graphic novels/manga are ISBNed books — semantically correct
@@ -426,7 +433,7 @@ export default async function ProductPage(
 
   // ── No-cover SVG placeholder ────────────────────────────────────────────────
   const NoCoverPlaceholder = ({ className }: { className?: string }) => (
-    <div className={`flex flex-col items-center justify-center gap-2 bg-gray-100 text-gray-400 ${className ?? ''}`}>
+    <div className={`flex flex-col items-center justify-center gap-2 bg-[#1f2937] text-white/30 ${className ?? ''}`}>
       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
         <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
@@ -443,18 +450,18 @@ export default async function ProductPage(
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      <main className="min-h-screen bg-white text-[#0A0A0A]">
+      <main className="min-h-screen bg-white text-[#0A0A0A]" style={{ scrollBehavior: 'smooth' }}>
 
         {/* ── Site header — shared Navbar component ─────────────────────── */}
         <Navbar />
 
         {/* ── Breadcrumb ─────────────────────────────────────────────────── */}
+        {/* T1-L: Removed broken "/search" crumb — /search with no query is an
+            empty result. "Home / [Title]" is honest and sufficient. */}
         <nav className="max-w-6xl mx-auto px-4 pt-4 pb-2 text-sm text-gray-500" aria-label="Breadcrumb">
           <Link href="/" className="hover:text-[#E8272A] transition-colors">Home</Link>
           <span className="mx-2 text-gray-300">/</span>
-          <Link href="/search" className="hover:text-[#E8272A] transition-colors">Search</Link>
-          <span className="mx-2 text-gray-300">/</span>
-          <span className="text-gray-700 truncate">{product.title}</span>
+          <span className="text-gray-700">{product.title}</span>
         </nav>
 
         {/* ── SECTION 1: Dark hero band ───────────────────────────────────
@@ -469,17 +476,20 @@ export default async function ProductPage(
             style={{ background: 'radial-gradient(circle, rgba(232,39,42,0.14) 0%, transparent 65%)' }}
           />
           <div className="relative max-w-6xl mx-auto px-4 py-8 sm:py-12">
-            <div className="flex flex-col sm:flex-row gap-6 sm:gap-10 items-start">
+            {/* T1-B: Always flex-row. Mobile cover is 90×135 (thumbnail beside title)
+                which brings the OffersTable near the fold. sm+ restores the larger
+                180×270 editorial cover. */}
+            <div className="flex flex-row gap-4 sm:gap-10 items-start">
 
-              {/* Cover — medium-sized */}
-              <div className="flex-shrink-0 mx-auto sm:mx-0">
+              {/* Cover — compact on mobile, editorial on sm+ */}
+              <div className="flex-shrink-0">
                 <CVCoverImage
                   dbCoverUrl={product.coverImageUrl}
                   comicvineId={product.comicvineId}
                   title={product.title}
-                  sizes="(min-width: 640px) 180px, 160px"
+                  sizes="(min-width: 640px) 180px, 90px"
                   priority
-                  className="w-[160px] h-[240px] sm:w-[180px] sm:h-[270px] rounded-lg shadow-2xl"
+                  className="w-[90px] h-[135px] sm:w-[180px] sm:h-[270px] rounded-md sm:rounded-lg shadow-lg sm:shadow-2xl"
                 />
               </div>
 
@@ -488,7 +498,7 @@ export default async function ProductPage(
                   labeled block as the editorial top of the hero. */}
               <div className="flex-1 min-w-0">
                 {/* Title */}
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white leading-tight mb-2">
+                <h1 className="text-xl sm:text-3xl lg:text-4xl font-bold text-white leading-tight mb-2">
                   {product.title}
                 </h1>
 
@@ -511,39 +521,80 @@ export default async function ProductPage(
                   comicvineId={cvVolumeId}
                   searchTitle={product.seriesName ?? product.title}
                   enabled={isCollectedEdition}
-                  className="text-[13px] text-white/60 mt-1 mb-5"
+                  className="text-[13px] text-white/60 mt-1 mb-3"
                 />
 
+                {/* T1-A: Hero price anchor — answers "how much?" above the fold.
+                    Only shown when bestListing is fresh, in-stock, and not stale.
+                    Links to #price-comparison for smooth jump to the full table. */}
+                {showHeroPrice && (
+                  <a
+                    href="#price-comparison"
+                    className="inline-flex items-baseline gap-2 mb-4 group w-fit"
+                  >
+                    <span className="text-xl sm:text-2xl font-bold text-white tabular-nums">
+                      {fmtPrice(Number(bestListing!.priceAmount), bestListing!.priceCurrency)}
+                    </span>
+                    <span className="text-xs text-white/60 group-hover:text-[#E8272A] transition-colors">
+                      at {bestListing!.retailer.name} ↗
+                    </span>
+                  </a>
+                )}
+
                 {/* Labeled metadata rows — uniform "Label: value" format.
-                    Replaces the previous mix of chip + scattered key-values. */}
+                    T1-B: Publisher, Creators and Character Tags hidden on mobile
+                    (< sm) to reduce hero height and bring pricing near fold.
+                    T1-J: Series row shows plain text fallback when not in registry. */}
                 <dl className="space-y-1.5 text-sm">
-                  {seriesEntry && seriesSlug && (
+                  {/* T1-J: Show series for all products that have seriesName.
+                      Linked when a registry entry exists; plain text otherwise. */}
+                  {product.seriesName && (
                     <LabeledRow label="Series">
-                      <Link
-                        href={`/series/${seriesSlug}`}
-                        className="text-white/85 hover:text-[#E8272A] transition-colors underline underline-offset-2 decoration-white/30 hover:decoration-[#E8272A]"
-                      >
-                        {seriesEntry.displayName}
-                      </Link>
+                      {seriesEntry && seriesSlug ? (
+                        <Link
+                          href={`/series/${seriesSlug}`}
+                          className="text-white/85 hover:text-[#E8272A] transition-colors underline underline-offset-2 decoration-white/30 hover:decoration-[#E8272A]"
+                        >
+                          {seriesEntry.displayName}
+                        </Link>
+                      ) : (
+                        <span className="text-white/70">
+                          {product.seriesName.replace(/[,;:.\s]+$/, '').trim()}
+                        </span>
+                      )}
                     </LabeledRow>
                   )}
                   <LabeledRow label="Format" value={FORMAT_LABELS[product.format] ?? product.format} />
+                  {/* T1-B: Publisher hidden on mobile — Format + Status are the
+                      decision-critical signals; Publisher is supplementary. */}
                   {product.publisher && (
-                    <LabeledRow label="Publisher" value={product.publisher} />
+                    <div className="hidden sm:block">
+                      <LabeledRow label="Publisher" value={product.publisher} />
+                    </div>
                   )}
                   {product.releaseDate && (
                     <LabeledRow label="Release Date" value={fmtDate(product.releaseDate)} />
                   )}
+                  {/* T1-B: Creators hidden on mobile — complex multi-role display
+                      takes significant vertical space; visible on sm+ only. */}
                   {orderedCreators.length > 0 && (
-                    <LabeledRow label="Creators">
-                      <InlineCreators creators={orderedCreators} />
-                    </LabeledRow>
+                    <div className="hidden sm:block">
+                      <LabeledRow label="Creators">
+                        <InlineCreators creators={orderedCreators} />
+                      </LabeledRow>
+                    </div>
                   )}
                   <LabeledRow label="Status" value={statusLabel(bestListing)} />
+                  {/* T1-B + T1-I: Character Tags hidden on mobile (async chips
+                      add scroll debt); min-h prevents layout shift during hydration. */}
                   {product.comicvineId && (
-                    <LabeledRow label="Character Tags">
-                      <CVCharacterTags comicvineId={product.comicvineId} darkBg />
-                    </LabeledRow>
+                    <div className="hidden sm:block">
+                      <LabeledRow label="Character Tags">
+                        <div className="min-h-[28px]">
+                          <CVCharacterTags comicvineId={product.comicvineId} darkBg />
+                        </div>
+                      </LabeledRow>
+                    </div>
                   )}
                 </dl>
               </div>
@@ -579,17 +630,22 @@ export default async function ProductPage(
               </div>
 
               {/* CENTRE — Price Comparison block.  order-1 on mobile (shows
-                  first), order-2 on md+ for centre column. */}
-              <div className="order-1 md:order-2 min-w-0">
+                  first), order-2 on md+ for centre column.
+                  T1-A: id="price-comparison" is the anchor target from the hero
+                  price link. scroll-mt-20 keeps the heading clear of the
+                  sticky navbar (h-20 = 80px). */}
+              <div id="price-comparison" className="order-1 md:order-2 min-w-0 scroll-mt-20">
 
-                <div className="flex flex-wrap items-baseline justify-between gap-3 mb-5">
+                <div className="mb-5">
                   <h2 className="text-2xl font-bold text-[#0A0A0A]">
                     Price Comparison
                     <span className="ml-2 text-sm font-normal text-gray-400">
                       ({offers.length} listing{offers.length !== 1 ? 's' : ''})
                     </span>
                   </h2>
-                  {bestListing && <BestPriceBadge />}
+                  {/* T1-G: Removed BestPriceBadge — the hero now shows the best
+                      price (T1-A) and the table badge marks it inline. One signal,
+                      one location, one colour. */}
                 </div>
 
                 <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6">
@@ -604,11 +660,17 @@ export default async function ProductPage(
                   />
                 </div>
 
+                {/* T1-H: Renamed from "Also Available At" + "Check price ↗" which
+                    implied comparable pricing. These are dynamic-link stubs with
+                    no tracked price — the copy now sets honest expectations. */}
                 {dynamicLinks.length > 0 && (
                   <div className="mt-8">
-                    <h3 className="text-[11px] font-bold uppercase tracking-[0.14em] text-gray-400 mb-3">
-                      Also Available At
+                    <h3 className="text-[11px] font-bold uppercase tracking-[0.14em] text-gray-400 mb-1">
+                      More retailers
                     </h3>
+                    <p className="text-[11px] text-gray-400 mb-3">
+                      No live price — visit to check current price
+                    </p>
                     <div className="flex flex-wrap gap-3">
                       {dynamicLinks.map(l => (
                         <a
@@ -619,7 +681,7 @@ export default async function ProductPage(
                           className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-gray-200 hover:border-[#E8272A] hover:text-[#E8272A] text-gray-700 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-[#E8272A] focus:ring-offset-1"
                         >
                           {l.retailer.name}
-                          <span className="text-gray-400 text-xs">Check price ↗</span>
+                          <span className="text-gray-400 text-xs">Search ↗</span>
                         </a>
                       ))}
                     </div>
@@ -794,13 +856,6 @@ function RelatedCard({ r }: {
   )
 }
 
-/** Red "Best Price" pill for the Price Comparison heading — matches the
- *  mockup spec exactly: just the label, no embedded price (the price lives
- *  in the table row beneath, so duplicating it here adds noise). */
-function BestPriceBadge() {
-  return (
-    <span className="inline-flex items-center px-3.5 py-1.5 rounded-full bg-[#E8272A] text-white text-[12px] font-bold uppercase tracking-[0.08em] shadow-sm">
-      Best Price
-    </span>
-  )
-}
+// T1-G: BestPriceBadge removed. Price is now anchored in the hero (T1-A)
+// and the table-row badge marks it inline with the correct brand colour.
+// One signal, one location, no duplicate. See OffersTable.tsx isBest badge.
