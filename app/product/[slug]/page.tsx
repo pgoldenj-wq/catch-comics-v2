@@ -263,7 +263,7 @@ export default async function ProductPage(
   // safe server rendering.
   const stripHtml = (s: string) => s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
   const cvSynopsis = cvMeta?.synopsis ? stripHtml(cvMeta.synopsis) : ''
-  const dbDesc     = product.description?.trim() ?? ''
+  const dbDesc     = product.description ? stripHtml(product.description) : ''
   const displayDescription = cvSynopsis.length > dbDesc.length + 40 ? cvSynopsis : dbDesc
 
   // Creators grouped by role for the hero block. CV roles use slash separators

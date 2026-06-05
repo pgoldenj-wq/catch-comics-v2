@@ -93,12 +93,6 @@ function fmtPrice(amount: number, currency: string) {
   }).format(amount)
 }
 
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-GB', {
-    day: 'numeric', month: 'short', year: 'numeric',
-  })
-}
-
 // Returns a freshness label like "Checked 4d ago" for data that is 2–29 days
 // old. Returns null for same-day / yesterday (silence = confidence) and for
 // stale rows (those have their own visual treatment).
@@ -246,7 +240,6 @@ export default function OffersTable({ offers, isbn13, productTitle, canonicalPro
                 <th className="pb-2 pr-4 font-medium">Price</th>
                 <th className="pb-2 pr-4 font-medium hidden sm:table-cell">Shipping</th>
                 <th className="pb-2 pr-4 font-medium hidden md:table-cell">Stock</th>
-                <th className="pb-2 pr-4 font-medium hidden lg:table-cell">Last checked</th>
                 <th className="pb-2 font-medium"></th>
               </tr>
             </thead>
@@ -255,8 +248,8 @@ export default function OffersTable({ offers, isbn13, productTitle, canonicalPro
                 const stale = !o.isMarketplace && isStale(o.lastSeenAt)
                 const stock = STOCK_LABELS[o.stockStatus] ?? STOCK_LABELS['UNKNOWN']
 
-                // "Best price" badge: only for trusted retailers (marketplace postage is unknown)
-                const isBest = i === 0 && visible.length > 1 && !o.isMarketplace
+                // "Best price" badge: only for trusted retailers in stock (marketplace postage is unknown)
+                const isBest = i === 0 && visible.length > 1 && !o.isMarketplace && o.stockStatus === 'IN_STOCK'
 
                 // Link destination: marketplace rows use externalUrl directly;
                 // trusted retailer rows go through /go/ for click tracking + affiliate redirect.
@@ -342,11 +335,6 @@ export default function OffersTable({ offers, isbn13, productTitle, canonicalPro
                       ) : (
                         stock.label
                       )}
-                    </td>
-
-                    {/* Last checked (lg+) */}
-                    <td className="py-3 pr-4 hidden lg:table-cell text-gray-400 text-xs">
-                      {o.isMarketplace ? 'Live' : fmtDate(o.lastSeenAt)}
                     </td>
 
                     {/* CTA */}

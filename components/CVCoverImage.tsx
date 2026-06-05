@@ -88,10 +88,10 @@ export default function CVCoverImage({
   return (
     <div
       className={`relative overflow-hidden ${className ?? ''}`}
-      style={{ background: '#F3F4F6' }}
+      style={{ background: '#1f2937' }}
     >
       {/* Placeholder — always the base layer; hidden by the image when it loads OK */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-gray-400">
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/30">
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor"
           strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
