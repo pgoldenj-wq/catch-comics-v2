@@ -52,21 +52,23 @@ select:focus-visible {
   outline-offset: 1px;
 }
 
-/* ─── Unified comic cover hover ─────────────────────────────────────────────
-   Applied to every product cover across the site (search, series, product
-   page, homepage deals, issue grids).  A single place to tune scale, easing,
-   and motion preferences.
+/* ─── Unified comic cover hover — size-aware variants ───────────────────────
+   Three classes tuned so covers at different starting sizes all preview to
+   roughly the same artwork-inspection size (~160-220px wide) on hover.
 
-   Requirements:
-     • Expands symmetrically from the centre (transform-origin: center center)
-     • Spring easing gives a subtle, intentional bounce
-     • z-index:10 paints the enlarged cover above siblings
-     • prefers-reduced-motion: no movement at all
+   cover-card-sm  Tiny thumbnails  (56–80px)   → ~2.5× → ~140-200px preview
+   cover-card-md  Medium thumbnails (100–140px) → ~1.75× → ~175-245px preview
+   cover-card-lg  Large thumbnails  (140px+)    → ~1.3×  → ~182-216px preview
 
-   Usage: add className="cover-card" to the cover container div.
-   The container (not just the image inside) scales so the frame and cover
-   expand as a single unit. */
+   All share the same spring easing and centre origin.
+   Apply ONE class to the cover container div — not the image inside it.
+   The container scales as a unit so frame and image move together.
 
+   cover-card (no suffix) is a backwards-compat alias for cover-card-md.    */
+
+.cover-card-sm,
+.cover-card-md,
+.cover-card-lg,
 .cover-card {
   position: relative;          /* required for z-index to take effect */
   transform-origin: center center;
@@ -74,9 +76,30 @@ select:focus-visible {
               box-shadow 0.25s ease-out;
   will-change: transform;
 }
+
+/* Tiny thumbnails — RelatedCard (56px), CVIssuesGrid small cols */
+.cover-card-sm:hover,
+.cover-card-sm:focus-visible {
+  transform: scale(2.5);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.30);
+  z-index: 10;
+}
+
+/* Medium thumbnails — IssueListGrid (114px), Search (100px) */
+.cover-card-md:hover,
+.cover-card-md:focus-visible,
 .cover-card:hover,
 .cover-card:focus-visible {
-  transform: scale(1.08);
+  transform: scale(1.75);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+  z-index: 10;
+}
+
+/* Large thumbnails — VolumeCard, SeriesIndexCard, homepage deals carousel
+   (carousel has overflow:hidden so a modest scale prevents hard clipping) */
+.cover-card-lg:hover,
+.cover-card-lg:focus-visible {
+  transform: scale(1.3);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
   z-index: 10;
 }

@@ -98,7 +98,7 @@ export default function CVIssuesGrid({
               style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', textAlign: 'left' }}
             >
               <div
-                className="cover-card relative bg-gray-100 border border-gray-200 rounded-md"
+                className="cover-card-md relative bg-gray-100 border border-gray-200 rounded-md"
                 style={{ aspectRatio: '2 / 3' }}
               >
                 <span className="absolute inset-0 flex items-center justify-center text-gray-400 text-[10px] font-medium">

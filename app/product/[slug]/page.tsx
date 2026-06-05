@@ -826,7 +826,7 @@ function RelatedCard({ r }: {
       href={`/product/${r.canonicalSlug}`}
       className="group flex gap-3 rounded-lg p-2 -mx-2 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-[#E8272A] focus:ring-offset-1"
     >
-      <div className="cover-card flex-shrink-0 w-[56px] h-[80px] rounded overflow-hidden bg-gray-100 shadow-sm">
+      <div className="cover-card-sm flex-shrink-0 w-[56px] h-[80px] rounded overflow-hidden bg-gray-100 shadow-sm">
         {r.coverImageUrl && !isBadCoverUrl(r.coverImageUrl) ? (
           <Image
             src={r.coverImageUrl}

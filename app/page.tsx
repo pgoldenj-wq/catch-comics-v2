@@ -670,7 +670,7 @@ export default function Home() {
                   style={{ flexShrink: 0, width: '136px', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
 
                   {/* Cover */}
-                  <div className="cover-card" style={{ width: '136px', height: '185px', borderRadius: '10px', overflow: 'hidden', background: '#1e1b2e', position: 'relative', boxShadow: '0 4px 16px rgba(0,0,0,0.1)', marginBottom: '8px' }}>
+                  <div className="cover-card-lg" style={{ width: '136px', height: '185px', borderRadius: '10px', overflow: 'hidden', background: '#1e1b2e', position: 'relative', boxShadow: '0 4px 16px rgba(0,0,0,0.1)', marginBottom: '8px' }}>
                     {/* Fallback — ALWAYS rendered as base layer (book icon + title).
                         Visible whenever the img above is absent, transparent (OL 1×1 GIF),
                         or hidden via onError/onLoad.  No conditional — always in the DOM. */}

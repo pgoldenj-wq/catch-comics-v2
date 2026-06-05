@@ -38,7 +38,7 @@ export default function VolumeCard({ volume }: Props) {
           background:  '#1a1a2e',
           boxShadow:   '0 2px 12px rgba(0,0,0,0.15)',
         }}
-        className="cover-card"
+        className="cover-card-lg"
       >
         {/* Letter fallback */}
         <span

@@ -106,7 +106,7 @@ export default function IssueListGrid({
               className="block group focus:outline-none"
             >
               <div
-                className={`cover-card relative bg-gray-100 rounded-md overflow-hidden ${
+                className={`cover-card-md relative bg-gray-100 rounded-md overflow-hidden ${
                   isCurrent ? 'ring-2 ring-[#E8272A]' : 'border border-gray-200'
                 }`}
                 style={{ aspectRatio: '2 / 3' }}

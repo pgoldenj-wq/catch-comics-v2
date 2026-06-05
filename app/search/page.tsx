@@ -879,7 +879,7 @@ function SearchResults() {
                         rows. Resting shadow-sm gives the result row a gallery feel
                         rather than a spreadsheet feel. */}
                     <div
-                      className="cover-card"
+                      className="cover-card-md"
                       style={{ width: '100px', height: '150px', borderRadius: '6px', background: '#F3F4F6', border: '1px solid #EBEBEB', boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.06)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <span style={{ color: '#6B7280', fontSize: '26px', fontWeight: 500, position: 'absolute' }}>
                         {comic.name.charAt(0)}
