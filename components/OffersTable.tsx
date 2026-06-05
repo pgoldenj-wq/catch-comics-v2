@@ -99,6 +99,16 @@ function fmtDate(iso: string) {
   })
 }
 
+// Returns a freshness label like "Checked 4d ago" for data that is 2–29 days
+// old. Returns null for same-day / yesterday (silence = confidence) and for
+// stale rows (those have their own visual treatment).
+function fmtAge(iso: string): string | null {
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24))
+  if (days <= 1)  return null   // fresh enough — don't add noise
+  if (days >= 30) return null   // stale row handles this separately
+  return `Checked ${days}d ago`
+}
+
 // eBay condition strings use natural-language labels — map to new/used buckets.
 // "New" → new. Everything else → used.
 function ebayConditionIsNew(condition: string): boolean {
@@ -194,6 +204,14 @@ export default function OffersTable({ offers, isbn13, productTitle, canonicalPro
     { id: 'USED', label: 'Used', count: usedCount  },
   ]
 
+  // Hide the Condition column when every visible trusted-retailer row shares
+  // the same condition (e.g. all NEW on a TPB/omnibus page). Never hide when
+  // marketplace rows are present — those use the Condition cell for seller
+  // feedback display.
+  const allSameCondition = visible.length > 0
+    && !visible.some(o => o.isMarketplace)
+    && visible.every(o => o.condition === visible[0].condition)
+
   const ebayLoading = (isbn13 || productTitle) && ebayListings === null && !ebayError
 
   return (
@@ -224,7 +242,7 @@ export default function OffersTable({ offers, isbn13, productTitle, canonicalPro
             <thead>
               <tr className="text-left text-gray-500 text-xs uppercase tracking-wide border-b border-gray-200">
                 <th className="pb-2 pr-4 font-medium">Retailer</th>
-                <th className="pb-2 pr-4 font-medium">Condition</th>
+                {!allSameCondition && <th className="pb-2 pr-4 font-medium">Condition</th>}
                 <th className="pb-2 pr-4 font-medium">Price</th>
                 <th className="pb-2 pr-4 font-medium hidden sm:table-cell">Shipping</th>
                 <th className="pb-2 pr-4 font-medium hidden md:table-cell">Stock</th>
@@ -259,7 +277,7 @@ export default function OffersTable({ offers, isbn13, productTitle, canonicalPro
                           </span>
                         )}
                         {isBest && (
-                          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-600 text-white leading-none">
+                          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#E8272A] text-white leading-none">
                             Best price
                           </span>
                         )}
@@ -269,15 +287,17 @@ export default function OffersTable({ offers, isbn13, productTitle, canonicalPro
                       )}
                     </td>
 
-                    {/* Condition */}
-                    <td className="py-3 pr-4 text-gray-700">
-                      {o.isMarketplace
-                        ? o.condition
-                        : (CONDITION_LABELS[o.condition] ?? o.condition)}
-                      {o.conditionDetail && (
-                        <span className="block text-xs text-gray-400">{o.conditionDetail}</span>
-                      )}
-                    </td>
+                    {/* Condition — hidden when all visible trusted rows share the same condition */}
+                    {!allSameCondition && (
+                      <td className="py-3 pr-4 text-gray-700">
+                        {o.isMarketplace
+                          ? o.condition
+                          : (CONDITION_LABELS[o.condition] ?? o.condition)}
+                        {o.conditionDetail && (
+                          <span className="block text-xs text-gray-400">{o.conditionDetail}</span>
+                        )}
+                      </td>
+                    )}
 
                     {/* Price */}
                     <td className="py-3 pr-4">
@@ -295,6 +315,13 @@ export default function OffersTable({ offers, isbn13, productTitle, canonicalPro
                       {o.isMarketplace && (
                         <span className="block text-xs text-gray-400">excl. postage</span>
                       )}
+                      {/* T1-C: freshness signal — shown when data is 2–29 days old */}
+                      {!o.isMarketplace && !stale && (() => {
+                        const age = fmtAge(o.lastSeenAt)
+                        return age
+                          ? <span className="block text-[10px] text-gray-400 mt-0.5">{age}</span>
+                          : null
+                      })()}
                     </td>
 
                     {/* Shipping column (sm+) */}
@@ -353,13 +380,23 @@ export default function OffersTable({ offers, isbn13, productTitle, canonicalPro
                           href={href}
                           target="_blank"
                           rel="noopener noreferrer sponsored"
-                          className={`inline-block px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                          className={`inline-block px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${
                             stale
                               ? 'bg-gray-200 text-gray-500 hover:bg-gray-300'
                               : 'bg-[#E8272A] text-white hover:bg-[#c41f22]'
                           }`}
                         >
-                          Buy at {o.retailerName} ↗
+                          {/* T1-D: stale rows say "Check price" to set honest expectations.
+                              T1-E: fresh rows show retailer name only on mobile (no overflow),
+                                    full "Buy at X" label on sm+ viewports. */}
+                          {stale ? (
+                            'Check price ↗'
+                          ) : (
+                            <>
+                              <span className="sm:hidden">{o.retailerName} ↗</span>
+                              <span className="hidden sm:inline">Buy at {o.retailerName} ↗</span>
+                            </>
+                          )}
                         </a>
                       )}
                     </td>
