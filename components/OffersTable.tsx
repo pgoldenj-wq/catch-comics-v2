@@ -5,6 +5,11 @@
  *
  * Renders the price comparison table with "New / Used / All" tab switching.
  *
+ * Each row is a real <a> element (not a div+onClick) so the full row is:
+ *   - keyboard accessible (Tab + Enter)
+ *   - screen-reader navigable (role=link with descriptive aria-label)
+ *   - focusable with a visible ring
+ *
  * Trusted-retailer rows link through /go/{listingId} for click tracking +
  * affiliate redirect. eBay Buy-It-Now rows are merged inline as marketplace
  * rows — fetched client-side from /api/ebay, shown with a marketplace badge,
@@ -231,168 +236,151 @@ export default function OffersTable({ offers, isbn13, productTitle, canonicalPro
       {visible.length === 0 ? (
         <p className="text-gray-500 text-sm py-4">No {tab.toLowerCase()} listings available.</p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-gray-500 text-xs uppercase tracking-wide border-b border-gray-200">
-                <th className="pb-2 pr-4 font-medium">Retailer</th>
-                {!allSameCondition && <th className="pb-2 pr-4 font-medium">Condition</th>}
-                <th className="pb-2 pr-4 font-medium">Price</th>
-                <th className="pb-2 pr-4 font-medium hidden sm:table-cell">Shipping</th>
-                <th className="pb-2 pr-4 font-medium hidden md:table-cell">Stock</th>
-                <th className="pb-2 font-medium"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {visible.map((o, i) => {
-                const stale = !o.isMarketplace && isStale(o.lastSeenAt)
-                const stock = STOCK_LABELS[o.stockStatus] ?? STOCK_LABELS['UNKNOWN']
+        <div>
+          {/* Column header */}
+          <div className="flex items-baseline text-xs uppercase tracking-wide text-gray-500 border-b border-gray-200 pb-2 select-none">
+            <span className="flex-1 min-w-0 font-medium">Retailer</span>
+            {!allSameCondition && <span className="w-24 shrink-0 font-medium">Condition</span>}
+            <span className="w-28 shrink-0 font-medium">Price</span>
+            <span className="hidden sm:block w-20 shrink-0 font-medium">Shipping</span>
+            <span className="hidden md:block w-24 shrink-0 font-medium">Stock</span>
+            <span className="w-4 shrink-0" aria-hidden="true" />
+          </div>
 
-                // "Best price" badge: only for trusted retailers in stock (marketplace postage is unknown)
-                const isBest = i === 0 && visible.length > 1 && !o.isMarketplace && o.stockStatus === 'IN_STOCK'
+          {/* Rows — each is a real <a> for keyboard + screen-reader accessibility.
+              The full row navigates to /go/{listingId} (trusted retailers) or the
+              eBay listing directly (marketplace). No CTA button column needed. */}
+          <div className="divide-y divide-gray-100">
+            {visible.map((o, i) => {
+              const stale = !o.isMarketplace && isStale(o.lastSeenAt)
+              const stock = STOCK_LABELS[o.stockStatus] ?? STOCK_LABELS['UNKNOWN']
 
-                // Link destination: marketplace rows use externalUrl directly;
-                // trusted retailer rows go through /go/ for click tracking + affiliate redirect.
-                const href = o.isMarketplace ? (o.externalUrl ?? '#') : `/go/${o.listingId}`
+              // Best price badge: only for trusted retailers in stock
+              const isBest = i === 0 && visible.length > 1 && !o.isMarketplace && o.stockStatus === 'IN_STOCK'
 
-                return (
-                  <tr
-                    key={`${o.isMarketplace ? 'mp' : 'rl'}-${o.listingId}`}
-                    className={`hover:bg-gray-50 transition-colors ${stale ? 'opacity-50' : ''} ${o.isMarketplace ? 'bg-amber-50/30' : ''}`}
-                  >
-                    {/* Retailer / marketplace name */}
-                    <td className="py-3 pr-4 font-medium text-gray-900">
-                      <span className="flex items-center gap-2 flex-wrap">
-                        {o.retailerName}
-                        {o.isMarketplace && o.marketplaceLabel && (
-                          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#E8272A] text-white leading-none">
-                            {o.marketplaceLabel}
-                          </span>
-                        )}
-                        {isBest && (
-                          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#E8272A] text-white leading-none">
-                            Best price
-                          </span>
-                        )}
-                      </span>
-                      {stale && (
-                        <span className="text-xs text-gray-400 font-normal">(stale)</span>
-                      )}
-                    </td>
+              // Link destination: marketplace rows go to eBay directly;
+              // trusted retailer rows go through /go/ for click tracking + affiliate redirect.
+              const href = o.isMarketplace ? (o.externalUrl ?? '#') : `/go/${o.listingId}`
 
-                    {/* Condition — hidden when all visible trusted rows share the same condition */}
-                    {!allSameCondition && (
-                      <td className="py-3 pr-4 text-gray-700">
-                        {o.isMarketplace
-                          ? o.condition
-                          : (CONDITION_LABELS[o.condition] ?? o.condition)}
-                        {o.conditionDetail && (
-                          <span className="block text-xs text-gray-400">{o.conditionDetail}</span>
-                        )}
-                      </td>
-                    )}
+              // Descriptive label for screen readers — announces retailer, price, stock.
+              const ariaLabel = [
+                o.retailerName,
+                fmtPrice(o.priceAmount, o.currency),
+                o.stockStatus !== 'IN_STOCK' ? stock.label : null,
+                stale ? 'stale data' : null,
+              ].filter(Boolean).join(' — ')
 
-                    {/* Price */}
-                    <td className="py-3 pr-4">
-                      <span className="font-semibold text-gray-900">
-                        {fmtPrice(o.priceAmount, o.currency)}
-                      </span>
-                      {!o.isMarketplace && o.shippingAmount !== null && o.shippingAmount > 0 && (
-                        <span className="block text-xs text-gray-400">
-                          +{fmtPrice(o.shippingAmount, o.currency)} ship
+              return (
+                <a
+                  key={`${o.isMarketplace ? 'mp' : 'rl'}-${o.listingId}`}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer sponsored"
+                  aria-label={ariaLabel}
+                  onClick={o.isMarketplace ? () => {
+                    handleEbayClick({
+                      itemId:     o.listingId,
+                      title:      o.conditionDetail ?? '',
+                      price:      { value: o.priceAmount, currency: o.currency },
+                      condition:  o.condition,
+                      imageUrl:   '',
+                      itemWebUrl: o.externalUrl ?? '',
+                      seller:     { username: o.marketplaceSeller ?? '', feedbackPercentage: 0 },
+                      buyItNow:   true,
+                    })
+                  } : undefined}
+                  className={[
+                    'group flex items-center py-3 text-sm rounded',
+                    'transition-colors duration-150',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E8272A] focus-visible:ring-offset-1',
+                    stale            ? 'opacity-50'         : '',
+                    o.isMarketplace  ? 'bg-amber-50/30 hover:bg-amber-50' : 'hover:bg-gray-50',
+                  ].join(' ')}
+                >
+                  {/* Retailer name + badges */}
+                  <span className="flex-1 min-w-0 font-medium text-gray-900">
+                    <span className="flex items-center gap-2 flex-wrap">
+                      {o.retailerName}
+                      {o.isMarketplace && o.marketplaceLabel && (
+                        <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#E8272A] text-white leading-none">
+                          {o.marketplaceLabel}
                         </span>
                       )}
-                      {!o.isMarketplace && o.shippingAmount === 0 && (
-                        <span className="block text-xs text-emerald-600">Free shipping</span>
+                      {isBest && (
+                        <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#E8272A] text-white leading-none">
+                          Best price
+                        </span>
                       )}
-                      {o.isMarketplace && (
-                        <span className="block text-xs text-gray-400">excl. postage</span>
-                      )}
-                      {/* T1-C: freshness signal — shown when data is 2–29 days old */}
-                      {!o.isMarketplace && !stale && (() => {
-                        const age = fmtAge(o.lastSeenAt)
-                        return age
-                          ? <span className="block text-[10px] text-gray-400 mt-0.5">{age}</span>
-                          : null
-                      })()}
-                    </td>
+                    </span>
+                    {stale && (
+                      <span className="text-xs text-gray-400 font-normal">(stale)</span>
+                    )}
+                  </span>
 
-                    {/* Shipping column (sm+) */}
-                    <td className="py-3 pr-4 hidden sm:table-cell text-gray-500">
+                  {/* Condition — hidden when all visible trusted rows share the same condition */}
+                  {!allSameCondition && (
+                    <span className="w-24 shrink-0 text-gray-700">
                       {o.isMarketplace
-                        ? <span className="text-gray-400 text-xs">excl. postage</span>
-                        : o.shippingAmount === null
-                          ? '—'
-                          : o.shippingAmount === 0
-                            ? 'Free'
-                            : fmtPrice(o.shippingAmount, o.currency)}
-                    </td>
-
-                    {/* Stock (md+) */}
-                    <td className={`py-3 pr-4 hidden md:table-cell font-medium ${stock.cls}`}>
-                      {o.isMarketplace ? (
-                        <span className="text-emerald-600">Available</span>
-                      ) : (
-                        stock.label
+                        ? o.condition
+                        : (CONDITION_LABELS[o.condition] ?? o.condition)}
+                      {o.conditionDetail && (
+                        <span className="block text-xs text-gray-400">{o.conditionDetail}</span>
                       )}
-                    </td>
+                    </span>
+                  )}
 
-                    {/* CTA */}
-                    <td className="py-3 text-right">
-                      {o.isMarketplace ? (
-                        <a
-                          href={href}
-                          target="_blank"
-                          rel="noopener noreferrer sponsored"
-                          onClick={() => {
-                            // Find the original EbayListing to pass to the click handler.
-                            // We reconstruct a minimal object from the OfferRow fields.
-                            const fakeEbayListing: EbayListing = {
-                              itemId:     o.listingId,
-                              title:      o.conditionDetail ?? '',
-                              price:      { value: o.priceAmount, currency: o.currency },
-                              condition:  o.condition,
-                              imageUrl:   '',
-                              itemWebUrl: o.externalUrl ?? '',
-                              seller:     { username: o.marketplaceSeller ?? '', feedbackPercentage: 0 },
-                              buyItNow:   true,
-                            }
-                            handleEbayClick(fakeEbayListing)
-                          }}
-                          className="inline-block px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors bg-[#E8272A] text-white hover:bg-[#c41f22]"
-                        >
-                          View on eBay ↗
-                        </a>
-                      ) : (
-                        <a
-                          href={href}
-                          target="_blank"
-                          rel="noopener noreferrer sponsored"
-                          className={`inline-block px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${
-                            stale
-                              ? 'bg-gray-200 text-gray-500 hover:bg-gray-300'
-                              : 'bg-[#E8272A] text-white hover:bg-[#c41f22]'
-                          }`}
-                        >
-                          {/* T1-D: stale rows say "Check price" to set honest expectations.
-                              T1-E: fresh rows show retailer name only on mobile (no overflow),
-                                    full "Buy at X" label on sm+ viewports. */}
-                          {stale ? (
-                            'Check price ↗'
-                          ) : (
-                            <>
-                              <span className="sm:hidden">{o.retailerName} ↗</span>
-                              <span className="hidden sm:inline">Buy at {o.retailerName} ↗</span>
-                            </>
-                          )}
-                        </a>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                  {/* Price + shipping / freshness sub-labels */}
+                  <span className="w-28 shrink-0">
+                    <span className="font-semibold text-gray-900">
+                      {fmtPrice(o.priceAmount, o.currency)}
+                    </span>
+                    {!o.isMarketplace && o.shippingAmount !== null && o.shippingAmount > 0 && (
+                      <span className="block text-xs text-gray-400">
+                        +{fmtPrice(o.shippingAmount, o.currency)} ship
+                      </span>
+                    )}
+                    {!o.isMarketplace && o.shippingAmount === 0 && (
+                      <span className="block text-xs text-emerald-600">Free shipping</span>
+                    )}
+                    {o.isMarketplace && (
+                      <span className="block text-xs text-gray-400">excl. postage</span>
+                    )}
+                    {/* T1-C: freshness signal — shown when data is 2–29 days old */}
+                    {!o.isMarketplace && !stale && (() => {
+                      const age = fmtAge(o.lastSeenAt)
+                      return age
+                        ? <span className="block text-[10px] text-gray-400 mt-0.5">{age}</span>
+                        : null
+                    })()}
+                  </span>
+
+                  {/* Shipping (sm+) */}
+                  <span className="hidden sm:block w-20 shrink-0 text-gray-500">
+                    {o.isMarketplace
+                      ? <span className="text-gray-400 text-xs">excl. postage</span>
+                      : o.shippingAmount === null
+                        ? '—'
+                        : o.shippingAmount === 0
+                          ? 'Free'
+                          : fmtPrice(o.shippingAmount, o.currency)}
+                  </span>
+
+                  {/* Stock (md+) */}
+                  <span className={`hidden md:block w-24 shrink-0 font-medium ${stock.cls}`}>
+                    {o.isMarketplace
+                      ? <span className="text-emerald-600">Available</span>
+                      : stock.label}
+                  </span>
+
+                  {/* Row arrow — visual affordance only, not read by screen readers */}
+                  <span
+                    className="w-4 shrink-0 text-gray-300 group-hover:text-[#E8272A] transition-colors"
+                    aria-hidden="true"
+                  >→</span>
+                </a>
+              )
+            })}
+          </div>
         </div>
       )}
 
