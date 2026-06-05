@@ -52,6 +52,35 @@ select:focus-visible {
   outline-offset: 1px;
 }
 
+/* ─── Unified comic cover hover ─────────────────────────────────────────────
+   Applied to every product cover across the site (search, series, product
+   page, homepage deals, issue grids).  A single place to tune scale, easing,
+   and motion preferences.
+
+   Requirements:
+     • Expands symmetrically from the centre (transform-origin: center center)
+     • Spring easing gives a subtle, intentional bounce
+     • z-index:10 paints the enlarged cover above siblings
+     • prefers-reduced-motion: no movement at all
+
+   Usage: add className="cover-card" to the cover container div.
+   The container (not just the image inside) scales so the frame and cover
+   expand as a single unit. */
+
+.cover-card {
+  position: relative;          /* required for z-index to take effect */
+  transform-origin: center center;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.25s ease-out;
+  will-change: transform;
+}
+.cover-card:hover,
+.cover-card:focus-visible {
+  transform: scale(1.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  z-index: 10;
+}
+
 /* ─── Reduced motion respect ────────────────────────────────────────────────
    Global safety net for animations / transitions. Components that own bouncy
    hover behaviour (IssueListGrid) also disable their transform locally, but

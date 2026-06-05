@@ -31,16 +31,14 @@ export default function VolumeCard({ volume }: Props) {
       {/* Cover */}
       <div
         style={{
-          position:     'relative',
-          aspectRatio:  '2 / 3',
-          borderRadius: '10px',
-          overflow:     'hidden',
-          background:   '#1a1a2e',
-          boxShadow:    '0 2px 12px rgba(0,0,0,0.15)',
-          // Scale container — overflow visible so the image blooms outward
-          transformOrigin: 'center center',
+          position:    'relative',
+          aspectRatio: '2 / 3',
+          borderRadius:'10px',
+          overflow:    'hidden',
+          background:  '#1a1a2e',
+          boxShadow:   '0 2px 12px rgba(0,0,0,0.15)',
         }}
-        className="transition-transform duration-300 ease-out group-hover:scale-[1.04] group-hover:shadow-2xl"
+        className="cover-card"
       >
         {/* Letter fallback */}
         <span

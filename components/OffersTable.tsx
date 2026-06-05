@@ -237,14 +237,16 @@ export default function OffersTable({ offers, isbn13, productTitle, canonicalPro
         <p className="text-gray-500 text-sm py-4">No {tab.toLowerCase()} listings available.</p>
       ) : (
         <div>
-          {/* Column header */}
-          <div className="flex items-baseline text-xs uppercase tracking-wide text-gray-500 border-b border-gray-200 pb-2 select-none">
-            <span className="flex-1 min-w-0 font-medium">Retailer</span>
-            {!allSameCondition && <span className="w-24 shrink-0 font-medium">Condition</span>}
-            <span className="w-28 shrink-0 font-medium">Price</span>
-            <span className="hidden sm:block w-20 shrink-0 font-medium">Shipping</span>
-            <span className="hidden md:block w-24 shrink-0 font-medium">Stock</span>
-            <span className="w-4 shrink-0" aria-hidden="true" />
+          {/* Column header — overflow-hidden + truncate prevent any label overlap
+              when the centre column is narrow (768–1023 px in the 3-col layout).
+              Condition/Stock: hidden below lg (1024px) where the centre col is
+              too narrow. Shipping: hidden below xl (1280px). */}
+          <div className="flex items-center overflow-hidden text-xs uppercase tracking-wide text-gray-500 border-b border-gray-200 pb-2 select-none">
+            <span className="flex-1 min-w-0 font-medium truncate pr-3">Retailer</span>
+            {!allSameCondition && <span className="hidden lg:block w-20 shrink-0 font-medium truncate">Condition</span>}
+            <span className="w-20 shrink-0 font-medium truncate">Price</span>
+            <span className="hidden xl:block w-16 shrink-0 font-medium truncate">Shipping</span>
+            <span className="hidden lg:block w-20 shrink-0 font-medium truncate">Stock</span>
           </div>
 
           {/* Rows — each is a real <a> for keyboard + screen-reader accessibility.
@@ -297,8 +299,8 @@ export default function OffersTable({ offers, isbn13, productTitle, canonicalPro
                     o.isMarketplace  ? 'bg-amber-50/30 hover:bg-amber-50' : 'hover:bg-gray-50',
                   ].join(' ')}
                 >
-                  {/* Retailer name + badges */}
-                  <span className="flex-1 min-w-0 font-medium text-gray-900">
+                  {/* Retailer name + badges — pr-3 matches header spacing */}
+                  <span className="flex-1 min-w-0 font-medium text-gray-900 pr-3">
                     <span className="flex items-center gap-2 flex-wrap">
                       {o.retailerName}
                       {o.isMarketplace && o.marketplaceLabel && (
@@ -317,9 +319,9 @@ export default function OffersTable({ offers, isbn13, productTitle, canonicalPro
                     )}
                   </span>
 
-                  {/* Condition — hidden when all visible trusted rows share the same condition */}
+                  {/* Condition — matches header: hidden below lg */}
                   {!allSameCondition && (
-                    <span className="w-24 shrink-0 text-gray-700">
+                    <span className="hidden lg:block w-20 shrink-0 text-gray-700">
                       {o.isMarketplace
                         ? o.condition
                         : (CONDITION_LABELS[o.condition] ?? o.condition)}
@@ -329,8 +331,8 @@ export default function OffersTable({ offers, isbn13, productTitle, canonicalPro
                     </span>
                   )}
 
-                  {/* Price + shipping / freshness sub-labels */}
-                  <span className="w-28 shrink-0">
+                  {/* Price + freshness sub-labels — w-20 matches header */}
+                  <span className="w-20 shrink-0">
                     <span className="font-semibold text-gray-900">
                       {fmtPrice(o.priceAmount, o.currency)}
                     </span>
@@ -340,7 +342,7 @@ export default function OffersTable({ offers, isbn13, productTitle, canonicalPro
                       </span>
                     )}
                     {!o.isMarketplace && o.shippingAmount === 0 && (
-                      <span className="block text-xs text-emerald-600">Free shipping</span>
+                      <span className="block text-xs text-emerald-600">Free ship</span>
                     )}
                     {o.isMarketplace && (
                       <span className="block text-xs text-gray-400">excl. postage</span>
@@ -354,10 +356,10 @@ export default function OffersTable({ offers, isbn13, productTitle, canonicalPro
                     })()}
                   </span>
 
-                  {/* Shipping (sm+) */}
-                  <span className="hidden sm:block w-20 shrink-0 text-gray-500">
+                  {/* Shipping — matches header: hidden below xl */}
+                  <span className="hidden xl:block w-16 shrink-0 text-gray-500">
                     {o.isMarketplace
-                      ? <span className="text-gray-400 text-xs">excl. postage</span>
+                      ? <span className="text-gray-400 text-xs">excl.</span>
                       : o.shippingAmount === null
                         ? '—'
                         : o.shippingAmount === 0
@@ -365,18 +367,12 @@ export default function OffersTable({ offers, isbn13, productTitle, canonicalPro
                           : fmtPrice(o.shippingAmount, o.currency)}
                   </span>
 
-                  {/* Stock (md+) */}
-                  <span className={`hidden md:block w-24 shrink-0 font-medium ${stock.cls}`}>
+                  {/* Stock — matches header: hidden below lg */}
+                  <span className={`hidden lg:block w-20 shrink-0 font-medium ${stock.cls}`}>
                     {o.isMarketplace
                       ? <span className="text-emerald-600">Available</span>
                       : stock.label}
                   </span>
-
-                  {/* Row arrow — visual affordance only, not read by screen readers */}
-                  <span
-                    className="w-4 shrink-0 text-gray-300 group-hover:text-[#E8272A] transition-colors"
-                    aria-hidden="true"
-                  >→</span>
                 </a>
               )
             })}

@@ -98,8 +98,8 @@ export default function CVIssuesGrid({
               style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', textAlign: 'left' }}
             >
               <div
-                className="relative bg-gray-100 border border-gray-200 rounded-md transition-transform duration-200 ease-out hover:scale-[3] hover:z-50 hover:shadow-2xl"
-                style={{ aspectRatio: '2 / 3', position: 'relative', transformOrigin: 'center center' }}
+                className="cover-card relative bg-gray-100 border border-gray-200 rounded-md"
+                style={{ aspectRatio: '2 / 3' }}
               >
                 <span className="absolute inset-0 flex items-center justify-center text-gray-400 text-[10px] font-medium">
                   {cardLabel}

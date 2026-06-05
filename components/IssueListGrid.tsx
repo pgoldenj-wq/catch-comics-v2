@@ -84,33 +84,6 @@ export default function IssueListGrid({
 
   return (
     <div>
-      {/* Component-scoped CSS for the bouncy hover + reduced-motion override.
-          Inline (not in globals) so the component is self-contained and the
-          rule can't accidentally affect other covers elsewhere on the page. */}
-      <style>{`
-        .ilg-cover-wrap { position: relative; overflow: visible; }
-        .ilg-cover {
-          transform-origin: center center;
-          transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
-                      box-shadow 0.25s ease-out;
-          will-change: transform;
-        }
-        .ilg-card:hover .ilg-cover,
-        .ilg-card:focus-visible .ilg-cover {
-          transform: scale(3);
-          z-index: 50;
-          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .ilg-cover { transition: none !important; }
-          .ilg-card:hover .ilg-cover,
-          .ilg-card:focus-visible .ilg-cover {
-            transform: none !important;
-            box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.2);
-          }
-        }
-      `}</style>
-
       {label && <SectionHeader label={label} count={issues.length} />}
 
       <div
@@ -130,15 +103,14 @@ export default function IssueListGrid({
               prefetch={false}
               aria-label={isCurrent ? `${cardLabel} (currently viewing)` : cardLabel}
               aria-current={isCurrent ? 'page' : undefined}
-              className="ilg-card block group focus:outline-none"
+              className="block group focus:outline-none"
             >
-              <div className="ilg-cover-wrap">
-                <div
-                  className={`ilg-cover relative bg-gray-100 rounded-md overflow-hidden ${
-                    isCurrent ? 'ring-2 ring-[#E8272A]' : 'border border-gray-200'
-                  }`}
-                  style={{ aspectRatio: '2 / 3' }}
-                >
+              <div
+                className={`cover-card relative bg-gray-100 rounded-md overflow-hidden ${
+                  isCurrent ? 'ring-2 ring-[#E8272A]' : 'border border-gray-200'
+                }`}
+                style={{ aspectRatio: '2 / 3' }}
+              >
                   {/* Placeholder layer — issue number always rendered behind cover */}
                   <span className="absolute inset-0 flex items-center justify-center text-gray-400 text-[10px] font-medium">
                     #{number}
@@ -157,7 +129,6 @@ export default function IssueListGrid({
                       onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
                     />
                   )}
-                </div>
               </div>
               <div className="mt-2">
                 <div className={`text-[12px] font-semibold truncate ${isCurrent ? 'text-[#E8272A]' : 'text-gray-900'}`}>

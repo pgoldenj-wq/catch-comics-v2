@@ -27,7 +27,7 @@ export default function SeriesIndexCard({ slug, displayName, publisher, heroCove
           background:  '#1a1a2e',
           boxShadow:   '0 2px 12px rgba(0,0,0,0.15)',
         }}
-        className="transition-transform duration-300 ease-out group-hover:scale-[1.04] group-hover:shadow-2xl"
+        className="cover-card"
       >
         {/* Letter fallback */}
         <span
