@@ -136,7 +136,10 @@ async function getRelated(
 ) {
   const orClauses: object[] = []
   if (seriesName) orClauses.push({ seriesName })
-  if (publisher)  orClauses.push({ publisher, format })
+  // Omit publisher+format clause for single issues: it matches all issues from
+  // the same publisher (thousands for DC/Marvel), producing noisy unrelated results.
+  // seriesName alone is sufficient and precise for single issue pages.
+  if (publisher && format !== 'SINGLE_ISSUE') orClauses.push({ publisher, format })
 
   if (orClauses.length === 0) return []
 
@@ -183,6 +186,65 @@ async function getSingleIssues(productId: string, seriesName: string | null) {
     ],
     take: 20,
   })
+}
+
+/** Collected editions (volumes, omnibuses, etc.) that share the same seriesName.
+ *  Used only on SINGLE_ISSUE pages to show "Collected In" section.
+ *  No schema change needed — seriesName is the shared key. */
+async function getCollectedEditions(productId: string, seriesName: string | null) {
+  if (!seriesName) return []
+  return prisma.canonicalProduct.findMany({
+    where: {
+      id:        { not: productId },
+      seriesName,
+      deletedAt: null,
+      format: { in: ['TPB', 'HARDCOVER', 'OMNIBUS', 'ABSOLUTE', 'DELUXE', 'COMPENDIUM', 'MANGA_VOLUME'] },
+    },
+    select: {
+      id:            true,
+      title:         true,
+      canonicalSlug: true,
+      format:        true,
+      listings: {
+        where: {
+          deletedAt  : null,
+          priceAmount: { gt: 0 },
+          retailer   : { isActive: true },
+        },
+        select:  { priceAmount: true, priceCurrency: true, stockStatus: true },
+        orderBy: { priceAmount: 'asc' },
+        take:    1,
+      },
+    },
+    orderBy: { releaseDate: 'asc' },
+  })
+}
+
+/** Previous and next single issues in the same series, derived from releaseDate.
+ *  releaseDate is used (not issueNumber) to avoid the string-sort problem with
+ *  issueNumber stored as text ("10" sorts before "2" alphabetically).
+ *  For Absolute Batman, each issue has a unique monthly releaseDate — reliable. */
+async function getSiblingIssues(
+  productId:   string,
+  seriesName:  string | null,
+  releaseDate: Date | null,
+) {
+  if (!seriesName || !releaseDate) return { prev: null, next: null }
+  const base = { seriesName, format: 'SINGLE_ISSUE', deletedAt: null, id: { not: productId } } as const
+  const sel  = { canonicalSlug: true, issueNumber: true, title: true } as const
+  const [prev, next] = await Promise.all([
+    prisma.canonicalProduct.findFirst({
+      where:   { ...base, releaseDate: { lt: releaseDate } },
+      select:  sel,
+      orderBy: { releaseDate: 'desc' },
+    }),
+    prisma.canonicalProduct.findFirst({
+      where:   { ...base, releaseDate: { gt: releaseDate } },
+      select:  sel,
+      orderBy: { releaseDate: 'asc' },
+    }),
+  ])
+  return { prev, next }
 }
 
 // ── generateMetadata ──────────────────────────────────────────────────────────
@@ -285,10 +347,18 @@ export default async function ProductPage(
     .filter(r => creatorsByRole.has(r))
     .map(r => ({ role: r, names: creatorsByRole.get(r)! }))
 
-  const [related, dynamicLinks, singleIssues] = await Promise.all([
+  const [related, dynamicLinks, singleIssues, collectedEditions, siblingIssues, siblingIssueCount] = await Promise.all([
     getRelated(product.id, product.seriesName, product.publisher, product.format),
     getDynamicLinks(product.id),
-    isCollectedEdition ? getSingleIssues(product.id, product.seriesName) : Promise.resolve([]),
+    isCollectedEdition  ? getSingleIssues(product.id, product.seriesName) : Promise.resolve([]),
+    // Single-issue only: volumes/omnibuses that collect this issue (same seriesName)
+    !isCollectedEdition ? getCollectedEditions(product.id, product.seriesName) : Promise.resolve([]),
+    // Single-issue only: immediately adjacent issues for prev/next nav
+    !isCollectedEdition ? getSiblingIssues(product.id, product.seriesName, product.releaseDate ?? null) : Promise.resolve({ prev: null, next: null }),
+    // Single-issue only: total issue count for "Issue #X of Y" display
+    !isCollectedEdition && product.seriesName
+      ? prisma.canonicalProduct.count({ where: { seriesName: product.seriesName, format: 'SINGLE_ISSUE', deletedAt: null } })
+      : Promise.resolve(null),
   ])
 
   // ── Amazon on-demand lookup (non-blocking, 800 ms budget) ────────────────
@@ -516,13 +586,24 @@ export default async function ProductPage(
                   )
                 })()}
 
-                {/* "Collects N issues" — dark-bg variant via className prop */}
-                <IssueCountLine
-                  comicvineId={cvVolumeId}
-                  searchTitle={product.seriesName ?? product.title}
-                  enabled={isCollectedEdition}
-                  className="text-[13px] text-white/60 mt-1 mb-3"
-                />
+                {/* Collected editions: "Collects N issues" summary.
+                    Single issues: "Issue #X of Y" position indicator.
+                    The same slot serves both, neither is ever blank. */}
+                {isCollectedEdition ? (
+                  <IssueCountLine
+                    comicvineId={cvVolumeId}
+                    searchTitle={product.seriesName ?? product.title}
+                    enabled={true}
+                    className="text-[13px] text-white/60 mt-1 mb-3"
+                  />
+                ) : product.issueNumber ? (
+                  <p className="text-[13px] text-white/60 mt-1 mb-3">
+                    Issue #{product.issueNumber}
+                    {siblingIssueCount && siblingIssueCount > 1
+                      ? ` · ${siblingIssueCount} issues in series`
+                      : ''}
+                  </p>
+                ) : null}
 
                 {/* T1-A: Hero price anchor — answers "how much?" above the fold.
                     Only shown when bestListing is fresh, in-stock, and not stale.
@@ -636,6 +717,12 @@ export default async function ProductPage(
                   sticky navbar (h-20 = 80px). */}
               <div id="price-comparison" className="order-1 md:order-2 min-w-0 scroll-mt-20">
 
+                {/* Single-issue only: prev/next navigation between adjacent issues.
+                    Derived from releaseDate — no extra queries when siblings are null. */}
+                {!isCollectedEdition && (siblingIssues.prev || siblingIssues.next) && (
+                  <PrevNextNav prev={siblingIssues.prev} next={siblingIssues.next} />
+                )}
+
                 <div className="mb-5">
                   <h2 className="text-2xl font-bold text-[#0A0A0A]">
                     Price Comparison
@@ -724,10 +811,16 @@ export default async function ProductPage(
                   )}
                 </div>
 
+                {/* Single-issue only: "Collected In" — volumes/omnibuses that
+                    collect this issue. Links directly to each collected edition. */}
+                {!isCollectedEdition && collectedEditions.length > 0 && (
+                  <CollectedInModule editions={collectedEditions} />
+                )}
+
                 {related.length > 0 && (
                   <div>
                     <h2 className="text-xl font-semibold text-[#0A0A0A] mb-3">
-                      You Might Also Like
+                      {isCollectedEdition ? 'You Might Also Like' : 'More in this series'}
                     </h2>
                     <div className="grid grid-cols-2 md:grid-cols-1 gap-3">
                       {related.slice(0, 4).map(r => (
@@ -853,6 +946,106 @@ function RelatedCard({ r }: {
         </p>
       </div>
     </Link>
+  )
+}
+
+// ── Single-issue-specific components ────────────────────────────────────────
+
+/** Prev/Next navigation between adjacent single issues in the same series.
+ *  Placed above the Price Comparison heading so it's visible without scrolling.
+ *  Uses releaseDate-ordered siblings from getSiblingIssues(). */
+function PrevNextNav({ prev, next }: {
+  prev: { canonicalSlug: string; issueNumber: string | null; title: string } | null
+  next: { canonicalSlug: string; issueNumber: string | null; title: string } | null
+}) {
+  const prevLabel = prev?.issueNumber ? `Issue #${prev.issueNumber}` : prev?.title ?? ''
+  const nextLabel = next?.issueNumber ? `Issue #${next.issueNumber}` : next?.title ?? ''
+  return (
+    <nav
+      className="flex items-center justify-between mb-5 text-sm gap-3"
+      aria-label="Issue navigation"
+    >
+      {prev ? (
+        <Link
+          href={`/product/${prev.canonicalSlug}`}
+          className="flex items-center gap-1.5 text-gray-500 hover:text-[#E8272A] transition-colors group min-w-0"
+        >
+          <span aria-hidden="true" className="text-gray-400 group-hover:text-[#E8272A] shrink-0">←</span>
+          <span className="group-hover:underline underline-offset-2 truncate">{prevLabel}</span>
+        </Link>
+      ) : <span />}
+      {next ? (
+        <Link
+          href={`/product/${next.canonicalSlug}`}
+          className="flex items-center gap-1.5 text-gray-500 hover:text-[#E8272A] transition-colors group ml-auto min-w-0"
+        >
+          <span className="group-hover:underline underline-offset-2 truncate">{nextLabel}</span>
+          <span aria-hidden="true" className="text-gray-400 group-hover:text-[#E8272A] shrink-0">→</span>
+        </Link>
+      ) : null}
+    </nav>
+  )
+}
+
+/** "Collected In" module — shows volumes/omnibuses that collect this issue,
+ *  with the lowest tracked price per edition. Placed in the right column.
+ *  Empty state: component not rendered (caller checks editions.length > 0). */
+function CollectedInModule({ editions }: {
+  editions: Array<{
+    id:            string
+    title:         string
+    canonicalSlug: string
+    format:        string
+    listings:      Array<{ priceAmount: unknown; priceCurrency: string; stockStatus: string }>
+  }>
+}) {
+  return (
+    <div>
+      <h2 className="text-xl font-semibold text-[#0A0A0A] mb-3">Collected in</h2>
+      <div className="space-y-2">
+        {editions.map(e => {
+          const listing     = e.listings[0] ?? null
+          const price       = listing ? Number(listing.priceAmount) : null
+          const isInStock   = listing?.stockStatus === 'IN_STOCK' || listing?.stockStatus === 'LOW_STOCK'
+          const fmtLabel    = FORMAT_LABELS[e.format] ?? e.format
+          const priceText   = price !== null
+            ? new Intl.NumberFormat('en-GB', { style: 'currency', currency: listing!.priceCurrency, maximumFractionDigits: 2 }).format(price)
+            : null
+
+          return (
+            <Link
+              key={e.id}
+              href={`/product/${e.canonicalSlug}`}
+              className="group flex items-center justify-between gap-3 p-3 rounded-lg border border-gray-200 hover:border-[#E8272A] hover:bg-gray-50 transition-all focus:outline-none focus:ring-2 focus:ring-[#E8272A] focus:ring-offset-1"
+            >
+              <div className="min-w-0">
+                <p className="text-[13px] font-semibold text-gray-900 group-hover:text-[#E8272A] transition-colors leading-snug line-clamp-2">
+                  {e.title}
+                </p>
+                <p className="text-[10px] text-gray-400 uppercase tracking-[0.08em] font-medium mt-0.5">
+                  {fmtLabel}
+                </p>
+              </div>
+              <div className="text-right shrink-0">
+                {priceText ? (
+                  <>
+                    <p className={`text-[13px] font-semibold ${isInStock ? 'text-[#E8272A]' : 'text-gray-500'}`}>
+                      From {priceText}
+                    </p>
+                    {!isInStock && (
+                      <p className="text-[10px] text-gray-400">out of stock</p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-[12px] text-gray-400">Check price</p>
+                )}
+                <span className="text-gray-300 group-hover:text-[#E8272A] text-xs transition-colors">→</span>
+              </div>
+            </Link>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
