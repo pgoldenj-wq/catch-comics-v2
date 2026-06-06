@@ -690,25 +690,43 @@ export default async function ProductPage(
                   )}
                 </dl>
               </div>
+
+              {/* ── Desktop nav cards — 3rd flex item in hero row (lg+) ──────
+                  Stacked vertically on the right side of the hero band.
+                  Single issues only; hidden below 1024 px. */}
+              {!isCollectedEdition && (siblingIssues.prev || siblingIssues.next) && (
+                <nav
+                  aria-label="Issue navigation"
+                  className="hidden lg:flex flex-col gap-2.5 w-44 shrink-0 self-start"
+                >
+                  {siblingIssues.prev && (
+                    <HeroNavCard issue={siblingIssues.prev} direction="prev" />
+                  )}
+                  {siblingIssues.next && (
+                    <HeroNavCard issue={siblingIssues.next} direction="next" />
+                  )}
+                </nav>
+              )}
             </div>
+
+            {/* ── Mobile nav — below the cover+metadata row, still inside the
+                dark hero band (< lg).  Border-top gives a clean divider. */}
+            {!isCollectedEdition && (siblingIssues.prev || siblingIssues.next) && (
+              <nav
+                aria-label="Issue navigation"
+                className="flex gap-2 lg:hidden mt-5 pt-4 border-t border-white/10"
+              >
+                {siblingIssues.prev && (
+                  <HeroNavCard issue={siblingIssues.prev} direction="prev" className="flex-1" />
+                )}
+                {siblingIssues.next && (
+                  <HeroNavCard issue={siblingIssues.next} direction="next" className="flex-1" />
+                )}
+              </nav>
+            )}
           </div>
         </section>
 
-        {/* ── Issue navigation strip (single issues only) ──────────────────
-            Sits between the hero and the three-column content area so that
-            keyboard / screen-reader focus order is:
-              hero → issue navigation → Section 2 content
-
-            Full-width band with max-w-6xl inner wrapper to match Section 2.
-            Only rendered when prev or next sibling exists. Never shown on
-            collected edition pages. */}
-        {!isCollectedEdition && (siblingIssues.prev || siblingIssues.next) && (
-          <div className="bg-gray-50 border-y border-gray-100">
-            <div className="max-w-6xl mx-auto px-4 py-3">
-              <PrevNextNav prev={siblingIssues.prev} next={siblingIssues.next} />
-            </div>
-          </div>
-        )}
 
         {/* ── SECTION 2: Single 3-column content row ────────────────────────
             Three columns on md+ (768px and above):
@@ -973,66 +991,74 @@ function RelatedCard({ r }: {
 
 // ── Single-issue-specific components ────────────────────────────────────────
 
-/** Prev/Next navigation between adjacent single issues in the same series.
- *  Styled as bordered pill cards with cover thumbnail so they feel like
- *  comic-native navigation, not generic text links. */
-function PrevNextNav({ prev, next }: {
-  prev: { canonicalSlug: string; issueNumber: string | null; title: string; coverImageUrl: string | null } | null
-  next: { canonicalSlug: string; issueNumber: string | null; title: string; coverImageUrl: string | null } | null
+/** Dark translucent nav card rendered inside the hero band.
+ *  Desktop: stacked vertically in the right column of the hero flex row.
+ *  Mobile:  displayed side-by-side below the metadata, separated by a
+ *           white/10 border-top.
+ *
+ *  Design:  cover thumbnail flush-left (no rounded corners — clipped by the
+ *           parent's overflow-hidden), label + issue number centred, arrow
+ *           flush-right.  Hover lifts the bg/border opacity for tactile
+ *           feedback without leaving the dark-hero palette. */
+function HeroNavCard({ issue, direction, className = '' }: {
+  issue: { canonicalSlug: string; issueNumber: string | null; title: string; coverImageUrl: string | null }
+  direction: 'prev' | 'next'
+  className?: string
 }) {
-  const prevNum  = prev?.issueNumber ? `Issue #${prev.issueNumber}` : prev?.title ?? ''
-  const nextNum  = next?.issueNumber ? `Issue #${next.issueNumber}` : next?.title ?? ''
-  const hasCovers = (prev?.coverImageUrl && !isBadCoverUrl(prev.coverImageUrl))
-                 || (next?.coverImageUrl && !isBadCoverUrl(next.coverImageUrl))
+  const label    = direction === 'prev' ? 'Previous Issue' : 'Next Issue'
+  const issueNum = issue.issueNumber ? `Issue #${issue.issueNumber}` : issue.title
+  const hasCover = issue.coverImageUrl && !isBadCoverUrl(issue.coverImageUrl)
 
   return (
-    <nav
-      className="flex items-stretch gap-2 mt-3"
-      aria-label="Issue navigation"
+    <Link
+      href={`/product/${issue.canonicalSlug}`}
+      aria-label={`${label}: ${issueNum}`}
+      className={[
+        'group flex items-center gap-0 rounded-lg overflow-hidden',
+        'bg-white/[0.07] border border-white/[0.12]',
+        'hover:bg-white/[0.14] hover:border-white/25',
+        'transition-all duration-200',
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-[#E8272A]',
+        'focus-visible:ring-offset-2 focus-visible:ring-offset-[#111827]',
+        className,
+      ].join(' ')}
     >
-      {prev ? (
-        <Link
-          href={`/product/${prev.canonicalSlug}`}
-          className="group flex items-center gap-2.5 flex-1 min-w-0 px-3 py-2 rounded-lg border border-gray-200 hover:border-[#E8272A] hover:bg-red-50/30 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#E8272A]"
-          aria-label={`Previous issue: ${prevNum}`}
-        >
-          <span aria-hidden="true" className="text-gray-400 group-hover:text-[#E8272A] transition-colors shrink-0 text-base">←</span>
-          {prev.coverImageUrl && !isBadCoverUrl(prev.coverImageUrl) && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={prev.coverImageUrl}
-              alt=""
-              className="w-7 h-10 object-cover rounded shrink-0 opacity-80 group-hover:opacity-100 transition-opacity"
-            />
-          )}
-          <div className="min-w-0">
-            <p className="text-[10px] text-gray-400 uppercase tracking-wide font-medium leading-none mb-0.5">Previous</p>
-            <p className="text-[12px] font-semibold text-gray-700 group-hover:text-[#E8272A] transition-colors truncate">{prevNum}</p>
+      {/* Cover thumbnail — flush with all card edges via overflow-hidden */}
+      <div className="shrink-0 w-10 self-stretch">
+        {hasCover ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={issue.coverImageUrl!}
+            alt=""
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full min-h-[52px] bg-white/10 flex items-center justify-center">
+            <span className="text-white/30 text-[10px] font-medium">
+              {issue.issueNumber ? `#${issue.issueNumber}` : '?'}
+            </span>
           </div>
-        </Link>
-      ) : <span className="flex-1" />}
-      {next ? (
-        <Link
-          href={`/product/${next.canonicalSlug}`}
-          className="group flex items-center gap-2.5 flex-1 min-w-0 px-3 py-2 rounded-lg border border-gray-200 hover:border-[#E8272A] hover:bg-red-50/30 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#E8272A] justify-end text-right"
-          aria-label={`Next issue: ${nextNum}`}
-        >
-          <div className="min-w-0">
-            <p className="text-[10px] text-gray-400 uppercase tracking-wide font-medium leading-none mb-0.5">Next</p>
-            <p className="text-[12px] font-semibold text-gray-700 group-hover:text-[#E8272A] transition-colors truncate">{nextNum}</p>
-          </div>
-          {next.coverImageUrl && !isBadCoverUrl(next.coverImageUrl) && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={next.coverImageUrl}
-              alt=""
-              className="w-7 h-10 object-cover rounded shrink-0 opacity-80 group-hover:opacity-100 transition-opacity"
-            />
-          )}
-          <span aria-hidden="true" className="text-gray-400 group-hover:text-[#E8272A] transition-colors shrink-0 text-base">→</span>
-        </Link>
-      ) : null}
-    </nav>
+        )}
+      </div>
+
+      {/* Label + issue number */}
+      <div className="flex-1 min-w-0 px-3 py-2.5">
+        <p className="text-[10px] font-semibold text-white/50 uppercase tracking-wider leading-none mb-1">
+          {label}
+        </p>
+        <p className="text-[13px] font-bold text-white leading-tight truncate">
+          {issueNum}
+        </p>
+      </div>
+
+      {/* Arrow — brightens on hover */}
+      <div
+        className="shrink-0 pr-3 pl-1 text-lg text-white/40 group-hover:text-white/80 transition-colors"
+        aria-hidden="true"
+      >
+        {direction === 'prev' ? '←' : '→'}
+      </div>
+    </Link>
   )
 }
 
