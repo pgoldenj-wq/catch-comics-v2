@@ -44,6 +44,11 @@ export const SERIES_REGISTRY: Record<string, SeriesEntry> = {
     cvVolumeId:  '91727',
     publisher:   'Yen Press',
   },
+  'trigun-maximum-deluxe': {
+    displayName: 'Trigun Maximum Deluxe Edition',
+    cvVolumeId:  '29569',
+    publisher:   'Dark Horse Comics',
+  },
 }
 
 /** Returns the SeriesEntry for a slug, or null if not registered. */
