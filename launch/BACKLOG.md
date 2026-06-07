@@ -19,12 +19,12 @@ Format: `[Area] Item — Launch-critical: yes/no`
 |------|--------|-----------|----------|-----------------|------|-------|--------|
 | 1 | Saga | Image Comics | 11 | 2 | 100% | 80.5 | ✅ DONE (2026-06-07) |
 | 2 | Fullmetal Alchemist | Viz Media | 18 | 1* | 100% | 77.0 | ✅ DONE |
-| 3 | Witch Hat Atelier | Kodansha | 10 | 2 | 100% | 76.0 | Build — Tier 1 |
+| 3 | Witch Hat Atelier | Kodansha | 10 | 2 | 100% | 76.0 | ⚠ BLOCKED — vols 2,5,6,7,8 absent from DB |
 | 4 | The Walking Dead | Image Comics | 27 | 1* | 100% | 75.8 | ✅ DONE |
 | 5 | Invincible | Image Comics | 11 | 1* | 100% | 73.0 | ✅ DONE |
-| 6 | Laid-Back Camp | Yen Press | 3 | 2 | 100% | 72.3 | Build — Tier 1 |
-| 7 | Trigun Maximum Deluxe Edition | Dark Horse Comics | 5 | 2 | 100% | 71.5 | Build — Tier 1 |
-| 8 | Ouran High School Host Club | Viz Media | 16 | 2 | 100% | 71.0 | Build — Tier 1 |
+| 6 | Laid-Back Camp | Yen Press | 17 | 2 | 100% | 72.3 | ✅ DONE (2026-06-08) |
+| 7 | Trigun Maximum Deluxe Edition | Dark Horse Comics | 5 | 2 | 100% | 71.5 | ✅ DONE (2026-06-07) |
+| 8 | Ouran High School Host Club | Viz Media | 18 | 2 | 100% | 71.0 | ⚠ BLOCKED — vols 6-13 unidentifiable (OL, Google Books needed) |
 | 9 | Hellsing | Dark Horse Comics | 10 | 2 | 100% | 69.3 | Build — Tier 2 |
 | 10 | Naruto | Viz Media | 6 | 2 | 100% | 68.8 | Build — Tier 2 ⚠️ |
 | 11 | Overlord | Yen On | 10 | 1* | 100% | 65.8 | ✅ DONE |
@@ -52,6 +52,10 @@ Format: `[Area] Item — Launch-critical: yes/no`
 
 ### Data quality flags
 
+**⚠️ Witch Hat Atelier (rank 3):** Vols 2, 5, 6, 7, 8 are genuinely absent from DB (not in any retailer feed). Vols 13 and 14 are present but have NULL volume_number. Vol.1 is TPB format (should be MANGA_VOLUME). Kitchen spin-off (cv:154952) and Grimoire editions have the same comicvine_id as the main series and will appear on the page. Fix: source ISBNs for missing vols, then run `repair-wha.ts`. Page blocked until missing vols are present.
+
+**⚠️ Ouran High School Host Club (rank 8):** 10 of 18 products have bare title "Ouran High School Host Club" with no volume number. Open Library returned no subtitle for any of the 10 ISBNs (9781421526720, 9781421526737, 9781421519296, 9781421522555, 9781421538709, 9781421541358, 9781421539799, 9781421511610, 9781421514048, 9781421505848). These likely cover vols 6-13. Fix: try Google Books API (`GOOGLE_BOOKS_API_KEY` is in `.env.local`) or cross-reference retailer data. 7 of 18 products repaired (vols 1-5, 14, 15 now correct format + volume_number). Page blocked until vols 6-13 are identified.
+
 **⚠️ Naruto (rank 10):** `distinct_volumes = 1` despite 6 editions in DB. All 6 editions appear to be Vol.1 formats (standard, omnibus, box set). Investigate before building series page — if only Vol.1 is represented, the page would show a 72-volume series with only 1 entry. Fix: check `canonical_products` for `series_name = 'Naruto'`, confirm `volume_number` values, run `ingest-cv-series` if needed.
 
 **⚠️ Baki the Grappler (rank 20):** `cv_enriched_editions = 0`. No ComicVine IDs assigned. Cover images and synopsis will be missing. Fix: run `npm run ingest:cv-series -- --search "Baki the Grappler"` before building series page.
@@ -67,13 +71,16 @@ Format: `[Area] Item — Launch-critical: yes/no`
 | Tsugumi Project | 40.8 | `distinct_volumes = 1`, very niche |
 | A Man Who Defies the World of BL | 39.0 | No CV enrichment, very niche |
 
-### Recommended next 4 series pages to build (Saga done)
+### Recommended next steps after Tier 1 (updated 2026-06-08)
 
-1. ~~**Saga** — Score 80.5. ✅ DONE 2026-06-07.~~ 11 volumes, all R2 covers, 2 retailers on Vol.1 at £7.49. Note: vols 7 and 10 absent from DB (data gap, not a page blocker).
-2. **Witch Hat Atelier** — Score 76.0. Anime adaptation announced. Critically acclaimed. 6 distinct volumes, 10 editions, 100% enriched. Strong beginner entry. **Build next.**
-3. **Ouran High School Host Club** — Score 71.0. Highest edition count of any passing series (16 editions, 4 volumes). Page will be richest in the catalogue. Well-loved shojo — appeals to a different audience than Saga.
-4. **Trigun Maximum Deluxe Edition** — Score 71.5. 2023 Trigun Stampede anime reignited interest. 5 distinct volumes, 100% enriched. Clean series page.
-5. **Laid-Back Camp** — Score 72.3. Netflix presence. Extremely beginner-friendly (highest beginner score in the set). Wholesome aesthetic stands out in the catalogue.
+**Tier 1 status:**
+1. ~~**Saga** — ✅ DONE 2026-06-07.~~ 11 volumes, all R2 covers, 2 retailers on Vol.1 at £7.49.
+2. ~~**Trigun Maximum Deluxe Edition** — ✅ DONE 2026-06-07.~~ 5 volumes, 2 retailers on Vol.1.
+3. ~~**Laid-Back Camp** — ✅ DONE 2026-06-08.~~ 17 volumes, 2 retailers on Vol.1 at £7.99.
+4. **Ouran High School Host Club** — ⚠ BLOCKED. 10 bare-titled products unresolvable. Try Google Books API next.
+5. **Witch Hat Atelier** — ⚠ BLOCKED. Vols 2,5,6,7,8 absent from DB. Source ISBNs first.
+
+**Recommended next (Tier 2):** Hellsing (rank 9), Sengoku Youko (rank 12), Void Rivals (rank 13) are all buildable pending a quick data audit. Naruto (rank 10) needs volume number investigation first.
 
 ---
 

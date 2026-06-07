@@ -5,7 +5,7 @@
 **Launch promise:** A collector can search for a comic, follow a reading order, compare prices across UK retailers, and trust the information they see.
 
 **Completion: auto-calculated from requirement statuses below**  
-Last updated: 2026-06-07
+Last updated: 2026-06-08
 
 ---
 
@@ -35,11 +35,11 @@ Items removed from launch-day scope after challenge:
 ---
 
 ### 2. Reading Order Journeys (20 curated series) — STRATEGIC BLOCKER
-**Status:** In progress (6 of 20 series complete — Walking Dead, FMA, Invincible, Claymore, Overlord, **Saga**)  
+**Status:** In progress (8 of 20 series complete — Walking Dead, FMA, Invincible, Claymore, Overlord, **Saga**, **Trigun Maximum Deluxe**, **Laid-Back Camp**)  
 **Done when:** All 20 series pages live, each passing the quality bar: ≥3 collected editions with correct `comicvine_id` + `volumeNumber`, ≥2 UK retailers with live Vol. 1 price, valid synopsis, correct sort order.  
-**Blocked by:** Nothing — series list defined 2026-06-07. See `launch/BACKLOG.md` for full ranked table.  
+**Blocked by:** Nothing for remaining tier. See `launch/BACKLOG.md` for full ranked table.  
 **Quality bar:** Do NOT add any series where `volumeNumber` values are wrong or fewer than 2 retailers price Vol. 1.  
-**Build order (Saga done, next 4):** ~~Saga~~ ✓ → Witch Hat Atelier → Ouran High School Host Club → Trigun Maximum Deluxe → Laid-Back Camp. Full order in BACKLOG.md.
+**Build order:** ~~Saga~~ ✓ → ~~Trigun Maximum Deluxe~~ ✓ → ~~Laid-Back Camp~~ ✓ → Ouran OHSHC ⚠ BLOCKED → Witch Hat Atelier ⚠ BLOCKED. Full order in BACKLOG.md.
 
 ---
 
@@ -159,7 +159,7 @@ The following are real improvements that come immediately after launch, informed
 | Area | Priority | Status | % done |
 |---|---|---|---|
 | CV Enrichment (launch series) | Required | In progress | 20% |
-| Reading Journeys | Required | In progress (6/20, list defined) | 30% |
+| Reading Journeys | Required | In progress (8/20) | 40% |
 | Cleanup v2 | Required | Done | 100% |
 | AWIN write mode | Required | Done | 100% |
 | Search | Required | Functional | 80% |
@@ -171,8 +171,8 @@ The following are real improvements that come immediately after launch, informed
 | R2 Image Domain | Required | Done | 100% |
 | Slack Alerting | Post-launch | Deferred — code complete, webhook not yet created | — |
 
-**Overall: ~47%** *(required items only — Slack excluded)*  
-*(Driven by the two strategic blockers — CV Enrichment at 25% and Reading Journeys at 30% (6/20 pages done, series list defined). All 11 required items are ≥75% or done. Slack is tracked but excluded from launch % — it is a post-launch operational improvement, not a launch requirement. Overall rises as series pages are built.)*
+**Overall: ~49%** *(required items only — Slack excluded)*  
+*(Driven by the two strategic blockers — CV Enrichment at ~25% and Reading Journeys at 40% (8/20 pages done). All 11 required items are ≥75% or done. Slack is tracked but excluded from launch % — it is a post-launch operational improvement, not a launch requirement. Overall rises as series pages are built.)*
 
 ---
 
@@ -180,7 +180,7 @@ The following are real improvements that come immediately after launch, informed
 
 1. ~~Cleanup v2 sign-off and execute~~ ✓ Done 2026-06-07
 2. ~~Series list defined — 20 series named, scored, and verified~~ ✓ Done 2026-06-07 (see BACKLOG.md)
-3. Series pages Tier 1 — ~~Saga~~ ✓, Witch Hat Atelier, Ouran High School Host Club, Trigun Maximum Deluxe, Laid-Back Camp
+3. Series pages Tier 1 — ~~Saga~~ ✓, ~~Trigun Maximum Deluxe~~ ✓, ~~Laid-Back Camp~~ ✓, Ouran OHSHC ⚠ BLOCKED (vols 6-13 unidentifiable), Witch Hat Atelier ⚠ BLOCKED (vols 2,5,6,7,8 absent from DB)
 4. Series pages Tier 2 — Hellsing, Naruto (volume data check first), Sengoku Youko, Void Rivals
 5. Series pages Tier 3 — Under Ninja, Innocent Omnibus, Eden of Witches, Wolf's Daughter, Multi-Mind Mayhem, Baki (CV enrichment first)
 6. Series index page at /series

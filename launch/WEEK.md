@@ -1,7 +1,7 @@
 # Catch Comics — Week of 2026-06-06
 
-**Launch date:** July 1, 2026 — **25 days remaining**  
-**Week objective:** Clear all no-blocker items. Sign off cleanup v2. Define the series list.
+**Launch date:** July 1, 2026 — **23 days remaining**  
+**Week objective:** Clear all no-blocker items. Sign off cleanup v2. Define the series list. Ship Tier 1 series pages.
 
 ---
 
@@ -77,6 +77,46 @@ npm run cleanup:noncomics:execute-c
 **Done when:** `https://images.catchcomics.com` confirmed live. Real cover images serving from custom domain.  
 **Blocked by:** —  
 **Completed:** 2026-06-07. ✅ SHIPPED. Domain routing via Cloudflare confirmed (HTTP 404 at root, healthy). Three independent cover image URLs each returned HTTP 200 OK, `image/webp`, served by Cloudflare. Example: `/covers/02bda695-f7d3-4bdf-9544-af49622d281b.webp` (Wings of Fire #8, 12,710 bytes). Production API confirms enriched products use `images.catchcomics.com` URLs. Unenriched products retain `covers.openlibrary.org` fallback — correct behaviour.
+
+---
+
+---
+
+### 9. Trigun Maximum Deluxe — Build and ship
+**Area:** Reading Orders  
+**Launch-critical:** YES  
+**Status:** done  
+**Done when:** ✓ Complete. `/series/trigun-maximum-deluxe` live. 5 volumes in order (Vols 1-5), all DELUXE format, all priced (from £14.99). Vol.1 "START HERE" badge. CV:29569 confirmed across all 5 products. No cover gaps. TypeCheck clean.  
+**Completed:** 2026-06-07. ✅ SHIPPED.
+
+---
+
+### 10. Laid-Back Camp — Repair and build
+**Area:** Reading Orders  
+**Launch-critical:** YES  
+**Status:** done  
+**Done when:** ✓ Complete. `/series/laid-back-camp` live. 17 volumes in order (Vols 1-17), all MANGA_VOLUME format, all priced (from £7.99). Vol.1 "START HERE" badge at £7.99. Data repairs: 15 volume_numbers fixed, 17 formats → MANGA_VOLUME, 5 orphan CV IDs set, 5 series_names set. TypeCheck clean.  
+**Completed:** 2026-06-08. ✅ SHIPPED.
+
+---
+
+### 11. Ouran High School Host Club — Audit and repair
+**Area:** Reading Orders  
+**Launch-critical:** YES  
+**Status:** blocked  
+**Done when:** All 18 products have correct volume_number and format. Page shows reading order without gaps vols 6-13.  
+**Blocked by:** 10 bare-titled products ("Ouran High School Host Club") with ISBNs that Open Library cannot resolve to volume numbers. Vols 6-13 range unidentifiable. Partial repair done: vols 1-5, 14, 15 fixed.  
+**Next action:** Try Google Books API (`GOOGLE_BOOKS_API_KEY` in `.env.local`) for the 10 unresolvable ISBNs. If Google Books also fails, consider cross-referencing Viz Media's own website ISBN list.
+
+---
+
+### 12. Witch Hat Atelier — Audit
+**Area:** Reading Orders  
+**Launch-critical:** YES  
+**Status:** blocked  
+**Done when:** Vols 2, 5, 6, 7, 8 present in DB with correct format (MANGA_VOLUME) and volume_number.  
+**Blocked by:** 5 volumes absent from DB entirely — not in any retailer feed. Also: Vols 13, 14 have NULL volume_number; format for numbered vols needs TPB → MANGA_VOLUME.  
+**Next action:** Source ISBNs for missing vols (try Yen Press catalogue, Bookshop.org, or direct CV lookup). Once ISBNs confirmed, create synthetic products only if evidence is solid (CV + OL confirmation).
 
 ---
 
