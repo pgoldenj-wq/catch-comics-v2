@@ -49,6 +49,11 @@ export const SERIES_REGISTRY: Record<string, SeriesEntry> = {
     cvVolumeId:  '29569',
     publisher:   'Dark Horse Comics',
   },
+  'laid-back-camp': {
+    displayName: 'Laid-Back Camp',
+    cvVolumeId:  '109427',
+    publisher:   'Yen Press',
+  },
 }
 
 /** Returns the SeriesEntry for a slug, or null if not registered. */
