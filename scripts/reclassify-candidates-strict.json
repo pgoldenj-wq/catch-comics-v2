@@ -1,0 +1,2202 @@
+[
+  {
+    "id": "014206d0-f191-4778-af8c-dae320392b20",
+    "title": "Teenage Mutant Ninja Turtles: Black, White, and Green",
+    "publisher": "Idea & Design Works, LLC",
+    "canonicalSlug": "teenage-mutant-ninja-turtles-black-white-and-green-241579",
+    "activeOffers": 2,
+    "maxPrice": 19.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "02d9435a-dae3-40b2-94c0-81a17b31af33",
+    "title": "Spider-Man By Chip Zdarsky Omnibus (New Printing)",
+    "publisher": null,
+    "canonicalSlug": "spider-man-by-chip-zdarsky-omnibus-new-printing-9781302969974",
+    "activeOffers": 1,
+    "maxPrice": 106.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "OMNIBUS"
+  },
+  {
+    "id": "0465f7d4-7ac8-4ecc-a4df-a7050d29ea75",
+    "title": "Ghost Projekt (New Edition)",
+    "publisher": "Oni Press",
+    "canonicalSlug": "ghost-projekt-new-edition-881218",
+    "activeOffers": 1,
+    "maxPrice": 24.19,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "04f05a8c-0794-4251-8330-8a2576efb0ca",
+    "title": "Mieruko-chan Official Comic Anthology",
+    "publisher": "Yen Press LLC",
+    "canonicalSlug": "mieruko-chan-official-comic-anthology-362393",
+    "activeOffers": 2,
+    "maxPrice": 10.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "05e7d7ce-de25-4a0a-8ba0-40d381a9bfd1",
+    "title": "Batman Vol. 2: The Bat-Man of Gotham",
+    "publisher": null,
+    "canonicalSlug": "batman-vol-2-the-bat-man-of-gotham-9781779520425",
+    "activeOffers": 1,
+    "maxPrice": 22,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "05eef10c-c914-419e-88f7-af670bc2235a",
+    "title": "The Devil Is a Part-Timer! Official Comic Anthology",
+    "publisher": "Yen Press LLC",
+    "canonicalSlug": "the-devil-is-a-part-timer-official-comic-anthology-362553",
+    "activeOffers": 2,
+    "maxPrice": 10.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "0618a494-2a6b-4c16-b1fb-cc4b9d7ec2a1",
+    "title": "Mighty Morphin Power Rangers: The Return",
+    "publisher": "BOOM! Studios",
+    "canonicalSlug": "mighty-morphin-power-rangers-the-return-151486",
+    "activeOffers": 1,
+    "maxPrice": 9.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "069f1832-1290-4b61-bd04-2ee0c64e5a08",
+    "title": "The Strongest Sage with the Weakest Crest 32",
+    "publisher": "Square Enix Manga",
+    "canonicalSlug": "the-strongest-sage-with-the-weakest-crest-32-100383",
+    "activeOffers": 1,
+    "maxPrice": 18.29,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "07335d9f-efb1-48b0-a4ed-8e62caec79db",
+    "title": "The Too-Perfect Saint: Tossed Aside by My Fiancé and Sold to Another Kingdom (Manga) Vol. 2",
+    "publisher": null,
+    "canonicalSlug": "the-too-perfect-saint-tossed-aside-by-my-fianc-and-sold-to-another-kingdom-manga-9798891609532",
+    "activeOffers": 1,
+    "maxPrice": 12.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "09151c54-c56e-414e-a3a1-9a0232bfe576",
+    "title": "AFTER: The Graphic Novel (Volume One)",
+    "publisher": null,
+    "canonicalSlug": "after-the-graphic-novel-volume-one-9780349435145",
+    "activeOffers": 1,
+    "maxPrice": 16.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "0a3f12fb-72d8-4ee7-b778-55efb8f8ec26",
+    "title": "Harley Quinn & the Gotham City Sirens: DC Compact Edition",
+    "publisher": "DC Comics",
+    "canonicalSlug": "harley-quinn-the-gotham-city-sirens-dc-compact-edition-527301",
+    "activeOffers": 2,
+    "maxPrice": 8.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "0acbe268-2899-4375-ba1b-891ac79da3cc",
+    "title": "The Complete Art Of Fullmetal Alchemist",
+    "publisher": "VIZ Media LLC",
+    "canonicalSlug": "the-complete-art-of-fullmetal-alchemist-703791",
+    "activeOffers": 0,
+    "maxPrice": null,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "0af53694-e300-4235-aa2e-6c887b808d10",
+    "title": "Chainsaw Man Buddy Stories",
+    "publisher": "Viz Media",
+    "canonicalSlug": "chainsaw-man-buddy-stories-738663",
+    "activeOffers": 2,
+    "maxPrice": 7.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "0c7abb7b-22dc-4b48-8e4e-5df51ea4f41e",
+    "title": "Teen Titans Raven",
+    "publisher": "DC Comics",
+    "canonicalSlug": "teen-titans-raven-507273",
+    "activeOffers": 1,
+    "maxPrice": 14.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "0cc55012-8a85-47c6-be20-5cfccf10a2a3",
+    "title": "Spider-Man: Into the Spider-Verse: The Art of the Movie",
+    "publisher": "Titan Books Limited",
+    "canonicalSlug": "spider-man-into-the-spider-verse-the-art-of-the-movie-659461",
+    "activeOffers": 0,
+    "maxPrice": null,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "103ec1ca-5f04-444f-a352-29c2a4bae230",
+    "title": "Apparently, Disillusioned Adventurers Will Save the World, Vol. 5 (manga)",
+    "publisher": null,
+    "canonicalSlug": "apparently-disillusioned-adventurers-will-save-the-world-vol-5-manga-9781975367411",
+    "activeOffers": 1,
+    "maxPrice": 10.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "10b14d1c-a768-4e14-a693-2e1f1593ef9a",
+    "title": "DC Poster Portfolio - Brian Bolland",
+    "publisher": "DC Comics",
+    "canonicalSlug": "dc-poster-portfolio-brian-bolland-517494",
+    "activeOffers": 0,
+    "maxPrice": null,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "110c674d-5eaa-4ed3-a491-cec2450a6030",
+    "title": "Spider-Man: Miles Morales",
+    "publisher": null,
+    "canonicalSlug": "spider-man-miles-morales-131633",
+    "activeOffers": 2,
+    "maxPrice": 17.79,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "11ca7201-fba8-42b4-82c6-f95ee7782f09",
+    "title": "Disney Twisted-Wonderland: The Official Art Book",
+    "publisher": "Viz Media",
+    "canonicalSlug": "disney-twisted-wonderland-the-official-art-book-748587",
+    "activeOffers": 0,
+    "maxPrice": null,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "1328efec-c2de-45e5-86fa-5401cd943647",
+    "title": "The Art And Making Of Transformers War For Cybertron Trilogy",
+    "publisher": "Viz Media",
+    "canonicalSlug": "the-art-and-making-of-transformers-war-for-cybertron-trilogy-732500",
+    "activeOffers": 0,
+    "maxPrice": null,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "1329b769-22b0-4ec9-a13d-7c3841d62556",
+    "title": "The Amory Wars: The Second Stage Turbine Blade",
+    "publisher": "BOOM! Studios",
+    "canonicalSlug": "the-amory-wars-the-second-stage-turbine-blade-153508",
+    "activeOffers": 1,
+    "maxPrice": 13.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "14f692a0-e344-4395-8423-8ea92d789c3b",
+    "title": "Marvel Comics Library",
+    "publisher": null,
+    "canonicalSlug": "marvel-comics-library-9783836599542",
+    "activeOffers": 1,
+    "maxPrice": 20,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "1551719a-f838-4df7-9b26-a19a0e2342f4",
+    "title": "Batman: Last Knight on Earth",
+    "publisher": "DC Comics",
+    "canonicalSlug": "batman-last-knight-on-earth-513182",
+    "activeOffers": 1,
+    "maxPrice": 19.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "19e395f4-4475-44e3-929e-56cb4d2d90b1",
+    "title": "You Can't Bluff the Sharp-Eyed Sister 5",
+    "publisher": "Kodansha Comics",
+    "canonicalSlug": "you-can-t-bluff-the-sharp-eyed-sister-5-779019",
+    "activeOffers": 1,
+    "maxPrice": 19.59,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "1b679b47-fed2-45d4-8ec0-8c3683ed11d9",
+    "title": "Re-Living My Life with a Boyfriend Who Doesn't Remember Me (Manga) Vol. 5",
+    "publisher": null,
+    "canonicalSlug": "re-living-my-life-with-a-boyfriend-who-doesn-t-remember-me-manga-vol-5-9798893739572",
+    "activeOffers": 1,
+    "maxPrice": 13.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "1effc8f9-825f-4510-a0bf-63f9bcb7d9bd",
+    "title": "Batman One Bad Day Catwoman",
+    "publisher": "DC Comics",
+    "canonicalSlug": "batman-one-bad-day-catwoman-520333",
+    "activeOffers": 2,
+    "maxPrice": 16.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "1fb31aae-a359-4f9a-a753-f38f62698cfd",
+    "title": "Re-Living My Life with a Boyfriend Who Doesn't Remember Me (Manga) Vol. 4",
+    "publisher": null,
+    "canonicalSlug": "re-living-my-life-with-a-boyfriend-who-doesn-t-remember-me-manga-vol-4-9798891609983",
+    "activeOffers": 1,
+    "maxPrice": 13.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "2078ac1c-8478-4081-8435-507655ab063a",
+    "title": "Harley Quinn Black + White + Redder",
+    "publisher": "DC Comics",
+    "canonicalSlug": "harley-quinn-black-white-redder-526045",
+    "activeOffers": 2,
+    "maxPrice": 16.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "2104b364-c478-4efc-a517-af95a2a35fee",
+    "title": "By the Grace of the Gods (Manga) 04",
+    "publisher": null,
+    "canonicalSlug": "by-the-grace-of-the-gods-manga-04-9781646090884",
+    "activeOffers": 1,
+    "maxPrice": 10.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "23ea92d8-b21a-46b4-926f-e1c0e7825c6b",
+    "title": "My Hero Academia: The Official Easy Illustration Guide",
+    "publisher": "Viz Media",
+    "canonicalSlug": "my-hero-academia-the-official-easy-illustration-guide-740369",
+    "activeOffers": 2,
+    "maxPrice": 10.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "2511d76a-5adc-4937-afd7-62a5302cef6d",
+    "title": "Hit Complete Collection",
+    "publisher": "BOOM! Studios",
+    "canonicalSlug": "hit-complete-collection-153584",
+    "activeOffers": 1,
+    "maxPrice": 7.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "2517823d-dd81-4eb4-9973-f44daa942960",
+    "title": "Magic Book One",
+    "publisher": "BOOM! Studios",
+    "canonicalSlug": "magic-book-one-506332",
+    "activeOffers": 1,
+    "maxPrice": 14.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "26c33e0c-66f7-4c68-95fe-3640a2499133",
+    "title": "Mimi's Tales of Terror",
+    "publisher": "Viz Media",
+    "canonicalSlug": "mimi-s-tales-of-terror-738519",
+    "activeOffers": 2,
+    "maxPrice": 20,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "27b3089f-737d-4208-bc64-07d0041e1139",
+    "title": "Spirited Away Film Comic All-in-One Edition",
+    "publisher": "Viz Media",
+    "canonicalSlug": "spirited-away-film-comic-all-in-one-edition-751556",
+    "activeOffers": 2,
+    "maxPrice": 28,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "29be52a0-d970-4a83-abdb-decf429b4650",
+    "title": "Rick And Morty Vs Dungeons & Dragons The Complete Adventures",
+    "publisher": "IDW Publishing",
+    "canonicalSlug": "rick-and-morty-vs-dungeons-dragons-the-complete-adventures-056491",
+    "activeOffers": 1,
+    "maxPrice": 20,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "2b113696-866a-4cb9-aa48-d40c35bd165b",
+    "title": "Minecraft: The Manga, Vol. 7 Volume 7",
+    "publisher": null,
+    "canonicalSlug": "minecraft-the-manga-vol-7-volume-7-9781974763115",
+    "activeOffers": 1,
+    "maxPrice": 8.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "2c864a29-cecb-449d-b8e4-480d29a3662a",
+    "title": "BL First Crush Anthology: Five Seconds Before We Fall in Love",
+    "publisher": "Seven Seas",
+    "canonicalSlug": "bl-first-crush-anthology-five-seconds-before-we-fall-in-love-437520",
+    "activeOffers": 1,
+    "maxPrice": 10.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "2da4f016-86eb-4924-8969-899f6482fe7d",
+    "title": "Sasaki And Miyano Official Comic Anthology",
+    "publisher": "Yen Press LLC",
+    "canonicalSlug": "sasaki-and-miyano-official-comic-anthology-366469",
+    "activeOffers": 2,
+    "maxPrice": 10.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "2e62c4e3-441a-4366-86e0-10a04f50f5ee",
+    "title": "This Is Screwed Up, but I Was Reincarnated as a GIRL in Another World! (Manga) Vol. 19",
+    "publisher": null,
+    "canonicalSlug": "this-is-screwed-up-but-i-was-reincarnated-as-a-girl-in-another-world-manga-vol-1-9798893737882",
+    "activeOffers": 1,
+    "maxPrice": 12.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "3456a428-c1c5-4783-b6b3-833bc730c76d",
+    "title": "Deadpool & Wolverine WWIII",
+    "publisher": "Marvel Universe",
+    "canonicalSlug": "deadpool-wolverine-wwiii-953478",
+    "activeOffers": 2,
+    "maxPrice": 14.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "34d85cc3-3959-447e-b951-de9b5db295cb",
+    "title": "Batman One Bad Day Two-Face",
+    "publisher": "DC Comics",
+    "canonicalSlug": "batman-one-bad-day-two-face-519924",
+    "activeOffers": 2,
+    "maxPrice": 16.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "35056e7e-0a30-4ed0-8a63-cf6e15428e2b",
+    "title": "Demon Slayer Coloring Book 2",
+    "publisher": "Viz Media",
+    "canonicalSlug": "demon-slayer-coloring-book-2-738977",
+    "activeOffers": 1,
+    "maxPrice": 7.59,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "374497b6-bfd6-4b73-a5ff-cd0ca8944640",
+    "title": "Campfire Cooking in Another World With My Absurd Skill: Volume 6 (Manga)",
+    "publisher": null,
+    "canonicalSlug": "campfire-cooking-in-another-world-with-my-absurd-skill-volume-6-manga-9781718337862",
+    "activeOffers": 1,
+    "maxPrice": 12.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "3b4e373f-c003-4c45-bf2c-08c054dd8a21",
+    "title": "Old-Fashioned Cupcake",
+    "publisher": "Viz Media",
+    "canonicalSlug": "old-fashioned-cupcake-734580",
+    "activeOffers": 1,
+    "maxPrice": 6.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "3c575161-8c3e-4327-92b0-95a5627550e2",
+    "title": "Seen - True Stories of Marginalized Trailblazers",
+    "publisher": "Boom! Studios",
+    "canonicalSlug": "seen-true-stories-of-marginalized-trailblazers-156344",
+    "activeOffers": 1,
+    "maxPrice": 3.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "3dfb400a-8577-48c0-9a4f-5a431180e32d",
+    "title": "Rooms An illustration And Comic Collection By Senbon Umishima",
+    "publisher": "Pie International Co., Ltd.",
+    "canonicalSlug": "rooms-an-illustration-and-comic-collection-by-senbon-umishima-254788",
+    "activeOffers": 1,
+    "maxPrice": 17.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "3e6cd676-0d34-4c46-a19c-175daaa3ac3f",
+    "title": "Batman: Gotham by Gaslight (2023 Edition)",
+    "publisher": "DC Comics",
+    "canonicalSlug": "batman-gotham-by-gaslight-2023-edition-524058",
+    "activeOffers": 2,
+    "maxPrice": 16.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "400c11c8-47da-4f51-9837-e6f48f7035fd",
+    "title": "Tatsuki Fujimoto Before Chainsaw Man: 17-21",
+    "publisher": "Viz Media",
+    "canonicalSlug": "tatsuki-fujimoto-before-chainsaw-man-17-21-734771",
+    "activeOffers": 1,
+    "maxPrice": 5.59,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "401b483b-36f3-42c9-afea-f8a38f380807",
+    "title": "Restart After Growing Hungry",
+    "publisher": "Seven Seas",
+    "canonicalSlug": "restart-after-growing-hungry-276774",
+    "activeOffers": 1,
+    "maxPrice": 9.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "4116be40-0cb0-420b-9898-8aae927a2204",
+    "title": "JoJo A-Go!Go!",
+    "publisher": "VIZ Media LLC",
+    "canonicalSlug": "jojo-a-go-go-746859",
+    "activeOffers": 1,
+    "maxPrice": 24,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "41d1c67f-ccbb-4008-96aa-2b443c106e9d",
+    "title": "ROLL OVER AND DIE: I Will Fight for an Ordinary Life with My Love and Cursed Sword! (Manga) Vol. 3",
+    "publisher": null,
+    "canonicalSlug": "roll-over-and-die-i-will-fight-for-an-ordinary-life-with-my-love-and-cursed-swor-9781648279003",
+    "activeOffers": 1,
+    "maxPrice": 11.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "424aea65-25e9-4fd9-a2c9-cd2b72ff5e33",
+    "title": "H.P. Lovecraft's The Dunwich Horror Deluxe Edition (Manga)",
+    "publisher": null,
+    "canonicalSlug": "h-p-lovecraft-s-the-dunwich-horror-deluxe-edition-manga-9781506753485",
+    "activeOffers": 1,
+    "maxPrice": 42.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "42da7fb5-aa8c-445c-91c0-6f3a80ee39a7",
+    "title": "Delicious In Dungeon World Guide Adventure Bible",
+    "publisher": "Yen Press",
+    "canonicalSlug": "delicious-in-dungeon-world-guide-adventure-bible-338664",
+    "activeOffers": 1,
+    "maxPrice": 14.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "42f55566-9ddb-4acb-9eb6-9f255148ba90",
+    "title": "10 Things I Want to Do Before I Turn 40",
+    "publisher": "Seven Seas",
+    "canonicalSlug": "10-things-i-want-to-do-before-i-turn-40-732894",
+    "activeOffers": 2,
+    "maxPrice": 14.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "44d2e7d9-bbee-4d65-bb93-7f889d2734d2",
+    "title": "Demon Slayer Coloring Book 3",
+    "publisher": "VIZ Media LLC",
+    "canonicalSlug": "demon-slayer-coloring-book-3-752881",
+    "activeOffers": 2,
+    "maxPrice": 12.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "4515473a-e86a-41bb-b9dd-52f28e7b16d3",
+    "title": "Candy Color Paradox Assorted Pack",
+    "publisher": "Viz Media",
+    "canonicalSlug": "candy-color-paradox-assorted-pack-743827",
+    "activeOffers": 2,
+    "maxPrice": 9.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "456abc59-285d-4219-95ec-d18f6ddda6d3",
+    "title": "DCeased",
+    "publisher": "DC Comics",
+    "canonicalSlug": "dceased-505651",
+    "activeOffers": 2,
+    "maxPrice": 16.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "4577aa41-eee1-4d87-946c-4a8b2dfb1245",
+    "title": "Spider-Man: Fake Red",
+    "publisher": "Viz Media",
+    "canonicalSlug": "spider-man-fake-red-738786",
+    "activeOffers": 1,
+    "maxPrice": 7.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "462568b7-08c4-4c46-9a98-359ecf3a94ca",
+    "title": "Bloodborne Collection: The Death of Sleep",
+    "publisher": "Titan Comics",
+    "canonicalSlug": "bloodborne-collection-the-death-of-sleep-863448",
+    "activeOffers": 2,
+    "maxPrice": 14.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "48a48f73-ed70-4610-81b2-4c37aef722e9",
+    "title": "The Matrix Comics 20th Anniversary Edition",
+    "publisher": null,
+    "canonicalSlug": "the-matrix-comics-20th-anniversary-edition-9781787734777",
+    "activeOffers": 1,
+    "maxPrice": 39.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "491582ae-bb79-4a88-a3c2-04e5b102c435",
+    "title": "The Do-Over Damsel Conquers the Dragon Emperor, Vol. 1 (manga)",
+    "publisher": null,
+    "canonicalSlug": "the-do-over-damsel-conquers-the-dragon-emperor-vol-1-manga-9781975360429",
+    "activeOffers": 1,
+    "maxPrice": 10.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "4ab0a2d6-687c-4e12-956a-3cfcaa838f5f",
+    "title": "Eclair Rouge: A Girls Love Anthology That Resonates In Your Heart",
+    "publisher": "Yen Press",
+    "canonicalSlug": "eclair-rouge-a-girls-love-anthology-that-resonates-in-your-heart-359126",
+    "activeOffers": 1,
+    "maxPrice": 10.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "4b5e664e-4d29-4ba6-b766-a503490885dc",
+    "title": "Tatsuki Fujimoto Before Chainsaw Man: 22-26",
+    "publisher": "Viz Media",
+    "canonicalSlug": "tatsuki-fujimoto-before-chainsaw-man-22-26-734788",
+    "activeOffers": 1,
+    "maxPrice": 5.59,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "4ba58412-e4ba-4491-bb80-854892611285",
+    "title": "Punks Triangle",
+    "publisher": "Seven Seas",
+    "canonicalSlug": "punks-triangle-731644",
+    "activeOffers": 1,
+    "maxPrice": 10.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "4e0b3ea2-a6e9-41b4-bcb9-108330fec36a",
+    "title": "Batman/Superman: World's Finest Vol. 7: Total Eclipso",
+    "publisher": null,
+    "canonicalSlug": "batman-superman-world-s-finest-vol-7-total-eclipso-9781799505266",
+    "activeOffers": 1,
+    "maxPrice": 22,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "4f7764f6-50cf-47cf-8382-31b755e26d72",
+    "title": "In Another World with My Smartphone, Vol. 6 (manga)",
+    "publisher": null,
+    "canonicalSlug": "in-another-world-with-my-smartphone-vol-6-manga-9781975321130",
+    "activeOffers": 1,
+    "maxPrice": 10.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "505a4c7a-4e82-4d0b-8c84-b6ca2d6af53a",
+    "title": "Nightwing: Fear State",
+    "publisher": "DC Comics",
+    "canonicalSlug": "nightwing-fear-state-520050",
+    "activeOffers": 2,
+    "maxPrice": 16.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "506fe3ae-792d-4cba-9cf4-3ceb65576b71",
+    "title": "American Vampire 1976",
+    "publisher": "DC Comics",
+    "canonicalSlug": "american-vampire-1976-517241",
+    "activeOffers": 1,
+    "maxPrice": 12.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "50e45e89-c38d-449c-af03-802dc2649643",
+    "title": "Domo: The Manga",
+    "publisher": null,
+    "canonicalSlug": "domo-the-manga-9781427884527",
+    "activeOffers": 1,
+    "maxPrice": 11.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "52bc2850-cce6-4919-ba25-7d84cc5b6566",
+    "title": "Takara's Treasure",
+    "publisher": "Viz Media",
+    "canonicalSlug": "takara-s-treasure-749621",
+    "activeOffers": 2,
+    "maxPrice": 10.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "53659184-6288-4c9c-8de4-bf22500014c3",
+    "title": "DC Pride: The New Generation",
+    "publisher": "DC Comics",
+    "canonicalSlug": "dc-pride-the-new-generation-518484",
+    "activeOffers": 2,
+    "maxPrice": 16.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "54401e1f-162b-4873-b12e-480529f63761",
+    "title": "Disney Mirrorverse: Belle",
+    "publisher": "Viz Media",
+    "canonicalSlug": "disney-mirrorverse-belle-734801",
+    "activeOffers": 1,
+    "maxPrice": 7.59,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "54e27fe5-2463-4e81-992b-898aedf5a2d7",
+    "title": "A Wizard of Earthsea: Graphic Novel",
+    "publisher": null,
+    "canonicalSlug": "a-wizard-of-earthsea-graphic-novel-526264",
+    "activeOffers": 2,
+    "maxPrice": 12.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "554e3c45-2c0c-44a9-9b57-f08f782de468",
+    "title": "Batman One Bad Day Clayface",
+    "publisher": "DC Comics",
+    "canonicalSlug": "batman-one-bad-day-clayface-520470",
+    "activeOffers": 2,
+    "maxPrice": 16.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "57573feb-f69b-49e5-af8c-529d9ecf60fe",
+    "title": "Justice League: The New 52 Omnibus Vol. 1",
+    "publisher": null,
+    "canonicalSlug": "justice-league-the-new-52-omnibus-vol-1-9781779510662",
+    "activeOffers": 1,
+    "maxPrice": 114,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "OMNIBUS"
+  },
+  {
+    "id": "57903a41-792b-496f-9992-366f8b1f22d6",
+    "title": "Batman One Bad Day Ra's Al Ghul",
+    "publisher": "DC Comics",
+    "canonicalSlug": "batman-one-bad-day-ra-s-al-ghul-520616",
+    "activeOffers": 1,
+    "maxPrice": 12.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "58801cd5-6dfc-4ca0-884e-cb6174e50866",
+    "title": "The Art of Demon Slayer: Kimetsu no Yaiba",
+    "publisher": "Viz Media",
+    "canonicalSlug": "the-art-of-demon-slayer-kimetsu-no-yaiba-734108",
+    "activeOffers": 0,
+    "maxPrice": null,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "5cd4a796-ef58-4ca9-b52d-ec1e18422364",
+    "title": "The Ogre / The Comics Page",
+    "publisher": null,
+    "canonicalSlug": "the-ogre-the-comics-page-703336",
+    "activeOffers": 1,
+    "maxPrice": 15.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "5d2e67a0-c9af-4b18-80f5-8ba6357a1679",
+    "title": "Jujutsu Kaisen: Thorny Road at Dawn",
+    "publisher": "Viz Media",
+    "canonicalSlug": "jujutsu-kaisen-thorny-road-at-dawn-732562",
+    "activeOffers": 1,
+    "maxPrice": 5.59,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "5d5dca16-6b8d-4d20-bddb-5b0b94c9960f",
+    "title": "Reincarnated as a Sword (Manga) Vol. 17",
+    "publisher": null,
+    "canonicalSlug": "reincarnated-as-a-sword-manga-vol-17-9798897651726",
+    "activeOffers": 1,
+    "maxPrice": 12.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "5f5a2804-5147-400d-9dcd-ecf6cb0e00cd",
+    "title": "The Art of Haikyu!!",
+    "publisher": "Viz Media LLC",
+    "canonicalSlug": "the-art-of-haikyu-733538",
+    "activeOffers": 0,
+    "maxPrice": null,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "5fefa41d-904d-4174-befd-5d241855c2c8",
+    "title": "The Superman Wars",
+    "publisher": "Simon & Schuster NZ",
+    "canonicalSlug": "the-superman-wars-654842",
+    "activeOffers": 1,
+    "maxPrice": 24.79,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "606f5a5f-8ef2-4dba-9936-83f4308da7b8",
+    "title": "On the Edge of the Dark Sea of Darkness: The Graphic Novel",
+    "publisher": null,
+    "canonicalSlug": "on-the-edge-of-the-dark-sea-of-darkness-the-graphic-novel-444939",
+    "activeOffers": 1,
+    "maxPrice": 21.49,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "60aa5b40-8331-45ad-9c65-7ef7835133eb",
+    "title": "War on Gaza",
+    "publisher": "Fantagraphics Books",
+    "canonicalSlug": "war-on-gaza-000904",
+    "activeOffers": 2,
+    "maxPrice": 11.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "61495ec1-f281-4008-a240-9393810d476e",
+    "title": "Batman: The Arkham Saga Omnibus (New Edition)",
+    "publisher": null,
+    "canonicalSlug": "batman-the-arkham-saga-omnibus-new-edition-9781779529503",
+    "activeOffers": 1,
+    "maxPrice": 136,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "OMNIBUS"
+  },
+  {
+    "id": "63c39fa5-06aa-4fd2-93f2-e06f4cf5f3dc",
+    "title": "Long Way Down (The Graphic Novel)",
+    "publisher": null,
+    "canonicalSlug": "long-way-down-the-graphic-novel-9780571404810",
+    "activeOffers": 1,
+    "maxPrice": 9.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "63ee89a2-06b7-4296-8a0e-fc0815efa7cf",
+    "title": "Teen Titans Beast Boy",
+    "publisher": "DC Comics",
+    "canonicalSlug": "teen-titans-beast-boy-507297",
+    "activeOffers": 1,
+    "maxPrice": 14.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "66706ce2-693e-414c-b88f-c4ef4b04d333",
+    "title": "The Art Of The Tale Of The Princess Kaguya",
+    "publisher": "Viz Media",
+    "canonicalSlug": "the-art-of-the-tale-of-the-princess-kaguya-727834",
+    "activeOffers": 0,
+    "maxPrice": null,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "6683a76a-ec50-461f-a195-1da98a090cdc",
+    "title": "Kiki's Delivery Service Film Comic All-in-One Edition",
+    "publisher": "Viz Media",
+    "canonicalSlug": "kiki-s-delivery-service-film-comic-all-in-one-edition-749683",
+    "activeOffers": 2,
+    "maxPrice": 24,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "679081d3-c88f-4128-a361-c6053a17c53c",
+    "title": "Daemons of the Shadow Realm 11",
+    "publisher": "Square Enix Manga",
+    "canonicalSlug": "daemons-of-the-shadow-realm-11-100307",
+    "activeOffers": 2,
+    "maxPrice": 18.49,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "687f563d-9eba-4724-bdf7-e578c14d9297",
+    "title": "The Amazing Spider-Man - Kraven's Last Hunt",
+    "publisher": "Panini UK Limited",
+    "canonicalSlug": "the-amazing-spider-man-kraven-s-last-hunt-910634",
+    "activeOffers": 1,
+    "maxPrice": 12.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "68a72c9a-1c50-4a14-b918-a94f145b09d6",
+    "title": "Mermaid Scales and the Town of Sand",
+    "publisher": "Viz Media",
+    "canonicalSlug": "mermaid-scales-and-the-town-of-sand-734658",
+    "activeOffers": 1,
+    "maxPrice": 11.19,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "6975d1d7-56aa-4acb-b6ad-a715583b27f7",
+    "title": "DC Pride: Better Together",
+    "publisher": "DC Comics",
+    "canonicalSlug": "dc-pride-better-together-525062",
+    "activeOffers": 1,
+    "maxPrice": 10.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "6a013231-3aae-4a90-a972-10e83b1798b4",
+    "title": "Avatar The Last Airbender: The Bounty Hunter and the Tea Brewer",
+    "publisher": "Dark Horse Comics",
+    "canonicalSlug": "avatar-the-last-airbender-the-bounty-hunter-and-the-tea-brewer-737720",
+    "activeOffers": 2,
+    "maxPrice": 11.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "6a98aca7-83d6-47ad-82e2-73a719f4a12b",
+    "title": "Lotus Land",
+    "publisher": "BOOM! Studios",
+    "canonicalSlug": "lotus-land-151462",
+    "activeOffers": 1,
+    "maxPrice": 11.59,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "6c8adeaa-fb48-4f8a-83c3-eb9ed68f4bb3",
+    "title": "Tombs Junji ito Story Collection",
+    "publisher": "VIZ Media",
+    "canonicalSlug": "tombs-junji-ito-story-collection-736041",
+    "activeOffers": 1,
+    "maxPrice": 13.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "6cc8a0ff-c610-4f75-98e7-ec5afc3c163b",
+    "title": "Daredevil By Chip Zdarsky Vol. 7: Lockdown",
+    "publisher": null,
+    "canonicalSlug": "daredevil-by-chip-zdarsky-vol-7-lockdown-9781302926106",
+    "activeOffers": 1,
+    "maxPrice": 16.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "6ce0770f-850e-4c98-8a92-dfe6a3b02e6c",
+    "title": "Batman by Tom King Book One",
+    "publisher": "DC Comics",
+    "canonicalSlug": "batman-by-tom-king-book-one-527592",
+    "activeOffers": 2,
+    "maxPrice": 45,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "6f83ea16-6bfe-43fb-8dfc-5776ee119df0",
+    "title": "Black Sight",
+    "publisher": "Dark Horse Comics",
+    "canonicalSlug": "black-sight-746906",
+    "activeOffers": 2,
+    "maxPrice": 20.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "6f8934b4-7c00-4506-bf69-39a69dbffdab",
+    "title": "Petra Cherie",
+    "publisher": "Fantagraphics Books",
+    "canonicalSlug": "petra-cherie-001048",
+    "activeOffers": 1,
+    "maxPrice": 50.39,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "6fd6df16-3cce-482f-8f21-111eb7f87d50",
+    "title": "The Atlas Comics Library No. 11",
+    "publisher": null,
+    "canonicalSlug": "the-atlas-comics-library-no-11-002359",
+    "activeOffers": 1,
+    "maxPrice": 47.09,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "705a106b-868e-491c-9716-aa8201e842bb",
+    "title": "Jujutsu Kaisen: The Official Character Guide",
+    "publisher": "Viz Media",
+    "canonicalSlug": "jujutsu-kaisen-the-official-character-guide-743810",
+    "activeOffers": 1,
+    "maxPrice": 11.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "713df8d8-30ab-4666-8510-a3f50d010296",
+    "title": "Beat It, Rufus ***Bookplate Edition***",
+    "publisher": "Fantagraphics Books",
+    "canonicalSlug": "beat-it-rufus-bookplate-edition-000478",
+    "activeOffers": 1,
+    "maxPrice": 22.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "71615a19-fdea-4283-aeed-41f48a5d746e",
+    "title": "Hitting Rewind With You 4",
+    "publisher": "Kodansha Comics",
+    "canonicalSlug": "hitting-rewind-with-you-4-778104",
+    "activeOffers": 2,
+    "maxPrice": 19.59,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "73fe84b5-2f70-4937-82a5-52b01078e421",
+    "title": "Re-Living My Life with a Boyfriend Who Doesn’t Remember Me (Manga) Vol. 2",
+    "publisher": null,
+    "canonicalSlug": "re-living-my-life-with-a-boyfriend-who-doesn-t-remember-me-manga-vol-2-9798891600546",
+    "activeOffers": 1,
+    "maxPrice": 13.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "748959ca-90d8-4cdd-a578-c1948196347d",
+    "title": "Sonic the Hedgehog: The IDW Comic Art Collection",
+    "publisher": "Idea & Design Works, LLC",
+    "canonicalSlug": "sonic-the-hedgehog-the-idw-comic-art-collection-240428",
+    "activeOffers": 1,
+    "maxPrice": 17.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "75633423-a7e7-41f9-a4f6-2593e0c08efb",
+    "title": "Batman The Detective",
+    "publisher": "DC Comics",
+    "canonicalSlug": "batman-the-detective-514189",
+    "activeOffers": 1,
+    "maxPrice": 15.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "76269597-612e-4917-ba0e-86d5728723b2",
+    "title": "Four Lives Remain: Tatsuya Endo Before Spy X Family",
+    "publisher": "Viz Media",
+    "canonicalSlug": "four-lives-remain-tatsuya-endo-before-spy-x-family-752607",
+    "activeOffers": 2,
+    "maxPrice": 8.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "76a56272-b54c-4ec4-84a3-948c8f07923f",
+    "title": "Omega Megaera 6",
+    "publisher": "Kodansha Comics",
+    "canonicalSlug": "omega-megaera-6-775967",
+    "activeOffers": 1,
+    "maxPrice": 17.89,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "78671948-9706-4a14-a1bb-afb85b3d12c2",
+    "title": "Heaven Official's Blessing (The Comic): Volume 4",
+    "publisher": null,
+    "canonicalSlug": "heaven-official-s-blessing-the-comic-volume-4-9781911741060",
+    "activeOffers": 1,
+    "maxPrice": 24,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "787ab37b-ce6e-4142-b995-9172ea643110",
+    "title": "Justice League vs. Godzilla vs. Kong",
+    "publisher": "DC Comics",
+    "canonicalSlug": "justice-league-vs-godzilla-vs-kong-525291",
+    "activeOffers": 2,
+    "maxPrice": 26,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "79c4ea86-f534-40a2-ab0e-36633cfd3d9b",
+    "title": "Marvel's Secret Reverse",
+    "publisher": "Viz Media",
+    "canonicalSlug": "marvel-s-secret-reverse-728541",
+    "activeOffers": 1,
+    "maxPrice": 5.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "79dfe775-7101-47d3-8060-729f858fab3a",
+    "title": "Batman The Long Halloween The Prequel: Haunted Knight",
+    "publisher": "DC Comics",
+    "canonicalSlug": "batman-the-long-halloween-the-prequel-haunted-knight-516381",
+    "activeOffers": 2,
+    "maxPrice": 45,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "7b521d5a-22fc-4e1f-a1a0-8a7fad836147",
+    "title": "Batwoman: Elegy",
+    "publisher": "DC Comics",
+    "canonicalSlug": "batwoman-elegy-527929",
+    "activeOffers": 2,
+    "maxPrice": 16.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "7bddd307-5e82-410c-8111-b34b39f249d0",
+    "title": "Jujutsu Kaisen Summer Of Ashes, Autumn Of Dust",
+    "publisher": "Viz Media",
+    "canonicalSlug": "jujutsu-kaisen-summer-of-ashes-autumn-of-dust-732555",
+    "activeOffers": 1,
+    "maxPrice": 5.59,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "7ff35c4b-66f4-44ae-9f7f-b01245279d86",
+    "title": "Fake Fact Lips",
+    "publisher": "Seven Seas",
+    "canonicalSlug": "fake-fact-lips-731361",
+    "activeOffers": 1,
+    "maxPrice": 11.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "8285b06d-b45e-4892-828b-73f425458907",
+    "title": "Persona 5 Comic à la Carte",
+    "publisher": "UDON Entertainment Corporation",
+    "canonicalSlug": "persona-5-comic-la-carte-942590",
+    "activeOffers": 1,
+    "maxPrice": 9.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "838aac46-0f57-4a7d-b812-d5a7ed0b6751",
+    "title": "Batman: One Dark Knight",
+    "publisher": "DC Comics",
+    "canonicalSlug": "batman-one-dark-knight-520524",
+    "activeOffers": 2,
+    "maxPrice": 16.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "846b3004-aa16-422f-8524-6bd4f6992d20",
+    "title": "Rent-A-Girlfriend 38",
+    "publisher": "Kodansha Comics",
+    "canonicalSlug": "rent-a-girlfriend-38-775271",
+    "activeOffers": 2,
+    "maxPrice": 18.79,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "8687ead3-e943-4c46-b994-46ed6bc30da7",
+    "title": "Mangatopia Cupcakes and Kitties",
+    "publisher": null,
+    "canonicalSlug": "mangatopia-cupcakes-and-kitties-9781035083626",
+    "activeOffers": 1,
+    "maxPrice": 8.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "87096f0c-fae3-4fbe-8069-6a7680320f71",
+    "title": "Transformers: A Visual History Limited Edition Slipcase",
+    "publisher": "Viz Media",
+    "canonicalSlug": "transformers-a-visual-history-limited-edition-slipcase-710577",
+    "activeOffers": 0,
+    "maxPrice": null,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "878e7b77-5088-43d5-a09e-ca37af96514a",
+    "title": "The Strange Case of Harleen and Harley",
+    "publisher": "DC Comics",
+    "canonicalSlug": "the-strange-case-of-harleen-and-harley-509758",
+    "activeOffers": 1,
+    "maxPrice": 13.59,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "879a9ebf-a193-4d7f-bda0-1dff95bd26f9",
+    "title": "My Neighbor Totoro All-in-One Edition",
+    "publisher": "Viz Media",
+    "canonicalSlug": "my-neighbor-totoro-all-in-one-edition-746972",
+    "activeOffers": 2,
+    "maxPrice": 24,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "87d4d7d1-e9d1-456a-b911-bb8aab4e5fbf",
+    "title": "Teenage Mutant Ninja Turtles: The Last Ronin--Lost Years",
+    "publisher": "IDW Publishing",
+    "canonicalSlug": "teenage-mutant-ninja-turtles-the-last-ronin-lost-years-244648",
+    "activeOffers": 1,
+    "maxPrice": 23.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "8a097850-a4ab-47ed-a17f-abd4de759bab",
+    "title": "Sea Melt Lover",
+    "publisher": "Seven Seas",
+    "canonicalSlug": "sea-melt-lover-651412",
+    "activeOffers": 1,
+    "maxPrice": 11.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "8cb15836-d8d3-457c-95ba-f8a06004579c",
+    "title": "Deadpool: Samurai The Official Colouring Book",
+    "publisher": "Viz Media",
+    "canonicalSlug": "deadpool-samurai-the-official-colouring-book-747115",
+    "activeOffers": 2,
+    "maxPrice": 10.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "8dd5e91f-a96f-4d63-9217-1a9f4bc7efc3",
+    "title": "How to Create Comics the Marvel Way",
+    "publisher": "Gallery Books",
+    "canonicalSlug": "how-to-create-comics-the-marvel-way-134549",
+    "activeOffers": 1,
+    "maxPrice": 15.59,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "8f32b594-f4dc-4491-a2ae-035366b1292e",
+    "title": "DCeased Unkillables",
+    "publisher": "DC Comics",
+    "canonicalSlug": "dceased-unkillables-505965",
+    "activeOffers": 2,
+    "maxPrice": 16.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "92172f11-602c-4a24-8a61-b52af2b786db",
+    "title": "Milk & Mocha Comics Collection",
+    "publisher": null,
+    "canonicalSlug": "milk-mocha-comics-collection-608750",
+    "activeOffers": 1,
+    "maxPrice": 164.09,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "93aec420-58d4-4d56-9f67-d1fdc9f9e0c4",
+    "title": "Jojo 6251 Hirohiko Araki's World",
+    "publisher": "Viz Media",
+    "canonicalSlug": "jojo-6251-hirohiko-araki-s-world-728367",
+    "activeOffers": 0,
+    "maxPrice": null,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "94ec5353-4ed6-4984-a250-0f9a63fcdd04",
+    "title": "Nausicaä of the Valley of the Wind Picture Book",
+    "publisher": "VIZ Media LLC",
+    "canonicalSlug": "nausica-of-the-valley-of-the-wind-picture-book-705610",
+    "activeOffers": 0,
+    "maxPrice": null,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "95c63441-82fb-4a8a-9db4-7f1e9783cf3d",
+    "title": "The Tale Of The Princess Kaguya Picture Book",
+    "publisher": "Viz Media",
+    "canonicalSlug": "the-tale-of-the-princess-kaguya-picture-book-727841",
+    "activeOffers": 1,
+    "maxPrice": 7.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "96250305-e302-4736-97c3-ac5e125b1c1c",
+    "title": "Pokemon The Complete Pokemon Pocket Guide Box Set",
+    "publisher": "VIZ Media LLC",
+    "canonicalSlug": "pokemon-the-complete-pokemon-pocket-guide-box-set-741205",
+    "activeOffers": 2,
+    "maxPrice": 23.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "98358273-0659-42c1-9870-6f865a688eda",
+    "title": "GALAXIAS 3",
+    "publisher": "Kodansha Comics",
+    "canonicalSlug": "galaxias-3-777138",
+    "activeOffers": 1,
+    "maxPrice": 19.59,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "986ca277-4fd5-46c6-942d-cdc14a7d5b46",
+    "title": "Demon Slayer Kimetsu no Yaiba- Corps Records",
+    "publisher": "Viz Media",
+    "canonicalSlug": "demon-slayer-kimetsu-no-yaiba-corps-records-736027",
+    "activeOffers": 2,
+    "maxPrice": 13.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "992c8837-5ccc-4ce6-a880-6e1461c9561e",
+    "title": "Batman: The 1989 Movie Adaptation",
+    "publisher": "DC Comics",
+    "canonicalSlug": "batman-the-1989-movie-adaptation-523501",
+    "activeOffers": 2,
+    "maxPrice": 13.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "99a98004-ec6e-489e-ade4-16fb7ae3a2be",
+    "title": "Batman/Superman: World's Finest: Deluxe Edition Vol. 1",
+    "publisher": null,
+    "canonicalSlug": "batman-superman-world-s-finest-deluxe-edition-vol-1-9781799508199",
+    "activeOffers": 1,
+    "maxPrice": 45,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "DELUXE"
+  },
+  {
+    "id": "9d445f62-19a4-40dc-b070-f38bace0fc67",
+    "title": "Teenage Mutant Ninja Turtles: The Last Ronin Lost Years - The Covers",
+    "publisher": null,
+    "canonicalSlug": "teenage-mutant-ninja-turtles-the-last-ronin-lost-years-the-covers-242842",
+    "activeOffers": 2,
+    "maxPrice": 27,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "9ee025a5-bc22-4133-81d1-db32e828f094",
+    "title": "DC Pride: 2021",
+    "publisher": "DC Comics",
+    "canonicalSlug": "dc-pride-2021-515230",
+    "activeOffers": 1,
+    "maxPrice": 11.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "9fe88110-0c09-4b8b-ac62-3cb6513585d5",
+    "title": "Joe the Barbarian",
+    "publisher": "DC Comics",
+    "canonicalSlug": "joe-the-barbarian-527981",
+    "activeOffers": 1,
+    "maxPrice": 12.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "a1f59175-9799-44ed-bfe5-7653465820e7",
+    "title": "Star Wars: The High Republic: The Edge of Balance―Premonition",
+    "publisher": "Viz Media",
+    "canonicalSlug": "star-wars-the-high-republic-the-edge-of-balance-premonition-749980",
+    "activeOffers": 2,
+    "maxPrice": 10.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "a2d1cc8f-ad26-4c60-a106-6dd1ac756f25",
+    "title": "Teenage Mutant Ninja Turtles: The Untold Destiny of the Foot Clan",
+    "publisher": "Idea & Design Works, LLC",
+    "canonicalSlug": "teenage-mutant-ninja-turtles-the-untold-destiny-of-the-foot-clan-241623",
+    "activeOffers": 1,
+    "maxPrice": 13.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "a2fb8b95-8aac-4027-a3ff-c81ca67e7932",
+    "title": "MARS 30th Anniversary Edition 2",
+    "publisher": "Kodansha Comics",
+    "canonicalSlug": "mars-30th-anniversary-edition-2-777855",
+    "activeOffers": 2,
+    "maxPrice": 32.19,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "a32607cb-253b-4fe7-a4c0-81b476471b7d",
+    "title": "Junji Ito Uncanny: The Origins of Fear",
+    "publisher": "Viz Media",
+    "canonicalSlug": "junji-ito-uncanny-the-origins-of-fear-747306",
+    "activeOffers": 2,
+    "maxPrice": 23,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "a340694a-196a-4cf1-8249-17084171d5b7",
+    "title": "Star Wars: The Mandalorian Season Two Graphic Novel",
+    "publisher": "Panini UK Limited",
+    "canonicalSlug": "star-wars-the-mandalorian-season-two-graphic-novel-910603",
+    "activeOffers": 1,
+    "maxPrice": 7.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "a5e5166d-e5f9-4fa8-a69c-2f064f1525b7",
+    "title": "Drip Drip",
+    "publisher": "Viz Media",
+    "canonicalSlug": "drip-drip-724499",
+    "activeOffers": 1,
+    "maxPrice": 6.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "a61c4d0f-2454-4b88-9e71-ee3b734a6bcf",
+    "title": "Kaiu Shirai x Posuka Demizu Beyond The Promised Neverland",
+    "publisher": "Viz Media",
+    "canonicalSlug": "kaiu-shirai-x-posuka-demizu-beyond-the-promised-neverland-734719",
+    "activeOffers": 1,
+    "maxPrice": 5.59,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "a70dcde7-5664-4617-bdac-f8d8ab57f247",
+    "title": "Stitches",
+    "publisher": "Viz Media",
+    "canonicalSlug": "stitches-736560",
+    "activeOffers": 2,
+    "maxPrice": 15,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "a89755c6-ca0f-48ea-a9d3-b7900f18ebe9",
+    "title": "Spy X Family: The Official Guide-Eyes Only",
+    "publisher": "Viz Media",
+    "canonicalSlug": "spy-x-family-the-official-guide-eyes-only-740765",
+    "activeOffers": 1,
+    "maxPrice": 11.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "aaf711d1-4025-48c6-948b-9746fac6ca1d",
+    "title": "Batman One Bad Day Mr. Freeze",
+    "publisher": "DC Comics",
+    "canonicalSlug": "batman-one-bad-day-mr-freeze-520081",
+    "activeOffers": 2,
+    "maxPrice": 16.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "ac69c034-d006-418b-8977-5b53fa272b02",
+    "title": "Junji Ito Alley",
+    "publisher": "Viz Media",
+    "canonicalSlug": "junji-ito-alley-736034",
+    "activeOffers": 2,
+    "maxPrice": 20,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "ada33a2b-c176-4825-88c8-5467215a44f8",
+    "title": "Sword Art Online abec Artworks Wanderers",
+    "publisher": "Yen Press",
+    "canonicalSlug": "sword-art-online-abec-artworks-wanderers-334932",
+    "activeOffers": 0,
+    "maxPrice": null,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "ae58bda5-fa29-4872-990d-bd6e467b7b2a",
+    "title": "Gachiakuta 12",
+    "publisher": "Kodansha Comics",
+    "canonicalSlug": "gachiakuta-12-775363",
+    "activeOffers": 2,
+    "maxPrice": 18.69,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "ae7a98d6-0cf5-47ac-ab13-9ed3a62b63c8",
+    "title": "Wednesday: the Season One Graphic Novel",
+    "publisher": null,
+    "canonicalSlug": "wednesday-the-season-one-graphic-novel-121502",
+    "activeOffers": 1,
+    "maxPrice": 24.49,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "ae9201e4-b66b-4a77-ad7a-0896177cf38f",
+    "title": "Higurashi When They Cry: GOU Comic Anthology",
+    "publisher": "Yen Press LLC",
+    "canonicalSlug": "higurashi-when-they-cry-gou-comic-anthology-363840",
+    "activeOffers": 2,
+    "maxPrice": 10.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "af09def3-2f90-43e7-a985-68f50a6a5519",
+    "title": "Deadly Class Compendium",
+    "publisher": null,
+    "canonicalSlug": "deadly-class-compendium-9781534397972",
+    "activeOffers": 1,
+    "maxPrice": 53.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "COMPENDIUM"
+  },
+  {
+    "id": "afff87c7-0eac-4d07-a1e1-383ded383789",
+    "title": "Our Sweet One-Room Apartment",
+    "publisher": "Seven Seas",
+    "canonicalSlug": "our-sweet-one-room-apartment-602625",
+    "activeOffers": 1,
+    "maxPrice": 9.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "b1575c9c-1fb9-458c-8097-aa4be2ff8146",
+    "title": "Power Rangers Unlimited: Forever Rangers",
+    "publisher": "BOOM! Studios",
+    "canonicalSlug": "power-rangers-unlimited-forever-rangers-155910",
+    "activeOffers": 2,
+    "maxPrice": 15.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "b3a8e04d-3c92-4e9b-89e3-558ce01ea81e",
+    "title": "Marvel Comics Library",
+    "publisher": null,
+    "canonicalSlug": "marvel-comics-library-9783836599504",
+    "activeOffers": 1,
+    "maxPrice": 20,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "b4410043-c70f-4536-8b85-61bb08252601",
+    "title": "On and Off: Work-Life Imbalance 04",
+    "publisher": "Square Enix Manga",
+    "canonicalSlug": "on-and-off-work-life-imbalance-04-100017",
+    "activeOffers": 2,
+    "maxPrice": 19.79,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "b617540a-8fe0-4cca-bde9-b3fa087a321a",
+    "title": "Assassination Classroom Complete Box Set Volumes 1-21",
+    "publisher": "Viz Media",
+    "canonicalSlug": "assassination-classroom-complete-box-set-volumes-1-21-710140",
+    "activeOffers": 1,
+    "maxPrice": 95,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "b80b4e2a-e68b-4602-a735-ef97ac78ac7a",
+    "title": "Scott Pilgrims Precious Little Boxset",
+    "publisher": "Oni Press",
+    "canonicalSlug": "scott-pilgrims-precious-little-boxset-964576",
+    "activeOffers": 1,
+    "maxPrice": 64.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "b9ed3393-1ce7-4625-bdfa-38e38d32cf6b",
+    "title": "Your Forma, Vol. 2 (manga)",
+    "publisher": null,
+    "canonicalSlug": "your-forma-vol-2-manga-9798855406320",
+    "activeOffers": 1,
+    "maxPrice": 10.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "bc12419e-4f9e-434d-8b02-3f196371d9d5",
+    "title": "Hex Vets: Graphic Novel Gift Set for Witches in Training",
+    "publisher": null,
+    "canonicalSlug": "hex-vets-graphic-novel-gift-set-for-witches-in-training-159333",
+    "activeOffers": 1,
+    "maxPrice": 40.79,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "bea5d198-bc26-498f-9537-f4e7f068822b",
+    "title": "Jessica Farm",
+    "publisher": "Fantagraphics Books",
+    "canonicalSlug": "jessica-farm-969938",
+    "activeOffers": 1,
+    "maxPrice": 24.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "c06bb383-076f-4525-8448-c0989269b3d3",
+    "title": "Crisis Zone",
+    "publisher": "Fantagraphics",
+    "canonicalSlug": "crisis-zone-964445",
+    "activeOffers": 1,
+    "maxPrice": 22.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "c0b03489-f23e-4e31-919f-81338bc93c39",
+    "title": "Magical Buffs: The Support Caster is Stronger Than He Realized! (Manga) Vol. 6",
+    "publisher": null,
+    "canonicalSlug": "magical-buffs-the-support-caster-is-stronger-than-he-realized-manga-vol-6-9798893736755",
+    "activeOffers": 1,
+    "maxPrice": 13.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "c0f842a2-b19a-43b7-9fa5-bef8811715b1",
+    "title": "10 Things I Want to Do Before I Turn 40 - Part 2",
+    "publisher": "Seven Seas",
+    "canonicalSlug": "10-things-i-want-to-do-before-i-turn-40-part-2-634001",
+    "activeOffers": 1,
+    "maxPrice": 21.29,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "c1121137-7894-40bd-b5c8-34e19d0d414c",
+    "title": "Re-Living My Life with a Boyfriend Who Doesn't Remember Me (Manga) Vol. 6",
+    "publisher": null,
+    "canonicalSlug": "re-living-my-life-with-a-boyfriend-who-doesn-t-remember-me-manga-vol-6-9798897651405",
+    "activeOffers": 1,
+    "maxPrice": 13.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "c1f23ba1-67cc-4f82-aa03-dd3f9bb624a1",
+    "title": "Astonishing X-Men Vol. 1",
+    "publisher": null,
+    "canonicalSlug": "astonishing-x-men-vol-1-9781846538735",
+    "activeOffers": 1,
+    "maxPrice": 13.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "c3b4da5d-f823-41cf-bea9-e44df41819a2",
+    "title": "Batman by Jeph Loeb and Tim Sale Omnibus",
+    "publisher": null,
+    "canonicalSlug": "batman-by-jeph-loeb-and-tim-sale-omnibus-9781401284268",
+    "activeOffers": 1,
+    "maxPrice": 114,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "OMNIBUS"
+  },
+  {
+    "id": "c7ee471d-4483-4c8f-b5e7-261bdbe2984f",
+    "title": "Batman One Bad Day Bane",
+    "publisher": "DC Comics",
+    "canonicalSlug": "batman-one-bad-day-bane-520357",
+    "activeOffers": 1,
+    "maxPrice": 12.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "c80a1396-e142-4e13-9c70-14fe8ca6460a",
+    "title": "Betwixt: A Horror Anthology",
+    "publisher": "Viz Media",
+    "canonicalSlug": "betwixt-a-horror-anthology-741458",
+    "activeOffers": 2,
+    "maxPrice": 20,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "c81a4eff-2088-47a7-aa0a-812a2b00a5e8",
+    "title": "The Girl That Can’t Get a Girlfriend",
+    "publisher": "VIZ Media LLC",
+    "canonicalSlug": "the-girl-that-can-t-get-a-girlfriend-736591",
+    "activeOffers": 1,
+    "maxPrice": 8.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "c833aebe-81cf-4258-8700-7d26b9235040",
+    "title": "Ultimate Fantastic Four Omnibus Vol. 2 Pasqual Ferry Silver Surfer Cover",
+    "publisher": null,
+    "canonicalSlug": "ultimate-fantastic-four-omnibus-vol-2-pasqual-ferry-silver-surfer-cover-9781302967970",
+    "activeOffers": 1,
+    "maxPrice": 89.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "OMNIBUS"
+  },
+  {
+    "id": "c9a881be-0720-41f2-a379-045a0e0e162d",
+    "title": "Marvel Comics Library",
+    "publisher": null,
+    "canonicalSlug": "marvel-comics-library-9783754405666",
+    "activeOffers": 1,
+    "maxPrice": 20,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "c9f6247e-4f62-46ed-aba4-448661e7d026",
+    "title": "Goodbye, Eri",
+    "publisher": "Viz Media",
+    "canonicalSlug": "goodbye-eri-738939",
+    "activeOffers": 1,
+    "maxPrice": 7.59,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "cb903166-2ac7-4afa-9883-8d48e52ea1db",
+    "title": "Batman by James Tynion IV Omnibus Vol. 2",
+    "publisher": null,
+    "canonicalSlug": "batman-by-james-tynion-iv-omnibus-vol-2-9781799507369",
+    "activeOffers": 1,
+    "maxPrice": 114,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "OMNIBUS"
+  },
+  {
+    "id": "cc109fb1-8651-4f4d-a6e2-8e4b00d1ac65",
+    "title": "Say Hello to Mr. Wallaby! 1",
+    "publisher": "Kodansha Comics",
+    "canonicalSlug": "say-hello-to-mr-wallaby-1-779521",
+    "activeOffers": 1,
+    "maxPrice": 20.39,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "cc21a766-2819-4b71-9c71-c9fae8cc8320",
+    "title": "The Way Of The House Husband The Gangster’s Guide to Housekeeping",
+    "publisher": "Viz Media",
+    "canonicalSlug": "the-way-of-the-house-husband-the-gangster-s-guide-to-housekeeping-736584",
+    "activeOffers": 2,
+    "maxPrice": 19.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "cebdd533-1b3c-4742-ae3f-09e067cf6757",
+    "title": "The Patriotic Preachers of the American Revolution",
+    "publisher": "Creative Media Partners, LLC",
+    "canonicalSlug": "the-patriotic-preachers-of-the-american-revolution-911574",
+    "activeOffers": 1,
+    "maxPrice": 24.95,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "cf7d981b-4f0a-4a5a-9fc9-d5db167640ae",
+    "title": "All in Saga",
+    "publisher": "DC Comics",
+    "canonicalSlug": "all-in-saga-506423",
+    "activeOffers": 2,
+    "maxPrice": 16.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "cfaa812f-4914-429c-bc02-1de2a425e363",
+    "title": "Wonderful Women of the World",
+    "publisher": "DC Comics",
+    "canonicalSlug": "wonderful-women-of-the-world-503787",
+    "activeOffers": 1,
+    "maxPrice": 9.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "d07487c3-16f9-4dab-a52f-493f483df34a",
+    "title": "The Boys Omnibus Vol. 2 TPB",
+    "publisher": null,
+    "canonicalSlug": "the-boys-omnibus-vol-2-tpb-9781524109707",
+    "activeOffers": 1,
+    "maxPrice": 26.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "OMNIBUS"
+  },
+  {
+    "id": "d0bb494d-0027-4ea0-a2c9-34f007bbed8d",
+    "title": "Apparently, Disillusioned Adventurers Will Save the World, Vol. 6 (manga)",
+    "publisher": null,
+    "canonicalSlug": "apparently-disillusioned-adventurers-will-save-the-world-vol-6-manga-9781975390129",
+    "activeOffers": 1,
+    "maxPrice": 10.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "d1da43ec-8dd8-42f3-8cf0-2f863814d129",
+    "title": "A Vampire in the Bathhouse",
+    "publisher": "Kodansha Comics",
+    "canonicalSlug": "a-vampire-in-the-bathhouse-774281",
+    "activeOffers": 2,
+    "maxPrice": 13.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "d386cd67-0152-4054-9ab9-bb8a073ff3f4",
+    "title": "Batman: Beyond the White Knight",
+    "publisher": "DC Comics",
+    "canonicalSlug": "batman-beyond-the-white-knight-501602",
+    "activeOffers": 1,
+    "maxPrice": 14.49,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "d458a232-5eb8-4a20-8851-7543251ff41d",
+    "title": "Blue Summer Haze 2",
+    "publisher": "Kodansha Comics",
+    "canonicalSlug": "blue-summer-haze-2-778340",
+    "activeOffers": 1,
+    "maxPrice": 19.79,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "d479003c-415c-4745-b7d9-9612fa6572e8",
+    "title": "DC Pride: Love and Justice",
+    "publisher": "DC Comics",
+    "canonicalSlug": "dc-pride-love-and-justice-525918",
+    "activeOffers": 1,
+    "maxPrice": 10.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "d644bdbf-66c5-4fe0-8cad-3da55a15e252",
+    "title": "Green Lantern Alliance",
+    "publisher": "DC Comics",
+    "canonicalSlug": "green-lantern-alliance-503800",
+    "activeOffers": 1,
+    "maxPrice": 5.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "d669b428-1ba4-4cc7-9462-95d48f85d77c",
+    "title": "Wanted! Eiichiro Oda Before One Piece",
+    "publisher": "VIZ Media LLC",
+    "canonicalSlug": "wanted-eiichiro-oda-before-one-piece-749928",
+    "activeOffers": 2,
+    "maxPrice": 8.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "d7231706-8fea-4b5f-8b6f-70a8fb3eea98",
+    "title": "The Legend of Zelda: Twilight Princess Complete Box Set",
+    "publisher": "Viz Media",
+    "canonicalSlug": "the-legend-of-zelda-twilight-princess-complete-box-set-749669",
+    "activeOffers": 2,
+    "maxPrice": 95,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "dadba257-3ad9-4ce0-b5eb-e7827f45bdb3",
+    "title": "Snegurochka of the Spring Breeze",
+    "publisher": "Kodansha USA",
+    "canonicalSlug": "snegurochka-of-the-spring-breeze-294588",
+    "activeOffers": 2,
+    "maxPrice": 13.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "dbeca97b-d8be-4ccc-ace8-ef1946321498",
+    "title": "The Batman & Scooby-Doo Mysteries Vol. 5",
+    "publisher": null,
+    "canonicalSlug": "the-batman-scooby-doo-mysteries-vol-5-9781779528582",
+    "activeOffers": 1,
+    "maxPrice": 11.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "dc95d078-51be-4a5f-af73-4187d7fc8c54",
+    "title": "Daisy Jealousy",
+    "publisher": "Viz Media",
+    "canonicalSlug": "daisy-jealousy-742752",
+    "activeOffers": 2,
+    "maxPrice": 10.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "dcb627e4-9959-4d66-8262-e940d49a7149",
+    "title": "Chainsaw Man Box Set",
+    "publisher": "Viz Media",
+    "canonicalSlug": "chainsaw-man-box-set-741427",
+    "activeOffers": 1,
+    "maxPrice": 55.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "de22abe1-1971-443f-a0e3-09041de7de81",
+    "title": "Batman & Superman World’s Finest: The Silver Age Omnibus Vol. 1 (New Edition)",
+    "publisher": null,
+    "canonicalSlug": "batman-superman-world-s-finest-the-silver-age-omnibus-vol-1-new-edition-9781779529510",
+    "activeOffers": 1,
+    "maxPrice": 91,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "OMNIBUS"
+  },
+  {
+    "id": "dffeb16e-9e90-45d7-a716-087a5cbe2002",
+    "title": "Daughters of Snow and Cinders",
+    "publisher": "Fantagraphics Books",
+    "canonicalSlug": "daughters-of-snow-and-cinders-967569",
+    "activeOffers": 2,
+    "maxPrice": 29.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "e1002eb7-80f6-4e55-99b7-158be0fcdf72",
+    "title": "Otherside Picnic (Manga) 15",
+    "publisher": null,
+    "canonicalSlug": "otherside-picnic-manga-15-9798899100062",
+    "activeOffers": 1,
+    "maxPrice": 11.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "e1b247be-b511-4a9e-aa7e-071421d397a8",
+    "title": "Teenage Mutant Ninja Turtles: Battle Nexus",
+    "publisher": "IDW Publishing",
+    "canonicalSlug": "teenage-mutant-ninja-turtles-battle-nexus-244594",
+    "activeOffers": 1,
+    "maxPrice": 24.29,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "e5163be5-5e4a-49f8-95f7-272f025306b7",
+    "title": "Batman One Bad Day Penguin",
+    "publisher": "DC Comics",
+    "canonicalSlug": "batman-one-bad-day-penguin-520302",
+    "activeOffers": 2,
+    "maxPrice": 16.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "e52da175-36bc-446e-914e-2ef3384897b9",
+    "title": "Fullmetal Alchemist 20th Anniversary Book",
+    "publisher": "Viz Media",
+    "canonicalSlug": "fullmetal-alchemist-20th-anniversary-book-738502",
+    "activeOffers": 0,
+    "maxPrice": null,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "e5a10613-9f78-45e1-8a67-db6cc788b9a3",
+    "title": "Manga in Theory and Practice: How to Create Villains Volume 1",
+    "publisher": null,
+    "canonicalSlug": "manga-in-theory-and-practice-how-to-create-villains-volume-1-9781974765539",
+    "activeOffers": 1,
+    "maxPrice": 20,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "e754c725-c2a6-4f62-8d25-e6d4b05c0c70",
+    "title": "Old-Fashioned Cupcake With Cappuccino",
+    "publisher": "Viz Media",
+    "canonicalSlug": "old-fashioned-cupcake-with-cappuccino-734597",
+    "activeOffers": 2,
+    "maxPrice": 9.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "e8a2e425-fa27-4594-b947-fcbfde70e4d6",
+    "title": "Tekkonkinkreet: Black & White 30th Anniversary Edition",
+    "publisher": "Viz Media",
+    "canonicalSlug": "tekkonkinkreet-black-white-30th-anniversary-edition-738816",
+    "activeOffers": 2,
+    "maxPrice": 32.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "ead672ed-ec09-4450-9d9f-3868a04e061c",
+    "title": "The Boxcar Children Graphic Novel",
+    "publisher": null,
+    "canonicalSlug": "the-boxcar-children-graphic-novel-117338",
+    "activeOffers": 1,
+    "maxPrice": 19.79,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "ec1e458d-f070-4775-9c8c-0b8cc9653a31",
+    "title": "Soichi: Junji Ito Story Collection",
+    "publisher": "Viz Media",
+    "canonicalSlug": "soichi-junji-ito-story-collection-739028",
+    "activeOffers": 2,
+    "maxPrice": 20,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "ec6f39de-d991-43e2-bd11-93e279d7f66a",
+    "title": "Tune In to the Midnight Heart 9",
+    "publisher": "Kodansha Comics",
+    "canonicalSlug": "tune-in-to-the-midnight-heart-9-777305",
+    "activeOffers": 2,
+    "maxPrice": 19.69,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "ed27306c-db8d-4094-82c6-5632a34be807",
+    "title": "Batman: The Doom that Came to Gotham (New Edition)",
+    "publisher": "DC Comics",
+    "canonicalSlug": "batman-the-doom-that-came-to-gotham-new-edition-521491",
+    "activeOffers": 2,
+    "maxPrice": 14.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "ee5f33e0-f8ba-4bb3-bf4f-dfb366c8f195",
+    "title": "Sheltering Eaves 5",
+    "publisher": "Kodansha Comics",
+    "canonicalSlug": "sheltering-eaves-5-776308",
+    "activeOffers": 2,
+    "maxPrice": 19.49,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "eef39e6b-a2bc-4ae8-9417-b6016d8c41b9",
+    "title": "Batman & Superman in World's Finest: The Silver Age Omnibus Vol. 2 (New Edition)",
+    "publisher": null,
+    "canonicalSlug": "batman-superman-in-world-s-finest-the-silver-age-omnibus-vol-2-new-edition-9781799506621",
+    "activeOffers": 1,
+    "maxPrice": 68,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "OMNIBUS"
+  },
+  {
+    "id": "f0b53730-cff5-4547-a23f-e3534d4fea76",
+    "title": "Teen Titans Raven (Connecting Cover Edition)",
+    "publisher": "DC Comics",
+    "canonicalSlug": "teen-titans-raven-connecting-cover-edition-523532",
+    "activeOffers": 2,
+    "maxPrice": 14.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "f0f31a29-b458-43eb-ab4f-4c4529a7675b",
+    "title": "Marvel Comics Library",
+    "publisher": null,
+    "canonicalSlug": "marvel-comics-library-9783836599535",
+    "activeOffers": 1,
+    "maxPrice": 20,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "f1aae845-380c-4e49-961b-e79f1367e2e0",
+    "title": "Memetic: The Apocalyptic Trilogy",
+    "publisher": "BOOM! Studios",
+    "canonicalSlug": "memetic-the-apocalyptic-trilogy-151030",
+    "activeOffers": 2,
+    "maxPrice": 26.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "f1c22941-5d07-4f36-b74f-bd481b3464d2",
+    "title": "Takopi's Original Sin",
+    "publisher": "Viz Media",
+    "canonicalSlug": "takopi-s-original-sin-740345",
+    "activeOffers": 1,
+    "maxPrice": 14.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "f555dd69-1295-4373-9260-5e2d26e3e050",
+    "title": "Wolverine: Snikt!",
+    "publisher": "Viz Media",
+    "canonicalSlug": "wolverine-snikt-738533",
+    "activeOffers": 1,
+    "maxPrice": 10.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "f5943481-b314-4ea8-8fa2-ad890e7727dd",
+    "title": "Marvel Comics Library",
+    "publisher": null,
+    "canonicalSlug": "marvel-comics-library-9783836599528",
+    "activeOffers": 1,
+    "maxPrice": 20,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "f8dd473d-79fc-4e34-b087-44626579f780",
+    "title": "The Apothecary Diaries 16 (Manga)",
+    "publisher": null,
+    "canonicalSlug": "the-apothecary-diaries-16-manga-9798899100208",
+    "activeOffers": 1,
+    "maxPrice": 11.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "MANGA_VOLUME"
+  },
+  {
+    "id": "fa798edd-b99c-43d8-b5c6-8fa83e804dcb",
+    "title": "DC Pride: To the Farthest Reaches",
+    "publisher": "DC Comics",
+    "canonicalSlug": "dc-pride-to-the-farthest-reaches-501527",
+    "activeOffers": 2,
+    "maxPrice": 16.99,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  },
+  {
+    "id": "fe65dcb8-3a77-4425-a927-6e4b160a1cf6",
+    "title": "Marvel Comics Library",
+    "publisher": null,
+    "canonicalSlug": "marvel-comics-library-9783836599511",
+    "activeOffers": 1,
+    "maxPrice": 20,
+    "reason": "strong comic signal (named publisher or specific format/character)",
+    "suggestedFormat": "TPB"
+  }
+]
