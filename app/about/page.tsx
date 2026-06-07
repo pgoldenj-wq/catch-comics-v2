@@ -64,7 +64,7 @@ export default function AboutPage() {
             Catch Comics is an independent, one-person project built by a comic reader tired of
             paying too much for books. If you have suggestions, found a bug, or want to get in touch,
             email{' '}
-            <a href="mailto:pgoldenj@gmail.com" style={{ color: '#E8272A' }}>pgoldenj@gmail.com</a>.
+            <a href="mailto:hello@catchcomics.com" style={{ color: '#E8272A' }}>hello@catchcomics.com</a>.
           </p>
         </Section>
 

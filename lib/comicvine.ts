@@ -55,7 +55,7 @@ export async function cvFetch(url: string): Promise<Response | null> {
   }
 
   const res = await fetch(url, {
-    headers: { 'User-Agent': 'CatchComics/1.0 (pgoldenj@gmail.com)' },
+    headers: { 'User-Agent': 'CatchComics/1.0 (hello@catchcomics.com)' },
     // 8-second timeout — CV can be slow; don't hold a serverless slot open longer
     signal: AbortSignal.timeout(8_000),
   })

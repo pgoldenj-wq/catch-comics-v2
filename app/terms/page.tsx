@@ -109,7 +109,7 @@ export default function TermsPage() {
         <Section title="Contact">
           <p>
             Questions about these terms? Email{' '}
-            <a href="mailto:pgoldenj@gmail.com" style={{ color: '#E8272A' }}>pgoldenj@gmail.com</a>.
+            <a href="mailto:hello@catchcomics.com" style={{ color: '#E8272A' }}>hello@catchcomics.com</a>.
           </p>
         </Section>
 

@@ -216,7 +216,7 @@ async function cvSearch<T>(
   url.searchParams.set('limit',      '5')   // top 5 per resource, we re-score locally
 
   const res = await fetch(url.toString(), {
-    headers: { 'User-Agent': 'CatchComics/1.0 (pgoldenj@gmail.com)' },
+    headers: { 'User-Agent': 'CatchComics/1.0 (hello@catchcomics.com)' },
     signal: AbortSignal.timeout(10_000),
   })
 

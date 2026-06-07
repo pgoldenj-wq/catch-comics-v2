@@ -122,7 +122,7 @@ async function fetchGoogleBooks(isbn13: string): Promise<GBVolume | null> {
   const url = `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn13}${key ? `&key=${key}` : ''}`
 
   const res = await fetch(url, {
-    headers: { 'User-Agent': 'CatchComics/1.0 (pgoldenj@gmail.com)' },
+    headers: { 'User-Agent': 'CatchComics/1.0 (hello@catchcomics.com)' },
     signal : AbortSignal.timeout(10_000),
   })
 
@@ -196,7 +196,7 @@ async function fetchOpenLibrary(isbn13: string): Promise<OLEntry | null> {
   const url = `https://openlibrary.org/api/books?bibkeys=ISBN:${isbn13}&format=json&jscmd=data`
 
   const res = await fetch(url, {
-    headers: { 'User-Agent': 'CatchComics/1.0 (pgoldenj@gmail.com)' },
+    headers: { 'User-Agent': 'CatchComics/1.0 (hello@catchcomics.com)' },
     signal : AbortSignal.timeout(10_000),
   })
 
