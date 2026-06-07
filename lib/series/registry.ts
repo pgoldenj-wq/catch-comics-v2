@@ -14,6 +14,11 @@ import type { SeriesEntry } from './types'
  *  4. The page is auto-registered via generateStaticParams.
  */
 export const SERIES_REGISTRY: Record<string, SeriesEntry> = {
+  'saga': {
+    displayName: 'Saga',
+    cvVolumeId:  '46568',
+    publisher:   'Image Comics',
+  },
   'the-walking-dead': {
     displayName: 'The Walking Dead',
     cvVolumeId:  '18166',

@@ -34,13 +34,24 @@ npm run cleanup:noncomics:execute-c
 ### 3. Launch series list — Define and rank
 **Area:** Reading Orders  
 **Launch-critical:** YES  
-**Status:** todo
-**Done when:** 20–25 series named, ranked, and added to BACKLOG.md. Each verified: ≥3 collected editions in DB, ≥2 retailer prices on Vol. 1. Ready to build next week.  
-**Blocked by:** —
+**Status:** done
+**Done when:** ✓ Complete. 20 series defined, DB-gate verified, scored, and ranked. Ranked table written to `launch/BACKLOG.md`.  
+**Blocked by:** —  
+**Completed:** 2026-06-07. ✅ SHIPPED. DB query found 591 series with ≥3 editions; 19 pass the full gate (vol1 exists, ≥2 UK retailers). With 5 already-done series = 20 total. Scored on 5 dimensions. Top 5 to build: Saga (80.5), Witch Hat Atelier (76.0), Ouran High School Host Club (71.0), Trigun Maximum Deluxe (71.5), Laid-Back Camp (72.3). Full table and data quality flags in BACKLOG.md. Aspirational series (Watchmen, Sandman, etc.) fail the DB gate — root causes documented.
 
 ---
 
-### 4. Legal pages — Create
+### 4. Saga series page — Build and ship
+**Area:** Reading Orders  
+**Launch-critical:** YES  
+**Status:** done
+**Done when:** ✓ Complete. `/series/saga` live, SSG with 1h revalidate. 11 volumes in DB (vols 1–6, 8–9, 11–12 + 1 unnumbered). All R2 covers. Vol.1 at £7.49 from 2 retailers (Travelling Man, Waterstones). Description populated from CV data via `stripHtml`. TypeCheck clean, build passing. Data quality notes: vols 4–6, 8–9 reclassified from format=OTHER to TPB and assigned comicvineId=46568. Vols 7 and 10 absent from DB (not in retailer feeds — known gap, does not block launch). Vol.1–3 covers backfilled to R2 via CV issue art.  
+**Blocked by:** —  
+**Completed:** 2026-06-07. ✅ SHIPPED.
+
+---
+
+### 6. Legal pages — Create
 **Area:** Legal  
 **Launch-critical:** YES  
 **Status:** done
@@ -49,12 +60,23 @@ npm run cleanup:noncomics:execute-c
 
 ---
 
-### 5. Verify Vercel production env vars
+### 7. Verify Vercel production env vars + Inngest sync
 **Area:** Retailers  
 **Launch-critical:** YES  
-**Status:** todo
-**Done when:** Every `.env.local` var confirmed in Vercel dashboard. Specifically: COMIC_VINE_API_KEY, AWIN_*, R2_*, eBay vars.  
-**Blocked by:** —
+**Status:** done
+**Done when:** All 30 Vercel Production vars cross-checked against .env.local and full codebase grep. Zero launch-critical vars missing. Inngest sync root cause fixed (INNGEST_SERVE_NEXT_URL added). All 8 functions registered in Production after manual resync: sync-retailer, sync-scheduled, enrich-canonical, cleanup-stale, price-check, on-failure, bookshop-lookup, bookshop-refresh. Future deployments will sync to catchcomics.com, not ephemeral Vercel URLs.  
+**Blocked by:** —  
+**Completed:** 2026-06-07. ✅ SHIPPED — 0 launch-critical gaps. Inngest permanently fixed.
+
+---
+
+### 8. R2 image domain — Verify custom domain
+**Area:** Infrastructure  
+**Launch-critical:** YES  
+**Status:** done
+**Done when:** `https://images.catchcomics.com` confirmed live. Real cover images serving from custom domain.  
+**Blocked by:** —  
+**Completed:** 2026-06-07. ✅ SHIPPED. Domain routing via Cloudflare confirmed (HTTP 404 at root, healthy). Three independent cover image URLs each returned HTTP 200 OK, `image/webp`, served by Cloudflare. Example: `/covers/02bda695-f7d3-4bdf-9544-af49622d281b.webp` (Wings of Fire #8, 12,710 bytes). Production API confirms enriched products use `images.catchcomics.com` URLs. Unenriched products retain `covers.openlibrary.org` fallback — correct behaviour.
 
 ---
 

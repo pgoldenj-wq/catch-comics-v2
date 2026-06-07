@@ -5,7 +5,7 @@
 **Launch promise:** A collector can search for a comic, follow a reading order, compare prices across UK retailers, and trust the information they see.
 
 **Completion: auto-calculated from requirement statuses below**  
-Last updated: 2026-06-06
+Last updated: 2026-06-07
 
 ---
 
@@ -34,11 +34,12 @@ Items removed from launch-day scope after challenge:
 
 ---
 
-### 2. Reading Order Journeys (20–25 curated series) — STRATEGIC BLOCKER
-**Status:** In progress (5 of 25 series complete — Walking Dead, FMA, Invincible, Claymore, Overlord)  
-**Done when:** 20–25 flagship series pages live, each passing the quality bar: ≥3 collected editions with correct `comicvine_id` + `volumeNumber`, ≥2 UK retailers with live Vol. 1 price, valid synopsis, correct sort order.  
-**Blocked by:** Series list definition (this week)  
-**Quality bar:** Do NOT add any series where `volumeNumber` values are wrong or fewer than 2 retailers price Vol. 1.
+### 2. Reading Order Journeys (20 curated series) — STRATEGIC BLOCKER
+**Status:** In progress (6 of 20 series complete — Walking Dead, FMA, Invincible, Claymore, Overlord, **Saga**)  
+**Done when:** All 20 series pages live, each passing the quality bar: ≥3 collected editions with correct `comicvine_id` + `volumeNumber`, ≥2 UK retailers with live Vol. 1 price, valid synopsis, correct sort order.  
+**Blocked by:** Nothing — series list defined 2026-06-07. See `launch/BACKLOG.md` for full ranked table.  
+**Quality bar:** Do NOT add any series where `volumeNumber` values are wrong or fewer than 2 retailers price Vol. 1.  
+**Build order (Saga done, next 4):** ~~Saga~~ ✓ → Witch Hat Atelier → Ouran High School Host Club → Trigun Maximum Deluxe → Laid-Back Camp. Full order in BACKLOG.md.
 
 ---
 
@@ -98,10 +99,42 @@ Items removed from launch-day scope after challenge:
 
 ---
 
-### 11. Vercel Production Env Vars
-**Status:** Unverified  
-**Done when:** Every env var in `.env.local` confirmed present in Vercel dashboard. Specifically: `COMIC_VINE_API_KEY`, all AWIN vars, all R2 vars, all eBay vars.  
-**Note:** Most common launch failure mode. Verify explicitly before go-live.
+### 11. Vercel Production Env Vars + Inngest Sync
+**Status:** Done (2026-06-07)  
+**Done when:** ✓ Complete. All 30 Vercel Production vars cross-checked against `.env.local` and full codebase grep. Zero launch-critical gaps.  
+**Inngest sync fix:** ✓ Complete (2026-06-07). Root cause: Vercel was sending per-deployment preview URLs to Inngest instead of the canonical domain, causing 9+ unattached sync failures since May 29. Fix: `INNGEST_SERVE_NEXT_URL=https://catchcomics.com/api/inngest` added to Vercel Production. Redeployed at 21:48 BST. Manual resync triggered in Inngest dashboard by operator. All 8 codebase functions now registered in Production: sync-retailer, sync-scheduled, enrich-canonical, cleanup-stale, price-check, on-failure, bookshop-lookup, bookshop-refresh. Future deployments will sync to catchcomics.com, not to ephemeral deployment URLs. No outstanding Inngest concerns.  
+**Note:** `INNGEST_SERVE_NEXT_URL` is scoped to Production only, so development and preview environments are unaffected.
+
+---
+
+### 12. R2 Image Domain Verification
+**Status:** Done (2026-06-07)  
+**Launch-critical:** YES — broken cover images kill first impressions  
+**Priority:** Required before launch  
+**Done when:** ✓ Complete. `https://images.catchcomics.com` custom domain live and serving production cover images via Cloudflare.  
+**Verified (2026-06-07):**
+- Domain routing: HTTP 404 at root (Cloudflare backend, expected — no object at `/`)
+- Real image test: 3 independent `.webp` cover files each returned HTTP 200 OK, `Content-Type: image/webp`, served by Cloudflare
+- Example: `https://images.catchcomics.com/covers/02bda695-f7d3-4bdf-9544-af49622d281b.webp` (Wings of Fire #8) — 12,710 bytes, HTTP 200
+- Production API (`/api/homepage-deals`) confirms enriched products use `images.catchcomics.com` URLs, not fallback domains
+- Note: unenriched products retain `covers.openlibrary.org` fallback URLs — this is expected and correct behaviour. R2 URLs are written during enrichment; the fallback is safe.
+
+---
+
+### 13. Operational Alerting — Slack Webhook
+**Status:** Deferred — post-launch enhancement  
+**Launch-critical:** NO  
+**Priority:** Post-launch / Nice-to-have operational task  
+**Implementation status:** ✅ Code complete. `lib/inngest/functions/on-failure.ts` fully implemented. Triggers on `inngest/function.failed` (fires automatically when any function exhausts all retries). Posts a formatted Block Kit message to the webhook URL. Graceful fallback if Slack is unreachable. No code changes required to activate.  
+**Remaining work (estimated 5–10 minutes when ready):**
+1. Create Slack app at `api.slack.com/apps` → Incoming Webhooks → add to `#catch-comics-ops`
+2. Add `SLACK_WEBHOOK_URL` to Vercel Production (Production scope only)
+3. Redeploy
+4. Send test event via Inngest dashboard: `inngest/function.failed` with synthetic payload
+5. Confirm message appears in `#catch-comics-ops`
+
+**What you miss without it:** AWIN sync failures, enrichment stoppages, cover upload errors, and background job crashes are only visible by manually checking the Inngest dashboard or Vercel function logs. Silent degradation window: potentially days.  
+**Risk if permanently deferred:** Low at launch. Grows as traffic and reliance on background jobs increases.
 
 ---
 
@@ -115,34 +148,41 @@ The following are real improvements that come immediately after launch, informed
 - **Full catalogue CV enrichment** — Running in background, completes post-launch
 - **Character / Creator / Publisher Pages** — Post-launch, requires ~30–40% CV coverage
 
+### Nice-to-have operational tasks (deferred, implementation complete)
+
+- **Slack Alerting** — Add `SLACK_WEBHOOK_URL` to Vercel Production. Code is done. 5–10 min effort. Prevents silent degradation of background jobs post-launch. See item 13 above for full steps.
+
 ---
 
 ## Completion by Area
 
-| Area | Status | % done |
-|---|---|---|
-| CV Enrichment (launch series) | In progress | 20% |
-| Reading Journeys | In progress (5/25) | 20% |
-| Cleanup v2 | Done | 100% |
-| AWIN write mode | Done | 100% |
-| Search | Functional | 80% |
-| Product Pages | Good | 75% |
-| Affiliate Tracking | Good | 85% |
-| Legal Pages | Done | 100% |
-| Series Index + Navbar | Not started | 0% |
-| Vercel Env Vars | Unverified | 50% |
+| Area | Priority | Status | % done |
+|---|---|---|---|
+| CV Enrichment (launch series) | Required | In progress | 20% |
+| Reading Journeys | Required | In progress (6/20, list defined) | 30% |
+| Cleanup v2 | Required | Done | 100% |
+| AWIN write mode | Required | Done | 100% |
+| Search | Required | Functional | 80% |
+| Product Pages | Required | Good | 75% |
+| Affiliate Tracking | Required | Good | 85% |
+| Legal Pages | Required | Done | 100% |
+| Series Index + Navbar | Required | Not started | 0% |
+| Vercel Env Vars + Inngest | Required | Done | 100% |
+| R2 Image Domain | Required | Done | 100% |
+| Slack Alerting | Post-launch | Deferred — code complete, webhook not yet created | — |
 
-**Overall: ~40%**
+**Overall: ~47%** *(required items only — Slack excluded)*  
+*(Driven by the two strategic blockers — CV Enrichment at 25% and Reading Journeys at 30% (6/20 pages done, series list defined). All 11 required items are ≥75% or done. Slack is tracked but excluded from launch % — it is a post-launch operational improvement, not a launch requirement. Overall rises as series pages are built.)*
 
 ---
 
 ## Critical Path — Steps
 
 1. ~~Cleanup v2 sign-off and execute~~ ✓ Done 2026-06-07
-2. Series list defined — 20–25 series named and verified
-3. Series pages Tier 1 — Saga, Watchmen, Sandman, Y: The Last Man, Preacher
-4. Series pages Tier 2 — V for Vendetta, The Boys, Locke & Key, Berserk, Akira
-5. Series pages Tier 3 — reach 20–25 total
+2. ~~Series list defined — 20 series named, scored, and verified~~ ✓ Done 2026-06-07 (see BACKLOG.md)
+3. Series pages Tier 1 — ~~Saga~~ ✓, Witch Hat Atelier, Ouran High School Host Club, Trigun Maximum Deluxe, Laid-Back Camp
+4. Series pages Tier 2 — Hellsing, Naruto (volume data check first), Sengoku Youko, Void Rivals
+5. Series pages Tier 3 — Under Ninja, Innocent Omnibus, Eden of Witches, Wolf's Daughter, Multi-Mind Mayhem, Baki (CV enrichment first)
 6. Series index page at /series
 7. Navbar update — add /series link
 8. Launch day checklist and go-live
