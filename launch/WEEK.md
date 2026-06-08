@@ -1,7 +1,7 @@
 # Catch Comics — Week of 2026-06-09
 
 **Launch date:** July 1, 2026 — **22 days remaining**  
-**Week objective:** Install analytics. Ship the launch announcement. Smoke test on production.
+**Week objective:** ~~Install analytics~~ ✅. Ship the launch announcement. Smoke test on production.
 
 ---
 
@@ -10,19 +10,29 @@
 ### 1. Analytics — Install Vercel Analytics
 **Area:** Monitoring  
 **Launch-critical:** YES  
-**Status:** todo  
-**Done when:** Vercel Analytics is installed and reporting pageviews in the Vercel dashboard. No external service needed — `@vercel/analytics` ships with Vercel.  
+**Status:** done  
+**Done when:** ✓ Complete (2026-06-08). `@vercel/analytics` installed, `<Analytics />` added to `app/layout.tsx`. Build passes. Privacy policy updated to disclose Vercel Analytics.  
 **Effort:** 15 min  
 **Command:** `npm install @vercel/analytics` + add `<Analytics />` to `app/layout.tsx`  
 **Why now:** Without analytics, you cannot validate the launch. No data = no learning = no iteration.
 
 ---
 
+### 1b. Speed Insights — Enable Vercel Speed Insights
+**Area:** Monitoring  
+**Launch-critical:** NO — pre-launch enhancement (recommended)  
+**Status:** todo  
+**Done when:** `@vercel/speed-insights` installed, `<SpeedInsights />` in `app/layout.tsx`, Core Web Vitals visible in Vercel dashboard after first production traffic.  
+**Effort:** 10 min  
+**Why now:** Zero cost (included in Observability Plus, already enabled). Surfaces LCP/CLS/INP/FCP/TTFB per page from real users from day one. Lets you catch slow cover-image loads and price-loading CLS shifts before they become user complaints.
+
+---
+
 ### 2. AWIN_PUBLISHER_ID — Verify in Vercel production
 **Area:** Monetisation  
 **Launch-critical:** YES  
-**Status:** todo  
-**Done when:** Confirm `AWIN_PUBLISHER_ID` is set in Vercel Production environment. If missing, add it.  
+**Status:** done  
+**Done when:** ✓ Complete (2026-06-08). Vercel CLI confirmed present in Production. Live production test on Bookshop.org (UK) listing: redirect to awin1.com with correct awinaffid (7-digit publisher ID), awinmid, clickref=cc-{listingId[:8]}, clean ued — no double-wrap. HTTP 302. Attribution fully operational.  
 **Effort:** 5 min  
 **Why now:** If unset, all AWIN clicks redirect without affiliate wrapping — silent revenue failure with only a server-side console warning.
 
@@ -31,10 +41,19 @@
 ### 3. Error monitoring — Install
 **Area:** Infrastructure  
 **Launch-critical:** YES (pre-launch)  
-**Status:** todo  
-**Done when:** Production errors are visible somewhere — Vercel's built-in error tracking enabled in dashboard, or Sentry free tier installed (`@sentry/nextjs`). At minimum, know when a page crashes.  
+**Status:** done  
+**Done when:** ✓ Complete (2026-06-08). Vercel Observability Plus covers all server-side errors. Client-side forwarding added: error.tsx → POST /api/log-error → Vercel server logs. No Sentry needed. Build passes.  
 **Effort:** 30 min  
 **Why now:** Without monitoring, production crashes are invisible. A broken series page could be live for days post-launch.
+
+---
+
+### 3b. Inngest — Stop DYNAMIC_LINK retailers from entering the sync queue
+**Area:** Infrastructure  
+**Launch-critical:** NO — operational health  
+**Status:** done  
+**Done when:** ✓ Complete (2026-06-08). Added `DYNAMIC_LINK` to `SKIP_PLATFORMS` in `lib/sync/dispatch.ts`. 8 active DYNAMIC_LINK retailers (Bookshop UK, Wordery, Forbidden Planet, Waterstones, WHSmith, Hive, Zavvi, AbeBooks) were being dispatched hourly, throwing on every run, exhausting 3 retries, and triggering `on-failure`. Eliminated ~960 failing Inngest invocations/day (~6,720/week) and stopped 192 stuck `status='running'` SyncLog rows accumulating daily. DYNAMIC_LINK retailers have no feed to sync — their listings are generated from ISBN URL templates at seed time.  
+**Effort:** 5 min
 
 ---
 

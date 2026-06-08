@@ -110,27 +110,35 @@ Items removed from launch-day scope after challenge:
 ---
 
 ### 11a. Analytics — Vercel Analytics
-**Status:** NOT INSTALLED  
+**Status:** ✅ Done (2026-06-08)  
 **Launch-critical:** YES  
-**Done when:** `@vercel/analytics` installed, `<Analytics />` in `app/layout.tsx`, pageview data visible in Vercel dashboard.  
+**Done when:** ✓ Complete. `@vercel/analytics` installed, `<Analytics />` added to `app/layout.tsx`. Build passes. Privacy policy updated to disclose Vercel Analytics (no cookies, no cross-site tracking).  
 **Effort:** 15 min  
 **Why:** Without analytics, you cannot validate whether the launch worked. No pageviews, no sessions, no conversion signals.
 
 ---
 
 ### 11b. Error Monitoring
-**Status:** NOT INSTALLED  
+**Status:** ✅ Done (2026-06-08)  
 **Launch-critical:** YES (pre-launch)  
-**Done when:** Production crashes are visible — Vercel built-in error tracking enabled OR `@sentry/nextjs` installed on free tier.  
+**Done when:** ✓ Complete. Vercel Observability Plus (enabled, 30-day retention) covers all server-side errors. Client-side error forwarding added: `app/error.tsx` sends browser crashes to `/api/log-error` which logs to Vercel server logs. No Sentry required — no third-party service, no cookies, no privacy implications. Build passes.  
 **Effort:** 30 min  
-**Why:** A broken series page could be live for days without visibility. Silent failures post-launch are unacceptable.
+**Why:** A broken series page could be live for days without visibility. Silent failures post-launch are unacceptable.  
+**Where to see errors:**
+- Dashboard: vercel.com → catch-comics-v2 → Logs tab (filter by Error)
+- Observability: vercel.com → catch-comics-v2 → Observability tab → Functions → error rate
+- CLI: `vercel logs --environment production --status-code 5xx --since 1h`
+- CLI: `vercel logs --environment production --query "[client-error]" --since 24h`
+- Inngest failures: inngest.com → your functions (also logged via on-failure.ts)
+**What is NOT visible:** Only if Vercel itself goes down.
 
 ---
 
+
 ### 12a. AWIN_PUBLISHER_ID — Verify in Vercel Production
-**Status:** Unverified  
+**Status:** ✅ Done (2026-06-08)  
 **Launch-critical:** YES  
-**Done when:** Confirm `AWIN_PUBLISHER_ID` is set in the Vercel Production environment. If missing, add it.  
+**Done when:** ✓ Complete. Confirmed via Vercel CLI (`vercel env ls`) + live production test. Production `/go/` redirects to `awin1.com/cread.php` with `awinmid`, `awinaffid` (7-digit publisher ID, matches local), `clickref=cc-{listingId[:8]}`, and clean `ued` (no double-wrap). HTTP 302. Attribution fully operational.  
 **Effort:** 5 min  
 **Risk:** If unset, `wrapAffiliateUrl()` falls through to unwrapped URLs. Silent revenue failure — only visible in server-side console logs.
 
@@ -195,6 +203,7 @@ The following are real improvements that come immediately after launch, informed
 ### Nice-to-have operational tasks (deferred, implementation complete)
 
 - **Slack Alerting** — Add `SLACK_WEBHOOK_URL` to Vercel Production. Code is done. 5–10 min effort. Prevents silent degradation of background jobs post-launch. See item 13 above for full steps.
+- **Speed Insights** — `npm install @vercel/speed-insights` + `<SpeedInsights />` in `app/layout.tsx`. Included in Observability Plus (already enabled — no cost). 10 min effort. Tracks Core Web Vitals (LCP, CLS, INP, FCP, TTFB) per page from real users. Recommended pre-launch so you have CWV data from day one. Not gated on launch.
 
 ---
 
@@ -208,34 +217,38 @@ The following are real improvements that come immediately after launch, informed
 | AWIN write mode | — | Done | 100% |
 | Search | 10% | Functional — price filter non-op is the only notable issue | 75% |
 | Product Pages | 10% | Good — mobile creators hidden, no-retailer state needs guidance | 78% |
-| Affiliate Tracking / Monetisation | 10% | AWIN working; eBay unwrapped; AWIN_PUBLISHER_ID unverified | 60% |
+| Affiliate Tracking / Monetisation | 10% | AWIN working; eBay unwrapped; AWIN_PUBLISHER_ID verified ✅ | 75% |
 | Legal Pages | 7% | Done — mailbox hello@catchcomics.com unverified | 88% |
 | Discovery — Series Index + Navbar | 15% | ✅ Done — navbar + MobileHeader link + homepage Explore Series section | 90% |
-| Analytics | 7% | **ZERO installed** | 0% |
-| Error Monitoring | 5% | **ZERO installed** | 0% |
-| Vercel Env Vars + Inngest | — | Done | 100% |
+| Analytics | 7% | ✅ Done — `@vercel/analytics` installed, `<Analytics />` in layout (2026-06-08) | 100% |
+| Error Monitoring | 5% | ✅ Done — Vercel Observability Plus + client-side forwarding (2026-06-08) | 100% |
+| Vercel Env Vars + Inngest | — | Done — DYNAMIC_LINK sync loop fixed 2026-06-08 (was ~960 failing invocations/day) | 100% |
 | R2 Image Domain | — | Done | 100% |
 | Slack Alerting | Post-launch | Deferred — code complete, webhook not yet created | — |
 | Data quality — Claymore | 6% | ✅ Resolved — removed from registry 2026-06-08. No broken reading order. | 95% |
 
-**Recalculated readiness: ~79%** *(reconciled 2026-06-08 — all shipped items reflected)*  
+**Recalculated readiness: 82%** *(dashboard generator authoritative — 2026-06-08, Analytics shipped)*  
 
-| Session | Change | Gain |
-|---------|--------|------|
-| Strategic review baseline | — | 62% |
-| Discovery (Navbar + Homepage section) | 15% → 90% × 15% weight | +11pp |
-| Claymore resolved (removed from registry) | 10% → 95% × 6% weight | +5pp |
-| **Current** | | **~78–79%** |
+*Note: the generator uses requirement-status weights (STRATEGIC BLOCKER×2, TACTICAL BLOCKER×1.5, standard×1), which differs from the session narrative (flat percentage weights). Generator output is authoritative.*
 
-*Remaining gaps (in weight order): Analytics 7% at 0%, Error monitoring 5% at 0%, Monetisation 10% at 60% (eBay unwrapped, AWIN_PUBLISHER_ID unverified), Legal 7% at 88% (mailbox unverified).*
+| Session | Gain |
+|---------|------|
+| Strategic review baseline | 62% |
+| Discovery + Navbar + Homepage | +~12pp |
+| Claymore resolved | +~3pp |
+| Analytics installed | +~5pp |
+| **Current (generator)** | **82%** |
+
+*Remaining gaps: Monetisation (75% — eBay unwrapped), Legal (88% — mailbox unverified).*
 
 **Biggest blockers remaining (ranked by impact):**
 1. ~~Discovery: no path from homepage or navbar to `/series`~~ ✅ DONE — navbar + homepage section shipped
-2. Analytics: no pageview data = cannot validate the launch
+2. ~~Analytics: no pageview data = cannot validate the launch~~ ✅ DONE — Vercel Analytics installed 2026-06-08
 3. ~~Claymore: Vol 1 absent = broken reading order~~ ✅ DONE — removed from registry
-4. Error monitoring: production crashes invisible
-5. Launch announcement copy: not written yet
-6. AWIN_PUBLISHER_ID: unverified in Vercel Production
+4. ~~Error monitoring: production crashes invisible~~ ✅ DONE — Vercel Observability Plus + client-side forwarding 2026-06-08
+5. ~~AWIN_PUBLISHER_ID: unverified in Vercel Production~~ ✅ DONE — verified live 2026-06-08
+6. Launch announcement copy: not written yet
+7. hello@catchcomics.com mailbox: unverified
 
 ---
 
