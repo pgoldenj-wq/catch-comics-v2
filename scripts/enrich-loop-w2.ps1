@@ -22,10 +22,24 @@ function Log($msg) {
 
 Log "wrapper started (PID $PID); workdir=$WorkDir; worker=2"
 
+# Prevent S0 Low Power Idle (Modern Standby) while this wrapper is alive.
+# ES_CONTINUOUS (0x80000000) | ES_SYSTEM_REQUIRED (0x00000001) — keep system awake.
+# The flag is automatically cleared when this PowerShell process exits.
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public class SleepBlock {
+  [DllImport("kernel32.dll")]
+  public static extern uint SetThreadExecutionState(uint esFlags);
+}
+'@
+[SleepBlock]::SetThreadExecutionState(0x80000001) | Out-Null
+Log "sleep-block active: ES_CONTINUOUS | ES_SYSTEM_REQUIRED"
+
 while ($true) {
-  Log "launching: npm run enrich:catalogue:full -- --worker-id 2"
-  & cmd /c "npm run enrich:catalogue:full -- --worker-id 2" *>> $LogFile
+  Log "launching: npm run enrich:catalogue:full -- --worker-id 2 --rate-ms 20000"
+  & cmd /c "npm run enrich:catalogue:full -- --worker-id 2 --rate-ms 20000" *>> $LogFile
   $exit = $LASTEXITCODE
-  Log "exited with code $exit; restarting in 30s"
-  Start-Sleep -Seconds 30
+  Log "exited with code $exit; restarting in 5s"
+  Start-Sleep -Seconds 5
 }

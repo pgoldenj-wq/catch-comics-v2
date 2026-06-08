@@ -5,7 +5,7 @@
 **Launch promise:** A collector can search for a comic, follow a reading order, compare prices across UK retailers, and trust the information they see.
 
 **Completion: auto-calculated from requirement statuses below**  
-Last updated: 2026-06-08 (session 3 — strategic review)
+Last updated: 2026-06-08 (session 4 — operations mode: enrichment throughput optimised)
 
 ---
 
@@ -197,7 +197,7 @@ The following are real improvements that come immediately after launch, informed
 - **Collection Pages (5 editorial collections)** — Build week of July 1, informed by what series pages users engage with
 - **Homepage redesign** — Update after seeing how collectors navigate from community posts
 - **Full catalogue cover backfill** — Running in background, completes post-launch
-- **Full catalogue CV enrichment** — Running in background, completes post-launch
+- **Full catalogue CV enrichment** — Running in background. Optimised 2026-06-08: rateMs 25s→20s, S0 Low Power Idle blocked, restart delay 30s→5s. ETA ~June 15 (continuous). Not gated on launch.
 - **Character / Creator / Publisher Pages** — Post-launch, requires ~30–40% CV coverage
 
 ### Nice-to-have operational tasks (deferred, implementation complete)
@@ -259,8 +259,8 @@ The following are real improvements that come immediately after launch, informed
 3. ~~Series pages Tier 1~~ ✓ Done 2026-06-08 — Saga, Trigun Maximum Deluxe, Laid-Back Camp, Ouran OHSHC, Witch Hat Atelier (all repaired and shipped)
 4. ~~Series pages Tier 2~~ ✓ Done 2026-06-08 — Hellsing, Void Rivals, Sengoku Youko, Under Ninja
 5. ~~Series pages Tier 3~~ ✓ Done 2026-06-08 — Innocent Omnibus, Wolf's Daughter, Eden of Witches, Multi-Mind Mayhem | **Naruto ⛔ BLOCKED** (needs human triage) | **Baki ⛔ BLOCKED** (needs ComicVine indexing)
-6. **Series index page at /series** ← NEXT
-7. **Navbar update — add /series link** ← NEXT
+6. ~~Series index page at /series~~ ✓ Done 2026-06-08
+7. ~~Navbar update — add /series link~~ ✓ Done 2026-06-08
 8. Launch day checklist and go-live
 
 **Running in parallel (not blocking the path):**

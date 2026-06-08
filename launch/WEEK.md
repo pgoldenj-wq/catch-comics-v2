@@ -48,6 +48,19 @@
 
 ---
 
+### 3c. CV Enrichment — Optimise throughput
+**Area:** Infrastructure  
+**Launch-critical:** NO — best-effort background task  
+**Status:** done  
+**Done when:** ✓ Complete (2026-06-08). Diagnosis confirmed bulk enrichment is off the launch critical path. Three low-risk throughput improvements applied to `scripts/enrich-loop.ps1` and `scripts/enrich-loop-w2.ps1`:  
+1. **rateMs 25s → 20s** — reduces per-request delay from 25,000ms to 20,000ms. W1 stays at ~180 req/hr vs 200 req/hr API limit (10% buffer). Zero 420 errors in full history. Expected W1 matches/hr: 26 → ~39.  
+2. **S0 Low Power Idle blocked** — `SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED)` added to both loop scripts. Prevents Modern Standby Network Disconnected state while wrapper is alive. Sleep and hibernate already disabled (confirmed via powercfg).  
+3. **Restart delay 30s → 5s** — reduces dead time between worker sessions from 30s to 5s.  
+**ETA (continuous, W1):** ~June 15 (Scenario C). W2 noted exhausted: 0.4% current match rate (pool of TPB/HC/OTHER comics is depleted). All remaining productive work from W1.  
+**⚠️ These changes take effect on next worker restart.** Running Scheduled Tasks are using the old script content. Restart both tasks to apply: Task Scheduler → CatchComicsEnrichment → End Task → Run, and CatchComicsEnrichment-W2 → End Task → Run.
+
+---
+
 ### 3b. Inngest — Stop DYNAMIC_LINK retailers from entering the sync queue
 **Area:** Infrastructure  
 **Launch-critical:** NO — operational health  
