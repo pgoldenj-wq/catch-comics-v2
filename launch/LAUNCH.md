@@ -93,9 +93,14 @@ Items removed from launch-day scope after challenge:
 ---
 
 ### 10. Navbar + Homepage Discovery
-**Status:** Not started  
-**Done when:** `/series` link appears in the Navbar component (visible on all pages, mobile + desktop). Homepage has a "Reading Orders" or "Explore Series" section featuring 3–6 series cards that link to `/series`.  
-**Note:** These are two separate changes. Navbar link ~30 min. Homepage section ~2–3 hrs. Both are required — the navbar covers direct navigation; the homepage section catches new visitors who land on the home URL from community posts.
+**Status:** ✅ Done (2026-06-08)  
+**Done when:** `/series` link in Navbar + "Explore Series" section on homepage.  
+**Delivered:**
+- `Navbar.tsx` — usePathname + "Series" link (between logo and search bar; hidden sm:block for narrow viewports; active state #E8272A on /series/*)
+- `MobileHeader.tsx` — "Series" link added to discovery variant (homepage mobile header)
+- `components/ExploreSeriesSection.tsx` (NEW) — 6 featured series cards, 3-col mobile / 6-col desktop, static OL fallback → live R2 covers from DB on mount
+- `app/api/series-preview/route.ts` (NEW) — ISR route (1h) for featured series covers + counts
+- `app/page.tsx` — imports and renders ExploreSeriesSection after all layout sections
 
 ---
 
@@ -200,7 +205,7 @@ The following are real improvements that come immediately after launch, informed
 | Product Pages | 10% | Good — mobile creators hidden, no-retailer state needs guidance | 78% |
 | Affiliate Tracking / Monetisation | 10% | AWIN working; eBay unwrapped; AWIN_PUBLISHER_ID unverified | 60% |
 | Legal Pages | 7% | Done — mailbox hello@catchcomics.com unverified | 88% |
-| Discovery — Series Index + Navbar | 15% | `/series` page built; navbar link + homepage section NOT done | 15% |
+| Discovery — Series Index + Navbar | 15% | ✅ Done — navbar + MobileHeader link + homepage Explore Series section | 90% |
 | Analytics | 7% | **ZERO installed** | 0% |
 | Error Monitoring | 5% | **ZERO installed** | 0% |
 | Vercel Env Vars + Inngest | — | Done | 100% |
@@ -208,14 +213,14 @@ The following are real improvements that come immediately after launch, informed
 | Slack Alerting | Post-launch | Deferred — code complete, webhook not yet created | — |
 | Data quality — Claymore | 6% | Vol 1 absent, 16 of 27 vols missing, zero retailer pricing | 10% |
 
-**Recalculated readiness: ~62%** *(weighted scoring from first principles — see strategic review 2026-06-08)*  
+**Recalculated readiness: ~74%** *(updated after discovery implementation 2026-06-08)*  
 
-*Key revisions from prior 79% figure: Discovery now carries 15% weight (vs. 0% item on a list); Analytics/Error monitoring added at 12% weight combined; Claymore data quality factored in; Monetisation scored at 60% (eBay unmonetised, AWIN_PUBLISHER_ID unverified).*
+*Prior: 62% (strategic review). Gain: Discovery from 15% → 90% × 15% weight = +11pp. Claymore removed from registry (data integrity restored). Remaining gaps: Analytics (0%), Error monitoring (0%), Monetisation verification, launch copy.*
 
 **Biggest blockers remaining (ranked by impact):**
-1. Discovery: no path from homepage or navbar to `/series` — launch without this means zero organic discovery
+1. ~~Discovery: no path from homepage or navbar to `/series`~~ ✅ DONE — navbar + homepage section shipped
 2. Analytics: no pageview data = cannot validate the launch
-3. Claymore: Vol 1 absent = "Start Here" on Vol 2 = broken reading order
+3. ~~Claymore: Vol 1 absent = broken reading order~~ ✅ DONE — removed from registry
 4. Error monitoring: production crashes invisible
 5. Launch announcement copy: not written yet
 6. AWIN_PUBLISHER_ID: unverified in Vercel Production

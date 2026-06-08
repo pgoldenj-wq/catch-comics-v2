@@ -10,20 +10,18 @@
 ### 1. Navbar — Add `/series` link
 **Area:** Discovery / UX  
 **Launch-critical:** YES  
-**Status:** todo  
+**Status:** ✅ done (2026-06-08)  
 **Done when:** `/series` appears in the Navbar component. One click from any page to the series index. Visible on both mobile and desktop.  
-**Effort:** ~30 min  
-**Why now:** The `/series` page is fully built but completely undiscoverable. This is the single highest-impact, lowest-effort item remaining.
+**Evidence:** `components/Navbar.tsx` — usePathname + "Series" link (hidden sm:block); `components/MobileHeader.tsx` — Series link in discovery variant. Build passes.
 
 ---
 
 ### 2. Homepage — Series discovery section
 **Area:** Discovery / UX  
 **Launch-critical:** YES  
-**Status:** todo  
-**Done when:** Homepage has a visible "Reading Orders" or "Explore Series" section that links to `/series` and features 3–6 series cards. New visitors have an in-page path to the series section.  
-**Effort:** 2–3 hrs  
-**Why now:** Homepage currently has zero path to series. Without this, the only discovery is typing the URL directly or following a shared link.
+**Status:** ✅ done (2026-06-08)  
+**Done when:** Homepage has a visible "Explore Series" section with 6 series cards and "Browse all series →" CTA.  
+**Evidence:** `components/ExploreSeriesSection.tsx` (new); `app/api/series-preview/route.ts` (new ISR route); `app/page.tsx` — import + render. Responsive 3-col mobile / 6-col desktop. OpenLibrary fallbacks on first paint; replaced by live R2 covers from DB on mount. Build passes, 43 pages generated.
 
 ---
 
