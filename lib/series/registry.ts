@@ -54,6 +54,11 @@ export const SERIES_REGISTRY: Record<string, SeriesEntry> = {
     cvVolumeId:  '109427',
     publisher:   'Yen Press',
   },
+  'ouran-high-school-host-club': {
+    displayName: 'Ouran High School Host Club',
+    cvVolumeId:  '26278',
+    publisher:   'Viz Media',
+  },
 }
 
 /** Returns the SeriesEntry for a slug, or null if not registered. */
