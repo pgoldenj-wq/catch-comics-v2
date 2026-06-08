@@ -21,7 +21,8 @@ import type { SyncResult }     from '@/lib/adapters/shared/matching'
 // MANUAL: hand-entry only.
 // DIRECT_AFFILIATE / CJ_FEED: no feed adapter implemented — sync throws, creating
 // stuck "running" SyncLog rows. These are synced via dedicated CLI scripts instead.
-export const SKIP_PLATFORMS = new Set(['EBAY', 'MANUAL', 'DIRECT_AFFILIATE', 'CJ_FEED'])
+// DYNAMIC_LINK: listings are generated from ISBN URL templates at DB seed time — no feed to sync.
+export const SKIP_PLATFORMS = new Set(['EBAY', 'MANUAL', 'DIRECT_AFFILIATE', 'CJ_FEED', 'DYNAMIC_LINK'])
 
 // Default refresh interval in hours, by platform.
 export const DEFAULT_REFRESH_HOURS: Record<string, number> = {
