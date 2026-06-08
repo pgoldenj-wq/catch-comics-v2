@@ -7,25 +7,7 @@
 
 ## This Week's Priorities
 
-### 1. Navbar — Add `/series` link
-**Area:** Discovery / UX  
-**Launch-critical:** YES  
-**Status:** ✅ done (2026-06-08)  
-**Done when:** `/series` appears in the Navbar component. One click from any page to the series index. Visible on both mobile and desktop.  
-**Evidence:** `components/Navbar.tsx` — usePathname + "Series" link (hidden sm:block); `components/MobileHeader.tsx` — Series link in discovery variant. Build passes.
-
----
-
-### 2. Homepage — Series discovery section
-**Area:** Discovery / UX  
-**Launch-critical:** YES  
-**Status:** ✅ done (2026-06-08)  
-**Done when:** Homepage has a visible "Explore Series" section with 6 series cards and "Browse all series →" CTA.  
-**Evidence:** `components/ExploreSeriesSection.tsx` (new); `app/api/series-preview/route.ts` (new ISR route); `app/page.tsx` — import + render. Responsive 3-col mobile / 6-col desktop. OpenLibrary fallbacks on first paint; replaced by live R2 covers from DB on mount. Build passes, 43 pages generated.
-
----
-
-### 3. Analytics — Install Vercel Analytics
+### 1. Analytics — Install Vercel Analytics
 **Area:** Monitoring  
 **Launch-critical:** YES  
 **Status:** todo  
@@ -36,16 +18,7 @@
 
 ---
 
-### 4. Claymore — Fix broken reading order
-**Area:** Data quality  
-**Launch-critical:** YES  
-**Status:** ✅ done (2026-06-08)  
-**Done when:** Claymore removed from `lib/series/registry.ts` (Option B). `/series/claymore` returns 404. No collector encounters the broken reading order.  
-**Restoration path:** See BACKLOG.md — requires sourcing Vol 1 evidence before re-adding to registry.
-
----
-
-### 5. AWIN_PUBLISHER_ID — Verify in Vercel production
+### 2. AWIN_PUBLISHER_ID — Verify in Vercel production
 **Area:** Monetisation  
 **Launch-critical:** YES  
 **Status:** todo  
@@ -55,7 +28,7 @@
 
 ---
 
-### 6. Error monitoring — Install
+### 3. Error monitoring — Install
 **Area:** Infrastructure  
 **Launch-critical:** YES (pre-launch)  
 **Status:** todo  
@@ -65,14 +38,14 @@
 
 ---
 
-### 7. Production smoke test
+### 4. Production smoke test
 **Area:** Quality  
 **Launch-critical:** YES  
 **Status:** todo  
 **Done when:** Walk through the following on the production URL (`catchcomics.com`):
 - [ ] Search for "Saga" → product page loads, cover visible, prices shown
 - [ ] Click a retailer link → `/go/[id]` redirects with affiliate params (check URL)
-- [ ] Navigate to `/series` → index page loads, 18 series visible
+- [ ] Navigate to `/series` → index page loads, 17 series visible
 - [ ] Click a series → `/series/saga` loads with Start Here badge and Vol 1 price
 - [ ] Click "Start Reading" → product page for Vol 1 loads
 - [ ] Confirm AWIN click is recorded in AWIN dashboard
@@ -82,7 +55,7 @@
 
 ---
 
-### 8. Search — Fix or hide non-functional price filter
+### 5. Search — Fix or hide non-functional price filter
 **Area:** UX  
 **Launch-critical:** NEAR  
 **Status:** todo  
@@ -91,7 +64,7 @@
 
 ---
 
-### 9. Launch announcement copy
+### 6. Launch announcement copy
 **Area:** Go-to-market  
 **Launch-critical:** YES  
 **Status:** todo  
@@ -99,12 +72,12 @@
 - Reddit: r/comicbooks, r/manga, r/graphicnovels (separate tailored posts)
 - Discord: relevant collector communities
 - Facebook: comic collector groups
-Copy should include: what Catch Comics does, 2–3 example series pages with direct links, CTA to browse all 18 series.  
+Copy should include: what Catch Comics does, 2–3 example series pages with direct links, CTA to browse all 17 series.  
 **Effort:** 2–3 hrs (writing + editing)
 
 ---
 
-### 10. Verify hello@catchcomics.com mailbox
+### 7. Verify hello@catchcomics.com mailbox
 **Area:** Legal / Ops  
 **Launch-critical:** YES  
 **Status:** todo  
