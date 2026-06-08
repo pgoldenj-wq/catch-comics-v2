@@ -100,23 +100,67 @@ npm run cleanup:noncomics:execute-c
 
 ---
 
-### 11. Ouran High School Host Club — Audit and repair
+### 11. Ouran High School Host Club — Repair and build
 **Area:** Reading Orders  
 **Launch-critical:** YES  
-**Status:** blocked  
-**Done when:** All 18 products have correct volume_number and format. Page shows reading order without gaps vols 6-13.  
-**Blocked by:** 10 bare-titled products ("Ouran High School Host Club") with ISBNs that Open Library cannot resolve to volume numbers. Vols 6-13 range unidentifiable. Partial repair done: vols 1-5, 14, 15 fixed.  
-**Next action:** Try Google Books API (`GOOGLE_BOOKS_API_KEY` in `.env.local`) for the 10 unresolvable ISBNs. If Google Books also fails, consider cross-referencing Viz Media's own website ISBN list.
+**Status:** done  
+**Done when:** ✓ Complete. 18 volumes all present and numbered. Retailer listing evidence (retailer bb626f10) resolved 10 bare-titled products. Vol 7 absent from DB — inserted via Google Books (ISBN 9781421508641, sequential position confirmed). All 18 covers present. TypeCheck clean.  
+**Completed:** 2026-06-08. ✅ SHIPPED.
 
 ---
 
-### 12. Witch Hat Atelier — Audit
+### 12. Witch Hat Atelier — Repair and build
 **Area:** Reading Orders  
 **Launch-critical:** YES  
+**Status:** done  
+**Done when:** ✓ Complete. 14 volumes (Vols 1-14). 5 missing vols (2,5,6,7,8) inserted via Google Books (Kodansha ISBNs). Grimoire/supplemental editions set to DELUXE+NULL vol_number (sort to page end). All formats MANGA_VOLUME. All covers present. TypeCheck clean.  
+**Completed:** 2026-06-08. ✅ SHIPPED.
+
+---
+
+### 13. Tier 2 — Hellsing, Void Rivals, Sengoku Youko, Under Ninja
+**Area:** Reading Orders  
+**Launch-critical:** YES  
+**Status:** done  
+**Done when:** ✓ Complete. All 4 series pages live. 3 missing vols inserted (SY Vol 5 + UN Vols 5,6 via Google Books). 8 format/vol_number repairs applied. Covers sourced.  
+**Completed:** 2026-06-08. ✅ SHIPPED.
+
+---
+
+### 14. Tier 3 — Innocent Omnibus, Wolf's Daughter, Eden of Witches, Multi-Mind Mayhem
+**Area:** Reading Orders  
+**Launch-critical:** YES  
+**Status:** done  
+**Done when:** ✓ Complete. All 4 series pages live. Notable repairs: Innocent Rouge Omnibus CV ID corrected 157999→171481 (prevented series page contamination); Eden of Witches Vols 5-7 CV IDs set to 161324; Wolf's Daughter Vol 2 volume_number set; format TPB→MANGA_VOLUME across all three manga publishers.  
+**Completed:** 2026-06-08. ✅ SHIPPED.
+
+---
+
+### 15. Series Index + Navbar
+**Area:** Reading Orders + UX  
+**Launch-critical:** YES  
+**Status:** todo  
+**Done when:** `/series` accessible from navbar. All 18 shipped series listed, browsable on mobile. One click from any page.  
+**Blocked by:** —  
+**Note:** The last 0% required item before launch. All series pages now exist. This is the final unlock.
+
+---
+
+### 16. Naruto — Triage
+**Area:** Reading Orders  
+**Launch-critical:** NO (blocked — deferred)  
 **Status:** blocked  
-**Done when:** Vols 2, 5, 6, 7, 8 present in DB with correct format (MANGA_VOLUME) and volume_number.  
-**Blocked by:** 5 volumes absent from DB entirely — not in any retailer feed. Also: Vols 13, 14 have NULL volume_number; format for numbered vols needs TPB → MANGA_VOLUME.  
-**Next action:** Source ISBNs for missing vols (try Yen Press catalogue, Bookshop.org, or direct CV lookup). Once ISBNs confirmed, create synthetic products only if evidence is solid (CV + OL confirmation).
+**Done when:** Main series volumes 1–72 mapped to a consistent CV ID with correct volume_numbers. Decision made on which edition to feature (3-in-1 omnibus vs individual volumes).  
+**Blocked by:** 81 products with cv=NULL. Complex mix of 3-in-1 editions and individual volumes. Would need catalogue-wide enrichment + editorial decision. **Do not attempt without human sign-off.**
+
+---
+
+### 17. Baki the Grappler — Monitor ComicVine
+**Area:** Reading Orders  
+**Launch-critical:** NO (blocked — waiting on external)  
+**Status:** blocked  
+**Done when:** ComicVine indexes the Kodama Tales English edition of Baki the Grappler. Then: run `npm run ingest:cv-series -- --search "Baki the Grappler Kodama"`, set CV IDs on 20 DB products, fix Vols 7-10 volume_numbers (currently NULL), add slug to registry, build.  
+**Blocked by:** ComicVine has no entry for Kodama Tales edition yet (pub Oct 2025). 20 volumes + covers + pricing are already in DB. This is a 15-minute task once ComicVine has the data.
 
 ---
 

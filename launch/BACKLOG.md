@@ -28,15 +28,15 @@ Format: `[Area] Item — Launch-critical: yes/no`
 | 9 | Hellsing | Dark Horse Comics | 10 | 2 | 100% | 69.3 | Build — Tier 2 |
 | 10 | Naruto | Viz Media | 6 | 2 | 100% | 68.8 | Build — Tier 2 ⚠️ |
 | 11 | Overlord | Yen On | 10 | 1* | 100% | 65.8 | ✅ DONE |
-| 12 | Sengoku Youko | Tokyopop | 3 | 2 | 100% | 63.5 | Build — Tier 2 |
-| 13 | Void Rivals | Image Comics | 4 | 2 | 100% | 61.5 | Build — Tier 2 |
-| 14 | Under Ninja | DENPA | 3 | 2 | 100% | 56.0 | Build — Tier 3 |
-| 15 | Innocent Omnibus | Dark Horse Comics | 3 | 2 | 100% | 55.8 | Build — Tier 3 |
+| 12 | Sengoku Youko | Tokyopop | 3 | 2 | 100% | 63.5 | ✅ DONE (2026-06-08) |
+| 13 | Void Rivals | Image Comics | 4 | 2 | 100% | 61.5 | ✅ DONE (2026-06-08) |
+| 14 | Under Ninja | DENPA | 3 | 2 | 100% | 56.0 | ✅ DONE (2026-06-08) |
+| 15 | Innocent Omnibus | Dark Horse Comics | 3 | 2 | 100% | 55.8 | ✅ DONE (2026-06-08) |
 | 16 | Claymore | Viz Media | 11 | 0* | 100% | 55.5 | ✅ DONE |
-| 17 | Eden of Witches | Abrams, Inc. | 4 | 2 | 100% | 53.5 | Build — Tier 3 |
-| 18 | Wolf's Daughter: A Werewolf's Tale | Seven Seas | 3 | 2 | 100% | 52.8 | Build — Tier 3 |
-| 19 | Multi-Mind Mayhem | One Peace Books | 3 | 2 | 100% | 52.0 | Build — Tier 3 |
-| 20 | Baki the Grappler | Kodama Tales | 6 | 2 | 0% | 51.5 | Build — Tier 3 ⚠️ |
+| 17 | Eden of Witches | Abrams, Inc. | 4 | 2 | 100% | 53.5 | ✅ DONE (2026-06-08) |
+| 18 | Wolf's Daughter: A Werewolf's Tale | Seven Seas | 3 | 2 | 100% | 52.8 | ✅ DONE (2026-06-08) |
+| 19 | Multi-Mind Mayhem | One Peace Books | 3 | 2 | 100% | 52.0 | ✅ DONE (2026-06-08) |
+| 20 | Baki the Grappler | Kodama Tales | 6 | 2 | 0% | 51.5 | ⛔ BLOCKED — Kodama Tales English ed. not yet in ComicVine |
 
 \* Failed gate but already built. Built manually — not DB-gate dependent.
 
@@ -52,11 +52,13 @@ Format: `[Area] Item — Launch-critical: yes/no`
 
 ### Data quality flags
 
-**⚠️ Witch Hat Atelier (rank 3):** Vols 2, 5, 6, 7, 8 are genuinely absent from DB (not in any retailer feed). Vols 13 and 14 are present but have NULL volume_number. Vol.1 is TPB format (should be MANGA_VOLUME). Kitchen spin-off (cv:154952) and Grimoire editions have the same comicvine_id as the main series and will appear on the page. Fix: source ISBNs for missing vols, then run `repair-wha.ts`. Page blocked until missing vols are present.
+**✅ Witch Hat Atelier (rank 3):** DONE 2026-06-08. Vols 2,5,6,7,8 sourced via Google Books (Kodansha ISBNs), inserted with covers. Vol.1 format fixed TPB→MANGA_VOLUME. Grimoire/supplemental editions set to DELUXE+NULL vol_number. All 14 vols present.
 
-**⚠️ Ouran High School Host Club (rank 8):** 10 of 18 products have bare title "Ouran High School Host Club" with no volume number. Open Library returned no subtitle for any of the 10 ISBNs (9781421526720, 9781421526737, 9781421519296, 9781421522555, 9781421538709, 9781421541358, 9781421539799, 9781421511610, 9781421514048, 9781421505848). These likely cover vols 6-13. Fix: try Google Books API (`GOOGLE_BOOKS_API_KEY` is in `.env.local`) or cross-reference retailer data. 7 of 18 products repaired (vols 1-5, 14, 15 now correct format + volume_number). Page blocked until vols 6-13 are identified.
+**✅ Ouran High School Host Club (rank 8):** DONE 2026-06-08. 10 bare-titled products unblocked via retailer listing evidence (retailer bb626f10 held complete titles). Vol 7 absent from DB; found via Google Books ISBN search (9781421508641, sequential between vol 6 and vol 8). All 18 vols present.
 
-**⚠️ Naruto (rank 10):** `distinct_volumes = 1` despite 6 editions in DB. All 6 editions appear to be Vol.1 formats (standard, omnibus, box set). Investigate before building series page — if only Vol.1 is represented, the page would show a 72-volume series with only 1 entry. Fix: check `canonical_products` for `series_name = 'Naruto'`, confirm `volume_number` values, run `ingest-cv-series` if needed.
+**⛔ Naruto (rank 10):** BLOCKED — deep catalogue problem. 81 products with cv=NULL (mostly 3-in-1 omnibus editions). Main series cv:18836 has only 6 products linked, 5 of them with volume_number=NULL. The 3-in-1 editions and individual volumes are mixed without clear CV ID linkage. Would require catalogue-wide enrichment run + editorial decision on which edition to feature. Cannot be resolved with targeted repair approach. **Needs human triage.**
+
+**⛔ Baki the Grappler (rank 20):** BLOCKED — Kodama Tales English edition (pub Oct 2025) has no ComicVine volume entry yet. 20 volumes in DB with covers + pricing, but cv=NULL across all products (cv:146173 on vols 7-10 is the Spanish Meian edition — wrong publisher, cannot use). Series page query requires comicvine_id match. **Resolution: wait for ComicVine to index the Kodama Tales edition, then run targeted repair script.**
 
 **⚠️ Baki the Grappler (rank 20):** `cv_enriched_editions = 0`. No ComicVine IDs assigned. Cover images and synopsis will be missing. Fix: run `npm run ingest:cv-series -- --search "Baki the Grappler"` before building series page.
 
@@ -71,16 +73,27 @@ Format: `[Area] Item — Launch-critical: yes/no`
 | Tsugumi Project | 40.8 | `distinct_volumes = 1`, very niche |
 | A Man Who Defies the World of BL | 39.0 | No CV enrichment, very niche |
 
-### Recommended next steps after Tier 1 (updated 2026-06-08)
+### Status (updated 2026-06-08 session 2)
 
-**Tier 1 status:**
-1. ~~**Saga** — ✅ DONE 2026-06-07.~~ 11 volumes, all R2 covers, 2 retailers on Vol.1 at £7.49.
-2. ~~**Trigun Maximum Deluxe Edition** — ✅ DONE 2026-06-07.~~ 5 volumes, 2 retailers on Vol.1.
-3. ~~**Laid-Back Camp** — ✅ DONE 2026-06-08.~~ 17 volumes, 2 retailers on Vol.1 at £7.99.
-4. **Ouran High School Host Club** — ⚠ BLOCKED. 10 bare-titled products unresolvable. Try Google Books API next.
-5. **Witch Hat Atelier** — ⚠ BLOCKED. Vols 2,5,6,7,8 absent from DB. Source ISBNs first.
+**All 18 buildable series shipped. 2 hard blockers remain.**
 
-**Recommended next (Tier 2):** Hellsing (rank 9), Sengoku Youko (rank 12), Void Rivals (rank 13) are all buildable pending a quick data audit. Naruto (rank 10) needs volume number investigation first.
+Shipped this session (10 new pages):
+- ~~**Ouran High School Host Club**~~ ✅ DONE 2026-06-08. 18 vols, retailer listing evidence + Google Books.
+- ~~**Witch Hat Atelier**~~ ✅ DONE 2026-06-08. 14 vols incl. 5 newly sourced from Kodansha.
+- ~~**Hellsing**~~ ✅ DONE 2026-06-08. 10 vols (Vol 8 bare title fixed).
+- ~~**Void Rivals**~~ ✅ DONE 2026-06-08. 5 vols.
+- ~~**Sengoku Youko**~~ ✅ DONE 2026-06-08. 6 vols (Vol 5 added from Google Books).
+- ~~**Under Ninja**~~ ✅ DONE 2026-06-08. 8 vols (Vols 5 & 6 added from Google Books).
+- ~~**Innocent Omnibus**~~ ✅ DONE 2026-06-08. 3 vols. Fixed: Innocent Rouge CV ID corrected 157999→171481.
+- ~~**Wolf's Daughter**~~ ✅ DONE 2026-06-08. 4 vols (Vol 2 volume_number fixed).
+- ~~**Eden of Witches**~~ ✅ DONE 2026-06-08. 7 vols (Vol 7 vol_number+format fixed; Vols 5-7 CV IDs set).
+- ~~**Multi-Mind Mayhem**~~ ✅ DONE 2026-06-08. 3 vols.
+
+**Remaining hard blockers (need human action):**
+- **Naruto** — catalogue triage required (81 cv=NULL products, 3-in-1/individual mix)
+- **Baki the Grappler** — wait for ComicVine to index Kodama Tales English edition (pub Oct 2025)
+
+**Recommended next (after this session):** Series Index page at `/series` + Navbar link — the last 0% required item for launch.
 
 ---
 
