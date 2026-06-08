@@ -59,6 +59,11 @@ export const SERIES_REGISTRY: Record<string, SeriesEntry> = {
     cvVolumeId:  '26278',
     publisher:   'Viz Media',
   },
+  'witch-hat-atelier': {
+    displayName: 'Witch Hat Atelier',
+    cvVolumeId:  '118208',
+    publisher:   'Kodansha Comics',
+  },
 }
 
 /** Returns the SeriesEntry for a slug, or null if not registered. */
