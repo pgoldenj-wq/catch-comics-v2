@@ -64,6 +64,26 @@ export const SERIES_REGISTRY: Record<string, SeriesEntry> = {
     cvVolumeId:  '118208',
     publisher:   'Kodansha Comics',
   },
+  'hellsing': {
+    displayName: 'Hellsing',
+    cvVolumeId:  '20494',
+    publisher:   'Dark Horse Comics',
+  },
+  'void-rivals': {
+    displayName: 'Void Rivals',
+    cvVolumeId:  '151301',
+    publisher:   'Image Comics',
+  },
+  'sengoku-youko': {
+    displayName: 'Sengoku Youko',
+    cvVolumeId:  '149906',
+    publisher:   'Tokyopop',
+  },
+  'under-ninja': {
+    displayName: 'Under Ninja',
+    cvVolumeId:  '152175',
+    publisher:   'DENPA',
+  },
 }
 
 /** Returns the SeriesEntry for a slug, or null if not registered. */
