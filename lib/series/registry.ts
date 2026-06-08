@@ -34,11 +34,6 @@ export const SERIES_REGISTRY: Record<string, SeriesEntry> = {
     cvVolumeId:  '17993',
     publisher:   'Image Comics',
   },
-  'claymore': {
-    displayName: 'Claymore',
-    cvVolumeId:  '21739',
-    publisher:   'Viz Media',
-  },
   'overlord': {
     displayName: 'Overlord',
     cvVolumeId:  '91727',

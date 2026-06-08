@@ -32,7 +32,7 @@ Format: `[Area] Item — Launch-critical: yes/no`
 | 13 | Void Rivals | Image Comics | 4 | 2 | 100% | 61.5 | ✅ DONE (2026-06-08) |
 | 14 | Under Ninja | DENPA | 3 | 2 | 100% | 56.0 | ✅ DONE (2026-06-08) |
 | 15 | Innocent Omnibus | Dark Horse Comics | 3 | 2 | 100% | 55.8 | ✅ DONE (2026-06-08) |
-| 16 | Claymore | Viz Media | 11 | 0* | 100% | 55.5 | ✅ DONE |
+| 16 | Claymore | Viz Media | 11 | 0* | 100% | 55.5 | ⛔ OFFLINE — Vol 1 absent, broken reading order (removed from registry 2026-06-08) |
 | 17 | Eden of Witches | Abrams, Inc. | 4 | 2 | 100% | 53.5 | ✅ DONE (2026-06-08) |
 | 18 | Wolf's Daughter: A Werewolf's Tale | Seven Seas | 3 | 2 | 100% | 52.8 | ✅ DONE (2026-06-08) |
 | 19 | Multi-Mind Mayhem | One Peace Books | 3 | 2 | 100% | 52.0 | ✅ DONE (2026-06-08) |
@@ -52,15 +52,13 @@ Format: `[Area] Item — Launch-critical: yes/no`
 
 ### Data quality flags — OPEN ISSUES
 
-**⛔ Claymore (rank 16) — BROKEN READING ORDER (discovered 2026-06-08 strategic review)**
-- Vol 1 (ISBN 9781421500897, Viz Media 2006) is absent from DB. Series page at `/series/claymore` shows Vol 2 as "Start Here" — a broken reading order.
-- 16 of 27 volumes missing from DB (present: 2,3,4,5,7,10,14,15,17,26,27).
-- Zero live retailer pricing across all 11 volumes in DB.
-- The series is listed as DONE in the build order but delivers a broken experience.
-- **Resolution options:**
-  - Option A: Source Vol 1 ISBN, insert into DB, verify live pricing → 1–2 hrs. Then assess whether to build or defer remaining volumes.
-  - Option B: Remove `claymore` from `lib/series/registry.ts` until Vol 1 can be properly sourced → 2 min.
-- **Decision needed from operator** before launch.
+**⛔ Claymore (rank 16) — TAKEN OFFLINE (2026-06-08)**
+- **Action taken:** Removed `claymore` from `lib/series/registry.ts`. `/series/claymore` returns 404.
+- **Reason:** Vol 1 (ISBN 9781421500897, Viz Media 2006) is absent from DB — never inserted, no deleted record. Series page showed Vol 2 as "Start Here" — a broken reading order.
+- **DB state (audit 2026-06-08):** 11 live volumes (2,3,4,5,7,10,14,15,17,26,27), all with covers. 23 real-price retailer listings across those volumes. Vol 1 has no DB record at all.
+- **16 of 27 volumes still missing:** 1,6,8,9,11,12,13,16,18,19,20,21,22,23,24,25.
+- **Audit script:** `scripts/repair-claymore.ts`
+- **To restore:** Source Vol 1 evidence (retailer feed or Google Books confirmation) → insert canonical product row → confirm live pricing → re-add `claymore` to registry.
 
 
 
@@ -87,7 +85,7 @@ Format: `[Area] Item — Launch-critical: yes/no`
 
 ### Status (updated 2026-06-08 session 2)
 
-**All 18 buildable series shipped. 2 hard blockers remain.**
+**17 buildable series shipped. 3 hard blockers remain (Claymore taken offline).**
 
 Shipped this session (10 new pages):
 - ~~**Ouran High School Host Club**~~ ✅ DONE 2026-06-08. 18 vols, retailer listing evidence + Google Books.
@@ -102,6 +100,7 @@ Shipped this session (10 new pages):
 - ~~**Multi-Mind Mayhem**~~ ✅ DONE 2026-06-08. 3 vols.
 
 **Remaining hard blockers (need human action):**
+- **Claymore** — Vol 1 absent from DB; offline until sourced (script: `scripts/repair-claymore.ts`)
 - **Naruto** — catalogue triage required (81 cv=NULL products, 3-in-1/individual mix)
 - **Baki the Grappler** — wait for ComicVine to index Kodama Tales English edition (pub Oct 2025)
 
