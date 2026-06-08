@@ -5,7 +5,7 @@
 **Launch promise:** A collector can search for a comic, follow a reading order, compare prices across UK retailers, and trust the information they see.
 
 **Completion: auto-calculated from requirement statuses below**  
-Last updated: 2026-06-08 (session 2)
+Last updated: 2026-06-08 (session 3 — strategic review)
 
 ---
 
@@ -86,20 +86,54 @@ Items removed from launch-day scope after challenge:
 ---
 
 ### 9. Series Index Page (`/series`)
-**Status:** Not started  
-**Done when:** `/series` accessible from navbar. All 20–25 series listed. Browsable on mobile.  
-**Blocked by:** Series pages must exist first
+**Status:** Page BUILT — navbar link NOT added  
+**Done when:** `/series` accessible from navbar. All 18 series listed with cards. Browsable on mobile.  
+**Note:** The `/series` index page is fully implemented (hero section, responsive grid, JSON-LD, ISR 1h). It is in the sitemap. It is NOT linked from the navbar or homepage. A visitor cannot find it organically.
 
 ---
 
-### 10. Navbar Update
+### 10. Navbar + Homepage Discovery
 **Status:** Not started  
-**Done when:** `/series` link added to navbar. One click from any page to the series index.  
-**Note:** Minimal change. Not a full redesign.
+**Done when:** `/series` link appears in the Navbar component (visible on all pages, mobile + desktop). Homepage has a "Reading Orders" or "Explore Series" section featuring 3–6 series cards that link to `/series`.  
+**Note:** These are two separate changes. Navbar link ~30 min. Homepage section ~2–3 hrs. Both are required — the navbar covers direct navigation; the homepage section catches new visitors who land on the home URL from community posts.
 
 ---
 
-### 11. Vercel Production Env Vars + Inngest Sync
+### 11a. Analytics — Vercel Analytics
+**Status:** NOT INSTALLED  
+**Launch-critical:** YES  
+**Done when:** `@vercel/analytics` installed, `<Analytics />` in `app/layout.tsx`, pageview data visible in Vercel dashboard.  
+**Effort:** 15 min  
+**Why:** Without analytics, you cannot validate whether the launch worked. No pageviews, no sessions, no conversion signals.
+
+---
+
+### 11b. Error Monitoring
+**Status:** NOT INSTALLED  
+**Launch-critical:** YES (pre-launch)  
+**Done when:** Production crashes are visible — Vercel built-in error tracking enabled OR `@sentry/nextjs` installed on free tier.  
+**Effort:** 30 min  
+**Why:** A broken series page could be live for days without visibility. Silent failures post-launch are unacceptable.
+
+---
+
+### 12a. AWIN_PUBLISHER_ID — Verify in Vercel Production
+**Status:** Unverified  
+**Launch-critical:** YES  
+**Done when:** Confirm `AWIN_PUBLISHER_ID` is set in the Vercel Production environment. If missing, add it.  
+**Effort:** 5 min  
+**Risk:** If unset, `wrapAffiliateUrl()` falls through to unwrapped URLs. Silent revenue failure — only visible in server-side console logs.
+
+---
+
+### 12b. Claymore — Fix broken reading order
+**Status:** DATA ISSUE — remove or repair before launch  
+**Done when:** Either (A) Claymore Vol 1 is in DB with a live priced listing, or (B) Claymore is removed from the registry.  
+**Context:** Vol 1 (ISBN 9781421500897, Viz Media 2006) is absent from DB. Series page shows Vol 2 as "Start Here" — broken reading order. 16 of 27 volumes missing. Zero live retailer pricing across the series. Option B (remove from registry) takes 2 minutes.
+
+---
+
+### 13. Vercel Production Env Vars + Inngest Sync
 **Status:** Done (2026-06-07)  
 **Done when:** ✓ Complete. All 30 Vercel Production vars cross-checked against `.env.local` and full codebase grep. Zero launch-critical gaps.  
 **Inngest sync fix:** ✓ Complete (2026-06-07). Root cause: Vercel was sending per-deployment preview URLs to Inngest instead of the canonical domain, causing 9+ unattached sync failures since May 29. Fix: `INNGEST_SERVE_NEXT_URL=https://catchcomics.com/api/inngest` added to Vercel Production. Redeployed at 21:48 BST. Manual resync triggered in Inngest dashboard by operator. All 8 codebase functions now registered in Production: sync-retailer, sync-scheduled, enrich-canonical, cleanup-stale, price-check, on-failure, bookshop-lookup, bookshop-refresh. Future deployments will sync to catchcomics.com, not to ephemeral deployment URLs. No outstanding Inngest concerns.  
@@ -156,23 +190,35 @@ The following are real improvements that come immediately after launch, informed
 
 ## Completion by Area
 
-| Area | Priority | Status | % done |
+| Area | Weight | Status | % done |
 |---|---|---|---|
-| CV Enrichment (launch series) | Required | In progress (18/20 series enriched) | 85% |
-| Reading Journeys | Required | 18/20 done — 2 hard blockers (Naruto, Baki) | 90% |
-| Cleanup v2 | Required | Done | 100% |
-| AWIN write mode | Required | Done | 100% |
-| Search | Required | Functional | 80% |
-| Product Pages | Required | Good | 75% |
-| Affiliate Tracking | Required | Good | 85% |
-| Legal Pages | Required | Done | 100% |
-| Series Index + Navbar | Required | Not started | 0% |
-| Vercel Env Vars + Inngest | Required | Done | 100% |
-| R2 Image Domain | Required | Done | 100% |
+| CV Enrichment (launch series) | 10% | All 18 live series enriched; bulk continues in background | 85% |
+| Reading Journeys | 20% | 18/20 done — Claymore broken (Vol 1 absent); 2 hard blockers (Naruto, Baki) | 85% |
+| Cleanup v2 | — | Done | 100% |
+| AWIN write mode | — | Done | 100% |
+| Search | 10% | Functional — price filter non-op is the only notable issue | 75% |
+| Product Pages | 10% | Good — mobile creators hidden, no-retailer state needs guidance | 78% |
+| Affiliate Tracking / Monetisation | 10% | AWIN working; eBay unwrapped; AWIN_PUBLISHER_ID unverified | 60% |
+| Legal Pages | 7% | Done — mailbox hello@catchcomics.com unverified | 88% |
+| Discovery — Series Index + Navbar | 15% | `/series` page built; navbar link + homepage section NOT done | 15% |
+| Analytics | 7% | **ZERO installed** | 0% |
+| Error Monitoring | 5% | **ZERO installed** | 0% |
+| Vercel Env Vars + Inngest | — | Done | 100% |
+| R2 Image Domain | — | Done | 100% |
 | Slack Alerting | Post-launch | Deferred — code complete, webhook not yet created | — |
+| Data quality — Claymore | 6% | Vol 1 absent, 16 of 27 vols missing, zero retailer pricing | 10% |
 
-**Overall: ~79%** *(required items only — Slack excluded)*  
-*(Reading Journeys now 90% (18/20). CV Enrichment 85%. Only Series Index + Navbar remains at 0% of required items — all others 75%+. Two hard blockers: Naruto needs catalogue triage, Baki needs ComicVine to index Kodama Tales edition.)*
+**Recalculated readiness: ~62%** *(weighted scoring from first principles — see strategic review 2026-06-08)*  
+
+*Key revisions from prior 79% figure: Discovery now carries 15% weight (vs. 0% item on a list); Analytics/Error monitoring added at 12% weight combined; Claymore data quality factored in; Monetisation scored at 60% (eBay unmonetised, AWIN_PUBLISHER_ID unverified).*
+
+**Biggest blockers remaining (ranked by impact):**
+1. Discovery: no path from homepage or navbar to `/series` — launch without this means zero organic discovery
+2. Analytics: no pageview data = cannot validate the launch
+3. Claymore: Vol 1 absent = "Start Here" on Vol 2 = broken reading order
+4. Error monitoring: production crashes invisible
+5. Launch announcement copy: not written yet
+6. AWIN_PUBLISHER_ID: unverified in Vercel Production
 
 ---
 

@@ -50,7 +50,19 @@ Format: `[Area] Item — Launch-critical: yes/no`
 | Trigun Maximum Deluxe | 60 | 75 | 65 | 65 | 100 | **71.5** |
 | Ouran High School Host Club | 65 | 75 | 75 | 40 | 100 | **71.0** |
 
-### Data quality flags
+### Data quality flags — OPEN ISSUES
+
+**⛔ Claymore (rank 16) — BROKEN READING ORDER (discovered 2026-06-08 strategic review)**
+- Vol 1 (ISBN 9781421500897, Viz Media 2006) is absent from DB. Series page at `/series/claymore` shows Vol 2 as "Start Here" — a broken reading order.
+- 16 of 27 volumes missing from DB (present: 2,3,4,5,7,10,14,15,17,26,27).
+- Zero live retailer pricing across all 11 volumes in DB.
+- The series is listed as DONE in the build order but delivers a broken experience.
+- **Resolution options:**
+  - Option A: Source Vol 1 ISBN, insert into DB, verify live pricing → 1–2 hrs. Then assess whether to build or defer remaining volumes.
+  - Option B: Remove `claymore` from `lib/series/registry.ts` until Vol 1 can be properly sourced → 2 min.
+- **Decision needed from operator** before launch.
+
+
 
 **✅ Witch Hat Atelier (rank 3):** DONE 2026-06-08. Vols 2,5,6,7,8 sourced via Google Books (Kodansha ISBNs), inserted with covers. Vol.1 format fixed TPB→MANGA_VOLUME. Grimoire/supplemental editions set to DELUXE+NULL vol_number. All 14 vols present.
 
