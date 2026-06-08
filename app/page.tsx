@@ -3,9 +3,10 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import SearchBar   from '../components/SearchBar';
-import MobileHeader from '../components/MobileHeader';
-import Navbar       from '../components/Navbar';
+import SearchBar            from '../components/SearchBar';
+import MobileHeader          from '../components/MobileHeader';
+import Navbar                from '../components/Navbar';
+import ExploreSeriesSection  from '../components/ExploreSeriesSection';
 import { isBadCoverUrl, adjustImgSrc } from '../lib/images/url-filters';
 
 type HoverZone = 'left' | 'right' | null;
@@ -751,6 +752,13 @@ export default function Home() {
       </div>
 
       </div>{/* end hidden md:block desktop wrapper */}
+
+      {/* ─── Explore Series — shared section (desktop + mobile) ─────────────
+          Renders once below both layouts. Uses responsive CSS internally:
+          3-column grid on mobile, 6-column on sm+ (≥640px).
+          Fetches live R2 cover URLs from /api/series-preview on mount;
+          shows OpenLibrary fallback covers on first paint.           ──────── */}
+      <ExploreSeriesSection />
 
       {/* Footer rendered globally by app/layout.tsx → components/SiteFooter */}
 

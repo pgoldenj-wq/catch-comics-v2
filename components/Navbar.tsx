@@ -14,9 +14,10 @@
  *     Used by the product page where region only affects search navigation.
  */
 
-import { useState }  from 'react'
-import Link          from 'next/link'
-import SearchBar     from '@/components/SearchBar'
+import { useState }     from 'react'
+import { usePathname }  from 'next/navigation'
+import Link             from 'next/link'
+import SearchBar        from '@/components/SearchBar'
 
 // ── Flag SVGs ─────────────────────────────────────────────────────────────────
 
@@ -69,6 +70,7 @@ export interface NavbarProps {
 export default function Navbar({ initialQuery, region: controlledRegion, onRegionChange }: NavbarProps) {
   // Uncontrolled fallback — only used when `region` prop is not supplied.
   const [internalRegion, setInternalRegion] = useState<'uk' | 'us'>('uk')
+  const pathname = usePathname()
 
   const region    = controlledRegion ?? internalRegion
   const setRegion = (r: 'uk' | 'us') => {
@@ -83,6 +85,24 @@ export default function Navbar({ initialQuery, region: controlledRegion, onRegio
         {/* Logo */}
         <Link href="/" className="shrink-0" aria-label="Catch Comics home">
           <img src="/logo.png" alt="Catch Comics" className="h-12 w-auto" />
+        </Link>
+
+        {/* Series nav link — hidden below sm (640px) to prevent cramping on narrow viewports */}
+        <Link
+          href="/series"
+          className="shrink-0 hidden sm:block"
+          style={{
+            fontSize:       '14px',
+            fontWeight:     600,
+            textDecoration: 'none',
+            whiteSpace:     'nowrap',
+            color:          pathname.startsWith('/series') ? '#E8272A' : '#374151',
+            transition:     'color 0.15s',
+          }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#E8272A' }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = pathname.startsWith('/series') ? '#E8272A' : '#374151' }}
+        >
+          Series
         </Link>
 
         {/* Search bar */}

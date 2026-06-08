@@ -137,11 +137,28 @@ export default function MobileHeader({
         </a>
 
         {variant === 'discovery' ? (
-          /* Discovery: region pills fill the right side */
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
-            <RegionPill active={region === 'uk'} value="uk" label="UK" onClick={() => onRegionChange('uk')} />
-            <RegionPill active={region === 'us'} value="us" label="US" onClick={() => onRegionChange('us')} />
-          </div>
+          /* Discovery: Series link + region pills on the right */
+          <>
+            <a
+              href="/series"
+              style={{
+                marginLeft:     'auto',
+                fontSize:       '13px',
+                fontWeight:     600,
+                color:          '#374151',
+                textDecoration: 'none',
+                whiteSpace:     'nowrap',
+                padding:        '8px 4px',
+                flexShrink:     0,
+              }}
+            >
+              Series
+            </a>
+            <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+              <RegionPill active={region === 'uk'} value="uk" label="UK" onClick={() => onRegionChange('uk')} />
+              <RegionPill active={region === 'us'} value="us" label="US" onClick={() => onRegionChange('us')} />
+            </div>
+          </>
         ) : (
           /* Search: search bar fills remaining space after logo.
              No region pills in the header — they live in the content area
