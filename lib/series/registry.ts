@@ -84,6 +84,26 @@ export const SERIES_REGISTRY: Record<string, SeriesEntry> = {
     cvVolumeId:  '152175',
     publisher:   'DENPA',
   },
+  'innocent-omnibus': {
+    displayName: 'Innocent Omnibus',
+    cvVolumeId:  '157999',
+    publisher:   'Dark Horse Comics',
+  },
+  'wolfs-daughter': {
+    displayName: "Wolf's Daughter",
+    cvVolumeId:  '169717',
+    publisher:   'Seven Seas Entertainment',
+  },
+  'eden-of-witches': {
+    displayName: 'Eden of Witches',
+    cvVolumeId:  '161324',
+    publisher:   'Abrams ComicArts',
+  },
+  'multi-mind-mayhem': {
+    displayName: 'Multi-Mind Mayhem',
+    cvVolumeId:  '138705',
+    publisher:   'One Peace Books',
+  },
 }
 
 /** Returns the SeriesEntry for a slug, or null if not registered. */
