@@ -27,14 +27,18 @@ Log "wrapper started (PID $PID); workdir=$WorkDir"
 # ES_CONTINUOUS (0x80000000) | ES_SYSTEM_REQUIRED (0x00000001) — keep system awake.
 # The flag is automatically cleared when this PowerShell process exits.
 Add-Type -TypeDefinition @'
-using System;
 using System.Runtime.InteropServices;
 public class SleepBlock {
   [DllImport("kernel32.dll")]
   public static extern uint SetThreadExecutionState(uint esFlags);
+  // PS 5.1 parses 0x80000001 as signed Int32 (-2147483647), which it refuses to
+  // widen to uint for P/Invoke.  Keep the constant in C# where the u-suffix is legal.
+  public static void PreventSleep() {
+    SetThreadExecutionState(0x80000001u); // ES_CONTINUOUS | ES_SYSTEM_REQUIRED
+  }
 }
 '@
-[SleepBlock]::SetThreadExecutionState(0x80000001) | Out-Null
+[SleepBlock]::PreventSleep()
 Log "sleep-block active: ES_CONTINUOUS | ES_SYSTEM_REQUIRED"
 
 while ($true) {
