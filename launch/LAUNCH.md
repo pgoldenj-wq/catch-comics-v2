@@ -86,9 +86,14 @@ Items removed from launch-day scope after challenge:
 ---
 
 ### 9. Series Index Page (`/series`)
-**Status:** Page BUILT — navbar link NOT added  
-**Done when:** `/series` accessible from navbar. All 18 series listed with cards. Browsable on mobile.  
-**Note:** The `/series` index page is fully implemented (hero section, responsive grid, JSON-LD, ISR 1h). It is in the sitemap. It is NOT linked from the navbar or homepage. A visitor cannot find it organically.
+**Status:** ✅ Done (2026-06-08)  
+**Done when:** `/series` accessible from navbar. 17 series listed with cards. Browsable on mobile.  
+**Delivered:**
+- `/series` index page — hero, ISR 1h, responsive grid, JSON-LD, sitemap ✓ (pre-existing)
+- Navbar "Series" link — desktop all pages, active state on `/series/*` ✓ (shipped 2026-06-08)
+- MobileHeader "Series" link — homepage mobile discovery variant ✓ (shipped 2026-06-08)
+- Homepage "Explore Series" section — 6 cards, mobile+desktop responsive, "Browse all series →" CTA ✓ (shipped 2026-06-08)
+- A visitor can reach `/series` in one click from any page on the site.
 
 ---
 
@@ -132,9 +137,9 @@ Items removed from launch-day scope after challenge:
 ---
 
 ### 12b. Claymore — Fix broken reading order
-**Status:** DATA ISSUE — remove or repair before launch  
-**Done when:** Either (A) Claymore Vol 1 is in DB with a live priced listing, or (B) Claymore is removed from the registry.  
-**Context:** Vol 1 (ISBN 9781421500897, Viz Media 2006) is absent from DB. Series page shows Vol 2 as "Start Here" — broken reading order. 16 of 27 volumes missing. Zero live retailer pricing across the series. Option B (remove from registry) takes 2 minutes.
+**Status:** ✅ Done (2026-06-08) — removed from registry (Option B)  
+**Done when:** ✓ Claymore removed from `lib/series/registry.ts`. `/series/claymore` returns 404. Data integrity restored — no collector can encounter a broken "Start Here" badge pointing to Vol 2.  
+**Restoration path:** Source Vol 1 evidence (retailer feed or Google Books) → insert canonical product row → confirm live pricing → re-add `claymore` to registry. See BACKLOG.md for full audit detail.
 
 ---
 
@@ -211,11 +216,18 @@ The following are real improvements that come immediately after launch, informed
 | Vercel Env Vars + Inngest | — | Done | 100% |
 | R2 Image Domain | — | Done | 100% |
 | Slack Alerting | Post-launch | Deferred — code complete, webhook not yet created | — |
-| Data quality — Claymore | 6% | Vol 1 absent, 16 of 27 vols missing, zero retailer pricing | 10% |
+| Data quality — Claymore | 6% | ✅ Resolved — removed from registry 2026-06-08. No broken reading order. | 95% |
 
-**Recalculated readiness: ~74%** *(updated after discovery implementation 2026-06-08)*  
+**Recalculated readiness: ~79%** *(reconciled 2026-06-08 — all shipped items reflected)*  
 
-*Prior: 62% (strategic review). Gain: Discovery from 15% → 90% × 15% weight = +11pp. Claymore removed from registry (data integrity restored). Remaining gaps: Analytics (0%), Error monitoring (0%), Monetisation verification, launch copy.*
+| Session | Change | Gain |
+|---------|--------|------|
+| Strategic review baseline | — | 62% |
+| Discovery (Navbar + Homepage section) | 15% → 90% × 15% weight | +11pp |
+| Claymore resolved (removed from registry) | 10% → 95% × 6% weight | +5pp |
+| **Current** | | **~78–79%** |
+
+*Remaining gaps (in weight order): Analytics 7% at 0%, Error monitoring 5% at 0%, Monetisation 10% at 60% (eBay unwrapped, AWIN_PUBLISHER_ID unverified), Legal 7% at 88% (mailbox unverified).*
 
 **Biggest blockers remaining (ranked by impact):**
 1. ~~Discovery: no path from homepage or navbar to `/series`~~ ✅ DONE — navbar + homepage section shipped

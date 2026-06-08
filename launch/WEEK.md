@@ -1,7 +1,7 @@
 # Catch Comics — Week of 2026-06-09
 
 **Launch date:** July 1, 2026 — **22 days remaining**  
-**Week objective:** Close the discovery gap. Install analytics. Fix Claymore. Ship the launch announcement. Smoke test on production.
+**Week objective:** Install analytics. Ship the launch announcement. Smoke test on production.
 
 ---
 
@@ -39,11 +39,9 @@
 ### 4. Claymore — Fix broken reading order
 **Area:** Data quality  
 **Launch-critical:** YES  
-**Status:** todo  
-**Done when:** Either (A) Claymore Vol 1 exists in DB with a live priced listing and the "Start Here" badge is correct, OR (B) Claymore is removed from the registry until Vol 1 can be sourced.  
-**Effort:** 1 hr  
-**Context:** Claymore Vol 1 is absent from DB. The series page at `/series/claymore` shows Vol 2 as "Start Here" — a broken reading order. The full series also has 16 of 27 volumes missing and zero live retailer pricing. Option B (remove from registry) takes 2 minutes; Option A requires finding the Vol 1 ISBN and sourcing retailer coverage.  
-**Vol 1 ISBN (Viz Media, 2006):** 9781421500897
+**Status:** ✅ done (2026-06-08)  
+**Done when:** Claymore removed from `lib/series/registry.ts` (Option B). `/series/claymore` returns 404. No collector encounters the broken reading order.  
+**Restoration path:** See BACKLOG.md — requires sourcing Vol 1 evidence before re-adding to registry.
 
 ---
 
