@@ -304,16 +304,19 @@ async function main() {
   try {
     const { PrismaClient } = require('@prisma/client');
     prisma = new PrismaClient({ log: [] });
-    const [total, cvCount, coverCount, descCount, listingCount, matchedCount, retailers] = await Promise.all([
+    const [total, cvCount, coverCount, descCount, listingCount, matchedCount, pricedProducts, retailers] = await Promise.all([
       prisma.canonicalProduct.count({ where: { deletedAt: null } }),
       prisma.canonicalProduct.count({ where: { deletedAt: null, comicvineId: { not: null } } }),
       prisma.canonicalProduct.count({ where: { deletedAt: null, coverImageUrl: { not: null } } }),
       prisma.canonicalProduct.count({ where: { deletedAt: null, description: { not: null } } }),
       prisma.retailerListing.count({ where: { deletedAt: null } }),
       prisma.retailerListing.count({ where: { deletedAt: null, canonicalProductId: { not: null } } }),
+      // Distinct canonical products that have at least one retailer listing — true "products with pricing".
+      // groupBy canonicalProductId gives one row per distinct value; .length = distinct count.
+      prisma.retailerListing.groupBy({ by: ['canonicalProductId'], where: { deletedAt: null, canonicalProductId: { not: null } } }).then(rows => rows.length),
       prisma.retailer.findMany({ select: { name:true, domain:true, isActive:true, affiliateNetwork:true, lastSyncedAt:true, _count:{ select:{ listings:true } } } }),
     ]);
-    db = { total, cvCount, coverCount, descCount, listingCount, matchedCount, retailers };
+    db = { total, cvCount, coverCount, descCount, listingCount, matchedCount, pricedProducts, retailers };
 
     // Snapshot (one per day)
     const { captureSnapshot } = require('./metrics-snapshot.js');
@@ -390,10 +393,23 @@ async function main() {
   // Cover coverage
   const coverPct = db ? pct(db.coverCount, db.total) : null;
 
-  // Retailer affiliate stats
+  // Retailer counts (kept for catalogue health display)
   const activeRetailers = db?.retailers?.filter(r => r.isActive && r._count.listings > 0) || [];
   const affiliatedR     = activeRetailers.filter(r => r.affiliateNetwork);
   const affiliateCovPct = activeRetailers.length ? Math.round(affiliatedR.length / activeRetailers.length * 100) : null;
+
+  // Monetisation: env-var presence checks (script runs server-side so process.env is available).
+  // Do NOT print the values — just check for existence.
+  const epnActive      = !!process.env.EBAY_CAMPAIGN_ID;
+  const amazonUkActive = !!process.env.NEXT_PUBLIC_AMAZON_UK_ASSOCIATE_TAG;
+  const amazonUkTag    = process.env.NEXT_PUBLIC_AMAZON_UK_ASSOCIATE_TAG || '';
+  const amazonUsTag    = process.env.NEXT_PUBLIC_AMAZON_US_ASSOCIATE_TAG || '';
+  // Flag if US tag is set but matches the UK tag (known bug: US incorrectly using UK Associates tag)
+  const amazonUsBug    = !!(amazonUsTag && amazonUsTag === amazonUkTag);
+
+  // Products with pricing: bounded [0–100]%, replaces the misleading 202% "Pricing coverage" metric.
+  // Old metric was matchedListings/products which exceeds 100% when products have multiple listings.
+  const pricedPct = db ? Math.min(100, pct(db.pricedProducts || 0, db.total)) : null;
 
   // Launch readiness weight breakdown
   const todoHighGain = reqs.filter(r => r.level === 'todo').reduce((s,r) => s + r.gain, 0);
@@ -724,27 +740,76 @@ a{color:inherit;text-decoration:none}
   </div>`).join('')}
 </div>`;
 
-  // Monetisation Readiness
-  const awinReq      = reqs.find(r => r.title.toLowerCase().includes('awin'));
-  const awinStatus   = awinReq?.level || 'todo';
-  const ebayListings = db?.retailers?.find(r => r.domain.includes('ebay.co.uk'))?._count?.listings || 0;
-  const amazonList   = db?.retailers?.find(r => r.domain.includes('amazon'))?._count?.listings || 0;
-  const pricedCount  = db ? db.matchedCount : 0; // proxy: matched products have at least one price
-
-  const monoRows = [
-    { label: 'eBay EPN', val: ebayListings > 0 ? 'Configured' : 'Not configured', cls: ebayListings > 0 ? 'configured' : 'not-configured' },
-    { label: 'Amazon Associates', val: amazonList > 0 ? 'Configured' : 'Not configured', cls: amazonList > 0 ? 'configured' : 'not-configured' },
-    { label: 'AWIN Write Mode', val: awinStatus === 'partial' ? 'Partial — write mode disabled' : awinStatus === 'done' ? 'Active' : 'Not enabled', cls: awinStatus === 'done' ? 'configured' : awinStatus === 'partial' ? 'partial-config' : 'not-configured' },
-    { label: 'Retailers connected', val: String(activeRetailers.length), cls: '' },
-    { label: 'With affiliate attribution', val: `${affiliatedR.length} / ${activeRetailers.length}`, cls: affiliatedR.length ? 'configured' : 'not-configured' },
-    { label: 'Affiliate coverage', val: affiliateCovPct !== null ? affiliateCovPct+'%' : 'Not yet tracked', cls: '' },
-    { label: 'Pricing coverage', val: db ? pct(pricedCount, db.total)+'%' : 'Not yet tracked', cls: '' },
+  // Monetisation Readiness — rebuilt after 2026-06-09 audit.
+  // Three tiers: confirmed earning / pending approval / not monetised.
+  // eBay and Amazon are excluded from the DB-backed retailer loop (eBay has 0 DB listings;
+  // Amazon tag is injected client-side via NEXT_PUBLIC_ env var) — checked by env presence instead.
+  const CONFIRMED_STREAMS = [
+    { name: 'eBay EPN',             active: epnActive,      note: epnActive ? 'EBAY_CAMPAIGN_ID set — wrapEpn() on all Browse API results' : '⚠ EBAY_CAMPAIGN_ID not set in this env' },
+    { name: 'Amazon UK Associates', active: amazonUkActive, note: amazonUkActive ? 'NEXT_PUBLIC_AMAZON_UK_ASSOCIATE_TAG set' : '⚠ Tag not set' },
+    { name: 'Bookshop.org UK',      active: true,           note: 'AWIN mid=62675 — joined & confirmed' },
+    { name: 'Lets Buy Books',       active: true,           note: 'AWIN mid=122824 — joined & confirmed' },
+  ];
+  const PENDING_STREAMS = [
+    { name: 'Scholastic',    note: 'AWIN mid=2957 — check approval status in AWIN dashboard' },
+    { name: 'Waterstones',   note: 'AWIN mid=3787 — awaiting approval' },
+    { name: 'Zavvi',         note: 'AWIN mid=2549 — awaiting approval' },
+    { name: 'AbeBooks',      note: 'AWIN mid=6139 — awaiting approval' },
+    { name: 'MusicMagpie',   note: 'AWIN — chase (highest EPC of pending: £0.26)' },
+  ];
+  const NOT_MONETISED = [
+    { name: 'World of Books', note: 'AWIN rejected — re-apply (143,796 listings, biggest gap)' },
+    { name: 'Wordery',        note: 'Programme closed' },
+    { name: 'Travelling Man', note: 'No public affiliate programme' },
+    { name: 'WHSmith',        note: 'TopCashback only — not a publisher path' },
+    { name: 'Bookshop.org US',note: 'No US affiliate programme' },
   ];
 
   const MONETISATION = `
 <div class="card">
   <h2>Monetisation Readiness <span style="font-weight:400;color:var(--muted2);letter-spacing:0;text-transform:none;font-size:11px">— configuration only, no revenue data</span></h2>
-  ${monoRows.map(r => `<div class="mono-row"><span class="mono-label">${esc(r.label)}</span><span class="mono-val ${r.cls}">${esc(r.val)}</span></div>`).join('')}
+
+  <div class="mono-row"><span class="mono-label">Retailers connected</span><span class="mono-val">${esc(String(activeRetailers.length))}</span></div>
+  <div class="mono-row"><span class="mono-label">Products with pricing</span><span class="mono-val">${pricedPct !== null ? pricedPct+'%' : 'Not yet tracked'}</span></div>
+
+  <div style="font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin:12px 0 6px;padding-top:6px;border-top:1px solid var(--border)">Confirmed commission streams</div>
+  ${CONFIRMED_STREAMS.map(s => `
+  <div class="mono-row">
+    <span class="mono-label">${esc(s.name)}</span>
+    <span class="mono-val ${s.active ? 'configured' : 'not-configured'}">${s.active ? 'Active' : 'Missing'}
+      <br><span style="font-size:10px;color:var(--muted);font-weight:400">${esc(s.note)}</span></span>
+  </div>`).join('')}
+
+  <div style="font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin:12px 0 6px;padding-top:6px;border-top:1px solid var(--border)">Pending / unverified</div>
+  ${PENDING_STREAMS.map(s => `
+  <div class="mono-row">
+    <span class="mono-label">${esc(s.name)}</span>
+    <span class="mono-val not-configured">Pending
+      <br><span style="font-size:10px;color:var(--muted);font-weight:400">${esc(s.note)}</span></span>
+  </div>`).join('')}
+
+  <div style="font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin:12px 0 6px;padding-top:6px;border-top:1px solid var(--border)">Not monetised</div>
+  ${NOT_MONETISED.map(s => `
+  <div class="mono-row">
+    <span class="mono-label">${esc(s.name)}</span>
+    <span class="mono-val" style="color:var(--muted2)">No commission
+      <br><span style="font-size:10px;color:var(--muted);font-weight:400">${esc(s.note)}</span></span>
+  </div>`).join('')}
+</div>`;
+
+  // Manual Monetisation Actions
+  const MONO_ACTIONS = `
+<div class="card warn-border">
+  <h2>Manual Monetisation Actions — Joe only</h2>
+  <div style="font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--red);margin:4px 0 8px">High priority</div>
+  <div class="mono-row"><span class="mono-label" style="color:var(--text)">Verify EBAY_CAMPAIGN_ID in Vercel</span><span class="mono-val not-configured">${epnActive ? '✓ Set locally' : '⚠ Not set locally'} — confirm in Vercel Production env vars</span></div>
+  <div class="mono-row"><span class="mono-label" style="color:var(--text)">Fix Amazon US tag</span><span class="mono-val ${amazonUsBug ? 'not-configured' : ''}">${amazonUsBug ? '⚠ US tag = UK tag (catchcomics-21) — blank it until real US tag obtained' : amazonUsTag ? 'Tag present — verify it is a real US Associates tag' : 'Not set — OK if US not yet enabled'}</span></div>
+  <div class="mono-row"><span class="mono-label" style="color:var(--text)">Re-apply to World of Books on AWIN</span><span class="mono-val not-configured">1-click in AWIN dashboard → My Advertisers → Rejected tab</span></div>
+  <div style="font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--warn);margin:12px 0 8px;padding-top:8px;border-top:1px solid var(--border)">Medium priority</div>
+  <div class="mono-row"><span class="mono-label" style="color:var(--text)">Verify Scholastic AWIN approval</span><span class="mono-val not-configured">AWIN dashboard → My Advertisers → confirm mid=2957 is approved, not pending</span></div>
+  <div class="mono-row"><span class="mono-label" style="color:var(--text)">Chase AbeBooks / MusicMagpie AWIN</span><span class="mono-val not-configured">MusicMagpie = highest EPC (£0.26 / 11.88% conv) — prioritise</span></div>
+  <div style="font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--muted2);margin:12px 0 8px;padding-top:8px;border-top:1px solid var(--border)">Low priority</div>
+  <div class="mono-row"><span class="mono-label" style="color:var(--muted2)">Monitor Waterstones + Zavvi AWIN</span><span class="mono-val" style="color:var(--muted2)">Pending approval — no action needed until approved</span></div>
 </div>`;
 
   // Launch Readiness
@@ -877,6 +942,9 @@ ${CATALOGUE_HEALTH}
   ${AUTOMATION}
   ${MONETISATION}
 </div>
+
+<!-- Manual Monetisation Actions -->
+${MONO_ACTIONS}
 
 <!-- Launch Readiness -->
 ${LR_TABLE}
