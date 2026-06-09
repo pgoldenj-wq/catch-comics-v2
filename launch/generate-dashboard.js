@@ -202,14 +202,22 @@ function getRetailerSyncLogs() {
       const mins    = fileMinsAgo(fp);
       const tail    = content.split('\n').slice(-8).join('\n');
       const done    = /✓|Done|complete|upserted/i.test(tail) || mins > 45;
-      const failed  = /error|failed|exception/i.test(tail);
-      const upM     = content.match(/Upserted\s*:\s*(\d+)/);
-      const crM     = content.match(/Created[^:]*\s*:\s*(\d+)/);
-      const erM     = content.match(/Errors\s*:\s*(\d+)/);
+      // Exclude summary counter lines ("Errors : 0") from the error check — they match
+      // /error/i as a substring but indicate a successful run, not a failure.
+      const failed  = tail.split('\n').some(l =>
+        /error|failed|exception/i.test(l) && !/^\s*errors?\s*:/i.test(l)
+      );
+      // Use [\d,]+ so comma-formatted counts ("14,796") parse correctly.
+      const upM     = content.match(/Upserted\s*:\s*([\d,]+)/);
+      const crM     = content.match(/Created[^:]*\s*:\s*([\d,]+)/);
+      const erM     = content.match(/Errors\s*:\s*([\d,]+)/);
       result[key] = {
         ts: f.replace(/^awin-[a-z-]+-/, '').replace('.log',''),
         status: failed ? 'error' : done ? 'complete' : 'running',
-        mins, upserted: upM ? +upM[1] : null, created: crM ? +crM[1] : null, errors: erM ? +erM[1] : null,
+        mins,
+        upserted: upM ? parseInt(upM[1].replace(/,/g, ''), 10) : null,
+        created:  crM ? parseInt(crM[1].replace(/,/g, ''), 10) : null,
+        errors:   erM ? parseInt(erM[1].replace(/,/g, ''), 10) : null,
       };
     }
   } catch {}
