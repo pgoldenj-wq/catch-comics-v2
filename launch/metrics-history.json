@@ -8,5 +8,35 @@
     "descCount": 28126,
     "listingCount": 203555,
     "matchedCount": 106131
+  },
+  {
+    "date": "2026-06-08",
+    "capturedAt": "2026-06-08T08:19:57.870Z",
+    "total": 53419,
+    "cvCount": 8646,
+    "coverCount": 53168,
+    "descCount": 28164,
+    "listingCount": 206315,
+    "matchedCount": 106869
+  },
+  {
+    "date": "2026-06-09",
+    "capturedAt": "2026-06-09T10:43:01.115Z",
+    "total": 54019,
+    "cvCount": 9439,
+    "coverCount": 53415,
+    "descCount": 28434,
+    "listingCount": 217667,
+    "matchedCount": 108859
+  },
+  {
+    "date": "2026-06-11",
+    "capturedAt": "2026-06-11T20:48:22.920Z",
+    "total": 57697,
+    "cvCount": 9705,
+    "coverCount": 54246,
+    "descCount": 29302,
+    "listingCount": 226518,
+    "matchedCount": 120068
   }
 ]

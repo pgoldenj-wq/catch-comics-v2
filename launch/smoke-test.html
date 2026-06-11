@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Catch Comics — Launch Smoke Test</title>
+<style>
+:root {
+  --red: #DC2626; --red-bg: #FEF2F2; --red-border: #FECACA;
+  --amber: #D97706; --amber-bg: #FFFBEB; --amber-border: #FDE68A;
+  --blue: #2563EB; --blue-bg: #EFF6FF; --blue-border: #BFDBFE;
+  --gray: #6B7280; --gray-bg: #F9FAFB; --gray-border: #E5E7EB;
+  --green: #16A34A; --green-bg: #F0FDF4; --green-border: #BBF7D0;
+  --brand: #E8272A;
+  --text: #111827; --muted: #6B7280; --border: #E5E7EB;
+  --surface: #FFFFFF; --page: #F8F8F6;
+  --radius: 10px; --radius-sm: 6px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--page); color: var(--text); font-size: 15px; line-height: 1.5; }
+
+/* ── Sticky header ── */
+#sticky-header {
+  position: sticky; top: 0; z-index: 100;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+}
+#sticky-header .brand { font-size: 13px; font-weight: 600; color: var(--brand); letter-spacing: 0.04em; text-transform: uppercase; }
+#verdict-pill {
+  padding: 6px 20px; border-radius: 999px; font-weight: 700; font-size: 14px; letter-spacing: 0.05em;
+  transition: background 0.3s, color 0.3s;
+}
+.verdict-progress { background: #FEF3C7; color: #92400E; }
+.verdict-go       { background: #DCFCE7; color: #14532D; }
+.verdict-nogo     { background: #FEE2E2; color: #7F1D1D; }
+#progress-bar-wrap { flex: 1; max-width: 220px; }
+#progress-label { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+#progress-bar-outer { height: 6px; background: var(--border); border-radius: 99px; }
+#progress-bar-inner { height: 6px; background: var(--green); border-radius: 99px; width: 0%; transition: width 0.3s; }
+#critical-label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+/* ── Page header ── */
+.page-header { padding: 32px 24px 16px; }
+.page-title { font-size: 26px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.page-title span { color: var(--brand); }
+.page-subtitle { font-size: 14px; color: var(--muted); }
+.meta-row { display: flex; gap: 24px; margin-top: 16px; flex-wrap: wrap; }
+.meta-field { display: flex; flex-direction: column; gap: 4px; }
+.meta-field label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+.meta-field input { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 10px; font-size: 14px; width: 200px; background: var(--surface); color: var(--text); }
+
+/* ── Jump nav ── */
+.jump-nav { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 24px 24px; }
+.jump-nav a { font-size: 12px; padding: 4px 12px; border: 1px solid var(--border); border-radius: 999px; text-decoration: none; color: var(--muted); background: var(--surface); transition: all 0.15s; }
+.jump-nav a:hover { border-color: var(--brand); color: var(--brand); }
+
+/* ── Section card ── */
+.section-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); margin: 0 24px 20px; overflow: hidden;
+}
+.section-header {
+  padding: 16px 20px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.section-title-row { display: flex; align-items: center; gap: 10px; }
+.section-icon { font-size: 20px; }
+.section-title { font-size: 17px; font-weight: 700; }
+.section-badge { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; letter-spacing: 0.05em; }
+.badge-critical { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-border); }
+.badge-high     { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-border); }
+.badge-medium   { background: var(--blue-bg); color: var(--blue); border: 1px solid var(--blue-border); }
+.badge-low      { background: var(--gray-bg); color: var(--gray); border: 1px solid var(--gray-border); }
+.section-counter { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.section-counter strong { color: var(--text); }
+
+/* ── Check items ── */
+.check-list { padding: 4px 0; }
+.check-item {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 11px 20px; border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+  cursor: pointer;
+}
+.check-item:last-child { border-bottom: none; }
+.check-item:hover { background: var(--page); }
+.check-item.checked { background: var(--green-bg); }
+.check-item input[type=checkbox] {
+  width: 18px; height: 18px; margin-top: 1px; flex-shrink: 0;
+  accent-color: var(--green); cursor: pointer;
+}
+.check-item label { flex: 1; cursor: pointer; font-size: 14px; line-height: 1.5; }
+.check-item.checked label { text-decoration: line-through; color: var(--muted); }
+.priority-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 6px;
+}
+.dot-critical { background: var(--red); }
+.dot-high     { background: var(--amber); }
+.dot-medium   { background: var(--blue); }
+.dot-low      { background: var(--gray); }
+.item-badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px; flex-shrink: 0; margin-top: 2px; letter-spacing: 0.04em; }
+.item-badge.critical { background: var(--red-bg); color: var(--red); }
+.item-badge.high     { background: var(--amber-bg); color: var(--amber); }
+.item-badge.medium   { background: var(--blue-bg); color: var(--blue); }
+.item-badge.low      { background: var(--gray-bg); color: var(--gray); }
+
+/* ── Notes area ── */
+.notes-wrap { padding: 14px 20px; background: var(--page); border-top: 1px solid var(--border); }
+.notes-wrap label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; display: block; margin-bottom: 6px; }
+.notes-wrap textarea {
+  width: 100%; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 10px 12px; font-size: 13px; font-family: inherit; resize: vertical; min-height: 60px;
+  background: var(--surface); color: var(--text); line-height: 1.5;
+}
+.notes-wrap textarea:focus { outline: none; border-color: var(--brand); }
+
+/* ── Subsection divider ── */
+.subsection-label {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700;
+  color: var(--muted); padding: 10px 20px 4px; background: var(--page);
+  border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+}
+
+/* ── Tip box ── */
+.tip-box {
+  margin: 12px 20px; padding: 10px 14px; background: #FFFBEB;
+  border: 1px solid #FDE68A; border-radius: var(--radius-sm);
+  font-size: 13px; color: #78350F; line-height: 1.5;
+}
+.tip-box strong { font-weight: 600; }
+
+/* ── Final verdict ── */
+.verdict-section { margin: 0 24px 32px; }
+.verdict-card {
+  border: 2px solid var(--border); border-radius: var(--radius);
+  overflow: hidden; background: var(--surface);
+}
+.verdict-header { padding: 20px 24px; border-bottom: 1px solid var(--border); }
+.verdict-header h2 { font-size: 16px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.verdict-body { padding: 24px; }
+.verdict-status-row { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+.verdict-btn {
+  flex: 1; min-width: 140px; padding: 18px 24px; border-radius: var(--radius); border: 2px solid var(--border);
+  font-size: 20px; font-weight: 800; letter-spacing: 0.08em; cursor: pointer;
+  text-align: center; transition: all 0.15s; background: var(--surface); color: var(--muted);
+}
+.verdict-btn:hover { border-color: var(--gray); }
+.verdict-btn.selected-go   { background: var(--green-bg); border-color: var(--green); color: var(--green); }
+.verdict-btn.selected-nogo { background: var(--red-bg); border-color: var(--red); color: var(--red); }
+.verdict-auto { font-size: 13px; color: var(--muted); margin-top: 8px; }
+.verdict-auto span { font-weight: 600; }
+.verdict-notes-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; margin-bottom: 8px; }
+.verdict-notes-area {
+  width: 100%; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 12px; font-size: 14px; font-family: inherit; resize: vertical; min-height: 100px;
+  background: var(--page); color: var(--text);
+}
+.verdict-notes-area:focus { outline: none; border-color: var(--brand); }
+
+/* ── Toolbar ── */
+.toolbar { display: flex; gap: 10px; padding: 0 24px 24px; flex-wrap: wrap; }
+.toolbar-btn {
+  padding: 8px 16px; border-radius: var(--radius-sm); border: 1px solid var(--border);
+  font-size: 13px; font-weight: 500; cursor: pointer; background: var(--surface);
+  color: var(--text); transition: all 0.15s;
+}
+.toolbar-btn:hover { background: var(--page); }
+.toolbar-btn.danger { color: var(--red); border-color: var(--red-border); }
+.toolbar-btn.danger:hover { background: var(--red-bg); }
+
+/* ── Legend ── */
+.legend { display: flex; gap: 20px; flex-wrap: wrap; padding: 0 24px 24px; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+@media print {
+  #sticky-header, .toolbar, .jump-nav { display: none; }
+  .section-card, .verdict-card { break-inside: avoid; }
+  body { background: white; }
+}
+</style>
+</head>
+<body>
+
+<!-- Sticky header -->
+<div id="sticky-header">
+  <div class="brand">Catch Comics</div>
+  <div id="progress-bar-wrap">
+    <div id="progress-label">0 of 0 items checked</div>
+    <div id="progress-bar-outer"><div id="progress-bar-inner"></div></div>
+  </div>
+  <div id="critical-label">Critical: 0/0</div>
+  <div id="verdict-pill" class="verdict-progress">IN PROGRESS</div>
+</div>
+
+<!-- Page header -->
+<div class="page-header">
+  <div class="page-title"><span>Catch Comics</span> — Launch Smoke Test</div>
+  <div class="page-subtitle">Walk through catchcomics.com and check each item. All critical items must pass before launch.</div>
+  <div class="meta-row">
+    <div class="meta-field"><label>Date</label><input type="text" id="meta-date" placeholder="e.g. 11 June 2026"></div>
+    <div class="meta-field"><label>Tester</label><input type="text" id="meta-tester" placeholder="Your name"></div>
+    <div class="meta-field"><label>Device</label><input type="text" id="meta-device" placeholder="e.g. MacBook + iPhone 14"></div>
+  </div>
+</div>
+
+<!-- Legend -->
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div> Critical — launch blocker</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--amber)"></div> High — fix before launch if possible</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div> Medium — launch week</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--gray)"></div> Low — post-launch</div>
+</div>
+
+<!-- Jump nav -->
+<div class="jump-nav">
+  <a href="#s-preflight">Pre-flight</a>
+  <a href="#s-homepage">Homepage</a>
+  <a href="#s-series-index">Series Index</a>
+  <a href="#s-series-pages">Series Pages</a>
+  <a href="#s-product">Product Pages</a>
+  <a href="#s-affiliate">Affiliate Links</a>
+  <a href="#s-search">Search</a>
+  <a href="#s-legal">Legal</a>
+  <a href="#s-errors">Error States</a>
+  <a href="#s-mobile">Mobile</a>
+  <a href="#s-verdict">Final Verdict</a>
+</div>
+
+<!-- Toolbar -->
+<div class="toolbar">
+  <button class="toolbar-btn" onclick="saveProgress()">Save progress</button>
+  <button class="toolbar-btn" onclick="window.print()">Print checklist</button>
+  <button class="toolbar-btn danger" onclick="resetAll()">Reset all</button>
+</div>
+
+
+<!-- ─────────────────────────────────── SECTION 1 ── -->
+<div class="section-card" id="s-preflight">
+  <div class="section-header">
+    <div class="section-title-row">
+      <span class="section-icon">✈️</span>
+      <span class="section-title">Pre-flight</span>
+      <span class="section-badge badge-low">LOW</span>
+    </div>
+    <span class="section-counter" id="ctr-preflight">0 / 3</span>
+  </div>
+  <div class="check-list" data-section="preflight">
+    <div class="check-item" data-priority="low">
+      <input type="checkbox" id="pf1"><div class="priority-dot dot-low"></div>
+      <label for="pf1">Open Chrome, Firefox, or Safari in <strong>incognito / private mode</strong> — prevents your cached sessions from masking real issues</label>
+      <span class="item-badge low">LOW</span>
+    </div>
+    <div class="check-item" data-priority="low">
+      <input type="checkbox" id="pf2"><div class="priority-dot dot-low"></div>
+      <label for="pf2">Navigate to <strong>https://catchcomics.com</strong></label>
+      <span class="item-badge low">LOW</span>
+    </div>
+    <div class="check-item" data-priority="medium">
+      <input type="checkbox" id="pf3"><div class="priority-dot dot-medium"></div>
+      <label for="pf3">Confirm you are on the <strong>live production site</strong> — address bar shows catchcomics.com, not localhost or a Vercel preview URL</label>
+      <span class="item-badge medium">MEDIUM</span>
+    </div>
+  </div>
+  <div class="notes-wrap">
+    <label>Notes</label>
+    <textarea id="notes-preflight" placeholder="Anything unusual before you start..."></textarea>
+  </div>
+</div>
+
+
+<!-- ─────────────────────────────────── SECTION 2 ── -->
+<div class="section-card" id="s-homepage">
+  <div class="section-header">
+    <div class="section-title-row">
+      <span class="section-icon">🏠</span>
+      <span class="section-title">Homepage</span>
+      <span class="section-badge badge-critical">CRITICAL</span>
+    </div>
+    <span class="section-counter" id="ctr-homepage">0 / 10</span>
+  </div>
+  <div class="check-list" data-section="homepage">
+    <div class="check-item" data-priority="critical">
+      <input type="checkbox" id="hp1"><div class="priority-dot dot-critical"></div>
+      <label for="hp1">Page loads — no error screen, no white blank page</label>
+      <span class="item-badge critical">CRITICAL</span>
+    </div>
+    <div class="check-item" data-priority="high">
+      <input type="checkbox" id="hp2"><div class="priority-dot dot-high"></div>
+      <label for="hp2">Hero section visible — headline text and search bar are present at the top</label>
+      <span class="item-badge high">HIGH</span>
+    </div>
+    <div class="check-item" data-priority="high">
+      <input type="checkbox" id="hp3"><div class="priority-dot dot-high"></div>
+      <label for="hp3">"Explore Series" section shows 6 series cards below the fold</label>
+      <span class="item-badge high">HIGH</span>
+    </div>
+    <div class="check-item" data-priority="high">
+      <input type="checkbox" id="hp4"><div class="priority-dot dot-high"></div>
+      <label for="hp4">At least 4 of the 6 series card covers load — no broken image icons</label>
+      <span class="item-badge high">HIGH</span>
+    </div>
+    <div class="check-item" data-priority="critical">
+      <input type="checkbox" id="hp5"><div class="priority-dot dot-critical"></div>
+      <label for="hp5">Navbar has: logo on the left, search bar in the middle, <strong>"Series"</strong> link visible</label>
+      <span class="item-badge critical">CRITICAL</span>
+    </div>
+    <div class="check-item" data-priority="critical">
+      <input type="checkbox" id="hp6"><div class="priority-dot dot-critical"></div>
+      <label for="hp6">Click the <strong>"Series"</strong> link in the navbar — it navigates to <strong>/series</strong></label>
+      <span class="item-badge critical">CRITICAL</span>
+    </div>
+    <div class="check-item" data-priority="medium">
+      <input type="checkbox" id="hp7"><div class="priority-dot dot-medium"></div>
+      <label for="hp7">"Browse all series →" link is present and clickable within the Explore Series section</label>
+      <span class="item-badge medium">MEDIUM</span>
+    </div>
+    <div class="check-item" data-priority="critical">
+      <input type="checkbox" id="hp8"><div class="priority-dot dot-critical"></div>
+      <label for="hp8">Footer shows <strong>hello@catchcomics.com</strong> as the contact address</label>
+      <span class="item-badge critical">CRITICAL</span>
+    </div>
+    <div class="check-item" data-priority="high">
+      <input type="checkbox" id="hp9"><div class="priority-dot dot-high"></div>
+      <label for="hp9">Footer has all four links: <strong>About · Affiliate Disclosure · Privacy · Terms</strong></label>
+      <span class="item-badge high">HIGH</span>
+    </div>
+    <div class="check-item" data-priority="low">
+      <input type="checkbox" id="hp10"><div class="priority-dot dot-low"></div>
+      <label for="hp10">Cookie notice bar appears at the bottom of the page</label>
+      <span class="item-badge low">LOW</span>
+    </div>
+  </div>
+  <div class="notes-wrap">
+    <label>Notes</label>
+    <textarea id="notes-homepage" placeholder="Any issues, broken elements, or things that looked off..."></textarea>
+  </div>
+</div>
+
+
+<!-- ─────────────────────────────────── SECTION 3 ── -->
+<div class="section-card" id="s-series-index">
+  <div class="section-header">
+    <div class="section-title-row">
+      <span class="section-icon">📚</span>
+      <span class="section-title">Series Index  <small style="font-weight:400;color:var(--muted);font-size:13px;">— catchcomics.com/series</small></span>
+      <span class="section-badge badge-critical">CRITICAL</span>
+    </div>
+    <span class="section-counter" id="ctr-series-index">0 / 5</span>
+  </div>
+  <div class="check-list" data-section="series-index">
+    <div class="check-item" data-priority="critical">
+      <input type="checkbox" id="si1"><div class="priority-dot dot-critical"></div>
+      <label for="si1">Navigate to <strong>catchcomics.com/series</strong> — page loads without error</label>
+      <span class="item-badge critical">CRITICAL</span>
+    </div>
+    <div class="check-item" data-priority="critical">
+      <input type="checkbox" id="si2"><div class="priority-dot dot-critical"></div>
+      <label for="si2"><strong>17 series cards</strong> visible in the grid (count them)</label>
+      <span class="item-badge critical">CRITICAL</span>
+    </div>
+    <div class="check-item" data-priority="high">
+      <input type="checkbox" id="si3"><div class="priority-dot dot-high"></div>
+      <label for="si3">Covers load on at least 12 of the 17 cards — no rows of broken image icons</label>
+      <span class="item-badge high">HIGH</span>
+    </div>
+    <div class="check-item" data-priority="high">
+      <input type="checkbox" id="si4"><div class="priority-dot dot-high"></div>
+      <label for="si4">Each card links through to a series page (hover over a card — URL in status bar should say /series/[name])</label>
+      <span class="item-badge high">HIGH</span>
+    </div>
+    <div class="check-item" data-priority="medium">
+      <input type="checkbox" id="si5"><div class="priority-dot dot-medium"></div>
+      <label for="si5">Grid layout is correct on desktop — multiple columns, not a single tall column</label>
+      <span class="item-badge medium">MEDIUM</span>
+    </div>
+  </div>
+  <div class="notes-wrap">
+    <label>Notes</label>
+    <textarea id="notes-series-index" placeholder="How many cards did you count? Any broken covers?"></textarea>
+  </div>
+</div>
+
+
+<!-- ─────────────────────────────────── SECTION 4 ── -->
+<div class="section-card" id="s-series-pages">
+  <div class="section-header">
+    <div class="section-title-row">
+      <span class="section-icon">📖</span>
+      <span class="section-title">Series Pages — spot-check 3 series</span>
+      <span class="section-badge badge-critical">CRITICAL</span>
+    </div>
+    <span class="section-counter" id="ctr-series-pages">0 / 14</span>
+  </div>
+
+  <div class="tip-box">Check each series in a new tab so you can keep your place. For each series: does it have a reading order, prices, and a clear starting point?</div>
+
+  <div class="subsection-label">Series 1 — Saga (catchcomics.com/series/saga)</div>
+  <div class="check-list" data-section="series-pages">
+    <div class="check-item" data-priority="critical">
+      <input type="checkbox" id="sp1"><div class="priority-dot dot-critical"></div>
+      <label for="sp1">Page loads — no error</label>
+      <span class="item-badge critical">CRITICAL</span>
+    </div>
+    <div class="check-item" data-priority="critical">
+      <input type="checkbox" id="sp2"><div class="priority-dot dot-critical"></div>
+      <label for="sp2">Vol 1 shows <strong>at least 2 UK retailer prices in £</strong></label>
+      <span class="item-badge critical">CRITICAL</span>
+    </div>
+    <div class="check-item" data-priority="high">
+      <input type="checkbox" id="sp3"><div class="priority-dot dot-high"></div>
+      <label for="sp3">Volumes are in correct order — 1, 2, 3… with no gaps or reversals</label>
+      <span class="item-badge high">HIGH</span>
+    </div>
+    <div class="check-item" data-priority="high">
+      <input type="checkbox" id="sp4"><div class="priority-dot dot-high"></div>
+      <label for="sp4">Vol 1 has a <strong>"Start Here"</strong> badge (not Vol 2 or another volume)</label>
+      <span class="item-badge high">HIGH</span>
+    </div>
+    <div class="check-item" data-priority="high">
+      <input type="checkbox" id="sp5"><div class="priority-dot dot-high"></div>
+      <label for="sp5">Series synopsis / description text is present and not empty</label>
+      <span class="item-badge high">HIGH</span>
+    </div>
+  </div>
+
+  <div class="subsection-label">Series 2 — Invincible (catchcomics.com/series/invincible)</div>
+  <div class="check-list" data-section="series-pages">
+    <div class="check-item" data-priority="critical">
+      <input type="checkbox" id="sp6"><div class="priority-dot dot-critical"></div>
+      <label for="sp6">Page loads — no error</label>
+      <span class="item-badge critical">CRITICAL</span>
+    </div>
+    <div class="check-item" data-priority="critical">
+      <input type="checkbox" id="sp7"><div class="priority-dot dot-critical"></div>
+      <label for="sp7">Vol 1 shows <strong>at least 2 UK retailer prices in £</strong></label>
+      <span class="item-badge critical">CRITICAL</span>
+    </div>
+    <div class="check-item" data-priority="high">
+      <input type="checkbox" id="sp8"><div class="priority-dot dot-high"></div>
+      <label for="sp8">Volumes in correct order — 1, 2, 3…</label>
+      <span class="item-badge high">HIGH</span>
+    </div>
+    <div class="check-item" data-priority="high">
+      <input type="checkbox" id="sp9"><div class="priority-dot dot-high"></div>
+      <label for="sp9">Vol 1 has a <strong>"Start Here"</strong> badge</label>
+      <span class="item-badge high">HIGH</span>
+    </div>
+  </div>
+
+  <div class="subsection-label">Series 3 — Fullmetal Alchemist (catchcomics.com/series/fullmetal-alchemist)</div>
+  <div class="check-list" data-section="series-pages">
+    <div class="check-item" data-priority="critical">
+      <input type="checkbox" id="sp10"><div class="priority-dot dot-critical"></div>
+      <label for="sp10">Page loads — no error</label>
+      <span class="item-badge critical">CRITICAL</span>
+    </div>
+    <div class="check-item" data-priority="critical">
+      <input type="checkbox" id="sp11"><div class="priority-dot dot-critical"></div>
+      <label for="sp11">Vol 1 shows <strong>at least 2 UK retailer prices in £</strong></label>
+      <span class="item-badge critical">CRITICAL</span>
+    </div>
+    <div class="check-item" data-priority="high">
+      <input type="checkbox" id="sp12"><div class="priority-dot dot-high"></div>
+      <label for="sp12">Volumes in correct order — 1, 2, 3…</label>
+      <span class="item-badge high">HIGH</span>
+    </div>
+    <div class="check-item" data-priority="high">
+      <input type="checkbox" id="sp13"><div class="priority-dot dot-high"></div>
+      <label for="sp13">Vol 1 has a <strong>"Start Here"</strong> badge</label>
+      <span class="item-badge high">HIGH</span>
+    </div>
+    <div class="check-item" data-priority="medium">
+      <input type="checkbox" id="sp14"><div class="priority-dot dot-medium"></div>
+      <label for="sp14">Vol 1 cover image loads (from images.catchcomics.com — check by right-clicking the image)</label>
+      <span class="item-badge medium">MEDIUM</span>
+    </div>
+  </div>
+  <div class="notes-wrap">
+    <label>Notes</label>
+    <textarea id="notes-series-pages" placeholder="Note any series with wrong volume order, missing prices, or broken covers..."></textarea>
+  </div>
+</div>
+
+
+<!-- ─────────────────────────────────── SECTION 5 ── -->
+<div class="section-card" id="s-product">
+  <div class="section-header">
+    <div class="section-title-row">
+      <span class="section-icon">🛒</span>
+      <span class="section-title">Product Pages</span>
+      <span class="section-badge badge-critical">CRITICAL</span>
+    </div>
+    <span class="section-counter" id="ctr-product">0 / 8</span>
+  </div>
+  <div class="tip-box">From the Saga series page, click <strong>"Start Reading"</strong> or the Vol 1 title to reach a product page.</div>
+  <div class="check-list" data-section="product">
+    <div class="check-item" data-priority="critical">
+      <input type="checkbox" id="pp1"><div class="priority-dot dot-critical"></div>
+      <label for="pp1">Product page loads — no error screen or blank white page</label>
+      <span class="item-badge critical">CRITICAL</span>
+    </div>
+    <div class="check-item" data-priority="high">
+      <input type="checkbox" id="pp2"><div class="priority-dot dot-high"></div>
+      <label for="pp2">Cover image loads correctly (not a grey placeholder, not a broken icon)</label>
+      <span class="item-badge high">HIGH</span>
+    </div>
+    <div class="check-item" data-priority="critical">
+      <input type="checkbox" id="pp3"><div class="priority-dot dot-critical"></div>
+      <label for="pp3">Pricing panel shows <strong>at least 2 retailers with prices in £</strong></label>
+      <span class="item-badge critical">CRITICAL</span>
+    </div>
+    <div class="check-item" data-priority="high">
+      <input type="checkbox" id="pp4"><div class="priority-dot dot-high"></div>
+      <label for="pp4">"Buy at [Retailer]" buttons are visible and clickable</label>
+      <span class="item-badge high">HIGH</span>
+    </div>
+    <div class="check-item" data-priority="high">
+      <input type="checkbox" id="pp5"><div class="priority-dot dot-high"></div>
+      <label for="pp5">Creator credits visible (writer, artist, or similar)</label>
+      <span class="item-badge high">HIGH</span>
+    </div>
+    <div class="check-item" data-priority="medium">
+      <input type="checkbox" id="pp6"><div class="priority-dot dot-medium"></div>
+      <label for="pp6">Synopsis text visible and readable</label>
+      <span class="item-badge medium">MEDIUM</span>
+    </div>
+    <div class="check-item" data-priority="medium">
+      <input type="checkbox" id="pp7"><div class="priority-dot dot-medium"></div>
+      <label for="pp7">eBay section appears after a few seconds (it's a live search — wait up to 5 seconds)</label>
+      <span class="item-badge medium">MEDIUM</span>
+    </div>
+    <div class="check-item" data-priority="medium">
+      <input type="checkbox" id="pp8"><div class="priority-dot dot-medium"></div>
+      <label for="pp8">Amazon search link visible on the page</label>
+      <span class="item-badge medium">MEDIUM</span>
+    </div>
+  </div>
+  <div class="notes-wrap">
+    <label>Notes</label>
+    <textarea id="notes-product" placeholder="Any broken product pages, missing prices, or missing covers..."></textarea>
+  </div>
+</div>
+
+
+<!-- ─────────────────────────────────── SECTION 6 ── -->
+<div class="section-card" id="s-affiliate">
+  <div class="section-header">
+    <div class="section-title-row">
+      <span class="section-icon">💰</span>
+      <span class="section-title">Affiliate Links — revenue critical</span>
+      <span class="section-badge badge-critical">CRITICAL</span>
+    </div>
+    <span class="section-counter" id="ctr-affiliate">0 / 10</span>
+  </div>
+  <div class="tip-box"><strong>This is the most important section.</strong> If the affiliate URL is broken, every click earns nothing. Take your time here. Find a Bookshop.org or Waterstones "Buy" button on a product page.</div>
+  <div class="check-list" data-section="affiliate">
+    <div class="check-item" data-priority="critical">
+      <input type="checkbox" id="af1"><div class="priority-dot dot-critical"></div>
+      <label for="af1">On a product page, find a <strong>Bookshop.org or Waterstones</strong> "Buy" button</label>
+      <span class="item-badge critical">CRITICAL</span>
+    </div>
+    <div class="check-item" data-priority="critical">
+      <input type="checkbox" id="af2"><div class="priority-dot dot-critical"></div>
+      <label for="af2">Right-click the button → "Copy Link Address" — the link starts with <strong>/go/</strong> followed by a long ID</label>
+      <span class="item-badge critical">CRITICAL</span>
+    </div>
+    <div class="check-item" data-priority="critical">
+      <input type="checkbox" id="af3"><div class="priority-dot dot-critical"></div>
+      <label for="af3">Click the button — a brief redirect happens</label>
+      <span class="item-badge critical">CRITICAL</span>
+    </div>
+    <div class="check-item" data-priority="critical">
+      <input type="checkbox" id="af4"><div class="priority-dot dot-critical"></div>
+      <label for="af4">The URL in your browser changes to <strong>awin1.com/cread.php?…</strong> (check the address bar)</label>
+      <span class="item-badge critical">CRITICAL</span>
+    </div>
+    <div class="check-item" data-priority="critical">
+      <input type="checkbox" id="af5"><div class="priority-dot dot-critical"></div>
+      <label for="af5">URL contains <strong>awinmid=</strong> followed by a number (the retailer ID)</label>
+      <span class="item-badge critical">CRITICAL</span>
+    </div>
+    <div class="check-item" data-priority="critical">
+      <input type="checkbox" id="af6"><div class="priority-dot dot-critical"></div>
+      <label for="af6">URL contains <strong>awinaffid=</strong> followed by a 7-digit number (your publisher ID)</label>
+      <span class="item-badge critical">CRITICAL</span>
+    </div>
+    <div class="check-item" data-priority="critical">
+      <input type="checkbox" id="af7"><div class="priority-dot dot-critical"></div>
+      <label for="af7">URL contains <strong>clickref=cc-</strong> followed by 8 characters</label>
+      <span class="item-badge critical">CRITICAL</span>
+    </div>
+    <div class="check-item" data-priority="critical">
+      <input type="checkbox" id="af8"><div class="priority-dot dot-critical"></div>
+      <label for="af8">URL contains <strong>ued=</strong> followed by a long encoded URL</label>
+      <span class="item-badge critical">CRITICAL</span>
+    </div>
+    <div class="check-item" data-priority="critical">
+      <input type="checkbox" id="af9"><div class="priority-dot dot-critical"></div>
+      <label for="af9">The <strong>ued=</strong> value does <strong>NOT</strong> contain another awin1.com address (no double-wrapping)</label>
+      <span class="item-badge critical">CRITICAL</span>
+    </div>
+    <div class="check-item" data-priority="high">
+      <input type="checkbox" id="af10"><div class="priority-dot dot-high"></div>
+      <label for="af10">You eventually land on the correct retailer page (Bookshop.org or Waterstones product)</label>
+      <span class="item-badge high">HIGH</span>
+    </div>
+  </div>
+  <div class="notes-wrap">
+    <label>Notes — paste the full awin1.com URL here for reference</label>
+    <textarea id="notes-affiliate" placeholder="Paste the full redirect URL here. Note the awinmid and awinaffid values..."></textarea>
+  </div>
+</div>
+
+
+<!-- ─────────────────────────────────── SECTION 7 ── -->
+<div class="section-card" id="s-search">
+  <div class="section-header">
+    <div class="section-title-row">
+      <span class="section-icon">🔍</span>
+      <span class="section-title">Search</span>
+      <span class="section-badge badge-critical">CRITICAL</span>
+    </div>
+    <span class="section-counter" id="ctr-search">0 / 5</span>
+  </div>
+  <div class="check-list" data-section="search">
+    <div class="check-item" data-priority="critical">
+      <input type="checkbox" id="sr1"><div class="priority-dot dot-critical"></div>
+      <label for="sr1">Click the search bar and type <strong>"Saga"</strong> — results appear (list or dropdown)</label>
+      <span class="item-badge critical">CRITICAL</span>
+    </div>
+    <div class="check-item" data-priority="critical">
+      <input type="checkbox" id="sr2"><div class="priority-dot dot-critical"></div>
+      <label for="sr2">"Saga Vol" or similar titles appear in the results</label>
+      <span class="item-badge critical">CRITICAL</span>
+    </div>
+    <div class="check-item" data-priority="high">
+      <input type="checkbox" id="sr3"><div class="priority-dot dot-high"></div>
+      <label for="sr3">Click a result — product page loads correctly</label>
+      <span class="item-badge high">HIGH</span>
+    </div>
+    <div class="check-item" data-priority="high">
+      <input type="checkbox" id="sr4"><div class="priority-dot dot-high"></div>
+      <label for="sr4">Search for <strong>"Invincible"</strong> — relevant results appear</label>
+      <span class="item-badge high">HIGH</span>
+    </div>
+    <div class="check-item" data-priority="medium">
+      <input type="checkbox" id="sr5"><div class="priority-dot dot-medium"></div>
+      <label for="sr5">Type complete gibberish (e.g. "xzqjkwp") — a clean "no results" message appears, no crash</label>
+      <span class="item-badge medium">MEDIUM</span>
+    </div>
+  </div>
+  <div class="tip-box"><strong>Known issue — do not fail for this:</strong> The price range filter on search results is visible but does nothing when adjusted. This is a known issue already on the fix list. Note it below but do not count it as a search failure.</div>
+  <div class="notes-wrap">
+    <label>Notes</label>
+    <textarea id="notes-search" placeholder="Note any searches that returned wrong results, no results, or crashed..."></textarea>
+  </div>
+</div>
+
+
+<!-- ─────────────────────────────────── SECTION 8 ── -->
+<div class="section-card" id="s-legal">
+  <div class="section-header">
+    <div class="section-title-row">
+      <span class="section-icon">⚖️</span>
+      <span class="section-title">Legal &amp; Trust Pages</span>
+      <span class="section-badge badge-critical">CRITICAL</span>
+    </div>
+    <span class="section-counter" id="ctr-legal">0 / 7</span>
+  </div>
+  <div class="check-list" data-section="legal">
+    <div class="check-item" data-priority="critical">
+      <input type="checkbox" id="lg1"><div class="priority-dot dot-critical"></div>
+      <label for="lg1">Navigate to <strong>catchcomics.com/privacy</strong> — page loads with readable content</label>
+      <span class="item-badge critical">CRITICAL</span>
+    </div>
+    <div class="check-item" data-priority="critical">
+      <input type="checkbox" id="lg2"><div class="priority-dot dot-critical"></div>
+      <label for="lg2"><strong>hello@catchcomics.com</strong> is visible in the Privacy Policy text</label>
+      <span class="item-badge critical">CRITICAL</span>
+    </div>
+    <div class="check-item" data-priority="high">
+      <input type="checkbox" id="lg3"><div class="priority-dot dot-high"></div>
+      <label for="lg3">"Vercel Analytics" is mentioned in the Privacy Policy (we added this disclosure)</label>
+      <span class="item-badge high">HIGH</span>
+    </div>
+    <div class="check-item" data-priority="critical">
+      <input type="checkbox" id="lg4"><div class="priority-dot dot-critical"></div>
+      <label for="lg4">Navigate to <strong>catchcomics.com/affiliate-disclosure</strong> — page loads with readable content</label>
+      <span class="item-badge critical">CRITICAL</span>
+    </div>
+    <div class="check-item" data-priority="high">
+      <input type="checkbox" id="lg5"><div class="priority-dot dot-high"></div>
+      <label for="lg5">Affiliate Disclosure mentions <strong>AWIN</strong></label>
+      <span class="item-badge high">HIGH</span>
+    </div>
+    <div class="check-item" data-priority="high">
+      <input type="checkbox" id="lg6"><div class="priority-dot dot-high"></div>
+      <label for="lg6">Affiliate Disclosure mentions <strong>Amazon</strong></label>
+      <span class="item-badge high">HIGH</span>
+    </div>
+    <div class="check-item" data-priority="high">
+      <input type="checkbox" id="lg7"><div class="priority-dot dot-high"></div>
+      <label for="lg7">All four footer links work: About, Affiliate Disclosure, Privacy, Terms — click each one</label>
+      <span class="item-badge high">HIGH</span>
+    </div>
+  </div>
+  <div class="notes-wrap">
+    <label>Notes</label>
+    <textarea id="notes-legal" placeholder="Any legal pages that 404'd, are missing content, or have the wrong contact email..."></textarea>
+  </div>
+</div>
+
+
+<!-- ─────────────────────────────────── SECTION 9 ── -->
+<div class="section-card" id="s-errors">
+  <div class="section-header">
+    <div class="section-title-row">
+      <span class="section-icon">🚧</span>
+      <span class="section-title">Error States</span>
+      <span class="section-badge badge-high">HIGH</span>
+    </div>
+    <span class="section-counter" id="ctr-errors">0 / 3</span>
+  </div>
+  <div class="check-list" data-section="errors">
+    <div class="check-item" data-priority="high">
+      <input type="checkbox" id="er1"><div class="priority-dot dot-high"></div>
+      <label for="er1">Navigate to <strong>catchcomics.com/series/this-does-not-exist</strong> — a 404 page appears (not a white crash screen)</label>
+      <span class="item-badge high">HIGH</span>
+    </div>
+    <div class="check-item" data-priority="high">
+      <input type="checkbox" id="er2"><div class="priority-dot dot-high"></div>
+      <label for="er2">The 404 page has a link back to the homepage or /series</label>
+      <span class="item-badge high">HIGH</span>
+    </div>
+    <div class="check-item" data-priority="medium">
+      <input type="checkbox" id="er3"><div class="priority-dot dot-medium"></div>
+      <label for="er3">Navigate to <strong>catchcomics.com/product/this-does-not-exist</strong> — a 404 page appears</label>
+      <span class="item-badge medium">MEDIUM</span>
+    </div>
+  </div>
+  <div class="notes-wrap">
+    <label>Notes</label>
+    <textarea id="notes-errors" placeholder="Did any bad URL show a crash instead of a 404?"></textarea>
+  </div>
+</div>
+
+
+<!-- ─────────────────────────────────── SECTION 10 ── -->
+<div class="section-card" id="s-mobile">
+  <div class="section-header">
+    <div class="section-title-row">
+      <span class="section-icon">📱</span>
+      <span class="section-title">Mobile</span>
+      <span class="section-badge badge-critical">CRITICAL</span>
+    </div>
+    <span class="section-counter" id="ctr-mobile">0 / 6</span>
+  </div>
+  <div class="tip-box">Test on a real phone if possible. Or use Chrome DevTools: press F12 → click the phone icon → select "iPhone SE" (375px). Navigate to catchcomics.com in this mode.</div>
+  <div class="check-list" data-section="mobile">
+    <div class="check-item" data-priority="high">
+      <input type="checkbox" id="mb1"><div class="priority-dot dot-high"></div>
+      <label for="mb1">Homepage loads and is readable on mobile — not zoomed out, not horizontally scrolling</label>
+      <span class="item-badge high">HIGH</span>
+    </div>
+    <div class="check-item" data-priority="high">
+      <input type="checkbox" id="mb2"><div class="priority-dot dot-high"></div>
+      <label for="mb2">Search bar is tappable and brings up the keyboard</label>
+      <span class="item-badge high">HIGH</span>
+    </div>
+    <div class="check-item" data-priority="high">
+      <input type="checkbox" id="mb3"><div class="priority-dot dot-high"></div>
+      <label for="mb3">/series grid renders on mobile — series cards are stacked readably (1 or 2 columns)</label>
+      <span class="item-badge high">HIGH</span>
+    </div>
+    <div class="check-item" data-priority="critical">
+      <input type="checkbox" id="mb4"><div class="priority-dot dot-critical"></div>
+      <label for="mb4">Product page pricing panel is usable on mobile — prices readable, not cut off, not overflowing</label>
+      <span class="item-badge critical">CRITICAL</span>
+    </div>
+    <div class="check-item" data-priority="high">
+      <input type="checkbox" id="mb5"><div class="priority-dot dot-high"></div>
+      <label for="mb5">"Buy at [Retailer]" buttons are large enough to tap comfortably (not tiny)</label>
+      <span class="item-badge high">HIGH</span>
+    </div>
+    <div class="check-item" data-priority="medium">
+      <input type="checkbox" id="mb6"><div class="priority-dot dot-medium"></div>
+      <label for="mb6">Footer links are readable and tappable on mobile</label>
+      <span class="item-badge medium">MEDIUM</span>
+    </div>
+  </div>
+  <div class="notes-wrap">
+    <label>Notes</label>
+    <textarea id="notes-mobile" placeholder="Which device / viewport did you test on? Any layout issues?"></textarea>
+  </div>
+</div>
+
+
+<!-- ─────────────────────────────────── FINAL VERDICT ── -->
+<div class="verdict-section" id="s-verdict">
+  <div class="verdict-card">
+    <div class="verdict-header"><h2>Final Verdict</h2></div>
+    <div class="verdict-body">
+      <div class="verdict-status-row">
+        <button class="verdict-btn" id="btn-go" onclick="setVerdict('go')">✓ GO</button>
+        <button class="verdict-btn" id="btn-nogo" onclick="setVerdict('nogo')">✗ NO-GO</button>
+      </div>
+      <div class="verdict-auto" id="verdict-auto-label">Auto-suggestion: — (complete critical items to see recommendation)</div>
+      <br>
+      <div class="verdict-notes-label">Overall notes &amp; issues found</div>
+      <textarea class="verdict-notes-area" id="verdict-notes" placeholder="Summarise what you found. List any bugs or issues here. Include section names and specific URLs."></textarea>
+    </div>
+  </div>
+</div>
+
+<div style="height: 40px;"></div>
+
+<script>
+const STORAGE_KEY = 'cc-smoke-test-v1';
+
+function getState() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch { return {}; }
+}
+
+function saveState(state) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function allCheckboxes() {
+  return Array.from(document.querySelectorAll('.check-list input[type=checkbox]'));
+}
+
+function criticalCheckboxes() {
+  return allCheckboxes().filter(cb => cb.closest('.check-item').dataset.priority === 'critical');
+}
+
+function updateCounts() {
+  const all = allCheckboxes();
+  const checked = all.filter(cb => cb.checked).length;
+  const total = all.length;
+  const critAll = criticalCheckboxes();
+  const critChecked = critAll.filter(cb => cb.checked).length;
+
+  document.getElementById('progress-label').textContent = `${checked} of ${total} items checked`;
+  document.getElementById('progress-bar-inner').style.width = total ? `${(checked/total*100).toFixed(0)}%` : '0%';
+  document.getElementById('critical-label').textContent = `Critical: ${critChecked}/${critAll.length}`;
+
+  const pill = document.getElementById('verdict-pill');
+  const auto = document.getElementById('verdict-auto-label');
+
+  if (critChecked === critAll.length && critAll.length > 0) {
+    pill.className = 'verdict-go';
+    pill.textContent = 'IN PROGRESS → GO';
+    auto.innerHTML = `Auto-suggestion: <span style="color:var(--green);font-weight:700">GO</span> — all ${critAll.length} critical checks passed`;
+  } else {
+    pill.className = 'verdict-progress';
+    pill.textContent = 'IN PROGRESS';
+    const remaining = critAll.length - critChecked;
+    auto.innerHTML = `Auto-suggestion: <span style="color:var(--amber);font-weight:700">IN PROGRESS</span> — ${remaining} critical item${remaining !== 1 ? 's' : ''} still unchecked`;
+  }
+
+  document.querySelectorAll('.section-card').forEach(card => {
+    const section = card.querySelector('.check-list');
+    if (!section) return;
+    const sectionId = card.id.replace('s-', '');
+    const ctr = document.getElementById('ctr-' + sectionId.replace(/-/g,''));
+    if (!ctr) return;
+    const items = Array.from(section.querySelectorAll('input[type=checkbox]'));
+    const doneInSection = items.filter(cb => cb.checked).length;
+    const sAll = items.length;
+    ctr.innerHTML = `<strong>${doneInSection}</strong> / ${sAll}`;
+  });
+}
+
+function updateCheckItem(cb) {
+  const item = cb.closest('.check-item');
+  if (cb.checked) item.classList.add('checked');
+  else item.classList.remove('checked');
+}
+
+function setVerdict(v) {
+  const go = document.getElementById('btn-go');
+  const nogo = document.getElementById('btn-nogo');
+  go.className = 'verdict-btn' + (v === 'go' ? ' selected-go' : '');
+  nogo.className = 'verdict-btn' + (v === 'nogo' ? ' selected-nogo' : '');
+  const state = getState();
+  state.verdict = v;
+  saveState(state);
+}
+
+function saveProgress() {
+  const state = getState();
+  allCheckboxes().forEach(cb => { state[cb.id] = cb.checked; });
+  document.querySelectorAll('textarea').forEach(ta => { state['ta_' + ta.id] = ta.value; });
+  document.querySelectorAll('input[type=text]').forEach(inp => { state['inp_' + inp.id] = inp.value; });
+  saveState(state);
+  const btn = event.target;
+  const orig = btn.textContent;
+  btn.textContent = 'Saved!';
+  setTimeout(() => btn.textContent = orig, 1500);
+}
+
+function resetAll() {
+  if (!confirm('Reset all checkboxes and notes? This cannot be undone.')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  allCheckboxes().forEach(cb => { cb.checked = false; cb.closest('.check-item').classList.remove('checked'); });
+  document.querySelectorAll('textarea').forEach(ta => ta.value = '');
+  document.querySelectorAll('input[type=text]').forEach(inp => inp.value = '');
+  document.getElementById('btn-go').className = 'verdict-btn';
+  document.getElementById('btn-nogo').className = 'verdict-btn';
+  updateCounts();
+}
+
+function loadProgress() {
+  const state = getState();
+  allCheckboxes().forEach(cb => {
+    if (state[cb.id]) { cb.checked = true; updateCheckItem(cb); }
+  });
+  document.querySelectorAll('textarea').forEach(ta => {
+    if (state['ta_' + ta.id]) ta.value = state['ta_' + ta.id];
+  });
+  document.querySelectorAll('input[type=text]').forEach(inp => {
+    if (state['inp_' + inp.id]) inp.value = state['inp_' + inp.id];
+  });
+  if (state.verdict) setVerdict(state.verdict);
+  updateCounts();
+}
+
+allCheckboxes().forEach(cb => {
+  cb.addEventListener('change', () => {
+    updateCheckItem(cb);
+    updateCounts();
+    const state = getState();
+    state[cb.id] = cb.checked;
+    saveState(state);
+  });
+});
+
+document.querySelectorAll('textarea, input[type=text]').forEach(el => {
+  el.addEventListener('input', () => {
+    const state = getState();
+    const key = el.tagName === 'TEXTAREA' ? 'ta_' + el.id : 'inp_' + el.id;
+    state[key] = el.value;
+    saveState(state);
+  });
+});
+
+loadProgress();
+</script>
+</body>
+</html>

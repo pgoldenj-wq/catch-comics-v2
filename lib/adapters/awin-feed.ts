@@ -151,7 +151,7 @@ async function upsertListing(
       data: {
         retailerId,
         retailerSku       : product.merchant_product_id,
-        retailerUrl       : product.aw_deep_link || product.merchant_deep_link,   // prefer affiliate URL; fall back to merchant URL
+        retailerUrl       : product.merchant_deep_link || product.aw_deep_link,   // prefer bare merchant URL; /go/ wraps via AWIN cread.php
         title             : product.product_name,
         priceAmount,
         priceCurrency     : product.currency || 'GBP',
@@ -193,7 +193,7 @@ async function upsertListing(
       title       : product.product_name,
       imageUrl    : product.merchant_image_url || null,
       rawData     : product as unknown as Prisma.InputJsonValue,
-      retailerUrl : product.aw_deep_link || product.merchant_deep_link,
+      retailerUrl : product.merchant_deep_link || product.aw_deep_link,
       deletedAt   : null,
       ...(priceChanged ? { lastPriceChangeAt: syncStart } : {}),
       ...matchUpdate,

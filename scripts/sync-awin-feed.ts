@@ -282,7 +282,10 @@ async function main() {
       const stockStr  = row['stock_quantity'] ?? ''
       const inStockStr= row['in_stock'] ?? ''
       const stock     = mapStock(inStockStr, stockStr)
-      const deepLink  = row['aw_deep_link'] ?? row['product_url'] ?? ''
+      // Use merchant_deep_link (bare retailer URL) so the /go/ route can wrap
+      // it with our AWIN clickref via cread.php. aw_deep_link is already
+      // AWIN-wrapped (pclick.php) and would create a double-wrap if stored.
+      const merchantUrl = row['merchant_deep_link'] || row['product_url'] || `https://${domain}/book/${isbn13}`
 
       const existing = await prisma.retailerListing.findFirst({
         where: { retailerId: retailerId!, isbn13, deletedAt: null },
@@ -292,7 +295,7 @@ async function main() {
       if (existing) {
         await prisma.retailerListing.update({
           where: { id: existing.id },
-          data: { priceAmount: priceStr, priceCurrency: 'GBP', stockStatus: stock, lastSeenAt: now, deletedAt: null },
+          data: { priceAmount: priceStr, priceCurrency: 'GBP', stockStatus: stock, lastSeenAt: now, deletedAt: null, retailerUrl: merchantUrl },
         })
         if (existing.priceAmount.toString() !== priceStr) {
           await prisma.priceHistory.create({
@@ -301,7 +304,6 @@ async function main() {
         }
       } else {
         const title = (row['product_name'] ?? isbn13).slice(0, 500)
-        const productUrl = deepLink || row['product_url'] || `https://${domain}/book/${isbn13}`
         const rl = await prisma.retailerListing.create({
           data: {
             retailerId         : retailerId!,
@@ -309,7 +311,7 @@ async function main() {
             isbn13,
             title,
             retailerSku        : isbn13,
-            retailerUrl        : productUrl,
+            retailerUrl        : merchantUrl,
             priceAmount        : priceStr,
             priceCurrency      : 'GBP',
             stockStatus        : stock,
@@ -352,6 +354,11 @@ async function main() {
     console.log(`  Feed saved to ${outFile} — inspect before writing.`)
   } else {
     console.log(`\n  ✓ Feed saved to ${outFile}`)
+    // Mark retailer as synced
+    if (retailerId) {
+      await prisma.retailer.update({ where: { id: retailerId }, data: { lastSyncedAt: new Date() } })
+      console.log('  ✓ lastSyncedAt updated on retailer')
+    }
   }
   console.log('══════════════════════════════════════════════════════════\n')
 }

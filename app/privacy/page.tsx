@@ -18,7 +18,7 @@ export default function PrivacyPage() {
           Privacy Policy
         </h1>
         <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '13px', marginBottom: '48px' }}>
-          Last updated: 7 June 2026
+          Last updated: 8 June 2026
         </p>
 
         <Section title="Who we are">
@@ -103,9 +103,17 @@ export default function PrivacyPage() {
             <li>Any data from social media integrations (there are none).</li>
           </ul>
           <p style={{ marginTop: '12px' }}>
-            We do not use third-party web analytics services such as Google Analytics, Plausible, or
-            any equivalent. We do not load advertising networks, remarketing pixels, or social media
-            tracking scripts.
+            We use <strong>Vercel Analytics</strong>, a privacy-friendly analytics service provided
+            by Vercel (our hosting provider). It records anonymous pageview data — the URL visited,
+            referrer, and approximate country — to help us understand how the site is used. It does
+            not set cookies, does not fingerprint your device, and does not track you across sites.
+            See <a href="https://vercel.com/docs/analytics/privacy-policy" target="_blank"
+            rel="noopener noreferrer" style={{ color: '#E8272A' }}>Vercel Analytics privacy
+            information</a>.
+          </p>
+          <p style={{ marginTop: '12px' }}>
+            We do not use Google Analytics, Plausible, or any other third-party analytics service.
+            We do not load advertising networks, remarketing pixels, or social media tracking scripts.
           </p>
         </Section>
 
@@ -166,6 +174,10 @@ export default function PrivacyPage() {
               <strong>Vercel</strong> — hosting and serverless infrastructure. Processes request
               data including IP addresses. Based in the United States; operates under the
               EU–US Data Privacy Framework where applicable.
+            </li>
+            <li style={{ marginTop: '6px' }}>
+              <strong>Vercel Analytics</strong> — anonymous pageview analytics (no cookies, no
+              cross-site tracking). Data is processed by Vercel under their privacy policy.
             </li>
             <li style={{ marginTop: '6px' }}>
               <strong>Neon (PostgreSQL)</strong> — our database provider. Stores our product catalogue,

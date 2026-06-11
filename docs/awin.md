@@ -40,21 +40,21 @@ Status: Active ✓ | 822 priced listings (2026-05-17)
 
 ## Waterstones
 
-Merchant ID: **2079**
-Integration: DYNAMIC_LINK — bare `waterstones.com/book/{ISBN13}` stored in DB, AWIN-wrapped at `/go/` redirect time
+Merchant ID: **3787** (confirmed from aw_deep_link m= in downloaded feed; 2079 was incorrect)
+Integration: DIRECT_AFFILIATE — bare `waterstones.com/book/{ISBN13}` stored in DB, AWIN-wrapped at `/go/` redirect time
 Product URL pattern: `https://www.waterstones.com/book/{ISBN13}` (ISBN-direct, no slug needed)
 
 Commission: 2-5%
-Status: Pending approval ⏳ (applied 2026-05-17)
-Note: 4,863 stubs created. Will earn commission once account approved on AWIN.
+Status: Active ✓ | Feed FID 3787 | affiliateId=3787 | 15,775 priced listings (2026-06-07)
+Note: AWIN approval confirmed — feed downloaded 228,622 rows. DB updated with affiliateNetwork=awin, affiliateId=3787.
 
 ---
 
 ## LetsBuyBooks
 
-Merchant ID: **112530** (FID)
-Integration: Feed (FID 112530)
-Status: Feed download pending (AWIN server outage 2026-05-17) ⏳
+Merchant ID: **122824** (affiliate ID) | Feed ID: **112530**
+Integration: Feed (FID 112530) — AWIN_FEED platform
+Status: Active ✓ | 5,870 priced listings (2026-06-07) | affiliateId=122824
 
 ---
 

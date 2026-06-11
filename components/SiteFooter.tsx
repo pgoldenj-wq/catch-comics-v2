@@ -76,6 +76,17 @@ export default function SiteFooter() {
         ))}
       </nav>
 
+      {/* Contact */}
+      <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.22)', marginBottom: '6px' }}>
+        Questions?{' '}
+        <a
+          href="mailto:hello@catchcomics.com"
+          style={{ color: 'rgba(255,255,255,0.35)', textDecoration: 'none' }}
+        >
+          hello@catchcomics.com
+        </a>
+      </p>
+
       {/* Copyright */}
       <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.2)' }}>
         © {year} Catch Comics. All prices shown are indicative only.

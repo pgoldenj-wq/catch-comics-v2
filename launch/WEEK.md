@@ -1,7 +1,7 @@
 # Catch Comics — Week of 2026-06-09
 
 **Launch date:** July 1, 2026 — **22 days remaining**  
-**Week objective:** ~~Install analytics~~ ✅. Ship the launch announcement. Smoke test on production.
+**Week objective:** ~~Install analytics~~ ✅. Smoke test on production. Ship the launch announcement.
 
 ---
 
@@ -15,16 +15,6 @@
 **Effort:** 15 min  
 **Command:** `npm install @vercel/analytics` + add `<Analytics />` to `app/layout.tsx`  
 **Why now:** Without analytics, you cannot validate the launch. No data = no learning = no iteration.
-
----
-
-### 1b. Speed Insights — Enable Vercel Speed Insights
-**Area:** Monitoring  
-**Launch-critical:** NO — pre-launch enhancement (recommended)  
-**Status:** todo  
-**Done when:** `@vercel/speed-insights` installed, `<SpeedInsights />` in `app/layout.tsx`, Core Web Vitals visible in Vercel dashboard after first production traffic.  
-**Effort:** 10 min  
-**Why now:** Zero cost (included in Observability Plus, already enabled). Surfaces LCP/CLS/INP/FCP/TTFB per page from real users from day one. Lets you catch slow cover-image loads and price-loading CLS shifts before they become user complaints.
 
 ---
 

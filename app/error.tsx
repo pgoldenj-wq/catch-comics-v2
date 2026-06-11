@@ -1,6 +1,24 @@
 'use client'
 
-export default function GlobalError({ reset }: { error: Error; reset: () => void }) {
+import { useEffect } from 'react'
+
+export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  useEffect(() => {
+    // Forward the client-side error to the server so it appears in Vercel logs.
+    // This is the only way to get client-side crash visibility without a third-party service.
+    fetch('/api/log-error', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: error.message,
+        stack:   error.stack,
+        digest:  error.digest,
+        page:    typeof window !== 'undefined' ? window.location.pathname : undefined,
+      }),
+    }).catch(() => {
+      // Silently ignore — if the log endpoint itself fails, don't cascade
+    })
+  }, [error])
   return (
     <main className="min-h-screen font-sans" style={{ background: '#F8F8F6' }}>
       <nav style={{ background: '#fff', borderBottom: '1px solid #F0F0F0', padding: '0 32px', height: '80px', display: 'flex', alignItems: 'center' }}>

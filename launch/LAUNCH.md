@@ -203,7 +203,7 @@ The following are real improvements that come immediately after launch, informed
 ### Nice-to-have operational tasks (deferred, implementation complete)
 
 - **Slack Alerting** — Add `SLACK_WEBHOOK_URL` to Vercel Production. Code is done. 5–10 min effort. Prevents silent degradation of background jobs post-launch. See item 13 above for full steps.
-- **Speed Insights** — `npm install @vercel/speed-insights` + `<SpeedInsights />` in `app/layout.tsx`. Included in Observability Plus (already enabled — no cost). 10 min effort. Tracks Core Web Vitals (LCP, CLS, INP, FCP, TTFB) per page from real users. Recommended pre-launch so you have CWV data from day one. Not gated on launch.
+- ~~**Speed Insights**~~ — **Not recommended pre-launch.** $10/month per project + $0.65/10k data points. Not included in Pro plan (separate paid add-on). Adds no collector-facing value and doesn't improve search, discovery, or revenue. Vercel Analytics already covers pageviews and session data. Reconsider post-launch if Core Web Vitals become a specific concern.
 
 ---
 
@@ -227,7 +227,7 @@ The following are real improvements that come immediately after launch, informed
 | Slack Alerting | Post-launch | Deferred — code complete, webhook not yet created | — |
 | Data quality — Claymore | 6% | ✅ Resolved — removed from registry 2026-06-08. No broken reading order. | 95% |
 
-**Recalculated readiness: 82%** *(dashboard generator authoritative — 2026-06-08, Analytics shipped)*  
+**Recalculated readiness: 91%** *(dashboard generator authoritative — last updated 2026-06-11)*  
 
 *Note: the generator uses requirement-status weights (STRATEGIC BLOCKER×2, TACTICAL BLOCKER×1.5, standard×1), which differs from the session narrative (flat percentage weights). Generator output is authoritative.*
 
@@ -237,18 +237,22 @@ The following are real improvements that come immediately after launch, informed
 | Discovery + Navbar + Homepage | +~12pp |
 | Claymore resolved | +~3pp |
 | Analytics installed | +~5pp |
-| **Current (generator)** | **82%** |
+| Error Monitoring installed | +~9pp |
+| **Current (generator)** | **91%** |
 
-*Remaining gaps: Monetisation (75% — eBay unwrapped), Legal (88% — mailbox unverified).*
+*Remaining gaps: CV Enrichment for launch series (in progress), Reading Journeys 18/20, Monetisation (eBay unwrapped), Legal (mailbox unverified).*
 
-**Biggest blockers remaining (ranked by impact):**
-1. ~~Discovery: no path from homepage or navbar to `/series`~~ ✅ DONE — navbar + homepage section shipped
-2. ~~Analytics: no pageview data = cannot validate the launch~~ ✅ DONE — Vercel Analytics installed 2026-06-08
-3. ~~Claymore: Vol 1 absent = broken reading order~~ ✅ DONE — removed from registry
-4. ~~Error monitoring: production crashes invisible~~ ✅ DONE — Vercel Observability Plus + client-side forwarding 2026-06-08
-5. ~~AWIN_PUBLISHER_ID: unverified in Vercel Production~~ ✅ DONE — verified live 2026-06-08
-6. Launch announcement copy: not written yet
-7. hello@catchcomics.com mailbox: unverified
+**Open blockers (ranked by impact):**
+1. ~~Discovery: no path from homepage or navbar to `/series`~~ ✅ DONE
+2. ~~Analytics: no pageview data = cannot validate the launch~~ ✅ DONE — 2026-06-08
+3. ~~Claymore: Vol 1 absent = broken reading order~~ ✅ DONE — 2026-06-08
+4. ~~Error monitoring: production crashes invisible~~ ✅ DONE — 2026-06-08
+5. ~~AWIN_PUBLISHER_ID: unverified in Vercel Production~~ ✅ DONE — 2026-06-08
+6. **Production smoke test: not yet done** — highest priority remaining
+7. **Launch announcement copy: not written** — the launch IS the announcement
+8. **hello@catchcomics.com mailbox: unverified** — 5 min, in Privacy Policy and Footer
+9. Search price filter: non-functional UI misleads collectors (30 min fix)
+10. Naruto: blocked (human triage required) · Baki: blocked (ComicVine indexing)
 
 ---
 

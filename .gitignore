@@ -52,3 +52,46 @@ next-env.d.ts
 # cleanup-non-comics output — regenerated each run, not source
 /scripts/delete-candidates.json
 /scripts/reclassify-candidates.json
+/scripts/reclassify-candidates-strict.json
+/scripts/c-pruned-delete-candidates.json
+
+# CV enrichment checkpoints — local machine state, not source code
+/scripts/.enrich-catalogue-checkpoint.json
+/scripts/.enrich-catalogue-checkpoint-w2.json
+/scripts/.backfill-covers-checkpoint.json
+/scripts/.cover-migration-checkpoint.json
+/scripts/.enrichment-test-snapshot.json
+
+# One-off diagnostic and audit scripts — not part of the application
+/scripts/audit-launch-series.ts
+/scripts/audit-tier3-series-batch1.ts
+/scripts/diagnose-covers.ts
+/scripts/diagnose-covers-2.ts
+/scripts/diagnose-missing-covers.ts
+/scripts/diagnose-publisher-quality.ts
+/scripts/dryrun-volume-numbers.ts
+/scripts/promote-listing-covers.ts
+/scripts/repair-claymore.ts
+/scripts/stats_review.ts
+/scripts/_w2-verify.ts
+
+# Generated dashboard — rebuilt on every open-dashboard.bat run
+/launch/dashboard.html
+
+# Dashboard utility scripts — one-time bootstrap, not source code
+/launch/seed-history.js
+/launch/status-check.js
+
+# Launch session artefacts — not source code
+/launch/CONTINUATION.md
+/launch/logs/
+
+# Ops artefacts — not source code
+/logs/
+/enrich-cv-overnight.bat
+/retailer-ops.xlsx
+/skills-lock.json
+
+# Claude agent config — local only
+/.agents/
+/.claude/

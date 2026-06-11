@@ -268,7 +268,7 @@ async function main() {
     const currency  = (row['currency'] ?? 'GBP').toUpperCase()
     const stock     = mapStock(row['in_stock'] ?? '0')
     const title     = row['product_name'] ?? ''
-    const url       = row['aw_deep_link'] || row['merchant_deep_link'] || ''
+    const url       = row['merchant_deep_link'] || row['aw_deep_link'] || ''
     const imageUrl  = row['merchant_image_url'] || null
 
     if (!url) {
