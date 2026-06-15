@@ -16,7 +16,7 @@
  */
 
 /** Networks the wrapping logic understands. */
-export type AffiliateNetwork = 'awin' | 'cj' | string | null | undefined
+export type AffiliateNetwork = 'awin' | 'amazon' | 'cj' | string | null | undefined
 
 /**
  * Wrap `targetUrl` through the given affiliate network.
@@ -68,6 +68,20 @@ export function wrapAffiliateUrl(
         return `${origin}/a/${affiliateId}${path}`
       } catch {
         console.warn('[affiliate] bookshop URL parse failed — returning unwrapped URL', targetUrl)
+        return targetUrl
+      }
+    }
+
+    case 'amazon': {
+      // Amazon Associates: append ?tag={associateTag} (or &tag= if query string already present).
+      // affiliateId holds the associate tag (e.g. 'catchcomics-21').
+      // retailerUrl is a direct product URL (amazon.co.uk/dp/... or amazon.com/dp/...).
+      try {
+        const url = new URL(targetUrl)
+        url.searchParams.set('tag', affiliateId)
+        return url.toString()
+      } catch {
+        console.warn('[affiliate] amazon URL parse failed — returning unwrapped URL', targetUrl)
         return targetUrl
       }
     }

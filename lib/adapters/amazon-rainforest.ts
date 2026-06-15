@@ -64,12 +64,14 @@ interface RainforestResponse {
 export type AmazonDomain = 'amazon.co.uk' | 'amazon.com'
 
 interface AmazonMarket {
-  domain      : AmazonDomain
-  retailerName: string
+  domain       : AmazonDomain
+  retailerName : string
   /** Bare domain used as retailer.domain in our DB */
-  dbDomain    : string
-  currency    : string
-  countryCode : string
+  dbDomain     : string
+  currency     : string
+  countryCode  : string
+  /** Amazon Associates tag for this market. Null until a valid tag is obtained. */
+  associateTag : string | null
 }
 
 const AMAZON_MARKETS: Record<AmazonDomain, AmazonMarket> = {
@@ -79,6 +81,7 @@ const AMAZON_MARKETS: Record<AmazonDomain, AmazonMarket> = {
     dbDomain    : 'amazon.co.uk',
     currency    : 'GBP',
     countryCode : 'GB',
+    associateTag: 'catchcomics-21',
   },
   'amazon.com': {
     domain      : 'amazon.com',
@@ -86,6 +89,7 @@ const AMAZON_MARKETS: Record<AmazonDomain, AmazonMarket> = {
     dbDomain    : 'amazon.com',
     currency    : 'USD',
     countryCode : 'US',
+    associateTag: null,   // no valid US Associates tag yet — blank until obtained
   },
 }
 
@@ -141,14 +145,16 @@ async function ensureAmazonRetailer(market: AmazonMarket): Promise<string> {
 
   const created = await prisma.retailer.create({
     data: {
-      name       : market.retailerName,
-      domain     : market.dbDomain,
-      platform   : 'EXTERNAL_API' as unknown as import('@prisma/client').RetailerPlatform,
-      countryCode: market.countryCode,
-      currency   : market.currency,
-      isActive   : true,
-      trustScore : TRUST_SCORE,
-      syncConfig : {},
+      name            : market.retailerName,
+      domain          : market.dbDomain,
+      platform        : 'EXTERNAL_API' as unknown as import('@prisma/client').RetailerPlatform,
+      countryCode     : market.countryCode,
+      currency        : market.currency,
+      isActive        : true,
+      trustScore      : TRUST_SCORE,
+      syncConfig      : {},
+      affiliateNetwork: 'amazon',
+      affiliateId     : market.associateTag,
     },
   })
   console.log(`[amazon] created retailer record for ${market.dbDomain} (${created.id})`)
