@@ -551,16 +551,19 @@ function SearchResults() {
       .catch(() => { setError('Something went wrong.'); setLoading(false) })
   }, [query, region])
 
-  // Spelling correction
+  // Spelling correction — only when the query returned few results. A confident
+  // exact match (e.g. "Saga" → 20+ hits) should never prompt "Did you mean…",
+  // which previously surfaced irrelevant fuzzy matches like "Spawn" (smoke test).
   useEffect(() => {
     if (!query || loading) return
+    if (results.length >= 5) { setDidYouMean(null); return }
     fetch(`/api/autocomplete?q=${encodeURIComponent(query)}&mode=correct`)
       .then(r => r.json())
       .then(d => {
         if (d.correction && d.correction.toLowerCase() !== query.toLowerCase()) setDidYouMean(d.correction)
       })
       .catch(() => {})
-  }, [query, loading])
+  }, [query, loading, results.length])
 
   // Dynamic publisher list from fetched results
   const availablePublishers = useMemo(() => {
