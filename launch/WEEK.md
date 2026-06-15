@@ -21,7 +21,7 @@
 - [ ] Confirm AWIN click is recorded in AWIN dashboard (external — manual)
 - [ ] Mobile test: search + series page on phone (manual)
 
-**Smoke-test stabilisation sprint (2026-06-15) — fixed & deployed:** homepage horizontal overflow; homepage Top Deals + `/series` real-cover preference (homepage 12/12, series 14/17 covers); search "Did you mean" suppressed on confident matches; eBay item URLs normalised to `.co.uk`; series synopsis Read-more; 404 neutral CTA; cover hover-enlarge disabled on touch; character-tag "+N more" removed. _Reported (need OffersTable approval):_ availability accuracy, eBay New/Used labelling, duplicate eBay badge, Bookshop primary-CTA ordering.
+**Smoke-test stabilisation sprint (2026-06-15) — fixed & deployed:** homepage horizontal overflow; homepage Top Deals + `/series` real-cover preference (homepage 12/12, series 14/17 covers); search "Did you mean" suppressed on confident matches; eBay item URLs normalised to `.co.uk`; series synopsis Read-more; 404 neutral CTA; cover hover-enlarge disabled on touch; character-tag "+N more" removed. **OffersTable trust pass (done 2026-06-15):** unreliable availability column removed (feed OOS false-positives), duplicate eBay badge suppressed, eBay New/Used mapping fixed. _Documented (correct as-is):_ Bookshop ordering is cheapest-first (no retailer-priority list); FMA ordering correct (vols 2/7/12/22/25/26 missing = data gap); creators are static text, not dead links. _Deferred (data/structural):_ 3 series OL-only covers, single-issue vs volume layout, recommendation diversification.
 **Effort:** 1 hr
 
 ---

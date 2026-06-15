@@ -68,7 +68,7 @@ Items removed from launch-day scope after challenge:
 ### 6. Product Pages
 **Status:** Good (UX overhaul 2026-05-30, post-audit fixes 2026-06-05)  
 **Done when:** Product pages load with correct cover, creators, synopsis, and pricing for enriched products. Fallback placeholder shown for unenriched. No console errors.  
-**Note:** Best current area. Minor polish only.
+**Note:** Best current area. Minor polish only. 2026-06-15 OffersTable trust pass: removed unreliable availability column (feed OOS false-positives — ~89% of Travelling Man flagged OOS while live), suppressed duplicate eBay badge, fixed eBay New/Used condition mapping. Creators render as static text (not dead links). Single-issue vs collected-edition layout differences remain (deferred — structural, not a defect).
 
 ---
 
