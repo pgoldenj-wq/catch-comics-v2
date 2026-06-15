@@ -75,14 +75,11 @@ const CONDITION_LABELS: Record<string, string> = {
   UNGRADED:   'Ungraded',
 }
 
-const STOCK_LABELS: Record<string, { label: string; cls: string }> = {
-  IN_STOCK:    { label: 'In stock',  cls: 'text-emerald-600' },
-  LOW_STOCK:   { label: 'Low stock', cls: 'text-gray-400'   },
-  PREORDER:    { label: 'Pre-order', cls: 'text-sky-600'      },
-  OUT_OF_STOCK:{ label: 'OOS',       cls: 'text-red-500'      },
-  UNKNOWN:     { label: 'Unknown',   cls: 'text-gray-400'     },
-}
-
+// NOTE: Stock/availability display was removed for launch (2026-06-15). Feed
+// availability proved unreliable — a large share of listings (e.g. ~89% of
+// Travelling Man, stale Amazon) were flagged OUT_OF_STOCK while live on the
+// retailer. Showing a wrong "OOS" is a trust failure worse than showing none;
+// prices link out and the retailer page is the source of truth for stock.
 const STALE_DAYS = 30
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -108,10 +105,13 @@ function fmtAge(iso: string): string | null {
   return `Checked ${days}d ago`
 }
 
-// eBay condition strings use natural-language labels — map to new/used buckets.
-// "New" → new. Everything else → used.
+// eBay Browse API returns natural-language conditions: "New", "Brand New",
+// "New other (see details)", "New with tags", "Like New", "Used", "Very Good",
+// "Good", "Acceptable". Treat any genuine new condition as New; "Like New" is a
+// used sub-grade, not new.
 function ebayConditionIsNew(condition: string): boolean {
-  return condition.toLowerCase() === 'new'
+  const c = condition.toLowerCase()
+  return c.includes('new') && !c.includes('like new')
 }
 
 // Determine whether an OfferRow falls into the NEW or USED tab bucket.
@@ -246,7 +246,6 @@ export default function OffersTable({ offers, isbn13, productTitle, canonicalPro
             {!allSameCondition && <span className="hidden lg:block w-20 shrink-0 font-medium truncate">Condition</span>}
             <span className="w-20 shrink-0 font-medium truncate">Price</span>
             <span className="hidden xl:block w-16 shrink-0 font-medium truncate">Shipping</span>
-            <span className="hidden lg:block w-20 shrink-0 font-medium truncate">Stock</span>
           </div>
 
           {/* Rows — each is a real <a> for keyboard + screen-reader accessibility.
@@ -255,10 +254,9 @@ export default function OffersTable({ offers, isbn13, productTitle, canonicalPro
           <div className="divide-y divide-gray-100">
             {visible.map((o, i) => {
               const stale = !o.isMarketplace && isStale(o.lastSeenAt)
-              const stock = STOCK_LABELS[o.stockStatus] ?? STOCK_LABELS['UNKNOWN']
 
-              // Best price badge: only for trusted retailers in stock
-              const isBest = i === 0 && visible.length > 1 && !o.isMarketplace && o.stockStatus === 'IN_STOCK'
+              // Best price badge: cheapest trusted-retailer row (stock no longer gated — see note above)
+              const isBest = i === 0 && visible.length > 1 && !o.isMarketplace
 
               // Link destination: marketplace rows go to eBay directly;
               // trusted retailer rows go through /go/ for click tracking + affiliate redirect.
@@ -268,7 +266,6 @@ export default function OffersTable({ offers, isbn13, productTitle, canonicalPro
               const ariaLabel = [
                 o.retailerName,
                 fmtPrice(o.priceAmount, o.currency),
-                o.stockStatus !== 'IN_STOCK' ? stock.label : null,
                 stale ? 'stale data' : null,
               ].filter(Boolean).join(' — ')
 
@@ -303,7 +300,7 @@ export default function OffersTable({ offers, isbn13, productTitle, canonicalPro
                   <span className="flex-1 min-w-0 font-medium text-gray-900 pr-3">
                     <span className="flex items-center gap-2 flex-wrap">
                       {o.retailerName}
-                      {o.isMarketplace && o.marketplaceLabel && (
+                      {o.isMarketplace && o.marketplaceLabel && o.marketplaceLabel !== o.retailerName && (
                         <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#E8272A] text-white leading-none">
                           {o.marketplaceLabel}
                         </span>
@@ -369,12 +366,6 @@ export default function OffersTable({ offers, isbn13, productTitle, canonicalPro
                           : fmtPrice(o.shippingAmount, o.currency)}
                   </span>
 
-                  {/* Stock — matches header: hidden below lg */}
-                  <span className={`hidden lg:block w-20 shrink-0 font-medium ${stock.cls}`}>
-                    {o.isMarketplace
-                      ? <span className="text-emerald-600">Available</span>
-                      : stock.label}
-                  </span>
                 </a>
               )
             })}
