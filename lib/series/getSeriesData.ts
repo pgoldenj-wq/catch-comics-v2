@@ -69,12 +69,22 @@ export async function getSeriesData(entry: SeriesEntry): Promise<SeriesPageData>
     }
   }
 
-  // ── Hero cover: first product with a valid, non-placeholder cover URL ─────
+  // ── Hero cover: prefer a real (R2) cover, then fall back to the first
+  //    non-placeholder cover. Open Library fallback URLs frequently 404, so a
+  //    broken OL Vol-1 cover should not win over a later volume's R2 cover. ────
   let heroCoverUrl: string | null = null
   for (const p of products) {
-    if (p.coverImageUrl && !isBadCoverUrl(p.coverImageUrl)) {
+    if (p.coverImageUrl?.startsWith('https://images.catchcomics.com')) {
       heroCoverUrl = p.coverImageUrl
       break
+    }
+  }
+  if (!heroCoverUrl) {
+    for (const p of products) {
+      if (p.coverImageUrl && !isBadCoverUrl(p.coverImageUrl)) {
+        heroCoverUrl = p.coverImageUrl
+        break
+      }
     }
   }
 

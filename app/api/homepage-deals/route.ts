@@ -111,7 +111,10 @@ export async function GET() {
           *,
           ROW_NUMBER() OVER (
             PARTITION BY dedup_key
-            ORDER BY listing_count DESC, release_date DESC NULLS LAST
+            -- Prefer the representative with a real (R2) cover: Open Library
+            -- fallback URLs frequently 404, leaving grey placeholder cards.
+            ORDER BY (cover_image_url LIKE 'https://images.catchcomics.com%') DESC,
+                     listing_count DESC, release_date DESC NULLS LAST
           ) AS series_rank
         FROM per_product
       )
@@ -126,7 +129,9 @@ export async function GET() {
         lowest_usd
       FROM ranked
       WHERE series_rank = 1                    -- Issue 3: one row per series
-      ORDER BY listing_count DESC
+      -- Surface real-cover (R2) products first so the carousel never shows a
+      -- wall of grey placeholders; listing_count keeps the most-listed within each tier.
+      ORDER BY (cover_image_url LIKE 'https://images.catchcomics.com%') DESC, listing_count DESC
       LIMIT 12
     `
 
