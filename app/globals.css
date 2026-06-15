@@ -82,32 +82,24 @@ select:focus-visible {
   will-change: transform;
 }
 
-/* Tiny thumbnails — RelatedCard (56px), CVIssuesGrid small cols */
-.cover-card-sm:hover,
-.cover-card-sm:focus-visible {
-  transform: scale(2.95);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.30);
-  z-index: 10;
+/* Hover-scale applies only on devices with a true hover pointer (desktop mice)
+   so a tap on a touch screen never triggers sticky-hover enlargement (smoke
+   test: disable hover-enlarge on mobile only — desktop behaviour unchanged).
+   Sizes: sm tiny thumbs (RelatedCard, CVIssuesGrid), md/`.cover-card` medium
+   (IssueListGrid, Search), lg large (VolumeCard, SeriesIndexCard, homepage
+   deals carousel — carousel overflow:hidden so a modest scale limits clipping). */
+@media (hover: hover) and (pointer: fine) {
+  .cover-card-sm:hover { transform: scale(2.95); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.30); z-index: 10; }
+  .cover-card-md:hover,
+  .cover-card:hover    { transform: scale(2.07); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25); z-index: 10; }
+  .cover-card-lg:hover { transform: scale(1.53); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18); z-index: 10; }
 }
 
-/* Medium thumbnails — IssueListGrid (114px), Search (100px) */
-.cover-card-md:hover,
+/* Keyboard focus preview — every device, for accessibility */
+.cover-card-sm:focus-visible { transform: scale(2.95); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.30); z-index: 10; }
 .cover-card-md:focus-visible,
-.cover-card:hover,
-.cover-card:focus-visible {
-  transform: scale(2.07);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
-  z-index: 10;
-}
-
-/* Large thumbnails — VolumeCard, SeriesIndexCard, homepage deals carousel
-   (carousel has overflow:hidden so a modest scale prevents hard clipping) */
-.cover-card-lg:hover,
-.cover-card-lg:focus-visible {
-  transform: scale(1.53);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
-  z-index: 10;
-}
+.cover-card:focus-visible    { transform: scale(2.07); box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25); z-index: 10; }
+.cover-card-lg:focus-visible { transform: scale(1.53); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18); z-index: 10; }
 
 /* ─── Reduced motion respect ────────────────────────────────────────────────
    Global safety net for animations / transitions. Components that own bouncy

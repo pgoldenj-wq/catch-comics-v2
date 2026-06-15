@@ -20,13 +20,13 @@ export default function NotFound() {
           }}>
             ← Back to home
           </a>
-          <a href="/search?q=batman" style={{
+          <a href="/series" style={{
             display: 'inline-flex', alignItems: 'center',
             padding: '10px 24px', background: '#fff', color: '#6B7280',
             borderRadius: '999px', fontSize: '14px', fontWeight: 500,
             textDecoration: 'none', border: '1px solid #E5E7EB',
           }}>
-            Search comics
+            Browse series
           </a>
         </div>
       </div>
