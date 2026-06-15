@@ -163,6 +163,10 @@ function wrapEpn(url: string): string {
   if (!EBAY_CAMPAIGN_ID || !url) return url
   try {
     const u = new URL(url)
+    // We search the EBAY_GB marketplace for UK shoppers, but the Browse API
+    // occasionally returns an ebay.com (US) item URL. eBay item ids are global,
+    // so normalise the host to ebay.co.uk for correct UK pricing/shipping.
+    if (/(^|\.)ebay\.com$/i.test(u.hostname)) u.hostname = 'www.ebay.co.uk'
     u.searchParams.set('campid',  EBAY_CAMPAIGN_ID)
     u.searchParams.set('toolid',  EBAY_TOOL_ID)
     u.searchParams.set('mkevt',   '1')   // event type: click
