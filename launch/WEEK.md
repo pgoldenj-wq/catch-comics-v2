@@ -1,83 +1,41 @@
-# Catch Comics — Week of 2026-06-09
+# Catch Comics — Week of 2026-06-15
 
-**Launch date:** July 1, 2026 — **22 days remaining**  
-**Week objective:** ~~Install analytics~~ ✅. Smoke test on production. Ship the launch announcement.
+**Launch date:** July 1, 2026 — **16 days remaining**  
+**Week objective:** Complete smoke test. Verify mailbox. Hide price filter. Write launch announcement.
 
 ---
 
 ## This Week's Priorities
 
-### 1. Analytics — Install Vercel Analytics
-**Area:** Monitoring  
-**Launch-critical:** YES  
-**Status:** done  
-**Done when:** ✓ Complete (2026-06-08). `@vercel/analytics` installed, `<Analytics />` added to `app/layout.tsx`. Build passes. Privacy policy updated to disclose Vercel Analytics.  
-**Effort:** 15 min  
-**Command:** `npm install @vercel/analytics` + add `<Analytics />` to `app/layout.tsx`  
-**Why now:** Without analytics, you cannot validate the launch. No data = no learning = no iteration.
-
----
-
-### 2. AWIN_PUBLISHER_ID — Verify in Vercel production
-**Area:** Monetisation  
-**Launch-critical:** YES  
-**Status:** done  
-**Done when:** ✓ Complete (2026-06-08). Vercel CLI confirmed present in Production. Live production test on Bookshop.org (UK) listing: redirect to awin1.com with correct awinaffid (7-digit publisher ID), awinmid, clickref=cc-{listingId[:8]}, clean ued — no double-wrap. HTTP 302. Attribution fully operational.  
-**Effort:** 5 min  
-**Why now:** If unset, all AWIN clicks redirect without affiliate wrapping — silent revenue failure with only a server-side console warning.
-
----
-
-### 3. Error monitoring — Install
-**Area:** Infrastructure  
-**Launch-critical:** YES (pre-launch)  
-**Status:** done  
-**Done when:** ✓ Complete (2026-06-08). Vercel Observability Plus covers all server-side errors. Client-side forwarding added: error.tsx → POST /api/log-error → Vercel server logs. No Sentry needed. Build passes.  
-**Effort:** 30 min  
-**Why now:** Without monitoring, production crashes are invisible. A broken series page could be live for days post-launch.
-
----
-
-### 3c. CV Enrichment — Optimise throughput
-**Area:** Infrastructure  
-**Launch-critical:** NO — best-effort background task  
-**Status:** done  
-**Done when:** ✓ Complete (2026-06-08). Diagnosis confirmed bulk enrichment is off the launch critical path. Three low-risk throughput improvements applied to `scripts/enrich-loop.ps1` and `scripts/enrich-loop-w2.ps1`:  
-1. **rateMs 25s → 20s** — reduces per-request delay from 25,000ms to 20,000ms. W1 stays at ~180 req/hr vs 200 req/hr API limit (10% buffer). Zero 420 errors in full history. Expected W1 matches/hr: 26 → ~39.  
-2. **S0 Low Power Idle blocked** — `SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED)` added to both loop scripts. Prevents Modern Standby Network Disconnected state while wrapper is alive. Sleep and hibernate already disabled (confirmed via powercfg).  
-3. **Restart delay 30s → 5s** — reduces dead time between worker sessions from 30s to 5s.  
-**ETA (continuous, W1):** ~June 15 (Scenario C). W2 noted exhausted: 0.4% current match rate (pool of TPB/HC/OTHER comics is depleted). All remaining productive work from W1.  
-**⚠️ These changes take effect on next worker restart.** Running Scheduled Tasks are using the old script content. Restart both tasks to apply: Task Scheduler → CatchComicsEnrichment → End Task → Run, and CatchComicsEnrichment-W2 → End Task → Run.
-
----
-
-### 3b. Inngest — Stop DYNAMIC_LINK retailers from entering the sync queue
-**Area:** Infrastructure  
-**Launch-critical:** NO — operational health  
-**Status:** done  
-**Done when:** ✓ Complete (2026-06-08). Added `DYNAMIC_LINK` to `SKIP_PLATFORMS` in `lib/sync/dispatch.ts`. 8 active DYNAMIC_LINK retailers (Bookshop UK, Wordery, Forbidden Planet, Waterstones, WHSmith, Hive, Zavvi, AbeBooks) were being dispatched hourly, throwing on every run, exhausting 3 retries, and triggering `on-failure`. Eliminated ~960 failing Inngest invocations/day (~6,720/week) and stopped 192 stuck `status='running'` SyncLog rows accumulating daily. DYNAMIC_LINK retailers have no feed to sync — their listings are generated from ISBN URL templates at seed time.  
-**Effort:** 5 min
-
----
-
-### 4. Production smoke test
+### 1. Production smoke test
 **Area:** Quality  
 **Launch-critical:** YES  
-**Status:** todo  
+**Status:** in-progress  
 **Done when:** Walk through the following on the production URL (`catchcomics.com`):
-- [ ] Search for "Saga" → product page loads, cover visible, prices shown
-- [ ] Click a retailer link → `/go/[id]` redirects with affiliate params (check URL)
-- [ ] Navigate to `/series` → index page loads, 17 series visible
-- [ ] Click a series → `/series/saga` loads with Start Here badge and Vol 1 price
-- [ ] Click "Start Reading" → product page for Vol 1 loads
-- [ ] Confirm AWIN click is recorded in AWIN dashboard
-- [ ] Confirm click event written to DB
-- [ ] Mobile test: search + series page on phone
+- [x] Click a retailer link → `/go/[id]` redirects with affiliate params — verified 2026-06-15 via curl (Amazon `?tag=catchcomics-21`; AWIN `awin1.com/cread.php` with `awinmid`, `awinaffid=2888331`, `clickref=cc-XXXXXXXX`, clean `ued` / no double-wrap)
+- [x] Navigate to `/series` → index page loads, 17 series visible — verified
+- [x] Confirm click event written to DB — verified (redirect clicks logged to `click_events`)
+- [ ] Search for "Saga" → product page loads, cover visible, prices shown (visual — manual)
+- [ ] Click a series → `/series/saga` loads with Start Here badge and Vol 1 price (visual — manual)
+- [ ] Click "Start Reading" → product page for Vol 1 loads (visual — manual)
+- [ ] Confirm AWIN click is recorded in AWIN dashboard (external — manual)
+- [ ] Mobile test: search + series page on phone (manual)
+
+**Smoke-test stabilisation sprint (2026-06-15) — fixed & deployed:** homepage horizontal overflow; homepage Top Deals + `/series` real-cover preference (homepage 12/12, series 14/17 covers); search "Did you mean" suppressed on confident matches; eBay item URLs normalised to `.co.uk`; series synopsis Read-more; 404 neutral CTA; cover hover-enlarge disabled on touch; character-tag "+N more" removed. _Reported (need OffersTable approval):_ availability accuracy, eBay New/Used labelling, duplicate eBay badge, Bookshop primary-CTA ordering.
 **Effort:** 1 hr
 
 ---
 
-### 5. Search — Fix or hide non-functional price filter
+### 2. Verify hello@catchcomics.com mailbox
+**Area:** Legal / Ops  
+**Launch-critical:** YES  
+**Status:** todo  
+**Done when:** Confirm the mailbox at hello@catchcomics.com is live and monitored. This address appears in the Privacy Policy and Footer on every page. A bounced email on launch day is a credibility failure and a UK GDPR risk.  
+**Effort:** 5 min
+
+---
+
+### 3. Search — Fix or hide non-functional price filter
 **Area:** UX  
 **Launch-critical:** NEAR  
 **Status:** todo  
@@ -86,7 +44,7 @@
 
 ---
 
-### 6. Launch announcement copy
+### 4. Launch announcement copy
 **Area:** Go-to-market  
 **Launch-critical:** YES  
 **Status:** todo  
@@ -99,23 +57,31 @@ Copy should include: what Catch Comics does, 2–3 example series pages with dir
 
 ---
 
-### 7. Verify hello@catchcomics.com mailbox
-**Area:** Legal / Ops  
+### 5. Naruto — Reading journey
+**Area:** Series  
 **Launch-critical:** YES  
 **Status:** todo  
-**Done when:** Confirm the mailbox at hello@catchcomics.com is live and monitored. This address appears in the Privacy Policy and Footer on every page.  
-**Effort:** 5 min
+**Blocked by:** Human triage required — complex 3-in-1/catalogue data mix, needs human sign-off. Do not attempt without dedicated session.  
+**Done when:** Naruto series page live with correct volume data and ≥2 retailers pricing Vol 1.  
+**Effort:** 1–2 hrs when unblocked
 
 ---
 
-### DEFERRED — Blocked
-*(These are real tasks that are explicitly waiting on something external)*
+### 6. Baki the Grappler — Reading journey
+**Area:** Series  
+**Launch-critical:** YES  
+**Status:** todo  
+**Blocked by:** ComicVine not yet indexed Kodama Tales English edition (published Oct 2025). Monitor weekly.  
+**Done when:** CV IDs set, volume numbers fixed, added to series registry. ~15 min once CV indexes it.  
+**Effort:** 15 min when unblocked
 
-**Naruto triage:** Catalogue-wide enrichment + editorial decision required. Do not attempt without human sign-off. Blocked until dedicated session.
+---
 
-**Baki the Grappler:** Waiting for ComicVine to index Kodama Tales English edition (pub Oct 2025). When it appears: set CV IDs, fix vol numbers, add to registry. ~15 min task.
+### DEFERRED — Post-launch
 
 **eBay affiliate attribution:** eBay marketplace clicks currently unmonetised. Investigate eBay EPN setup and parameter injection. Can ship after launch — not blocking.
+
+**Slack alerting:** Code complete. Add `SLACK_WEBHOOK_URL` to Vercel Production when ready. 5–10 min. Prevents silent degradation of background jobs post-launch.
 
 ---
 

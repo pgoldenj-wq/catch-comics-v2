@@ -5,7 +5,7 @@
 **Launch promise:** A collector can search for a comic, follow a reading order, compare prices across UK retailers, and trust the information they see.
 
 **Completion: auto-calculated from requirement statuses below**  
-Last updated: 2026-06-08 (session 4 — operations mode: enrichment throughput optimised)
+Last updated: 2026-06-15 (session 5 — production deployment, CV enrichment complete, dashboard sync)
 
 ---
 
@@ -27,10 +27,9 @@ Items removed from launch-day scope after challenge:
 ## Launch Requirements — Day One
 
 ### 1. CV Enrichment for Launch Series — STRATEGIC BLOCKER
-**Status:** In progress  
-**Done when:** All 20–25 launch series have CV data via `ingest-cv-series`. Each series: cover images stored in R2, synopsis populated, issue relationships working. Bulk enrichment continues in background — does NOT block launch.  
-**Blocked by:** Nothing — use `ingest-cv-series` per series, bypasses bulk queue  
-**Command:** `npm run ingest:cv-series -- --search "[Series Name]"`
+**Status:** Done (2026-06-15)  
+**Done when:** ✓ Complete (2026-06-15). All 18 active launch series have CV data: cover images in R2, synopsis populated, issue relationships working. Bulk enrichment workers also complete — W1 processed 18,428 IDs, W2 processed 12,157 IDs (30,585 total, 0 candidates remaining). Workers stopped 2026-06-10. The 2 blocked series (Naruto, Baki) are tracked in Item 2 and do not affect this status.  
+**Note:** Run `npm run ingest:cv-series -- --search "[Series Name]"` to enrich individual series when they unblock.
 
 ---
 
@@ -39,7 +38,8 @@ Items removed from launch-day scope after challenge:
 **Done when:** All 20 series pages live, each passing the quality bar: ≥3 collected editions with correct `comicvine_id` + `volumeNumber`, ≥2 UK retailers with live Vol. 1 price, valid synopsis, correct sort order.  
 **Blocked by:** Naruto (complex 3-in-1/catalogue data mix, needs human triage) · Baki the Grappler (Kodama Tales English edition not yet indexed on ComicVine)  
 **Quality bar:** Do NOT add any series where `volumeNumber` values are wrong or fewer than 2 retailers price Vol. 1.  
-**Build order (all complete):** ~~Saga~~ ✓ → ~~Trigun Maximum Deluxe~~ ✓ → ~~Laid-Back Camp~~ ✓ → ~~Ouran OHSHC~~ ✓ → ~~Witch Hat Atelier~~ ✓ → ~~Hellsing~~ ✓ → ~~Void Rivals~~ ✓ → ~~Sengoku Youko~~ ✓ → ~~Under Ninja~~ ✓ → ~~Innocent Omnibus~~ ✓ → ~~Wolf's Daughter~~ ✓ → ~~Eden of Witches~~ ✓ → ~~Multi-Mind Mayhem~~ ✓ → ~~The Walking Dead~~ ✓ → ~~Fullmetal Alchemist~~ ✓ → ~~Invincible~~ ✓ → ~~Claymore~~ ✓ → ~~Overlord~~ ✓ | Naruto ⛔ BLOCKED | Baki the Grappler ⛔ BLOCKED
+**Build order (all complete):** ~~Saga~~ ✓ → ~~Trigun Maximum Deluxe~~ ✓ → ~~Laid-Back Camp~~ ✓ → ~~Ouran OHSHC~~ ✓ → ~~Witch Hat Atelier~~ ✓ → ~~Hellsing~~ ✓ → ~~Void Rivals~~ ✓ → ~~Sengoku Youko~~ ✓ → ~~Under Ninja~~ ✓ → ~~Innocent Omnibus~~ ✓ → ~~Wolf's Daughter~~ ✓ → ~~Eden of Witches~~ ✓ → ~~Multi-Mind Mayhem~~ ✓ → ~~The Walking Dead~~ ✓ → ~~Fullmetal Alchemist~~ ✓ → ~~Invincible~~ ✓ → ~~Claymore~~ ✓ → ~~Overlord~~ ✓ | Naruto ⛔ BLOCKED | Baki the Grappler ⛔ BLOCKED  
+**Progress:** In progress (17 of 20 series live — Naruto and Baki externally blocked, Claymore resolved via removal)
 
 ---
 
@@ -61,7 +61,7 @@ Items removed from launch-day scope after challenge:
 ### 5. Product Search
 **Status:** Functional  
 **Done when:** Search by title and ISBN returns correct results on production URL. Zero results shows clean empty state. No broken product page links from results.  
-**Note:** Appears solid — verify on production before launch day.
+**Note:** Appears solid — verify on production before launch day. 2026-06-15: confirmed `/api/search?q=Saga` returns volume + issue results; "Did you mean" now suppressed when the query already has confident results (was surfacing irrelevant fuzzy matches like "Spawn" for "Saga"). Autocomplete dropdown remains intentionally series-level.
 
 ---
 
@@ -73,8 +73,9 @@ Items removed from launch-day scope after challenge:
 ---
 
 ### 7. Affiliate Tracking
-**Status:** Good (eBay + Amazon + AWIN all operational as of 2026-06-07)
+**Status:** Good (eBay + Amazon + AWIN all operational; re-verified on production 2026-06-15)
 **Done when:** `/go/[id]` redirect and click logging verified on production URL. No console errors.
+**Verified (2026-06-15):** Amazon `/go/` appends `?tag=catchcomics-21` (1,282 priced Amazon UK listings); AWIN redirects to `awin1.com/cread.php` with `awinmid`, `awinaffid=2888331`, `clickref=cc-{listingId[:8]}`, clean `ued` (no double-wrap); Bookshop.org routes identically to Waterstones via AWIN (awinmid 62675); `click_events` writes confirmed live; eBay item URLs normalised to `ebay.co.uk` (US-link fix). Open (manual): confirm an AWIN click lands in the AWIN reporting dashboard.
 
 ---
 
@@ -211,8 +212,8 @@ The following are real improvements that come immediately after launch, informed
 
 | Area | Weight | Status | % done |
 |---|---|---|---|
-| CV Enrichment (launch series) | 10% | All 18 live series enriched; bulk continues in background | 85% |
-| Reading Journeys | 20% | 18/20 done — Claymore broken (Vol 1 absent); 2 hard blockers (Naruto, Baki) | 85% |
+| CV Enrichment (launch series) | 10% | ✅ All 18 live series enriched. Bulk workers complete (30,585 IDs, 0 remaining, stopped 2026-06-10). | 100% |
+| Reading Journeys | 20% | 17 live; 1 resolved via removal (Claymore); 2 blocked (Naruto, Baki) | 85% |
 | Cleanup v2 | — | Done | 100% |
 | AWIN write mode | — | Done | 100% |
 | Search | 10% | Functional — price filter non-op is the only notable issue | 75% |
@@ -227,7 +228,7 @@ The following are real improvements that come immediately after launch, informed
 | Slack Alerting | Post-launch | Deferred — code complete, webhook not yet created | — |
 | Data quality — Claymore | 6% | ✅ Resolved — removed from registry 2026-06-08. No broken reading order. | 95% |
 
-**Recalculated readiness: 91%** *(dashboard generator authoritative — last updated 2026-06-11)*  
+**Recalculated readiness: see dashboard** *(dashboard generator authoritative — last updated 2026-06-15)*  
 
 *Note: the generator uses requirement-status weights (STRATEGIC BLOCKER×2, TACTICAL BLOCKER×1.5, standard×1), which differs from the session narrative (flat percentage weights). Generator output is authoritative.*
 
@@ -238,9 +239,10 @@ The following are real improvements that come immediately after launch, informed
 | Claymore resolved | +~3pp |
 | Analytics installed | +~5pp |
 | Error Monitoring installed | +~9pp |
-| **Current (generator)** | **91%** |
+| CV Enrichment complete + prod deploy (2026-06-15) | +~5pp |
+| **Current (generator)** | **94%** |
 
-*Remaining gaps: CV Enrichment for launch series (in progress), Reading Journeys 18/20, Monetisation (eBay unwrapped), Legal (mailbox unverified).*
+*Remaining gaps: Reading Journeys 18/20 (2 blocked externally), Monetisation (eBay unwrapped), Legal (mailbox unverified), Smoke test in progress.*
 
 **Open blockers (ranked by impact):**
 1. ~~Discovery: no path from homepage or navbar to `/series`~~ ✅ DONE
@@ -248,11 +250,12 @@ The following are real improvements that come immediately after launch, informed
 3. ~~Claymore: Vol 1 absent = broken reading order~~ ✅ DONE — 2026-06-08
 4. ~~Error monitoring: production crashes invisible~~ ✅ DONE — 2026-06-08
 5. ~~AWIN_PUBLISHER_ID: unverified in Vercel Production~~ ✅ DONE — 2026-06-08
-6. **Production smoke test: not yet done** — highest priority remaining
-7. **Launch announcement copy: not written** — the launch IS the announcement
-8. **hello@catchcomics.com mailbox: unverified** — 5 min, in Privacy Policy and Footer
-9. Search price filter: non-functional UI misleads collectors (30 min fix)
-10. Naruto: blocked (human triage required) · Baki: blocked (ComicVine indexing)
+6. ~~Production deployment: not on latest commit~~ ✅ DONE — 2026-06-15 (catchcomics.com · commit 5c34dd8)
+7. **Production smoke test: IN PROGRESS (2026-06-15)** — running now
+8. **Launch announcement copy: not written** — the launch IS the announcement
+9. **hello@catchcomics.com mailbox: unverified** — 5 min, in Privacy Policy and Footer
+10. Search price filter: non-functional UI misleads collectors (30 min fix)
+11. Naruto: blocked (human triage required) · Baki: blocked (ComicVine indexing)
 
 ---
 
