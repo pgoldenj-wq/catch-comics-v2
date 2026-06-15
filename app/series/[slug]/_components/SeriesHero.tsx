@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import type { SeriesEntry }    from '@/lib/series/types'
 import type { SeriesPageData } from '@/lib/series/types'
@@ -16,6 +17,17 @@ export default function SeriesHero({ entry, seriesData }: Props) {
   const fromPrice   = firstVolume?.lowestPrice
     ? `From ${currency}${firstVolume.lowestPrice.toFixed(2)}`
     : null
+
+  // Read-more: clamp the (often very long) Comic Vine synopsis to 4 lines and
+  // reveal the full text inline. The toggle only appears when the text is
+  // actually clamped (measured after mount), so short synopses stay clean.
+  const [expanded, setExpanded]   = useState(false)
+  const [isClamped, setIsClamped] = useState(false)
+  const descRef = useRef<HTMLParagraphElement>(null)
+  useEffect(() => {
+    const el = descRef.current
+    if (el) setIsClamped(el.scrollHeight > el.clientHeight + 2)
+  }, [description])
 
   return (
     <section
@@ -96,20 +108,39 @@ export default function SeriesHero({ entry, seriesData }: Props) {
               )}
             </p>
 
-            {/* Description */}
+            {/* Description — clamped to 4 lines with inline Read more */}
             {description && (
-              <p style={{
-                fontSize: '14px', lineHeight: 1.7,
-                color: 'rgba(255,255,255,0.7)',
-                maxWidth: '560px',
-                marginBottom: '28px',
-                display: '-webkit-box',
-                WebkitLineClamp: 4,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden',
-              }}>
-                {description}
-              </p>
+              <div style={{ maxWidth: '560px', marginBottom: '28px' }}>
+                <p
+                  ref={descRef}
+                  style={{
+                    fontSize: '14px', lineHeight: 1.7,
+                    color: 'rgba(255,255,255,0.7)',
+                    margin: 0,
+                    ...(expanded ? {} : {
+                      display: '-webkit-box',
+                      WebkitLineClamp: 4,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                    }),
+                  }}
+                >
+                  {description}
+                </p>
+                {(isClamped || expanded) && (
+                  <button
+                    onClick={() => setExpanded(v => !v)}
+                    aria-expanded={expanded}
+                    style={{
+                      marginTop: '8px', background: 'none', border: 'none', padding: 0,
+                      color: '#E8272A', fontSize: '13px', fontWeight: 600,
+                      cursor: 'pointer', fontFamily: 'inherit',
+                    }}
+                  >
+                    {expanded ? 'Show less' : 'Read more'}
+                  </button>
+                )}
+              </div>
             )}
 
             {/* CTA */}
