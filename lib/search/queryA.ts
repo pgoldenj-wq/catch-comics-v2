@@ -61,7 +61,7 @@ export async function queryCanonical(
           isbn_13, cover_image_url, canonical_slug, release_date,
           1.0::float4 AS ts_rank, 1.0::float4 AS trgm_sim
         FROM canonical_products
-        WHERE isbn_13 = ${isbnClean}
+        WHERE deleted_at IS NULL AND isbn_13 = ${isbnClean}
         LIMIT 10
       `
     } else {
@@ -71,7 +71,7 @@ export async function queryCanonical(
           isbn_13, cover_image_url, canonical_slug, release_date,
           1.0::float4 AS ts_rank, 1.0::float4 AS trgm_sim
         FROM canonical_products
-        WHERE isbn_10 = ${isbnClean}
+        WHERE deleted_at IS NULL AND isbn_10 = ${isbnClean}
         LIMIT 10
       `
     }
@@ -91,13 +91,20 @@ export async function queryCanonical(
         )::float4 AS trgm_sim
       FROM canonical_products
       WHERE
+        -- Exclude soft-deleted rows (cleanup pollution must not resurface in search).
+        -- NB: the OR group below MUST stay parenthesised — without the parens,
+        -- "deleted_at IS NULL AND A OR B OR C" binds as "(NULL AND A) OR B OR C"
+        -- and leaks deleted rows that match B or C.
+        deleted_at IS NULL
         -- trgm threshold raised from 0.15 → 0.30 to reduce false positives on short queries.
         -- 0.15 matched almost any title sharing 2 trigrams (e.g. "Saga" → unrelated results);
         -- 0.30 requires meaningful trigram overlap while keeping good recall for 6+ char queries.
-        to_tsvector('english', coalesce(title,'') || ' ' || coalesce(series_name,'') || ' ' || coalesce(publisher,''))
-          @@ websearch_to_tsquery('english', ${q})
-        OR similarity(title, ${q}) > 0.30
-        OR coalesce(similarity(series_name, ${q}), 0) > 0.30
+        AND (
+          to_tsvector('english', coalesce(title,'') || ' ' || coalesce(series_name,'') || ' ' || coalesce(publisher,''))
+            @@ websearch_to_tsquery('english', ${q})
+          OR similarity(title, ${q}) > 0.30
+          OR coalesce(similarity(series_name, ${q}), 0) > 0.30
+        )
       ORDER BY ts_rank DESC, trgm_sim DESC
       LIMIT 40
     `

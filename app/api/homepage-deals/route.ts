@@ -8,9 +8,11 @@ import { prisma } from '@/lib/prisma'
  * ordered by number of listings DESC (most-listed = most popular / best value).
  *
  * Only comic-native formats appear on the homepage:
- *   - Any of: SINGLE_ISSUE, MANGA_VOLUME, OMNIBUS, ABSOLUTE, COMPENDIUM, DELUXE
- *   - TPB / HARDCOVER only when the publisher is a known comics publisher
- *   (prevents board games, RPG books, and ambiguous OTHER formats from surfacing)
+ *   - SINGLE_ISSUE, MANGA_VOLUME — inherently comic, allowed unconditionally
+ *   - OMNIBUS / ABSOLUTE / COMPENDIUM / DELUXE / TPB / HARDCOVER — only when the
+ *     publisher is a known comics publisher (these collected-edition formats get
+ *     mis-tagged onto prose classics like "Anna Karenina Deluxe" / "Complete Sherlock Holmes")
+ *   (prevents board games, RPG books, prose classics, and ambiguous OTHER formats from surfacing)
  *
  * Filters:
  *   - cover_image_url IS NOT NULL  (a visual carousel demands images)
@@ -87,18 +89,33 @@ export async function GET() {
           AND rl.stock_status = 'IN_STOCK'
           AND rl.deleted_at IS NULL
         WHERE cp.deleted_at IS NULL
-          AND cp.cover_image_url IS NOT NULL   -- Issue 4: visual carousel demands images
+          -- Issue 4: visual carousel demands images. Also exclude known placeholder
+          -- URLs (mirrors lib/images/url-filters.isBadCoverUrl) so a homepage slot is
+          -- never spent on a product whose only "cover" is a placeholder.
+          AND cp.cover_image_url IS NOT NULL
+          AND cp.cover_image_url NOT ILIKE '%no_image%'
+          AND cp.cover_image_url NOT ILIKE '%not_available%'
+          AND cp.cover_image_url NOT ILIKE '%books.google.com%'
+          AND cp.cover_image_url !~ '/uploads/[^/]+/0/[0-9]+/'
           AND (
-            cp.format IN ('SINGLE_ISSUE','MANGA_VOLUME','OMNIBUS','ABSOLUTE','COMPENDIUM','DELUXE')
+            -- SINGLE_ISSUE and MANGA_VOLUME are inherently comic — allow unconditionally.
+            cp.format IN ('SINGLE_ISSUE','MANGA_VOLUME')
+            -- Collected-edition formats get mis-tagged onto prose classics
+            -- ("Anna Karenina Deluxe", "Complete Sherlock Holmes Omnibus"), so they must
+            -- come from a known comics publisher — the same gate TPB/HARDCOVER already use.
             OR (
-              cp.format IN ('TPB','HARDCOVER')
+              cp.format IN ('OMNIBUS','ABSOLUTE','COMPENDIUM','DELUXE','TPB','HARDCOVER')
               AND cp.publisher IN (
-                'DC Comics','Marvel','Image Comics','Dark Horse Comics','Viz Media',
-                'IDW Publishing','BOOM! Studios','Valiant','Dynamite','Oni Press',
-                'Fantagraphics','Drawn & Quarterly','Top Shelf','Archie Comics',
+                'DC Comics','DC Black Label','Marvel','Marvel Comics','Image Comics',
+                'Dark Horse Comics','Dark Horse Books','Dark Horse Manga','Viz Media','VIZ Media LLC',
+                'IDW Publishing','BOOM! Studios','BOOM! Box','Valiant','Dynamite','Oni Press',
+                'Fantagraphics','Drawn & Quarterly','Drawn and Quarterly','Top Shelf','Archie Comics',
                 'Slave Labor Graphics','Avatar Press','Titan Comics','Rebellion',
-                'Panini','Kodansha','Shueisha','Shogakukan','Square Enix','Yen Press',
-                'Seven Seas','Tokyopop','Del Rey Manga','Vertical','Udon','Antarctic Press'
+                'Panini','Kodansha','Kodansha Comics','Kodansha USA','Shueisha','Shogakukan',
+                'Square Enix','Square Enix Manga','Yen Press','Yen On',
+                'Seven Seas','Tokyopop','Del Rey Manga','Vertical','Udon','Udon Entertainment',
+                'Antarctic Press','Scholastic','Graphix','First Second','Humanoids',
+                'Lion Forge','Papercutz','Ablaze','Vault Comics','Abrams ComicArts'
               )
             )
           )

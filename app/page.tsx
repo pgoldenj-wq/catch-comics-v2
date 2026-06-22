@@ -363,9 +363,11 @@ export default function Home() {
             const price      = isLive
               ? (region === 'uk' ? liveDeal!.lowestPriceGBP : liveDeal!.lowestPriceUSD)
               : (region === 'uk' ? staticDeal!.priceUK : staticDeal!.priceUS)
-            const coverSrc   = isLive
+            const rawCover   = isLive
               ? (liveDeal!.coverImageUrl ?? '')
               : (staticDeal ? (dealCovers[staticDeal.id] || DEAL_FALLBACKS[staticDeal.id] || '') : '')
+            // Strip provider placeholder URLs — parity with the desktop carousel.
+            const coverSrc   = rawCover && !isPlaceholderCoverUrl(rawCover) ? rawCover : ''
             const handleClick = () => isLive
               ? router.push(`/product/${liveDeal!.slug}`)
               : router.push(`/comic/${staticDeal!.id}?region=${region}`)
@@ -377,14 +379,18 @@ export default function Home() {
                 <div style={{ width: '100%', aspectRatio: '2/3', borderRadius: '8px', overflow: 'hidden', background: '#1a1a2e', marginBottom: '8px', position: 'relative' }}>
                   {coverSrc && (
                     <img
-                      src={coverSrc}
+                      src={adjustImgSrc(coverSrc)}
                       alt={title}
                       style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      onLoad={(e) => {
+                        const img = e.currentTarget
+                        if (img.naturalWidth <= 1 || img.naturalHeight <= 1) img.style.display = 'none'
+                      }}
                       onError={(e) => {
-                        const img = e.target as HTMLImageElement
+                        const img = e.currentTarget
                         if (!isLive && staticDeal) {
                           const fb = DEAL_FALLBACKS[staticDeal.id]
-                          if (fb && img.src !== fb) { img.src = fb; return }
+                          if (fb && img.src !== adjustImgSrc(fb)) { img.src = fb; return }
                         }
                         img.style.display = 'none'
                       }}

@@ -55,6 +55,11 @@ next-env.d.ts
 /scripts/reclassify-candidates-strict.json
 /scripts/c-pruned-delete-candidates.json
 
+# Operation Cover Zero — local reversal logs + candidate dumps, not source
+/scripts/.cover-zero-candidates-auto.txt
+/scripts/.cover-zero-cleanup-log-*.json
+/scripts/verify-tier1.ts
+
 # CV enrichment checkpoints — local machine state, not source code
 /scripts/.enrich-catalogue-checkpoint.json
 /scripts/.enrich-catalogue-checkpoint-w2.json
