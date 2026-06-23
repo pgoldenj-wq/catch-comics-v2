@@ -65,8 +65,10 @@ next-env.d.ts
 /scripts/.cover-placeholder-null-log-*.json
 /scripts/.cover-retailer-recovery-log-*.json
 /scripts/.cover-remaining-recovery-log-*.json
+/scripts/.cover-priority-recovery-log-*.json
 /scripts/cover-debug.ts
 /scripts/cover-r2-scan.ts
+/scripts/cover-gap-comics.csv
 
 # CV enrichment checkpoints — local machine state, not source code
 /scripts/.enrich-catalogue-checkpoint.json
