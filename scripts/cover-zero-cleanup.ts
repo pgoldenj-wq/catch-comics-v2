@@ -106,12 +106,16 @@ const ACADEMIC_PUBLISHER_SUBSTR = [
   'martinus nijhoff', 'edward elgar', 'brill', 'mit press',
   'princeton university press', 'yale university press', 'harvard university press',
   'university of chicago press', 'manchester university press', 'bloomsbury academic',
+  'university press',                       // any "* University Press" is academic
+  'wiley', 'rodopi', 'sense publishers', 'cognella', 'gale ecco', 'lawbook exchange',
+  'peter lang', 'vdm verlag', 'lap lambert', 'grin verlag', 'mohr siebeck',
   // public-domain reprint mills (academic/classics scans)
   'creative media partners', 'legare street', 'kessinger', 'palala', 'nabu press',
   'wentworth press', 'hansebooks', 'forgotten books', 'books on demand',
   'bibliolife', 'trieste publishing', 'alpha editions', 'sagwan press',
   'franklin classics', 'scholar select', 'andesite press', 'rarebooksclub',
   'pranava books', 'tredition', 'hachette livre',
+  'tradd street press', 'anson street press', 'hassell street press', 'hutson street press',
 ]
 const isAcademicPublisher = (pub: string | null) =>
   !!pub && ACADEMIC_PUBLISHER_SUBSTR.some(s => pub.toLowerCase().includes(s))
@@ -152,15 +156,20 @@ function classify(row: Row): Flagged | null {
   const pub   = row.publisher
   const title = row.title ?? ''
 
-  // ── Preserve guards (never delete) ──
+  // ── Preserve guards (never delete) — real comic signals only ──
   if (fmt !== 'OTHER') return null                       // only OTHER is eligible
-  if (isComicPublisher(pub)) return null
-  if (hasPreserveSignal(title)) return null
+  if (isComicPublisher(pub)) return null                 // comic publisher always wins
   if (isStrongComic(title, pub)) return null
   if (row.comicvine_id && REGISTRY_CV_IDS.has(row.comicvine_id)) return null
 
-  // ── AUTO tiers ──
-  if (isAcademicPublisher(pub))   return { row, cat: 'CAT1', reason: `academic/reprint publisher: "${pub}"` }
+  // ── CAT1: academic/reprint publisher — a hard non-comic signal that OVERRIDES
+  // the title preserve guard. An academic publisher's "Collected Works" or
+  // "Volume N" is still prose, never a comic. (Comic publisher / strong-comic /
+  // registry are already excluded above, so no real comic reaches here.)
+  if (isAcademicPublisher(pub)) return { row, cat: 'CAT1', reason: `academic/reprint publisher: "${pub}"` }
+
+  // ── Title-based tiers respect the comic preserve guard (vol N / issue / collected). ──
+  if (hasPreserveSignal(title)) return null
   if (hasHardAcademicTitle(title)) return { row, cat: 'CAT2', reason: `academic title pattern` }
 
   // ── REVIEW tiers ──
