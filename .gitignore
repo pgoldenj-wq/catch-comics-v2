@@ -69,6 +69,7 @@ next-env.d.ts
 /scripts/cover-debug.ts
 /scripts/cover-r2-scan.ts
 /scripts/cover-gap-comics.csv
+/scripts/under-ninja-v6.ts
 
 # CV enrichment checkpoints — local machine state, not source code
 /scripts/.enrich-catalogue-checkpoint.json
