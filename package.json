@@ -74,7 +74,8 @@
     "cleanup:noncomics:execute-c": "dotenv -e .env.local -- tsx scripts/cleanup-non-comics.ts --execute-c-pruned",
     "migrate:covers": "dotenv -e .env.local -- tsx scripts/migrate-covers.ts",
     "fix:ext-covers": "dotenv -e .env.local -- tsx scripts/fix-external-covers.ts",
-    "audit:covers": "dotenv -e .env.local -- tsx scripts/audit-covers.ts"
+    "audit:covers": "dotenv -e .env.local -- tsx scripts/audit-covers.ts",
+    "verify:covers": "dotenv -e .env.local -- tsx scripts/cover-r2-fullscan.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1055.0",

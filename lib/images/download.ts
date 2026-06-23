@@ -19,6 +19,7 @@
  */
 
 import { PutObjectCommand }  from '@aws-sdk/client-s3'
+import crypto                 from 'crypto'
 import sharp                  from 'sharp'
 import { prisma }             from '../prisma'
 import { r2Client, R2_BUCKET, R2_PUBLIC_URL } from './r2'
@@ -27,6 +28,19 @@ const MAX_BYTES   = 5 * 1024 * 1024   // 5 MB
 const MAX_WIDTH   = 400
 const WEBP_Q      = 85
 const TIMEOUT_MS  = 10_000
+
+// Known placeholder graphics ("image not available" / "no cover") that some
+// sources (Open Library default, Google Books "no preview") return as a
+// real-sized image. They pass the dimension check but render as a placeholder.
+// sha256[:16] of the processed WebP — captured by scripts/cover-r2-fullscan.ts.
+// Guard below rejects them so we never bake one into R2 or overwrite a good
+// cover with one. Add new signatures here if verify:covers surfaces more.
+const PLACEHOLDER_HASHES = new Set<string>([
+  '06661fd690879985', // Open Library "no cover" (3484b) — 15,313 occurrences
+  '2cafc2b0f16dfe03', // Google Books "no preview" (4558b) — 9,414 occurrences
+  '307a2fbbc46139a8', // misc placeholder (876b)
+  'b3165c10e262603d', // misc placeholder (836b)
+])
 
 // Browser-like headers — defeats Cloudflare anti-scraping on CV and similar CDNs.
 // Tested 2026-05-28: CV currently returns 200 to plain requests, but this is
@@ -123,6 +137,15 @@ export async function downloadAndStoreCover(
       })
       .webp({ quality: WEBP_Q })
       .toBuffer()
+
+    // ── Placeholder guard ─────────────────────────────────────────────────
+    // Reject byte-identical "image not available" / "no cover" graphics so we
+    // never store a placeholder or overwrite an existing good cover with one.
+    const sig = crypto.createHash('sha256').update(processed).digest('hex').slice(0, 16)
+    if (PLACEHOLDER_HASHES.has(sig)) {
+      console.warn(`[r2] Rejected known placeholder image (sha ${sig}) for ${canonicalProductId}: ${fetchUrl}`)
+      return null
+    }
 
     // ── Upload to R2 ────────────────────────────────────────────────────────
     const key = `covers/${canonicalProductId}.webp`

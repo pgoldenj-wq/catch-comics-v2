@@ -15,7 +15,8 @@ import { prisma } from '@/lib/prisma'
  *   (prevents board games, RPG books, prose classics, and ambiguous OTHER formats from surfacing)
  *
  * Filters:
- *   - cover_image_url IS NOT NULL  (a visual carousel demands images)
+ *   - cover_image_url on the R2 CDN (real validated cover; excludes nulls,
+ *     placeholders, and fragile external OL/GB URLs)
  *   - deleted_at IS NULL           (live products only)
  *
  * Series dedup: many series have several canonical_products that share
@@ -92,11 +93,12 @@ export async function GET() {
           -- Issue 4: visual carousel demands images. Also exclude known placeholder
           -- URLs (mirrors lib/images/url-filters.isBadCoverUrl) so a homepage slot is
           -- never spent on a product whose only "cover" is a placeholder.
-          AND cp.cover_image_url IS NOT NULL
-          AND cp.cover_image_url NOT ILIKE '%no_image%'
-          AND cp.cover_image_url NOT ILIKE '%not_available%'
-          AND cp.cover_image_url NOT ILIKE '%books.google.com%'
-          AND cp.cover_image_url !~ '/uploads/[^/]+/0/[0-9]+/'
+          -- Homepage trust: require a real R2-hosted cover. Stored placeholder
+          -- graphics were nulled (scripts/fix-placeholder-covers), and external
+          -- Open Library / Google Books URLs are excluded here because they can
+          -- 404 or themselves be "image not available" placeholders. Guarantees
+          -- the carousel never shows a broken/placeholder card.
+          AND cp.cover_image_url ILIKE 'https://images.catchcomics.com/%'
           AND (
             -- SINGLE_ISSUE and MANGA_VOLUME are inherently comic — allow unconditionally.
             cp.format IN ('SINGLE_ISSUE','MANGA_VOLUME')

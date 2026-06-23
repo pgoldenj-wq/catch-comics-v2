@@ -60,6 +60,12 @@ next-env.d.ts
 /scripts/.cover-zero-cleanup-log-*.json
 /scripts/verify-tier1.ts
 
+# Cover integrity — local reversal logs + throwaway investigation scripts
+/scripts/.cover-placeholder-ids.json
+/scripts/.cover-placeholder-null-log-*.json
+/scripts/cover-debug.ts
+/scripts/cover-r2-scan.ts
+
 # CV enrichment checkpoints — local machine state, not source code
 /scripts/.enrich-catalogue-checkpoint.json
 /scripts/.enrich-catalogue-checkpoint-w2.json
