@@ -432,6 +432,8 @@ function SearchResults() {
   const [loading,    setLoading]    = useState(true)
   const [error,      setError]      = useState('')
   const [didYouMean, setDidYouMean] = useState<string | null>(null)
+  // Fuzzy honesty: true when the server found no strong title match for the query.
+  const [weakMatch, setWeakMatch] = useState(false)
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false)
   // Collected price data from PriceTag callbacks — used for "Lowest price" sort
   const [priceMap, setPriceMap] = useState<Map<string, number | null>>(new Map())
@@ -488,6 +490,7 @@ function SearchResults() {
     setUnmatchedListings([])
     setLooseEbayResults([])
     setDidYouMean(null)
+    setWeakMatch(false)
     setPriceMap(new Map()) // reset prices for new query
     fetch(`/api/search?q=${encodeURIComponent(query)}&region=${region}`)
       .then(res => res.json())
@@ -524,6 +527,7 @@ function SearchResults() {
             }
           )
           setResults(mapped)
+          setWeakMatch((data as { weakMatch?: boolean }).weakMatch ?? false)
           setUnmatchedListings(
             (data.unmatchedListings ?? []).map(
               (r: { id: string; title: string; retailerName: string; retailerUrl: string; priceAmount: number; currency: string; condition: string; imageUrl: string | null }) => ({
@@ -789,6 +793,14 @@ function SearchResults() {
                   <option value="price">Lowest Price</option>
                 </select>
               </div>
+            </div>
+          )}
+
+          {/* Fuzzy honesty: no strong title match — say so rather than presenting
+              the closest fuzzy results as confident answers. */}
+          {weakMatch && !loading && !error && filteredResults.length > 0 && (
+            <div style={{ padding: '12px 16px', borderRadius: '12px', background: '#FFF7ED', border: '1px solid #FED7AA', fontSize: '14px', color: '#9A3412', marginBottom: '16px' }}>
+              No strong match for <span style={{ fontWeight: 600 }}>&ldquo;{query}&rdquo;</span> — showing the closest results below.
             </div>
           )}
 

@@ -53,6 +53,8 @@ export interface CanonicalSearchResult {
   isbn13:       string | null
   coverImageUrl: string | null
   canonicalSlug: string
+  /** Volume number (1-based) when known — drives Vol-1 preference for series queries */
+  volumeNumber: number | null
   releaseDate:  string | null  // ISO date string
   /** Top 5 in-stock offers, sorted cheapest first */
   offers:       SearchOffer[]
@@ -112,6 +114,10 @@ export interface UnifiedSearchResult {
   looseEbayResults:   LooseEbayResult[]
   facets:             SearchFacets
   total:              number
+  /** True when no canonical result strongly matches the query (best title-match
+   *  below the confidence floor). The UI shows an honest "no strong match" state
+   *  instead of presenting weak fuzzy results as confident answers. */
+  weakMatch:          boolean
   /** Debug info (timings, source counts) */
   debug?: {
     durationMs:      number

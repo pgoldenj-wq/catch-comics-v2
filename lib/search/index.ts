@@ -14,7 +14,7 @@
 import { queryCanonical }                    from './queryA'
 import { queryUnmatched }                    from './queryB'
 import { queryEbay }                         from './queryC'
-import { applyScores, isStaleDud }           from './score'
+import { applyScores, isStaleDud, titleMatchSignal, STRONG_MATCH_FLOOR } from './score'
 import { makeCacheKey, shouldBypassCache, getCached, setCached } from './cache'
 import type {
   SearchQuery, UnifiedSearchResult, CanonicalSearchResult,
@@ -160,7 +160,7 @@ export async function unifiedSearch(sq: SearchQuery): Promise<UnifiedSearchResul
   const merged = mergeEbayMatches(rawCanonicals, ebayResult.matched)
 
   // Score + sort. Stale duds sink to the bottom of the canonical bucket.
-  let scored = applyScores(merged)
+  let scored = applyScores(merged, sq.q)
 
   // ISBN exact-match pinning: when the query is a bare ISBN, the first result
   // from queryA already has ts_rank=1.0 / trgm_sim=1.0 (set in queryA), but
@@ -192,6 +192,15 @@ export async function unifiedSearch(sq: SearchQuery): Promise<UnifiedSearchResul
   const facets = computeFacets(canonicals)
   const total  = canonicals.length + unmatched.length + ebayResult.loose.length
 
+  // Fuzzy honesty: the query is a "weak match" when no canonical result strongly
+  // matches the title (best title-match below the floor). ISBN queries are exact
+  // by construction and never weak. The UI uses this to show an honest
+  // "no strong match" state instead of presenting fuzzy results as confident.
+  const weakMatch = !isIsbnQuery(sq.q) && (
+    canonicals.length === 0 ||
+    titleMatchSignal(sq.q, canonicals[0]) < STRONG_MATCH_FLOOR
+  )
+
   const result: UnifiedSearchResult = {
     type:              'unified',
     query:             sq.q,
@@ -200,6 +209,7 @@ export async function unifiedSearch(sq: SearchQuery): Promise<UnifiedSearchResul
     looseEbayResults:  ebayResult.loose,
     facets,
     total,
+    weakMatch,
     debug: {
       durationMs:  Date.now() - start,
       queryACount: rawCanonicals.length,

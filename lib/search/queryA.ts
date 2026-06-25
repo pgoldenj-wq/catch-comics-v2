@@ -21,6 +21,7 @@ interface FtsRow {
   isbn_13:         string | null
   cover_image_url: string | null
   canonical_slug:  string
+  volume_number:   number | null
   release_date:    Date | null
   ts_rank:         number
   trgm_sim:        number
@@ -58,7 +59,7 @@ export async function queryCanonical(
       productRows = await prisma.$queryRaw<FtsRow[]>`
         SELECT
           id, title, series_name, publisher, format::text,
-          isbn_13, cover_image_url, canonical_slug, release_date,
+          isbn_13, cover_image_url, canonical_slug, volume_number, release_date,
           1.0::float4 AS ts_rank, 1.0::float4 AS trgm_sim
         FROM canonical_products
         WHERE deleted_at IS NULL AND isbn_13 = ${isbnClean}
@@ -68,7 +69,7 @@ export async function queryCanonical(
       productRows = await prisma.$queryRaw<FtsRow[]>`
         SELECT
           id, title, series_name, publisher, format::text,
-          isbn_13, cover_image_url, canonical_slug, release_date,
+          isbn_13, cover_image_url, canonical_slug, volume_number, release_date,
           1.0::float4 AS ts_rank, 1.0::float4 AS trgm_sim
         FROM canonical_products
         WHERE deleted_at IS NULL AND isbn_10 = ${isbnClean}
@@ -80,7 +81,7 @@ export async function queryCanonical(
     productRows = await prisma.$queryRaw<FtsRow[]>`
       SELECT
         id, title, series_name, publisher, format::text,
-        isbn_13, cover_image_url, canonical_slug, release_date,
+        isbn_13, cover_image_url, canonical_slug, volume_number, release_date,
         ts_rank(
           to_tsvector('english', coalesce(title,'') || ' ' || coalesce(series_name,'') || ' ' || coalesce(publisher,'')),
           websearch_to_tsquery('english', ${q})
@@ -175,6 +176,7 @@ export async function queryCanonical(
     isbn13:        r.isbn_13,
     coverImageUrl: r.cover_image_url,
     canonicalSlug: r.canonical_slug,
+    volumeNumber:  r.volume_number,
     releaseDate:   r.release_date ? r.release_date.toISOString().slice(0, 10) : null,
     offers:        offersByProduct.get(r.id) ?? [],
     totalOffers:   countsByProduct.get(r.id) ?? 0,
