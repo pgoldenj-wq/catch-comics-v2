@@ -70,6 +70,12 @@ next-env.d.ts
 /scripts/cover-r2-scan.ts
 /scripts/cover-gap-comics.csv
 /scripts/under-ninja-v6.ts
+/scripts/.cover-dead-ol-fix-log-*.json
+/scripts/.cover-live-ol-11-log-*.json
+/scripts/diagnose-cover-gaps.ts
+/scripts/diagnose-ol-direct.ts
+/scripts/diagnose-coverage-honest.ts
+/scripts/verify-ol-fix.ts
 
 # CV enrichment checkpoints — local machine state, not source code
 /scripts/.enrich-catalogue-checkpoint.json

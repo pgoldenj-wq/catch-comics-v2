@@ -23,6 +23,14 @@
  *   - Google Books:                full books.google.com URLs (their "no preview"
  *                                 placeholder is a real-sized JPEG, undetectable
  *                                 at the pixel level — easier to drop the host)
+ *   - Open Library (direct):       bare covers.openlibrary.org hotlinks. OL serves
+ *                                 a 1×1 transparent GIF (HTTP 200) for any ISBN it
+ *                                 lacks — indistinguishable from a real cover at the
+ *                                 URL level, and it renders blank while suppressing
+ *                                 every fallback. Real OL covers are downloaded to
+ *                                 R2 at ingest, so a bare OL URL in a cover field is
+ *                                 always either dead or a fragile hotlink — never
+ *                                 render it directly. (See scripts/fix-dead-ol-covers.ts.)
  */
 export function isBadCoverUrl(url: string | null | undefined): boolean {
   if (!url) return true
@@ -32,6 +40,7 @@ export function isBadCoverUrl(url: string | null | undefined): boolean {
   if (u.includes('not_available'))           return true
   if (/\/uploads\/[^/]+\/0\/\d+\//.test(u)) return true   // CV system placeholder
   if (u.includes('books.google.com'))        return true   // GB "no preview" JPEG
+  if (u.includes('covers.openlibrary.org'))  return true   // OL direct: 1×1 dead GIF / fragile hotlink
   return false
 }
 

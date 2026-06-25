@@ -75,7 +75,8 @@
     "migrate:covers": "dotenv -e .env.local -- tsx scripts/migrate-covers.ts",
     "fix:ext-covers": "dotenv -e .env.local -- tsx scripts/fix-external-covers.ts",
     "audit:covers": "dotenv -e .env.local -- tsx scripts/audit-covers.ts",
-    "verify:covers": "dotenv -e .env.local -- tsx scripts/cover-r2-fullscan.ts"
+    "verify:covers": "dotenv -e .env.local -- tsx scripts/cover-r2-fullscan.ts",
+    "test:url-filters": "tsx scripts/test-url-filters.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1055.0",
