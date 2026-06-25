@@ -51,18 +51,17 @@ const TOP_DEALS: DealItem[] = [
   { id: 72157,  title: 'Hellboy Omnibus Vol. 1',     publisher: 'Dark Horse',   format: 'Omnibus',       priceUK: 19.99, priceUS: 24.99, rrpUK: 24.99, rrpUS: 29.99, searchQuery: 'Hellboy Omnibus Vol 1 Dark Horse Mignola' },
 ];
 
-// Open Library cover fallbacks (ISBN-keyed) for when Comic Vine is slow/unavailable
+// Static R2 cover fallbacks for the Top-Deals carousel before the live,
+// R2-backed /api/homepage-deals resolves (and for when the client-side Comic
+// Vine cover is slow). Only deals whose Vol-1 R2 cover is verified edition-correct
+// are listed; the others fall back to the CV cover then the dark placeholder.
+// No bare Open Library hotlinks — those returned dead 1×1 GIFs (now rejected by
+// isBadCoverUrl), which would have rendered blank here.
 const DEAL_FALLBACKS: Record<number, string> = {
-  796:    'https://covers.openlibrary.org/b/isbn/1401232590-L.jpg',
-  2127:   'https://covers.openlibrary.org/b/isbn/0785115609-L.jpg',
-  31022:  'https://covers.openlibrary.org/b/isbn/1569319014-L.jpg',
-  46568:  'https://covers.openlibrary.org/b/isbn/1607066017-L.jpg',
-  111792: 'https://covers.openlibrary.org/b/isbn/1974717747-L.jpg',
-  2133:   'https://covers.openlibrary.org/b/isbn/0785140425-L.jpg',
-  18166:  'https://covers.openlibrary.org/b/isbn/1582406723-L.jpg',
-  17993:  'https://covers.openlibrary.org/b/isbn/1582402869-L.jpg',
-  18836:  'https://covers.openlibrary.org/b/isbn/1569319006-L.jpg',
-  72157:  'https://covers.openlibrary.org/b/isbn/1593070942-L.jpg',
+  46568: 'https://images.catchcomics.com/covers/b4f6aadd-8c80-4cb5-996b-260b7782905f.webp', // Saga Vol. 1
+  18166: 'https://images.catchcomics.com/covers/5abe044c-6118-4046-83c3-23b12d0cbfbf.webp', // The Walking Dead Vol. 1
+  17993: 'https://images.catchcomics.com/covers/6f46c197-f959-4052-b56b-ef75f17e86e3.webp', // Invincible Vol. 1
+  18836: 'https://images.catchcomics.com/covers/1068612a-c369-45df-b361-ad598397860e.webp', // Naruto Vol. 1
 };
 
 // isBadCoverUrl + adjustImgSrc are imported from lib/images/url-filters (line ~6) —

@@ -40,8 +40,10 @@ interface FeaturedSeries {
 }
 
 // ── Static fallback ────────────────────────────────────────────────────────────
-// OpenLibrary cover URLs used on first paint (ISBNs from Vol 1 of each series).
-// Replaced by /api/series-preview on mount, which returns live R2 covers.
+// R2 hero covers used on first paint (sourced from production getSeriesData, so
+// they match the live series-page hero). Replaced by /api/series-preview on mount.
+// No bare Open Library hotlinks — those returned dead 1×1 GIFs (now rejected by
+// isBadCoverUrl) and rendered blank over the letter fallback.
 
 const SERIES_FALLBACK: FeaturedSeries[] = [
   {
@@ -49,42 +51,42 @@ const SERIES_FALLBACK: FeaturedSeries[] = [
     displayName:  'Saga',
     publisher:    'Image Comics',
     volumeCount:  11,
-    heroCoverUrl: 'https://covers.openlibrary.org/b/isbn/9781607066019-L.jpg',
+    heroCoverUrl: 'https://images.catchcomics.com/covers/b4f6aadd-8c80-4cb5-996b-260b7782905f.webp',
   },
   {
     slug:         'the-walking-dead',
     displayName:  'The Walking Dead',
     publisher:    'Image Comics',
     volumeCount:  27,
-    heroCoverUrl: 'https://covers.openlibrary.org/b/isbn/9781582406724-L.jpg',
+    heroCoverUrl: 'https://images.catchcomics.com/covers/5abe044c-6118-4046-83c3-23b12d0cbfbf.webp',
   },
   {
     slug:         'invincible',
     displayName:  'Invincible',
     publisher:    'Image Comics',
     volumeCount:  11,
-    heroCoverUrl: 'https://covers.openlibrary.org/b/isbn/9781582402697-L.jpg',
+    heroCoverUrl: 'https://images.catchcomics.com/covers/6f46c197-f959-4052-b56b-ef75f17e86e3.webp',
   },
   {
     slug:         'witch-hat-atelier',
     displayName:  'Witch Hat Atelier',
     publisher:    'Kodansha Comics',
     volumeCount:  14,
-    heroCoverUrl: 'https://covers.openlibrary.org/b/isbn/9781632368072-L.jpg',
+    heroCoverUrl: 'https://images.catchcomics.com/covers/710a5b46-9207-462f-991f-6596b4f4fb11.webp',
   },
   {
     slug:         'trigun-maximum-deluxe',
     displayName:  'Trigun Maximum Deluxe Edition',
     publisher:    'Dark Horse Comics',
     volumeCount:  5,
-    heroCoverUrl: 'https://covers.openlibrary.org/b/isbn/9781506722429-L.jpg',
+    heroCoverUrl: 'https://images.catchcomics.com/covers/20a0cf50-07e9-4671-ae07-ff0dc647480d.webp',
   },
   {
     slug:         'hellsing',
     displayName:  'Hellsing',
     publisher:    'Dark Horse Comics',
     volumeCount:  10,
-    heroCoverUrl: 'https://covers.openlibrary.org/b/isbn/9781593070342-L.jpg',
+    heroCoverUrl: 'https://images.catchcomics.com/covers/d85e5969-0cdb-4bde-9a42-8be9e44d48b9.webp',
   },
 ]
 

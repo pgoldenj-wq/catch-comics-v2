@@ -29,6 +29,7 @@ eq('null is bad',                  isBadCoverUrl(null), true)
 
 // ── adjustImgSrc still appends ?default=false to OL (defence in depth) ──
 eq('adjustImgSrc appends default=false', adjustImgSrc('https://covers.openlibrary.org/b/isbn/1-L.jpg'), 'https://covers.openlibrary.org/b/isbn/1-L.jpg?default=false')
+eq('adjustImgSrc appends &default=false when query exists', adjustImgSrc('https://covers.openlibrary.org/b/isbn/1-L.jpg?size=L'), 'https://covers.openlibrary.org/b/isbn/1-L.jpg?size=L&default=false')
 eq('adjustImgSrc leaves R2 untouched',   adjustImgSrc('https://images.catchcomics.com/covers/a.webp'), 'https://images.catchcomics.com/covers/a.webp')
 
 console.log(`\n${fail === 0 ? '✓ ALL PASS' : '✗ FAILURES'}  (${pass} passed, ${fail} failed)`)

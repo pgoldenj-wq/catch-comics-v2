@@ -76,6 +76,7 @@ next-env.d.ts
 /scripts/diagnose-ol-direct.ts
 /scripts/diagnose-coverage-honest.ts
 /scripts/verify-ol-fix.ts
+/scripts/lookup-fallback-r2.ts
 
 # CV enrichment checkpoints — local machine state, not source code
 /scripts/.enrich-catalogue-checkpoint.json

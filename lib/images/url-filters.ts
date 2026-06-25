@@ -48,6 +48,12 @@ export function isBadCoverUrl(url: string | null | undefined): boolean {
  * Open Library serves a 1×1 transparent GIF (HTTP 200) when an ISBN isn't in
  * its cover database. Appending ?default=false makes OL return 404 instead,
  * which lets <img onError> + the letter-initial fallback fire correctly.
+ *
+ * Note: isBadCoverUrl() now rejects bare covers.openlibrary.org URLs from cover
+ * fields, so in normal rendering an OL URL never reaches here. This remains as
+ * defence-in-depth for the few intentional static OL fallbacks that bypass the
+ * filter — if one slips through, ?default=false guarantees onError fires rather
+ * than a silent blank 1×1.
  */
 export function adjustImgSrc(url: string): string {
   if (url.includes('covers.openlibrary.org')) {
