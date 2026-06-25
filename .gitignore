@@ -81,6 +81,7 @@ next-env.d.ts
 /scripts/audit-product-pages.ts
 /scripts/audit-amm-wof.ts
 /scripts/get-wof-slugs.ts
+/scripts/verify-issue-gate.ts
 
 # CV enrichment checkpoints — local machine state, not source code
 /scripts/.enrich-catalogue-checkpoint.json
