@@ -82,6 +82,21 @@ export default function IssueListGrid({
   // Silent collapse — no header, no empty state
   if (issues.length === 0) return null
 
+  // ── Quality gate ─────────────────────────────────────────────────────────
+  // The issue list comes from a live Comic Vine volume (resolved by id or by a
+  // fuzzy title search). When that resolution lands on the WRONG volume — or on
+  // an obscure one CV has no issue art for — the grid renders as mostly-blank
+  // "#N" cards (e.g. "Winter Turning" resolved to a 1988 series: 21/29 blank).
+  // That looks broken. If the MAJORITY of issues lack usable artwork, the match
+  // is untrustworthy, so collapse the rail entirely rather than show broken
+  // cards. A correctly-matched volume (issue art present) renders normally.
+  // Isolated to this component — does not touch DB covers or the cover pipeline.
+  const withArt = issues.filter(i => {
+    const u = i.image?.medium_url || i.image?.small_url || ''
+    return !!u && !isBadCoverUrl(u)
+  }).length
+  if (withArt < issues.length / 2) return null
+
   return (
     <div>
       {label && <SectionHeader label={label} count={issues.length} />}

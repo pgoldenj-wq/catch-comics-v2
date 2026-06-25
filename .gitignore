@@ -78,6 +78,9 @@ next-env.d.ts
 /scripts/verify-ol-fix.ts
 /scripts/lookup-fallback-r2.ts
 /scripts/verify-named-final.ts
+/scripts/audit-product-pages.ts
+/scripts/audit-amm-wof.ts
+/scripts/get-wof-slugs.ts
 
 # CV enrichment checkpoints — local machine state, not source code
 /scripts/.enrich-catalogue-checkpoint.json
