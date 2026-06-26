@@ -1,17 +1,21 @@
 /**
  * Unified Search — composite result scoring.
  *
- * Formula (weights sum to 1.0):
- *   textRank    × 0.55  — FTS + trgm signal from Postgres (primary signal)
- *   recency     × 0.15  — how recently the product was released
- *   offerCount  × 0.12  — log-damped in-stock offer count (boost, not gate)
- *   stockAvail  × 0.10  — fraction of offers that are in-stock
- *   trustScore  × 0.08  — average retailer trust score across offers
+ * Formula (weights sum to 1.0), then minus editionPenalty (0 or 0.5, applied
+ * OUTSIDE the weighted sum to demote off-type editions):
+ *   titleMatch  × 0.60  — exact/phrase/prefix/token relevance (dominant signal)
+ *   volPref     × 0.22  — Vol-1 / lowest-volume / canonical-edition preference
+ *   textRank    × 0.08  — Postgres FTS + trgm signal (secondary)
+ *   recency     × 0.03  — how recently the product was released
+ *   offerCount  × 0.03  — log-damped in-stock offer count (boost, not gate)
+ *   stockAvail  × 0.02  — fraction of offers that are in-stock
+ *   trustScore  × 0.02  — average retailer trust score across offers
  *
- * Philosophy: text relevance drives ranking. Pricing signals are a boost
- * for products that happen to be priced, not a penalty for unlisted ones.
- * A well-matched catalogue entry (no current price) should outrank a
- * weakly-matched priced result.
+ * Philosophy: TITLE relevance drives ranking; for a bare series query the volume
+ * preference steers a new reader to Volume 1 / the canonical mainline edition.
+ * Pricing/recency signals are light boosts, never strong enough to lift a fuzzy
+ * or supplementary match above an exact mainline one. A well-matched catalogue
+ * entry (no current price) still outranks a weakly-matched priced result.
  *
  * isStaleDud: products with no in-stock offers are catalogue entries and
  * are NOT demoted below eBay scrapes. They sort by score like everything
@@ -101,11 +105,14 @@ function coreTitle(s: string): string {
 /**
  * titleMatchSignal: how strongly the query matches this product's title/series.
  *   1.00 exact   — query equals the title core or series name
- *   0.90 prefix  — title starts with the query
- *   0.75 phrase  — title contains the full query phrase
- *   0.55 tokens  — every query token appears in the title
+ *   0.80 prefix  — title starts with the query (heavily rewarded, but exact wins)
+ *   0.72 phrase  — multi-word query appears as a contiguous phrase in the title
+ *   0.55 tokens  — every token of a MULTI-word query appears in the title
+ *   0.50 tokens  — a single-word query buried in the title (at the weak floor)
  *   ≤0.30 partial token overlap   ·   0 = no meaningful overlap
- * Leading articles ("The Sandman" vs "sandman") are matched both ways.
+ * Leading articles ("The Sandman" vs "sandman") are matched both ways. The
+ * STRONG_MATCH_FLOOR (0.5) and volumePreference's 0.7 gate are downstream of
+ * these tiers — retune together.
  */
 export function titleMatchSignal(
   query: string,
@@ -145,7 +152,11 @@ export function titleMatchSignal(
   if (!qTokens.length) return 0
   const haystack = new Set(normTitle(`${r.title} ${r.seriesName ?? ''}`).split(' ').filter(Boolean))
   const hits = qTokens.filter(w => haystack.has(w)).length
-  if (hits === qTokens.length) return multiWord ? 0.55 : 0.45  // single buried word = weak
+  // All query tokens present: a real (if not exact) match. Single-word queries
+  // land exactly AT the floor (0.5) — NOT flagged weak (a buried but correct hit
+  // like "The Complete Maus" for "maus" must not show the no-match banner), yet
+  // still rank below exact/prefix/phrase. Multi-word all-tokens scores higher.
+  if (hits === qTokens.length) return multiWord ? 0.55 : STRONG_MATCH_FLOOR
   return 0.30 * (hits / qTokens.length)
 }
 

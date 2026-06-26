@@ -64,8 +64,9 @@ ok('exact core match = 1.0', titleMatchSignal('saga', mk('Saga Volume 1', { seri
 ok('article-insensitive (sandman ~ The Sandman)', titleMatchSignal('sandman', mk('The Sandman Volume 1', { seriesName: 'The Sandman' })) >= 0.9)
 ok('phrase match strong (>= 0.7, beats fuzzy)', titleMatchSignal('dark knight returns', mk('Batman: The Dark Knight Returns')) >= 0.7)
 ok('exact decisively beats prefix', titleMatchSignal('saga', mk('Saga', { seriesName: 'Saga' })) - titleMatchSignal('saga', mk('Saga: Special Story')) >= 0.15)
-ok('weak: maus vs Di Di Mau below floor', titleMatchSignal('maus', mk('Di Di Mau')) < STRONG_MATCH_FLOOR)
-ok('weak: blade vs Blood Blade below floor (token-partial)', titleMatchSignal('blade', mk('Blood Blade Volume 2')) < STRONG_MATCH_FLOOR)
+ok('weak: maus vs Di Di Mau below floor (no token hit)', titleMatchSignal('maus', mk('Di Di Mau')) < STRONG_MATCH_FLOOR)
+ok('single buried word lands AT floor, not below (not falsely weak)', titleMatchSignal('blade', mk('Blood Blade Volume 2')) === STRONG_MATCH_FLOOR)
+ok('correct buried single-word match (The Complete Maus) is NOT weak', titleMatchSignal('maus', mk('The Complete Maus')) >= STRONG_MATCH_FLOOR)
 ok('strong: exact one-word series at/above floor', titleMatchSignal('watchmen', mk('Watchmen: DC Compact Comics Edition')) >= STRONG_MATCH_FLOOR)
 
 // 8. parseVolumeFromTitle — the fallback for products with a NULL volumeNumber column

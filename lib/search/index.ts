@@ -196,10 +196,14 @@ export async function unifiedSearch(sq: SearchQuery): Promise<UnifiedSearchResul
   // matches the title (best title-match below the floor). ISBN queries are exact
   // by construction and never weak. The UI uses this to show an honest
   // "no strong match" state instead of presenting fuzzy results as confident.
-  const weakMatch = !isIsbnQuery(sq.q) && (
-    canonicals.length === 0 ||
-    titleMatchSignal(sq.q, canonicals[0]) < STRONG_MATCH_FLOOR
-  )
+  // Use the STRONGEST title match across the whole set, not canonicals[0]: the
+  // top-by-composite-score result isn't necessarily the best title match (volume
+  // preference can reorder), and this stays correct if offer-staleness ever
+  // reorders the bucket. weakMatch means "nothing in the catalogue matches well".
+  const bestTitleMatch = canonicals.length
+    ? Math.max(...canonicals.map(c => titleMatchSignal(sq.q, c)))
+    : 0
+  const weakMatch = !isIsbnQuery(sq.q) && bestTitleMatch < STRONG_MATCH_FLOOR
 
   const result: UnifiedSearchResult = {
     type:              'unified',
