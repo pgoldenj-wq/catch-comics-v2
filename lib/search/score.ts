@@ -125,15 +125,18 @@ export function titleMatchSignal(
     cands.add(coreTitle(base)); cands.add(stripArticle(coreTitle(base)))
   }
 
-  // exact (title core / series equals the query)
+  // exact (title core / series equals the query) — must DECISIVELY beat prefix so
+  // the mainline Vol 1 outranks supplementary editions that merely start with the
+  // query ("Witch Hat Atelier: Grimoire Edition", "One Piece: Law's Story").
   for (const c of cands) if (variants.includes(c)) return 1.0
-  // prefix (title starts with the query word/phrase)
-  for (const c of cands) if (variants.some(v => c.startsWith(`${v} `))) return 0.9
+  // prefix (title starts with the query word/phrase) — heavily rewarded, but the
+  // gap below exact is wide enough that recency/offers can't flip an exact match.
+  for (const c of cands) if (variants.some(v => c.startsWith(`${v} `))) return 0.8
   // phrase containment — only a STRONG signal for multi-word queries. A single
   // word buried mid-title ("blade" in "Blood Blade") is weak, not a phrase match.
   if (multiWord) {
     for (const c of cands) {
-      if (variants.some(v => c.includes(` ${v} `) || c.endsWith(` ${v}`))) return 0.75
+      if (variants.some(v => c.includes(` ${v} `) || c.endsWith(` ${v}`))) return 0.72
     }
   }
 
