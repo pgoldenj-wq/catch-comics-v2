@@ -84,6 +84,7 @@ next-env.d.ts
 /scripts/verify-issue-gate.ts
 /scripts/diagnose-search-relevance.ts
 /scripts/corpus-search-rank.ts
+/scripts/diagnose-vol-pref.ts
 
 # CV enrichment checkpoints — local machine state, not source code
 /scripts/.enrich-catalogue-checkpoint.json
