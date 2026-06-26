@@ -152,11 +152,20 @@ export const STRONG_MATCH_FLOOR = 0.5
 // ── Volume-1 / canonical-edition preference ───────────────────────────────────
 // For a strong series/title match (a bare series query), steer toward the place
 // a new reader begins: Volume 1, then lowest volume, then standalone editions.
-function volumePreference(volumeNumber: number | null, titleMatch: number): number {
+
+/** Volume number parsed from a title ("...Volume 110" / "...Vol. 41") — fallback
+ *  for the many products whose DB volumeNumber column is null. */
+export function parseVolumeFromTitle(title: string): number | null {
+  const m = title.match(/\bvol(?:ume)?\.?\s*(\d{1,4})\b/i)
+  return m ? parseInt(m[1], 10) : null
+}
+
+function volumePreference(volumeNumber: number | null, title: string, titleMatch: number): number {
   if (titleMatch < 0.7) return 0.5                      // not a series match — neutral
-  if (volumeNumber === null) return 0.85                // standalone / canonical edition
-  if (volumeNumber <= 1) return 1.0                     // Volume 1
-  return Math.max(0.1, 1.0 - (volumeNumber - 1) * 0.06) // later volumes decay
+  const vol = volumeNumber ?? parseVolumeFromTitle(title)
+  if (vol === null) return 0.85                         // standalone / canonical edition
+  if (vol <= 1) return 1.0                              // Volume 1
+  return Math.max(0.1, 1.0 - (vol - 1) * 0.06)          // later volumes decay
 }
 
 // ── Off-type edition demotion ─────────────────────────────────────────────────
@@ -172,7 +181,7 @@ function editionPenalty(title: string, query: string): number {
 export function scoreCanonical(result: CanonicalSearchResult, query: string): number {
   const titleMatch = titleMatchSignal(query, result)
   const textRank   = textRankSignal(result.score)
-  const volPref    = volumePreference(result.volumeNumber, titleMatch)
+  const volPref    = volumePreference(result.volumeNumber, result.title, titleMatch)
   const offerCount = offerCountSignal(result.totalOffers)
   const recency    = recencySignal(result.releaseDate)
   const stockAvail = stockAvailSignal(result.offers)

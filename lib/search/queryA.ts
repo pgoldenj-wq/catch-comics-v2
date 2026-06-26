@@ -107,7 +107,10 @@ export async function queryCanonical(
           OR coalesce(similarity(series_name, ${q}), 0) > 0.30
         )
       ORDER BY ts_rank DESC, trgm_sim DESC
-      LIMIT 40
+      -- Recall headroom: large series (e.g. Saga + 58 single issues) can crowd
+      -- Volume 1 out of a 40-row cut, so it never reaches the relevance scorer.
+      -- 80 keeps the full series in-set; composite scoring then sorts it.
+      LIMIT 80
     `
   }
 

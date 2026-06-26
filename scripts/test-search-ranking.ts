@@ -3,7 +3,7 @@
  *  edition demotion, article-insensitive matching, fuzzy-honesty floor.
  *    npx tsx scripts/test-search-ranking.ts   (npm run test:search-ranking)
  */
-import { applyScores, titleMatchSignal, STRONG_MATCH_FLOOR } from '../lib/search/score'
+import { applyScores, titleMatchSignal, parseVolumeFromTitle, STRONG_MATCH_FLOOR } from '../lib/search/score'
 import type { CanonicalSearchResult } from '../lib/search/types'
 
 let pass = 0, fail = 0
@@ -66,6 +66,19 @@ ok('phrase match >= 0.75', titleMatchSignal('dark knight returns', mk('Batman: T
 ok('weak: maus vs Di Di Mau below floor', titleMatchSignal('maus', mk('Di Di Mau')) < STRONG_MATCH_FLOOR)
 ok('weak: blade vs Blood Blade below floor (token-partial)', titleMatchSignal('blade', mk('Blood Blade Volume 2')) < STRONG_MATCH_FLOOR)
 ok('strong: exact one-word series at/above floor', titleMatchSignal('watchmen', mk('Watchmen: DC Compact Comics Edition')) >= STRONG_MATCH_FLOOR)
+
+// 8. parseVolumeFromTitle — the fallback for products with a NULL volumeNumber column
+ok('parse Volume 110', parseVolumeFromTitle('One Piece Volume 110') === 110)
+ok('parse Vol. 41', parseVolumeFromTitle('Berserk, Vol. 41') === 41)
+ok('parse Volume 1 from edition title', parseVolumeFromTitle('The Sandman Volume 1 30th Anniversary Edition') === 1)
+ok('parse none from colouring book', parseVolumeFromTitle('Witch Hat Atelier Colouring Book') === null)
+
+// 9. Title-parse fallback drives Vol-1 preference when DB volumeNumber is NULL
+//    (real bug: "One Piece Volume 110"/"...Volume 1" both had null volumeNumber)
+ok('vol 1 beats vol 110 via title-parse (both null volumeNumber)', top('one piece', [
+  mk('One Piece Volume 110', { seriesName: 'One Piece', volumeNumber: null, releaseDate: '2026-01-01', totalOffers: 12 }),
+  mk('One Piece Volume 1',   { seriesName: 'One Piece', volumeNumber: null, releaseDate: '2010-01-01', totalOffers: 3 }),
+]) === 'One Piece Volume 1')
 
 console.log(`\n${fail === 0 ? '✓ ALL PASS' : '✗ FAILURES'}  (${pass} passed, ${fail} failed)`)
 process.exit(fail === 0 ? 0 : 1)
