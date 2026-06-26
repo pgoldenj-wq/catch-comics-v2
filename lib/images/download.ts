@@ -5,7 +5,7 @@
  *   1. Skip if already on R2
  *   2. Download from external CDN (10s timeout, 5MB cap)
  *      — uses browser-like headers to defeat anti-scraping (CV Cloudflare etc.)
- *   3. Process with sharp → WebP 400px max-width, quality 85
+ *   3. Process with sharp → WebP 1000px max-width, quality 85
  *   4. Upload to R2 at covers/{productId}.webp
  *   5. Update canonical_products.cover_image_url
  *   6. Return new R2 URL, or null on any failure (never throws)
@@ -25,7 +25,12 @@ import { prisma }             from '../prisma'
 import { r2Client, R2_BUCKET, R2_PUBLIC_URL } from './r2'
 
 const MAX_BYTES   = 5 * 1024 * 1024   // 5 MB
-const MAX_WIDTH   = 400
+// 1000px wide captures the full resolution of our best free source — ISBN-keyed
+// Shopify retailer images are ~975-1011px wide (1500px tall, the "_SL1500"
+// variant). 400px was too low: it threw away that resolution and rendered soft
+// when cards hover-zoom (~3x) or on retina. withoutEnlargement still prevents
+// upscaling genuinely small sources. WebP q85 at ~1000x1500 ≈ 150-300KB.
+const MAX_WIDTH   = 1000
 const WEBP_Q      = 85
 const TIMEOUT_MS  = 10_000
 
