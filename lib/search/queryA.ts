@@ -5,7 +5,7 @@
  * using websearch_to_tsquery (phrase-aware FTS) plus pg_trgm similarity for
  * typo tolerance. Hydrates each result with up to 5 in-stock offers.
  *
- * Returns at most 40 canonical products. Scoring/ranking is done in score.ts.
+ * Returns at most 80 canonical products. Scoring/ranking is done in score.ts.
  */
 
 import { prisma } from '@/lib/prisma'
@@ -39,6 +39,7 @@ interface ListingRow {
   condition:      string
   trust_score:    number
   last_seen_at:   Date
+  total_offers:   number  // full in-stock offer count for the product (window COUNT)
 }
 
 export async function queryCanonical(
@@ -118,31 +119,56 @@ export async function queryCanonical(
 
   const productIds = productRows.map(r => r.id)
 
-  // Hydrate offers — up to 5 IN_STOCK listings per product, cheapest first
+  // Hydrate offers — up to 5 IN_STOCK listings per product, cheapest first.
+  // ROW_NUMBER caps to 5 rows per product *in the database* so a popular volume
+  // with dozens of active listings transfers 5 rows, not all of them. COUNT(*)
+  // OVER the same partition rides the true full offer count along on each row,
+  // preserving the totalOffers semantics without a second round-trip.
   const listingRows = await prisma.$queryRaw<ListingRow[]>`
+    WITH ranked AS (
+      SELECT
+        rl.id,
+        rl.canonical_product_id,
+        rl.retailer_id,
+        ret.name AS retailer_name,
+        rl.retailer_url,
+        rl.price_amount,
+        rl.price_currency,
+        rl.stock_status,
+        rl.condition,
+        ret.trust_score,
+        rl.last_seen_at,
+        ROW_NUMBER() OVER (PARTITION BY rl.canonical_product_id ORDER BY rl.price_amount ASC) AS rn,
+        COUNT(*)     OVER (PARTITION BY rl.canonical_product_id)                              AS total_offers
+      FROM retailer_listings rl
+      JOIN retailers ret ON ret.id = rl.retailer_id
+      WHERE
+        rl.canonical_product_id = ANY(${productIds}::uuid[])
+        AND rl.stock_status IN ('IN_STOCK', 'LOW_STOCK', 'PREORDER')
+        AND rl.deleted_at IS NULL
+        AND ret.is_active = true
+    )
     SELECT
-      rl.id,
-      rl.canonical_product_id,
-      rl.retailer_id,
-      ret.name AS retailer_name,
-      rl.retailer_url,
-      rl.price_amount::text,
-      rl.price_currency,
-      rl.stock_status::text,
-      rl.condition::text,
-      ret.trust_score,
-      rl.last_seen_at
-    FROM retailer_listings rl
-    JOIN retailers ret ON ret.id = rl.retailer_id
-    WHERE
-      rl.canonical_product_id = ANY(${productIds}::uuid[])
-      AND rl.stock_status IN ('IN_STOCK', 'LOW_STOCK', 'PREORDER')
-      AND rl.deleted_at IS NULL
-      AND ret.is_active = true
-    ORDER BY rl.canonical_product_id, rl.price_amount ASC
+      id,
+      canonical_product_id,
+      retailer_id,
+      retailer_name,
+      retailer_url,
+      price_amount::text,
+      price_currency,
+      stock_status::text,
+      condition::text,
+      trust_score,
+      last_seen_at,
+      total_offers::int
+    FROM ranked
+    WHERE rn <= 5
+    ORDER BY canonical_product_id, rn
   `
 
-  // Group offers by canonical product id (cap at 5 per product)
+  // Group offers by canonical product id. The DB already capped each product to
+  // its 5 cheapest in-stock listings (rn <= 5) and attached the full count via
+  // total_offers, so we just collect rows and read the count off any of them.
   const offersByProduct = new Map<string, SearchOffer[]>()
   const countsByProduct = new Map<string, number>()
 
@@ -150,23 +176,21 @@ export async function queryCanonical(
     const pid = row.canonical_product_id
     const list = offersByProduct.get(pid) ?? []
 
-    countsByProduct.set(pid, (countsByProduct.get(pid) ?? 0) + 1)
+    countsByProduct.set(pid, row.total_offers)
 
-    if (list.length < 5) {
-      list.push({
-        listingId:    row.id,
-        retailerId:   row.retailer_id,
-        retailerName: row.retailer_name,
-        retailerUrl:  row.retailer_url,
-        priceAmount:  parseFloat(row.price_amount),
-        currency:     row.price_currency,
-        stockStatus:  row.stock_status,
-        condition:    row.condition,
-        trustScore:   row.trust_score,
-        lastSeenAt:   row.last_seen_at.toISOString(),
-      })
-      offersByProduct.set(pid, list)
-    }
+    list.push({
+      listingId:    row.id,
+      retailerId:   row.retailer_id,
+      retailerName: row.retailer_name,
+      retailerUrl:  row.retailer_url,
+      priceAmount:  parseFloat(row.price_amount),
+      currency:     row.price_currency,
+      stockStatus:  row.stock_status,
+      condition:    row.condition,
+      trustScore:   row.trust_score,
+      lastSeenAt:   row.last_seen_at.toISOString(),
+    })
+    offersByProduct.set(pid, list)
   }
 
   return productRows.map(r => ({
