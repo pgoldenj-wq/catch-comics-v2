@@ -166,8 +166,13 @@ export function parseVolumeFromTitle(title: string): number | null {
 function volumePreference(volumeNumber: number | null, title: string, titleMatch: number): number {
   if (titleMatch < 0.7) return 0.5                      // not a series match — neutral
   const vol = volumeNumber ?? parseVolumeFromTitle(title)
-  if (vol === null) return 0.85                         // standalone / canonical edition
-  if (vol <= 1) return 1.0                              // Volume 1
+  // No volume number on a strong series match usually means a supplementary
+  // product (side story, art/Grimoire edition, box set) — NOT where a new reader
+  // starts. Demote it below the numbered volumes so mainline Vol 1 wins. A truly
+  // standalone canonical edition (e.g. Watchmen) has no in-series competition, so
+  // its lower absolute score doesn't affect its rank.
+  if (vol === null) return 0.55
+  if (vol <= 1) return 1.0                              // Volume 1 — the place to start
   return Math.max(0.1, 1.0 - (vol - 1) * 0.06)          // later volumes decay
 }
 
@@ -191,15 +196,17 @@ export function scoreCanonical(result: CanonicalSearchResult, query: string): nu
   const trust      = trustSignal(result.offers)
   const penalty    = editionPenalty(result.title, query)
 
-  // Title relevance dominates; volume preference steers series queries to Vol 1;
-  // recency/offers/trust are light boosts. Weights (excl. penalty) sum to 1.0.
+  // Title relevance dominates; volume preference is weighted strongly enough that,
+  // among products sharing a series name (all title-match 1.0), the mainline Vol 1
+  // decisively beats supplementary no-volume editions even when those are newer or
+  // better-stocked. Recency/offers/trust are light boosts. Weights sum to 1.0.
   return (
     titleMatch * 0.60 +
-    textRank   * 0.12 +
-    volPref    * 0.15 +
-    recency    * 0.04 +
-    offerCount * 0.04 +
-    stockAvail * 0.03 +
+    volPref    * 0.22 +
+    textRank   * 0.08 +
+    recency    * 0.03 +
+    offerCount * 0.03 +
+    stockAvail * 0.02 +
     trust      * 0.02
   ) - penalty
 }

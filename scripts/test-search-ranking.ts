@@ -81,5 +81,19 @@ ok('vol 1 beats vol 110 via title-parse (both null volumeNumber)', top('one piec
   mk('One Piece Volume 1',   { seriesName: 'One Piece', volumeNumber: null, releaseDate: '2010-01-01', totalOffers: 3 }),
 ]) === 'One Piece Volume 1')
 
+// 10. Supplementary no-volume edition sharing the series name loses to Vol 1
+//     (real bug: "One Piece: Law's Story" / "Witch Hat Atelier: Grimoire Edition"
+//      both have seriesName == query -> exact 1.0, separated only by volPref)
+ok('Vol 1 beats side-story sharing series name (newer + stocked)', top('one piece', [
+  mk("One Piece: Law's Story", { seriesName: 'One Piece', volumeNumber: null, releaseDate: '2026-01-01', totalOffers: 12,
+    offers: [{ listingId: 'x', retailerId: 'r', retailerName: 'eBay', retailerUrl: 'u', priceAmount: 5, currency: 'GBP', stockStatus: 'IN_STOCK', condition: 'NEW', trustScore: 90, lastSeenAt: new Date().toISOString() }] }),
+  mk('One Piece, Vol. 1 Volume 1', { seriesName: 'One Piece', volumeNumber: 1, releaseDate: '2010-01-01', totalOffers: 1 }),
+]) === 'One Piece, Vol. 1 Volume 1')
+
+ok('Vol 1 beats art/grimoire edition sharing series name', top('witch hat atelier', [
+  mk('Witch Hat Atelier: Grimoire Edition 2', { seriesName: 'Witch Hat Atelier', volumeNumber: null, releaseDate: '2025-01-01', totalOffers: 10 }),
+  mk('Witch Hat Atelier, Volume 1', { seriesName: 'Witch Hat Atelier', volumeNumber: 1, releaseDate: '2019-01-01' }),
+]) === 'Witch Hat Atelier, Volume 1')
+
 console.log(`\n${fail === 0 ? '✓ ALL PASS' : '✗ FAILURES'}  (${pass} passed, ${fail} failed)`)
 process.exit(fail === 0 ? 0 : 1)
