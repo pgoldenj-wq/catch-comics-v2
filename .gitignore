@@ -87,6 +87,7 @@ next-env.d.ts
 /scripts/diagnose-vol-pref.ts
 /scripts/diagnose-cover-quality.ts
 /scripts/diagnose-quality-cohorts.ts
+/scripts/audit-comic-widths.ts
 /scripts/.cover-upgrade-log-*.json
 
 # CV enrichment checkpoints — local machine state, not source code
