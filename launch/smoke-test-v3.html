@@ -1,0 +1,2184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Catch Comics — Smoke Test V3 · QA & Launch Hub</title>
+<style>
+/* ════════════════════════════════════════════════════════════════
+   CATCH COMICS — SMOKE TEST V3
+   Self-contained QA, launch-testing & verification hub.
+   No build step, no dependencies, works from file://.
+   ════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Brand */
+  --brand: #E8272A;
+  --brand-dark: #B91C1C;
+
+  /* Severity (colour + always paired with icon/label in markup) */
+  --p0: #DC2626; --p0-bg: #FEF2F2; --p0-bd: #FCA5A5;
+  --p1: #EA580C; --p1-bg: #FFF7ED; --p1-bd: #FDBA74;
+  --p2: #B45309; --p2-bg: #FFFBEB; --p2-bd: #FCD34D;
+  --p3: #2563EB; --p3-bg: #EFF6FF; --p3-bd: #93C5FD;
+  --pos: #16A34A; --pos-bg: #F0FDF4; --pos-bd: #86EFAC;
+
+  /* Annotation stroke colours */
+  --c-red: #DC2626; --c-orange: #EA580C; --c-yellow: #EAB308;
+  --c-blue: #2563EB; --c-green: #16A34A;
+
+  /* Status */
+  --st-open: #6B7280; --st-diag: #6366F1; --st-prog: #3B82F6;
+  --st-fixed: #0D9488; --st-ready: #8B5CF6; --st-ver: #16A34A; --st-closed: #334155;
+
+  /* Surfaces — light theme */
+  --page: #F4F5F7; --surface: #FFFFFF; --surface-2: #F9FAFB;
+  --text: #111827; --muted: #6B7280; --faint: #9CA3AF;
+  --border: #E5E7EB; --border-strong: #D1D5DB;
+  --shadow: 0 1px 3px rgba(17,24,39,.08), 0 1px 2px rgba(17,24,39,.04);
+  --shadow-lg: 0 10px 30px rgba(17,24,39,.16);
+  --ring: #2563EB;
+
+  --radius: 12px; --radius-sm: 8px; --radius-xs: 6px;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Inter, sans-serif;
+  --mono: 'SF Mono', 'Segoe UI Mono', 'Roboto Mono', Menlo, Consolas, monospace;
+}
+
+html[data-theme="dark"] {
+  --page: #0B0D10; --surface: #14171C; --surface-2: #1A1E24;
+  --text: #ECEFF3; --muted: #9BA3AE; --faint: #6B7280;
+  --border: #262B33; --border-strong: #353C46;
+  --shadow: 0 1px 3px rgba(0,0,0,.5); --shadow-lg: 0 16px 40px rgba(0,0,0,.6);
+  --p0-bg: #2A1414; --p1-bg: #271710; --p2-bg: #241C0D; --p3-bg: #0F1A2E; --pos-bg: #0E2018;
+  --c-yellow: #FACC15;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { background: var(--page); }
+body {
+  font-family: var(--font); background: var(--page); color: var(--text);
+  font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+button { font-family: inherit; cursor: pointer; }
+input, textarea, select { font-family: inherit; color: var(--text); }
+a { color: var(--p3); }
+
+/* Visible focus for keyboard users (accessibility) */
+:focus-visible {
+  outline: 3px solid var(--ring); outline-offset: 2px; border-radius: 4px;
+}
+.skip-link {
+  position: absolute; left: 8px; top: -48px; z-index: 2000;
+  background: var(--brand); color: #fff; padding: 10px 16px; border-radius: 8px;
+  font-weight: 700; transition: top .15s; text-decoration: none;
+}
+.skip-link:focus { top: 8px; }
+
+/* ─── App bar ─────────────────────────────────────────────── */
+.appbar {
+  position: sticky; top: 0; z-index: 90; background: var(--surface);
+  border-bottom: 1px solid var(--border); box-shadow: var(--shadow);
+}
+.appbar-row {
+  display: flex; align-items: center; gap: 18px; padding: 10px 18px; flex-wrap: wrap;
+}
+.brand-lockup { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.brand-mark {
+  width: 30px; height: 30px; border-radius: 8px; background: var(--brand);
+  color: #fff; display: grid; place-items: center; font-weight: 900; font-size: 17px;
+}
+.brand-name { font-weight: 800; font-size: 15px; letter-spacing: -0.01em; }
+.brand-name small { display: block; font-size: 10px; font-weight: 600; color: var(--muted); letter-spacing: .14em; text-transform: uppercase; }
+
+.appbar-progress { flex: 1; min-width: 160px; max-width: 320px; }
+.apb-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+.apb-top b { color: var(--text); font-size: 12px; }
+.apb-track { height: 8px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 99px; overflow: hidden; }
+.apb-fill { height: 100%; background: linear-gradient(90deg, var(--brand), #ff7a4d); border-radius: 99px; transition: width .4s ease; }
+
+.readiness-pill {
+  display: flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 99px;
+  font-weight: 800; font-size: 13px; white-space: nowrap; border: 2px solid;
+}
+.rec-go        { background: var(--pos-bg); color: var(--pos); border-color: var(--pos-bd); }
+.rec-conditions{ background: var(--p1-bg); color: var(--p1); border-color: var(--p1-bd); }
+.rec-nogo      { background: var(--p0-bg); color: var(--p0); border-color: var(--p0-bd); }
+.readiness-pill .pct { font-size: 15px; }
+
+.appbar-actions { display: flex; gap: 8px; align-items: center; }
+.icon-btn {
+  width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text); font-size: 16px; display: grid; place-items: center;
+}
+.icon-btn:hover { background: var(--surface-2); }
+
+/* ─── Tabs ────────────────────────────────────────────────── */
+.tabs { display: flex; gap: 2px; padding: 0 12px; overflow-x: auto; border-bottom: 1px solid var(--border); background: var(--surface); }
+.tab {
+  appearance: none; background: none; border: none; padding: 12px 16px; font-size: 14px; font-weight: 600;
+  color: var(--muted); border-bottom: 3px solid transparent; white-space: nowrap; display: flex; align-items: center; gap: 8px;
+}
+.tab:hover { color: var(--text); }
+.tab[aria-current="page"] { color: var(--brand); border-bottom-color: var(--brand); }
+.tab .tab-count { font-size: 11px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 99px; padding: 1px 7px; color: var(--muted); font-weight: 700; }
+
+/* ─── Layout ──────────────────────────────────────────────── */
+.view { display: none; }
+.view.active { display: block; }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 20px 18px 80px; }
+
+.sections-layout { display: grid; grid-template-columns: 264px 1fr; gap: 20px; max-width: 1320px; margin: 0 auto; padding: 18px; align-items: start; }
+@media (max-width: 960px) { .sections-layout { grid-template-columns: 1fr; } }
+
+/* ─── Section rail (sidebar) ──────────────────────────────── */
+.rail { position: sticky; top: 118px; }
+@media (max-width: 960px) { .rail { position: static; } }
+.rail-head { font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); padding: 0 4px 10px; }
+.rail-list { display: flex; flex-direction: column; gap: 4px; }
+@media (max-width: 960px) { .rail-list { flex-direction: row; overflow-x: auto; padding-bottom: 8px; } }
+.rail-item {
+  display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: 10px;
+  background: var(--surface); border: 1px solid var(--border); text-align: left; width: 100%;
+  color: var(--text); font-size: 13px; transition: border-color .15s, background .15s;
+}
+@media (max-width: 960px) { .rail-item { min-width: 190px; } }
+.rail-item:hover { border-color: var(--border-strong); }
+.rail-item[aria-current="true"] { border-color: var(--brand); background: var(--p0-bg); box-shadow: inset 3px 0 0 var(--brand); }
+.rail-num { font-size: 10px; font-weight: 800; color: var(--faint); width: 16px; flex-shrink: 0; }
+.rail-ico { font-size: 15px; flex-shrink: 0; }
+.rail-title { flex: 1; font-weight: 600; line-height: 1.25; }
+.rail-status { flex-shrink: 0; }
+.status-dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--border-strong); }
+.sd-not-started { background: transparent; box-shadow: 0 0 0 1px var(--border-strong); }
+.sd-in-progress { background: var(--p3); box-shadow: 0 0 0 1px var(--p3); }
+.sd-passed { background: var(--pos); box-shadow: 0 0 0 1px var(--pos); }
+.sd-failed { background: var(--p0); box-shadow: 0 0 0 1px var(--p0); }
+.sd-blocked { background: var(--p2); box-shadow: 0 0 0 1px var(--p2); }
+
+.rail-meta { margin-top: 14px; padding: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.rail-meta label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 700; margin: 8px 0 3px; }
+.rail-meta label:first-child { margin-top: 0; }
+.rail-meta input, .rail-meta select { width: 100%; padding: 7px 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-2); font-size: 13px; }
+
+/* ─── Section panel ───────────────────────────────────────── */
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+.panel-head { padding: 20px 22px 16px; border-bottom: 1px solid var(--border); }
+.panel-eyebrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.panel-num { font-size: 12px; font-weight: 800; color: var(--faint); }
+.panel-ico { font-size: 24px; }
+.panel-title { font-size: 23px; font-weight: 800; letter-spacing: -0.02em; flex: 1; min-width: 200px; }
+.panel-why { font-size: 14px; color: var(--muted); margin-top: 2px; }
+
+.sev-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 800; padding: 3px 9px; border-radius: 99px; border: 1px solid; letter-spacing: .02em; }
+.sev-p0 { color: var(--p0); background: var(--p0-bg); border-color: var(--p0-bd); }
+.sev-p1 { color: var(--p1); background: var(--p1-bg); border-color: var(--p1-bd); }
+.sev-p2 { color: var(--p2); background: var(--p2-bg); border-color: var(--p2-bd); }
+.sev-p3 { color: var(--p3); background: var(--p3-bg); border-color: var(--p3-bd); }
+.sev-positive { color: var(--pos); background: var(--pos-bg); border-color: var(--pos-bd); }
+
+/* Step strip — guided 8-step */
+.steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin: 16px 22px; }
+@media (max-width: 720px) { .steps { grid-template-columns: repeat(2, 1fr); } }
+.step { background: var(--surface-2); padding: 11px 13px; }
+.step-n { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--brand); color: #fff; font-size: 11px; font-weight: 800; margin-bottom: 5px; }
+.step-t { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.step-d { font-size: 12.5px; color: var(--text); margin-top: 2px; line-height: 1.4; }
+.step-d code { font-family: var(--mono); font-size: 11.5px; background: var(--page); padding: 1px 5px; border-radius: 4px; border: 1px solid var(--border); }
+
+/* Open-page bar */
+.openbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 22px 16px; padding: 12px 14px; background: var(--p3-bg); border: 1px solid var(--p3-bd); border-radius: 10px; }
+.openbar .lbl { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: var(--p3); }
+.openbar .url { font-family: var(--mono); font-size: 13px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 5px 9px; color: var(--text); }
+.openbar .vp { font-size: 12px; color: var(--muted); }
+.mini-btn { font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 7px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); }
+.mini-btn:hover { background: var(--surface-2); }
+.mini-btn.primary { background: var(--brand); color: #fff; border-color: var(--brand); }
+.mini-btn.primary:hover { background: var(--brand-dark); }
+
+.block-title { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 20px 22px 8px; display: flex; align-items: center; gap: 8px; }
+
+/* Checklist */
+.checks { margin: 0 14px; }
+.check {
+  display: flex; align-items: flex-start; gap: 11px; padding: 11px 12px; border-radius: 9px;
+  border: 1px solid transparent; transition: background .12s;
+}
+.check:hover { background: var(--surface-2); }
+.check.done { background: var(--pos-bg); }
+.check input[type=checkbox] { width: 22px; height: 22px; margin-top: 1px; accent-color: var(--pos); cursor: pointer; flex-shrink: 0; }
+.check .ctext { flex: 1; font-size: 14px; }
+.check.done .ctext { color: var(--muted); text-decoration: line-through; }
+.check .ctext strong { color: var(--text); }
+.chip {
+  font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 5px; flex-shrink: 0; margin-top: 2px;
+  display: inline-flex; align-items: center; gap: 3px; border: 1px solid;
+}
+.chip-p0 { color: var(--p0); background: var(--p0-bg); border-color: var(--p0-bd); }
+.chip-p1 { color: var(--p1); background: var(--p1-bg); border-color: var(--p1-bd); }
+.chip-p2 { color: var(--p2); background: var(--p2-bg); border-color: var(--p2-bd); }
+.chip-p3 { color: var(--p3); background: var(--p3-bg); border-color: var(--p3-bd); }
+
+/* Pass / Fail criteria */
+.pf-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 8px 22px 0; }
+@media (max-width: 720px) { .pf-grid { grid-template-columns: 1fr; } }
+.pf { border-radius: 10px; padding: 12px 14px; border: 1px solid; }
+.pf.pass { background: var(--pos-bg); border-color: var(--pos-bd); }
+.pf.fail { background: var(--p0-bg); border-color: var(--p0-bd); }
+.pf h4 { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; display: flex; align-items: center; gap: 6px; margin-bottom: 7px; }
+.pf.pass h4 { color: var(--pos); }
+.pf.fail h4 { color: var(--p0); }
+.pf ul { list-style: none; display: flex; flex-direction: column; gap: 5px; }
+.pf li { font-size: 13px; padding-left: 18px; position: relative; }
+.pf.pass li::before { content: "✓"; position: absolute; left: 0; color: var(--pos); font-weight: 800; }
+.pf.fail li::before { content: "✕"; position: absolute; left: 0; color: var(--p0); font-weight: 800; }
+
+.tip { margin: 14px 22px 0; padding: 11px 14px; background: var(--p2-bg); border: 1px solid var(--p2-bd); border-radius: 9px; font-size: 13px; color: var(--p2); }
+.tip strong { font-weight: 800; }
+
+/* Notes */
+.notes { margin: 16px 22px 0; }
+.notes label { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); display: block; margin-bottom: 6px; }
+textarea.area, input.field {
+  width: 100%; border: 1px solid var(--border); border-radius: 9px; padding: 10px 12px; font-size: 14px;
+  background: var(--surface-2); resize: vertical; line-height: 1.5;
+}
+textarea.area:focus, input.field:focus { outline: none; border-color: var(--ring); background: var(--surface); }
+textarea.area { min-height: 64px; }
+
+/* Screenshot workspace */
+.workspace { margin: 12px 22px 0; }
+.dropzone {
+  border: 2.5px dashed var(--border-strong); border-radius: 12px; padding: 26px 20px; text-align: center;
+  background: var(--surface-2); transition: all .15s; cursor: pointer;
+}
+.dropzone:hover, .dropzone.drag { border-color: var(--brand); background: var(--p0-bg); }
+.dz-icon { font-size: 32px; margin-bottom: 8px; }
+.dz-kbd { display: inline-flex; gap: 4px; align-items: center; margin: 8px 0; }
+kbd {
+  font-family: var(--mono); font-size: 12px; font-weight: 700; background: var(--surface); border: 1px solid var(--border-strong);
+  border-bottom-width: 2px; border-radius: 6px; padding: 3px 8px; color: var(--text);
+}
+.dz-main { font-size: 16px; font-weight: 700; }
+.dz-sub { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+.dz-actions { margin-top: 12px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+.shots-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; margin-top: 14px; }
+.shot-card { border: 1px solid var(--border); border-radius: 11px; overflow: hidden; background: var(--surface); box-shadow: var(--shadow); }
+.shot-thumb { position: relative; aspect-ratio: 16/10; background: var(--surface-2); overflow: hidden; cursor: pointer; display: block; width: 100%; border: none; padding: 0; }
+.shot-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.shot-thumb .shot-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.shot-callout-mini { position: absolute; transform: translate(-50%, -50%); width: 22px; height: 22px; border-radius: 50%; color: #fff; font-size: 11px; font-weight: 800; display: grid; place-items: center; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+.shot-overlay-edit { position: absolute; inset: 0; background: rgba(17,24,39,.0); display: grid; place-items: center; transition: background .15s; }
+.shot-thumb:hover .shot-overlay-edit { background: rgba(17,24,39,.45); }
+.shot-overlay-edit span { opacity: 0; color: #fff; font-weight: 800; font-size: 13px; background: rgba(0,0,0,.55); padding: 7px 14px; border-radius: 99px; transition: opacity .15s; }
+.shot-thumb:hover .shot-overlay-edit span { opacity: 1; }
+.shot-foot { padding: 9px 11px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.shot-code { font-family: var(--mono); font-size: 11px; color: var(--muted); font-weight: 700; }
+.shot-tags { font-size: 11px; color: var(--muted); }
+.shot-foot-btns { display: flex; gap: 5px; }
+.tiny-btn { font-size: 11px; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); font-weight: 600; }
+.tiny-btn:hover { background: var(--surface-2); color: var(--text); }
+.tiny-btn.danger:hover { color: var(--p0); border-color: var(--p0-bd); background: var(--p0-bg); }
+
+/* Section issues list */
+.section-issues { margin: 8px 22px 0; display: flex; flex-direction: column; gap: 10px; }
+
+/* Section footer */
+.section-foot { margin: 22px; padding-top: 18px; border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+.status-set { display: flex; gap: 6px; flex-wrap: wrap; }
+.status-opt {
+  font-size: 12.5px; font-weight: 700; padding: 8px 14px; border-radius: 9px; border: 1.5px solid var(--border-strong);
+  background: var(--surface); color: var(--muted); display: inline-flex; align-items: center; gap: 6px;
+}
+.status-opt[aria-pressed="true"].o-passed { background: var(--pos-bg); color: var(--pos); border-color: var(--pos); }
+.status-opt[aria-pressed="true"].o-failed { background: var(--p0-bg); color: var(--p0); border-color: var(--p0); }
+.status-opt[aria-pressed="true"].o-blocked { background: var(--p2-bg); color: var(--p2); border-color: var(--p2); }
+.status-opt[aria-pressed="true"].o-in-progress { background: var(--p3-bg); color: var(--p3); border-color: var(--p3); }
+.nav-btns { display: flex; gap: 8px; }
+
+/* ─── Issue card ──────────────────────────────────────────── */
+.issue-card { border: 1px solid var(--border); border-left: 5px solid var(--st-open); border-radius: 11px; background: var(--surface); box-shadow: var(--shadow); overflow: hidden; }
+.issue-card.sev-l-p0 { border-left-color: var(--p0); }
+.issue-card.sev-l-p1 { border-left-color: var(--p1); }
+.issue-card.sev-l-p2 { border-left-color: var(--p2); }
+.issue-card.sev-l-p3 { border-left-color: var(--p3); }
+.issue-card.sev-l-positive { border-left-color: var(--pos); }
+.ic-head { display: flex; align-items: center; gap: 9px; padding: 11px 13px; flex-wrap: wrap; background: var(--surface-2); border-bottom: 1px solid var(--border); }
+.ic-id { font-family: var(--mono); font-size: 12px; font-weight: 800; color: var(--text); }
+.ic-callout { width: 22px; height: 22px; border-radius: 50%; color: #fff; font-size: 11px; font-weight: 800; display: grid; place-items: center; flex-shrink: 0; }
+.ic-spacer { flex: 1; }
+.ic-body { padding: 12px 13px; display: grid; gap: 10px; }
+.ic-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.ic-field label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); display: block; margin-bottom: 3px; }
+.ic-field select, .ic-field input, .ic-field textarea { width: 100%; padding: 7px 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-2); font-size: 13px; }
+.ic-field textarea { resize: vertical; min-height: 40px; line-height: 1.45; }
+.ic-meta { display: flex; gap: 12px; flex-wrap: wrap; font-size: 11px; color: var(--muted); padding-top: 2px; }
+.ic-meta code { font-family: var(--mono); }
+.ic-foot { padding: 9px 13px; border-top: 1px solid var(--border); display: flex; gap: 7px; flex-wrap: wrap; align-items: center; }
+
+/* Status pill + selector */
+.status-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 800; padding: 4px 11px; border-radius: 99px; border: 1px solid; white-space: nowrap; }
+.stp-open { color: var(--st-open); background: color-mix(in srgb, var(--st-open) 12%, transparent); border-color: var(--st-open); }
+.stp-diagnosed { color: var(--st-diag); background: color-mix(in srgb, var(--st-diag) 12%, transparent); border-color: var(--st-diag); }
+.stp-in-progress { color: var(--st-prog); background: color-mix(in srgb, var(--st-prog) 12%, transparent); border-color: var(--st-prog); }
+.stp-fixed { color: var(--st-fixed); background: color-mix(in srgb, var(--st-fixed) 12%, transparent); border-color: var(--st-fixed); }
+.stp-ready { color: var(--st-ready); background: color-mix(in srgb, var(--st-ready) 12%, transparent); border-color: var(--st-ready); }
+.stp-verified { color: var(--st-ver); background: color-mix(in srgb, var(--st-ver) 12%, transparent); border-color: var(--st-ver); }
+.stp-closed { color: #fff; background: var(--st-closed); border-color: var(--st-closed); }
+.stp-positive { color: var(--pos); background: var(--pos-bg); border-color: var(--pos-bd); }
+
+.status-flow { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; }
+.flow-step { font-size: 10px; font-weight: 700; padding: 3px 7px; border-radius: 6px; border: 1px solid var(--border); color: var(--faint); background: var(--surface); }
+.flow-step.active { color: #fff; background: var(--st-prog); border-color: var(--st-prog); }
+.flow-step.passed { color: var(--st-ver); border-color: var(--st-ver); }
+.flow-arrow { color: var(--faint); font-size: 10px; }
+
+/* ─── Issues view ─────────────────────────────────────────── */
+.filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+.filter-chip { font-size: 12px; font-weight: 700; padding: 7px 13px; border-radius: 99px; border: 1.5px solid var(--border-strong); background: var(--surface); color: var(--muted); }
+.filter-chip[aria-pressed="true"] { background: var(--text); color: var(--surface); border-color: var(--text); }
+.issues-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 14px; }
+.empty-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+.empty-state .es-ico { font-size: 44px; margin-bottom: 12px; }
+
+/* ─── Dashboard ───────────────────────────────────────────── */
+.dash-hero { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; margin-bottom: 16px; }
+@media (max-width: 860px) { .dash-hero { grid-template-columns: 1fr; } }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px 20px; }
+.card h2 { font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
+.gauge-wrap { display: flex; align-items: center; gap: 20px; }
+.gauge { flex-shrink: 0; }
+.gauge-meta .big { font-size: 44px; font-weight: 900; line-height: 1; }
+.gauge-meta .lbl { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.gauge-rec { margin-top: 10px; }
+
+.stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+@media (max-width: 720px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } }
+.stat { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 14px; text-align: center; }
+.stat .n { font-size: 30px; font-weight: 900; line-height: 1; }
+.stat .l { font-size: 11px; color: var(--muted); margin-top: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.stat.p0 .n { color: var(--p0); } .stat.p1 .n { color: var(--p1); }
+.stat.p2 .n { color: var(--p2); } .stat.p3 .n { color: var(--p3); }
+.stat.ok .n { color: var(--pos); }
+
+.sevbar { display: flex; height: 28px; border-radius: 8px; overflow: hidden; border: 1px solid var(--border); margin-top: 4px; }
+.sevbar span { display: grid; place-items: center; color: #fff; font-size: 11px; font-weight: 800; min-width: 0; }
+.sevbar .b-p0 { background: var(--p0); } .sevbar .b-p1 { background: var(--p1); }
+.sevbar .b-p2 { background: var(--p2); } .sevbar .b-p3 { background: var(--p3); }
+.sevbar .b-pos { background: var(--pos); } .sevbar .b-none { background: var(--surface-2); color: var(--muted); }
+
+.seclist { display: flex; flex-direction: column; gap: 8px; }
+.secrow { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-2); }
+.secrow .si { font-size: 16px; }
+.secrow .sn { flex: 1; font-weight: 600; font-size: 13px; }
+.secrow .sbar { width: 120px; height: 7px; background: var(--surface); border: 1px solid var(--border); border-radius: 99px; overflow: hidden; }
+.secrow .sbar i { display: block; height: 100%; background: var(--pos); }
+.secrow .sc { font-size: 11px; color: var(--muted); font-family: var(--mono); width: 44px; text-align: right; }
+
+/* ─── Launch centre ───────────────────────────────────────── */
+.launch-banner { border-radius: var(--radius); padding: 28px; text-align: center; margin-bottom: 18px; border: 2px solid; }
+.launch-banner.rec-go { background: var(--pos-bg); border-color: var(--pos); }
+.launch-banner.rec-conditions { background: var(--p1-bg); border-color: var(--p1); }
+.launch-banner.rec-nogo { background: var(--p0-bg); border-color: var(--p0); }
+.lb-verdict { font-size: 40px; font-weight: 900; letter-spacing: -0.02em; }
+.launch-banner.rec-go .lb-verdict { color: var(--pos); }
+.launch-banner.rec-conditions .lb-verdict { color: var(--p1); }
+.launch-banner.rec-nogo .lb-verdict { color: var(--p0); }
+.lb-sub { font-size: 14px; color: var(--text); margin-top: 6px; }
+.lb-reasons { margin-top: 12px; font-size: 13px; color: var(--muted); }
+
+.override { display: flex; gap: 8px; justify-content: center; margin-top: 16px; flex-wrap: wrap; }
+.ov-btn { font-size: 14px; font-weight: 800; padding: 12px 22px; border-radius: 10px; border: 2px solid var(--border-strong); background: var(--surface); color: var(--muted); }
+.ov-btn.sel-go { background: var(--pos-bg); color: var(--pos); border-color: var(--pos); }
+.ov-btn.sel-conditions { background: var(--p1-bg); color: var(--p1); border-color: var(--p1); }
+.ov-btn.sel-nogo { background: var(--p0-bg); color: var(--p0); border-color: var(--p0); }
+
+.risk-list { display: flex; flex-direction: column; gap: 8px; }
+.risk { display: flex; gap: 10px; align-items: flex-start; padding: 11px 13px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-2); }
+.risk .rsev { flex-shrink: 0; }
+.risk .rtext { flex: 1; font-size: 13px; }
+.risk .rtext b { font-family: var(--mono); font-size: 12px; }
+
+/* ─── Export ──────────────────────────────────────────────── */
+.export-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.exp-card { background: var(--surface); border: 1px solid var(--border); border-radius: 11px; padding: 16px; box-shadow: var(--shadow); }
+.exp-card h3 { font-size: 15px; font-weight: 800; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+.exp-card p { font-size: 12.5px; color: var(--muted); margin-bottom: 12px; }
+.exp-actions { display: flex; gap: 8px; }
+
+/* ─── Annotation editor (modal) ───────────────────────────── */
+.modal-backdrop { position: fixed; inset: 0; background: rgba(8,11,16,.78); z-index: 200; display: none; }
+.modal-backdrop.open { display: block; }
+.editor { position: fixed; inset: 16px; z-index: 210; background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow-lg); display: none; grid-template-rows: auto 1fr; overflow: hidden; }
+.editor.open { display: grid; }
+.ed-bar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border); flex-wrap: wrap; background: var(--surface-2); }
+.ed-title { font-weight: 800; font-size: 14px; }
+.ed-code { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.ed-tools { display: flex; gap: 3px; }
+.tool { width: 40px; height: 40px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface); font-size: 17px; display: grid; place-items: center; color: var(--text); position: relative; }
+.tool:hover { background: var(--surface-2); }
+.tool[aria-pressed="true"] { background: var(--text); color: var(--surface); border-color: var(--text); }
+.ed-colors { display: flex; gap: 5px; }
+.swatch { width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--surface); box-shadow: 0 0 0 1.5px var(--border-strong); position: relative; }
+.swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--text), 0 0 0 5px color-mix(in srgb, var(--text) 25%, transparent); }
+.swatch[aria-pressed="true"]::after { content: "✓"; position: absolute; inset: 0; display: grid; place-items: center; color: #fff; font-size: 14px; font-weight: 900; text-shadow: 0 1px 2px rgba(0,0,0,.5); }
+.ed-spacer { flex: 1; }
+.ed-body { display: grid; grid-template-columns: 1fr 360px; overflow: hidden; }
+@media (max-width: 820px) { .ed-body { grid-template-columns: 1fr; grid-template-rows: 1fr auto; } }
+.ed-stage { background: repeating-conic-gradient(var(--surface-2) 0% 25%, var(--page) 0% 50%) 50% / 22px 22px; overflow: auto; padding: 20px; display: grid; place-items: center; }
+.ed-canvas-wrap { position: relative; max-width: 100%; box-shadow: var(--shadow-lg); line-height: 0; }
+.ed-img { max-width: 100%; height: auto; display: block; user-select: none; }
+.ed-svg { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+.ed-svg.tool-draw { cursor: crosshair; }
+.ed-callouts { position: absolute; inset: 0; pointer-events: none; }
+.ed-callout { position: absolute; transform: translate(-50%, -50%); width: 26px; height: 26px; border-radius: 50%; color: #fff; font-size: 13px; font-weight: 800; display: grid; place-items: center; border: 2.5px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.5); pointer-events: auto; cursor: pointer; }
+.ed-callout.sel { outline: 3px solid var(--text); outline-offset: 2px; }
+.ed-side { border-left: 1px solid var(--border); overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px; background: var(--surface-2); }
+@media (max-width: 820px) { .ed-side { border-left: none; border-top: 1px solid var(--border); max-height: 40vh; } }
+.ed-side-head { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.ed-hint { font-size: 12px; color: var(--muted); background: var(--p3-bg); border: 1px solid var(--p3-bd); border-radius: 8px; padding: 9px 11px; }
+
+/* ─── Toast ───────────────────────────────────────────────── */
+.toasts { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 500; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+.toast { background: var(--text); color: var(--surface); padding: 10px 18px; border-radius: 99px; font-size: 13px; font-weight: 600; box-shadow: var(--shadow-lg); display: flex; align-items: center; gap: 8px; animation: tin .2s ease; }
+.toast.ok { background: var(--pos); color: #fff; } .toast.err { background: var(--p0); color: #fff; }
+@keyframes tin { from { opacity: 0; transform: translateY(10px); } }
+
+/* Help modal */
+.help-modal { position: fixed; inset: 0; z-index: 300; display: none; place-items: center; background: rgba(8,11,16,.7); padding: 20px; }
+.help-modal.open { display: grid; }
+.help-box { background: var(--surface); border-radius: var(--radius); max-width: 640px; width: 100%; max-height: 86vh; overflow-y: auto; box-shadow: var(--shadow-lg); }
+.help-head { padding: 18px 22px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.help-head h2 { font-size: 18px; font-weight: 800; }
+.help-content { padding: 20px 22px; }
+.help-content h3 { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--brand); margin: 16px 0 8px; }
+.help-content h3:first-child { margin-top: 0; }
+.help-content p, .help-content li { font-size: 14px; color: var(--text); margin-bottom: 6px; }
+.help-content ul { padding-left: 20px; }
+.help-content kbd { margin: 0 2px; }
+
+.storage-meter { font-size: 11px; color: var(--muted); }
+
+@media print {
+  .appbar, .tabs, .rail, .dropzone, .section-foot, .ed-bar, .filters, .export-grid, .icon-btn { display: none !important; }
+  .view { display: block !important; }
+  body { background: #fff; }
+}
+</style>
+</head>
+<body>
+<a href="#main" class="skip-link">Skip to content</a>
+
+<!-- ═══ APP BAR ═══ -->
+<header class="appbar">
+  <div class="appbar-row">
+    <div class="brand-lockup">
+      <div class="brand-mark" aria-hidden="true">C</div>
+      <div class="brand-name">Catch Comics<small>Smoke Test V3 · QA Hub</small></div>
+    </div>
+    <div class="appbar-progress" role="group" aria-label="Overall testing progress">
+      <div class="apb-top"><span>Sections passed</span><b id="apb-label">0 / 14</b></div>
+      <div class="apb-track"><div class="apb-fill" id="apb-fill" style="width:0%"></div></div>
+    </div>
+    <div class="readiness-pill rec-nogo" id="readiness-pill" title="Launch recommendation">
+      <span id="rec-icon">⛔</span><span id="rec-text">NO-GO</span><span class="pct" id="rec-pct">0%</span>
+    </div>
+    <div class="appbar-actions">
+      <button class="icon-btn" id="theme-btn" title="Toggle light / dark" aria-label="Toggle light or dark theme">◐</button>
+      <button class="icon-btn" id="help-btn" title="How to use" aria-label="Open help">?</button>
+    </div>
+  </div>
+  <nav class="tabs" role="tablist" aria-label="Main views">
+    <button class="tab" role="tab" data-view="sections" aria-current="page"><span aria-hidden="true">🧪</span> Test Sections</button>
+    <button class="tab" role="tab" data-view="issues"><span aria-hidden="true">🐞</span> Issues <span class="tab-count" id="tc-issues">0</span></button>
+    <button class="tab" role="tab" data-view="dashboard"><span aria-hidden="true">📊</span> Dashboard</button>
+    <button class="tab" role="tab" data-view="launch"><span aria-hidden="true">🚀</span> Launch Centre</button>
+    <button class="tab" role="tab" data-view="export"><span aria-hidden="true">📤</span> Export</button>
+  </nav>
+</header>
+
+<main id="main">
+  <!-- ═══ SECTIONS VIEW ═══ -->
+  <section class="view active" id="view-sections" role="tabpanel" aria-label="Test sections">
+    <div class="sections-layout">
+      <aside class="rail" aria-label="Section navigation">
+        <div class="rail-head">Test Sections</div>
+        <div class="rail-list" id="rail-list"></div>
+        <div class="rail-meta">
+          <label for="meta-date">Date</label><input class="field" id="meta-date" type="text" placeholder="16 June 2026">
+          <label for="meta-tester">Tester</label><input class="field" id="meta-tester" type="text" placeholder="Joe">
+          <label for="meta-device">Device</label><input class="field" id="meta-device" type="text" placeholder="MacBook + iPhone SE">
+          <label for="meta-env">Environment</label>
+          <select id="meta-env">
+            <option value="production">Production · catchcomics.com</option>
+            <option value="staging">Staging · Vercel preview</option>
+            <option value="local">Local · localhost:3000</option>
+          </select>
+        </div>
+      </aside>
+      <div id="section-panel"></div>
+    </div>
+  </section>
+
+  <!-- ═══ ISSUES VIEW ═══ -->
+  <section class="view" id="view-issues" role="tabpanel" aria-label="Issue register" hidden>
+    <div class="wrap">
+      <h1 style="font-size:24px;font-weight:800;margin-bottom:4px">Issue Register</h1>
+      <p style="color:var(--muted);margin-bottom:18px">Every annotation creates a tracked issue card. Filter, update status, and drive each issue to Verified.</p>
+      <div class="filters" id="issue-filters"></div>
+      <div class="issues-grid" id="issues-grid"></div>
+    </div>
+  </section>
+
+  <!-- ═══ DASHBOARD VIEW ═══ -->
+  <section class="view" id="view-dashboard" role="tabpanel" aria-label="Dashboard" hidden>
+    <div class="wrap" id="dashboard-body"></div>
+  </section>
+
+  <!-- ═══ LAUNCH VIEW ═══ -->
+  <section class="view" id="view-launch" role="tabpanel" aria-label="Launch command centre" hidden>
+    <div class="wrap" id="launch-body"></div>
+  </section>
+
+  <!-- ═══ EXPORT VIEW ═══ -->
+  <section class="view" id="view-export" role="tabpanel" aria-label="Export" hidden>
+    <div class="wrap">
+      <h1 style="font-size:24px;font-weight:800;margin-bottom:4px">Export</h1>
+      <p style="color:var(--muted);margin-bottom:18px">All outputs are Markdown — copy and paste straight back into Claude for implementation work. Annotated screenshots export as PNG with callouts burned in.</p>
+      <div class="export-grid" id="export-grid"></div>
+      <div style="margin-top:22px" class="card">
+        <h2>Preview</h2>
+        <textarea class="area" id="export-preview" style="min-height:320px;font-family:var(--mono);font-size:12.5px" readonly placeholder="Click any “Preview” button above to see the output here."></textarea>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ═══ ANNOTATION EDITOR ═══ -->
+<div class="modal-backdrop" id="ed-backdrop"></div>
+<div class="editor" id="editor" role="dialog" aria-modal="true" aria-label="Annotate screenshot">
+  <div class="ed-bar">
+    <span class="ed-title">Annotate</span><span class="ed-code" id="ed-code"></span>
+    <div class="ed-tools" id="ed-tools" role="group" aria-label="Drawing tools"></div>
+    <div class="ed-colors" id="ed-colors" role="group" aria-label="Severity colour"></div>
+    <div class="ed-spacer"></div>
+    <button class="mini-btn" id="ed-undo">↶ Undo</button>
+    <button class="mini-btn" id="ed-clear">Clear all</button>
+    <button class="mini-btn primary" id="ed-done">✓ Done</button>
+  </div>
+  <div class="ed-body">
+    <div class="ed-stage">
+      <div class="ed-canvas-wrap" id="ed-wrap">
+        <img class="ed-img" id="ed-img" alt="Screenshot being annotated">
+        <svg class="ed-svg" id="ed-svg" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div class="ed-callouts" id="ed-callouts"></div>
+      </div>
+    </div>
+    <div class="ed-side" id="ed-side">
+      <div class="ed-hint">Draw on the screenshot — each shape auto-creates a numbered callout <b>and</b> a linked issue card below. The colour sets the severity. Select tool (V) lets you move or delete shapes.</div>
+      <div class="ed-side-head">Callouts &amp; issue cards</div>
+      <div id="ed-cards" style="display:flex;flex-direction:column;gap:11px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ HELP ═══ -->
+<div class="help-modal" id="help-modal">
+  <div class="help-box">
+    <div class="help-head"><h2>How Smoke Test V3 works</h2><button class="icon-btn" id="help-close" aria-label="Close help">✕</button></div>
+    <div class="help-content">
+      <h3>The loop</h3>
+      <p>Pick a section in the left rail → follow the guided steps → take a screenshot → paste it → annotate → issues are created automatically → drive them to Verified → mark the section Passed.</p>
+      <h3>Screenshots — paste only</h3>
+      <p>Capture with <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> (or <kbd>⌘</kbd>+<kbd>Shift</kbd>+<kbd>4</kbd> on Mac), then press <kbd>Ctrl</kbd>+<kbd>V</kbd> anywhere on this page. The screenshot drops into the section you have open. No uploads, no file pickers. You can also drag an image straight onto the paste zone.</p>
+      <h3>Annotating</h3>
+      <p>Tools: <b>V</b> select · <b>C</b> circle · <b>R</b> rectangle · <b>A</b> arrow · <b>P</b> pencil · <b>H</b> highlighter · <b>T</b> text. Colours map to severity — Red = Critical (P0), Orange = High (P1), Yellow = Medium (P2), Blue = Question (P3), Green = Positive. Every shape gets a number and a matching issue card.</p>
+      <h3>Issue workflow</h3>
+      <p>Open → Diagnosed → Fix In Progress → Fixed → Ready For Verification → Verified → Closed. Set status on each card; the dashboard and launch centre update live.</p>
+      <h3>Launch decision</h3>
+      <p>The Launch Centre computes GO / GO WITH CONDITIONS / NO-GO from open P0/P1 issues and section completion. You can override the verdict manually before launch.</p>
+      <h3>Everything is saved</h3>
+      <p>All progress, screenshots, annotations and issues persist in your browser (localStorage). Use Export to pull Markdown reports for Claude.</p>
+      <h3>New in V3 — Self-contained Master Report</h3>
+      <p>Export → <b>Self-Contained Master Report (HTML)</b> generates one standalone file with everything together per section: checklist results, notes, issue cards, and the <b>annotated screenshots embedded inline</b> as evidence — plus statuses and verification. No separate PNGs to hunt for. Open it in any browser or print to PDF with <kbd>Ctrl</kbd>+<kbd>P</kbd>. V3 keeps its own saved data, separate from V2 — use <b>Import from V2</b> on the Export screen to pull an existing V2 session in.</p>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script>
+"use strict";
+/* ════════════════════════════════════════════════════════════════
+   DATA — section definitions (guided, project-specific)
+   ════════════════════════════════════════════════════════════════ */
+const LAUNCH_DATE = new Date('2026-07-01T00:00:00');
+
+const SECTIONS = [
+  { id:'homepage', ico:'🏠', title:'Homepage', sev:'p0', url:'https://catchcomics.com', vp:'Desktop · 1280px+',
+    why:'First impression and the gateway to discovery. If this is broken nothing else matters.',
+    checks:[
+      {p:'p0', t:'Page loads — no error screen, no blank white page'},
+      {p:'p1', t:'Hero section visible — headline and <strong>search bar</strong> present at the top'},
+      {p:'p1', t:'“Explore Series” shows <strong>6 series cards</strong> below the fold'},
+      {p:'p1', t:'At least 4 of the 6 series covers load — no broken-image icons'},
+      {p:'p0', t:'Navbar has logo (left), search (middle) and a visible <strong>“Series”</strong> link'},
+      {p:'p0', t:'Clicking <strong>“Series”</strong> navigates to <code>/series</code>'},
+      {p:'p2', t:'“Browse all series →” link present and clickable'},
+      {p:'p0', t:'Footer shows <strong>hello@catchcomics.com</strong>'},
+      {p:'p1', t:'Footer has all four links: About · Affiliate Disclosure · Privacy · Terms'},
+      {p:'p3', t:'Cookie notice bar appears at the bottom'},
+    ],
+    pass:['Loads cleanly with hero, search and 6 series cards','Series link works','Footer email + 4 legal links present'],
+    fail:['Blank/error page','Series link 404s or missing','Wrong contact email','3+ broken covers'] },
+
+  { id:'search', ico:'🔍', title:'Search', sev:'p0', url:'https://catchcomics.com', vp:'Desktop',
+    why:'Primary way users find a specific comic. Must return relevant results fast and never crash.',
+    checks:[
+      {p:'p0', t:'Type <strong>“Saga”</strong> in the search bar — results appear (list or dropdown)'},
+      {p:'p0', t:'“Saga Vol …” or similar relevant titles appear'},
+      {p:'p1', t:'Click a result — the correct product page loads'},
+      {p:'p1', t:'Search <strong>“Invincible”</strong> — relevant results appear'},
+      {p:'p2', t:'Type gibberish (e.g. <code>xzqjkwp</code>) — clean “no results” message, no crash'},
+    ],
+    pass:['Relevant results for real titles','Result click loads correct product','Gibberish shows graceful empty state'],
+    fail:['No results for known titles','Wrong product on click','Crash / spinner-forever on empty query'],
+    tip:'<strong>Known issue — do not fail for this:</strong> the price-range filter on search results is visible but currently no-ops. Note it, do not count it as a search failure.' },
+
+  { id:'series-index', ico:'📚', title:'Series Index', sev:'p0', url:'https://catchcomics.com/series', vp:'Desktop',
+    why:'The curated catalogue front door. Should show every launch series with a loading cover.',
+    checks:[
+      {p:'p0', t:'<code>/series</code> loads without error'},
+      {p:'p0', t:'<strong>17 series cards</strong> visible in the grid (count them)'},
+      {p:'p1', t:'Covers load on at least 12 of 17 cards — no rows of broken icons'},
+      {p:'p1', t:'Each card links to <code>/series/[name]</code> (hover to check the URL)'},
+      {p:'p2', t:'Grid is multi-column on desktop, not a single tall column'},
+    ],
+    pass:['17 cards, multi-column','≥12 covers load','Cards route to series pages'],
+    fail:['Page errors','Far fewer than 17 cards','Rows of broken covers','Cards dead / wrong links'] },
+
+  { id:'series-pages', ico:'📖', title:'Series Pages', sev:'p0', url:'https://catchcomics.com/series/saga', vp:'Desktop · spot-check 3',
+    why:'The reading-order journey — the core product thesis. Volume order, pricing and a clear start point.',
+    checks:[
+      {p:'p0', t:'<strong>Saga</strong> — page loads, Vol 1 shows ≥2 UK retailer prices in £'},
+      {p:'p1', t:'Saga — volumes in correct order (1,2,3…), no gaps/reversals'},
+      {p:'p1', t:'Saga — Vol 1 has a <strong>“Start Here”</strong> badge; synopsis present'},
+      {p:'p0', t:'<strong>Invincible</strong> — loads, Vol 1 shows ≥2 UK £ prices'},
+      {p:'p1', t:'Invincible — volumes in order, Vol 1 “Start Here” badge'},
+      {p:'p0', t:'<strong>Fullmetal Alchemist</strong> — loads, Vol 1 shows ≥2 UK £ prices'},
+      {p:'p1', t:'FMA — volumes in order, Vol 1 “Start Here” badge'},
+      {p:'p2', t:'FMA — Vol 1 cover loads from <code>images.catchcomics.com</code>'},
+    ],
+    pass:['All 3 series load with correct volume order','Vol 1 priced (≥2 retailers) with Start Here badge','Synopsis present'],
+    fail:['Wrong/garbled volume order','Vol 1 unpriced','Start Here on wrong volume','Broken covers'],
+    tip:'Open each series in a new tab so you keep your place. Targets: <code>/series/saga</code>, <code>/series/invincible</code>, <code>/series/fullmetal-alchemist</code>.' },
+
+  { id:'product', ico:'🛒', title:'Product Pages', sev:'p0', url:'https://catchcomics.com (Saga → Vol 1)', vp:'Desktop',
+    why:'Where the buying decision happens. Cover, pricing, credits and synopsis must all land.',
+    checks:[
+      {p:'p0', t:'Product page loads — no error / blank page'},
+      {p:'p1', t:'Cover image loads (not grey placeholder, not broken icon)'},
+      {p:'p0', t:'Pricing panel shows <strong>≥2 retailers with £ prices</strong>'},
+      {p:'p1', t:'“Buy at [Retailer]” buttons visible and clickable'},
+      {p:'p1', t:'Creator credits visible (writer / artist)'},
+      {p:'p2', t:'Synopsis text visible and readable'},
+      {p:'p2', t:'eBay section appears within ~5s (live search)'},
+      {p:'p2', t:'Amazon search link visible on the page'},
+    ],
+    pass:['Loads with cover, ≥2 priced retailers, Buy buttons','Creators + synopsis present','eBay + Amazon links render'],
+    fail:['Blank/error','No prices','Placeholder/broken cover','No Buy buttons'],
+    tip:'Reach a product page from the Saga series page via “Start Reading” or the Vol 1 title.' },
+
+  { id:'offerstable', ico:'💷', title:'OffersTable', sev:'p0', url:'On any product page', vp:'Desktop',
+    why:'The price-comparison table is the trust core. Sorting, stock and Best-Price logic must be exact.',
+    checks:[
+      {p:'p0', t:'Table renders with one row per retailer and a £ price each'},
+      {p:'p1', t:'Rows sorted cheapest-first (top price ≤ rows below)'},
+      {p:'p1', t:'“Best Price” badge appears <strong>only</strong> on the cheapest <strong>in-stock</strong> row'},
+      {p:'p1', t:'Stock labels correct (In stock / Out of stock / Pre-order)'},
+      {p:'p2', t:'“Checked N days ago” freshness sub-label present'},
+      {p:'p0', t:'Each row’s Buy/Go button works (revenue path)'},
+      {p:'p2', t:'Out-of-stock / pre-order rows visually distinct'},
+      {p:'p2', t:'No duplicate retailer rows for the same listing'},
+    ],
+    pass:['Sorted cheapest-first','Best Price only on in-stock cheapest','Stock + freshness accurate'],
+    fail:['Best Price on out-of-stock row','Mis-sorted prices','Duplicate retailers','Dead Buy button'] },
+
+  { id:'affiliate', ico:'💰', title:'Affiliate Systems', sev:'p0', url:'Buy button → /go/… → awin1.com', vp:'Desktop',
+    why:'Revenue-critical. A broken affiliate URL means every click earns nothing. Verify the full redirect chain.',
+    checks:[
+      {p:'p0', t:'Find a <strong>Bookshop.org / Waterstones / Lets Buy Books</strong> “Buy” button'},
+      {p:'p0', t:'Copy Link Address → starts with <code>/go/</code> + a long ID'},
+      {p:'p0', t:'Click → URL becomes <code>awin1.com/cread.php?…</code>'},
+      {p:'p0', t:'URL contains <code>awinmid=</code> + a number (retailer ID)'},
+      {p:'p0', t:'URL contains <code>awinaffid=</code> + your 7-digit publisher ID'},
+      {p:'p0', t:'URL contains <code>clickref=cc-</code> + 8 characters'},
+      {p:'p0', t:'URL contains <code>ued=</code> + an encoded retailer URL'},
+      {p:'p0', t:'<code>ued=</code> is <strong>NOT</strong> double-wrapped with another awin1.com'},
+      {p:'p1', t:'You land on the correct retailer product page'},
+      {p:'p1', t:'eBay links wrap the EPN campaign id; Amazon /go/ applies the associate tag'},
+    ],
+    pass:['/go/ → awin1.com/cread.php with mid, affid, clickref=cc-, ued','No double-wrap','Lands on correct retailer'],
+    fail:['Missing awinmid/awinaffid','clickref not cc-','Double-wrapped ued','Wrong/broken destination'],
+    tip:'<strong>Most important section.</strong> Take your time and paste the full awin1.com URL into the notes for the record.' },
+
+  { id:'mobile', ico:'📱', title:'Mobile', sev:'p0', url:'catchcomics.com on phone', vp:'iPhone SE · 375px',
+    why:'A large share of launch traffic is mobile. Layout must not break, prices must stay usable.',
+    checks:[
+      {p:'p1', t:'Homepage readable on mobile — no horizontal scroll, not zoomed out'},
+      {p:'p1', t:'Search bar tappable and brings up the keyboard'},
+      {p:'p1', t:'<code>/series</code> grid stacks readably (1–2 columns)'},
+      {p:'p0', t:'Product pricing panel usable — prices readable, not cut off / overflowing'},
+      {p:'p1', t:'“Buy” buttons large enough to tap comfortably'},
+      {p:'p1', t:'OffersTable scrolls/stacks without clipping'},
+      {p:'p2', t:'Footer links readable and tappable'},
+    ],
+    pass:['No horizontal scroll','Pricing panel + Buy buttons usable','Series grid stacks cleanly'],
+    fail:['Horizontal scroll / off-canvas whitespace','Prices cut off','Tap targets too small'],
+    tip:'Test on a real phone, or DevTools (F12 → device toolbar → iPhone SE 375px).' },
+
+  { id:'loading', ico:'⏳', title:'Loading States', sev:'p2', url:'Throttle to Slow 3G in DevTools', vp:'Desktop',
+    why:'Perceived speed. Users should see skeletons / spinners, never a flash of blank or jank.',
+    checks:[
+      {p:'p2', t:'Homepage shows skeleton/placeholder before content (not blank white)'},
+      {p:'p2', t:'Series index shows card skeletons while covers load'},
+      {p:'p2', t:'Product page eBay section shows a spinner, then results'},
+      {p:'p3', t:'Search shows a loading indicator while querying'},
+      {p:'p2', t:'No large layout shift (CLS jank) when content arrives'},
+      {p:'p3', t:'Under Slow-3G throttle the pages still resolve gracefully'},
+    ],
+    pass:['Skeletons/spinners shown during load','No blank flashes','Minimal layout shift'],
+    fail:['Long blank white screens','Content jumps badly on load','Spinner that never resolves'],
+    tip:'DevTools → Network → throttle “Slow 3G”, then reload to exaggerate loading states.' },
+
+  { id:'route', ico:'🧭', title:'Route Transitions', sev:'p2', url:'Navigate between pages', vp:'Desktop',
+    why:'Single-page navigation should feel instant and never crash or lose the URL.',
+    checks:[
+      {p:'p2', t:'Home → <code>/series</code> — no full white flash or crash'},
+      {p:'p2', t:'<code>/series</code> → a series page — smooth transition'},
+      {p:'p2', t:'Series page → product page — smooth transition'},
+      {p:'p1', t:'Browser <strong>Back</strong> returns to the previous page correctly'},
+      {p:'p2', t:'Browser <strong>Forward</strong> works'},
+      {p:'p2', t:'No red errors in the DevTools Console during navigation'},
+      {p:'p1', t:'The URL updates correctly on every navigation'},
+    ],
+    pass:['Smooth transitions, no crash','Back/Forward correct','URL stays in sync','Clean console'],
+    fail:['White flash / crash on navigate','Back button breaks','Stale URL','Console errors'],
+    tip:'Keep DevTools Console open (F12) while you click around to catch silent errors.' },
+
+  { id:'errors', ico:'🚧', title:'Error States', sev:'p1', url:'catchcomics.com/series/this-does-not-exist', vp:'Desktop',
+    why:'Bad URLs and missing data must degrade to a friendly 404, never a white crash.',
+    checks:[
+      {p:'p1', t:'<code>/series/this-does-not-exist</code> → a 404 page (not a white crash)'},
+      {p:'p1', t:'The 404 page links back to the homepage or <code>/series</code>'},
+      {p:'p2', t:'<code>/product/this-does-not-exist</code> → a 404 page'},
+      {p:'p2', t:'Broken cover images fall back gracefully (placeholder, not raw broken icon)'},
+      {p:'p3', t:'A failed search/API call shows a message, not a crash'},
+    ],
+    pass:['Bad URLs show branded 404 with a way back','Image fallbacks graceful'],
+    fail:['White crash screen on bad URL','404 with no navigation','Raw broken-image icons'] },
+
+  { id:'covers', ico:'🖼️', title:'Cover Quality', sev:'p1', url:'/series, series & product pages', vp:'Desktop',
+    why:'Covers carry the visual catalogue. Placeholders and fake “no preview” images erode trust.',
+    checks:[
+      {p:'p2', t:'Series index covers are sharp, not pixelated/stretched'},
+      {p:'p1', t:'No Google Books “no preview available” placeholder covers'},
+      {p:'p1', t:'No 1×1 / blank Open Library images'},
+      {p:'p1', t:'No grey or broken-icon covers on the key launch series'},
+      {p:'p2', t:'R2 covers (<code>images.catchcomics.com</code>) load quickly'},
+      {p:'p2', t:'Product hero cover is high-resolution'},
+      {p:'p2', t:'Aspect ratios consistent — no obvious stretching'},
+    ],
+    pass:['Sharp covers throughout','No placeholder/fake covers','Consistent aspect ratios'],
+    fail:['“No preview” placeholders','Blank/1×1 images','Pixelated or stretched covers'] },
+
+  { id:'recommendation', ico:'🎯', title:'Recommendation Quality', sev:'p1', url:'On a product page', vp:'Desktop',
+    why:'“Inside this collection” / “More issues in this series” must show the right comics — no cross-series bleed.',
+    checks:[
+      {p:'p1', t:'“Inside this collection” / “More issues” grid shows the correct series issues'},
+      {p:'p0', t:'No wrong-series contamination (e.g. Absolute Batman must not list The Invisibles)'},
+      {p:'p2', t:'Related / issue thumbnails load their covers'},
+      {p:'p2', t:'Issue numbers shown in order'},
+      {p:'p1', t:'Clicking a recommended issue loads the correct product'},
+      {p:'p1', t:'Recommendations are relevant to the comic being viewed'},
+    ],
+    pass:['Correct series issues, in order','No cross-series bleed','Clicks load the right product'],
+    fail:['Wrong series in the grid','Mismatched issue → product','Empty/broken recommendation block'],
+    tip:'The Absolute Batman → The Invisibles mismatch is the canonical failure to watch for here.' },
+
+  { id:'launch-readiness', ico:'✅', title:'Launch Readiness', sev:'p0', url:'Final gate — review all', vp:'—',
+    why:'The final pre-launch gate. Cross-checks the critical paths and feeds the launch verdict.',
+    checks:[
+      {p:'p0', t:'All critical sections above are marked Passed'},
+      {p:'p0', t:'No P0 issues are still Open in the register'},
+      {p:'p0', t:'Legal pages present: <code>/privacy</code> and <code>/affiliate-disclosure</code> load'},
+      {p:'p1', t:'<strong>hello@catchcomics.com</strong> mailbox is live and monitored'},
+      {p:'p0', t:'Affiliate redirect chain verified end-to-end (see Affiliate section)'},
+      {p:'p2', t:'Analytics + error monitoring confirmed live in production'},
+      {p:'p1', t:'17 series live with correct reading orders'},
+      {p:'p1', t:'Mobile experience confirmed usable'},
+    ],
+    pass:['All critical sections Passed','Zero open P0 issues','Legal + affiliate + mailbox confirmed'],
+    fail:['Any open P0','Critical section still failing','Missing legal page / dead mailbox'] },
+];
+
+const STATUSES = [
+  {key:'open', label:'Open', glyph:'○', cls:'stp-open'},
+  {key:'diagnosed', label:'Diagnosed', glyph:'◍', cls:'stp-diagnosed'},
+  {key:'in-progress', label:'Fix In Progress', glyph:'◐', cls:'stp-in-progress'},
+  {key:'fixed', label:'Fixed', glyph:'◑', cls:'stp-fixed'},
+  {key:'ready', label:'Ready For Verification', glyph:'◒', cls:'stp-ready'},
+  {key:'verified', label:'Verified', glyph:'●', cls:'stp-verified'},
+  {key:'closed', label:'Closed', glyph:'✓', cls:'stp-closed'},
+  {key:'positive', label:'Positive Observation', glyph:'★', cls:'stp-positive'},
+];
+const FLOW = ['open','diagnosed','in-progress','fixed','ready','verified','closed'];
+const OPEN_STATES = ['open','diagnosed','in-progress','fixed','ready'];
+
+const SEVS = [
+  {key:'p0', label:'P0 · Critical', short:'P0', glyph:'▲', cls:'sev-p0'},
+  {key:'p1', label:'P1 · High', short:'P1', glyph:'▲', cls:'sev-p1'},
+  {key:'p2', label:'P2 · Medium', short:'P2', glyph:'◆', cls:'sev-p2'},
+  {key:'p3', label:'P3 · Low / Question', short:'P3', glyph:'▼', cls:'sev-p3'},
+  {key:'positive', label:'Positive', short:'POS', glyph:'★', cls:'sev-positive'},
+];
+const COLORS = [
+  {key:'red', hex:'#DC2626', sev:'p0', label:'Critical', cat:''},
+  {key:'orange', hex:'#EA580C', sev:'p1', label:'High', cat:''},
+  {key:'yellow', hex:'#EAB308', sev:'p2', label:'Medium', cat:''},
+  {key:'blue', hex:'#2563EB', sev:'p3', label:'Question', cat:'Investigation'},
+  {key:'green', hex:'#16A34A', sev:'positive', label:'Positive', cat:'Positive'},
+];
+const CATEGORIES = ['UX','Visual','Data','Pricing','Trust','Affiliate','Performance','Accessibility','Content','Mobile','Navigation','Recommendation','SEO','Other'];
+const TOOLS = [
+  {key:'select', glyph:'⤧', label:'Select / move (V)'},
+  {key:'circle', glyph:'◯', label:'Circle (C)'},
+  {key:'rect', glyph:'▢', label:'Rectangle (R)'},
+  {key:'arrow', glyph:'↗', label:'Arrow (A)'},
+  {key:'pencil', glyph:'✎', label:'Pencil (P)'},
+  {key:'highlighter', glyph:'▰', label:'Highlighter (H)'},
+  {key:'text', glyph:'T', label:'Text (T)'},
+];
+
+/* ════════════════════════════════════════════════════════════════
+   STATE
+   ════════════════════════════════════════════════════════════════ */
+const KEY = 'cc-smoke-test-v3';   // V3 uses its own storage — isolated from V2 (no regression risk). Use Export → Import from V2 to pull a V2 session in.
+let state = loadState();
+let activeSection = state.activeSection || SECTIONS[0].id;
+let activeView = 'sections';
+let pendingReplace = null;        // shotId awaiting a paste-replace
+let issueFilter = { status:'all', sev:'all' };
+
+function blankState(){
+  return {
+    version:2, meta:{date:'', tester:'', device:'', env:'production'},
+    activeSection:SECTIONS[0].id, theme:'light',
+    sections:{}, screenshots:{}, shotOrder:[], issues:{}, issueSeq:0, shotSeq:0, verdict:null,
+  };
+}
+function loadState(){
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY));
+    if (s && s.version === 2) return s;
+  } catch(e){}
+  return blankState();
+}
+let saveTimer = null;
+function save(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(()=>{
+    try { localStorage.setItem(KEY, JSON.stringify(state)); }
+    catch(e){ toast('Storage full — export & clear old screenshots','err'); }
+  }, 200);
+}
+function sectionState(id){
+  if (!state.sections[id]) state.sections[id] = { checks:{}, notes:'', status:'not-started' };
+  return state.sections[id];
+}
+
+/* ════════════════════════════════════════════════════════════════
+   UTIL
+   ════════════════════════════════════════════════════════════════ */
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function $(sel, root){ return (root||document).querySelector(sel); }
+function $$(sel, root){ return Array.from((root||document).querySelectorAll(sel)); }
+function sev(key){ return SEVS.find(s=>s.key===key) || SEVS[0]; }
+function status(key){ return STATUSES.find(s=>s.key===key) || STATUSES[0]; }
+function color(key){ return COLORS.find(c=>c.key===key) || COLORS[0]; }
+function sectionDef(id){ return SECTIONS.find(s=>s.id===id); }
+function daysLeft(){ return Math.max(0, Math.ceil((LAUNCH_DATE - new Date())/86400000)); }
+function nowStamp(){ const d=new Date(); return d.toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
+function toast(msg, kind){
+  const t = document.createElement('div');
+  t.className = 'toast' + (kind?(' '+kind):'');
+  t.textContent = msg;
+  $('#toasts').appendChild(t);
+  setTimeout(()=>{ t.style.opacity='0'; t.style.transition='opacity .3s'; setTimeout(()=>t.remove(),300); }, 2200);
+}
+function calloutNum(issue){
+  const shot = state.screenshots[issue.shot];
+  if (!shot) return '–';
+  const i = shot.order.indexOf(issue.id);
+  return i<0 ? '–' : (i+1);
+}
+function sectionIssues(id){ return Object.values(state.issues).filter(i=>i.section===id); }
+function openIssues(){ return Object.values(state.issues).filter(i=>OPEN_STATES.includes(i.stat)); }
+
+/* ════════════════════════════════════════════════════════════════
+   METRICS
+   ════════════════════════════════════════════════════════════════ */
+function metrics(){
+  const issues = Object.values(state.issues);
+  const real = issues.filter(i=>i.sev!=='positive');
+  const m = {
+    total: issues.length,
+    positives: issues.filter(i=>i.sev==='positive').length,
+    open: issues.filter(i=>OPEN_STATES.includes(i.stat)).length,
+    verified: issues.filter(i=>i.stat==='verified').length,
+    closed: issues.filter(i=>i.stat==='closed').length,
+    p0:0,p1:0,p2:0,p3:0, p0open:0,p1open:0,p2open:0,p3open:0,
+  };
+  real.forEach(i=>{
+    m[i.sev]++;
+    if (OPEN_STATES.includes(i.stat)) m[i.sev+'open']++;
+  });
+  const passed = SECTIONS.filter(s=>sectionState(s.id).status==='passed').length;
+  const attempted = SECTIONS.filter(s=>['passed','failed','in-progress','blocked'].includes(sectionState(s.id).status)).length;
+  m.sectionsTotal = SECTIONS.length;
+  m.sectionsPassed = passed;
+  m.sectionsAttempted = attempted;
+  m.coverage = Math.round(passed / SECTIONS.length * 100);
+  const penalty = Math.min(100, m.p0open*40 + m.p1open*15 + m.p2open*5 + m.p3open*2);
+  m.issueHealth = 100 - penalty;
+  m.readiness = Math.max(0, Math.round(0.6*m.coverage + 0.4*m.issueHealth));
+  // recommendation
+  if (m.p0open > 0) m.rec = 'nogo';
+  else if (m.p1open > 0 || passed < SECTIONS.length) m.rec = 'conditions';
+  else m.rec = 'go';
+  m.effectiveRec = state.verdict || m.rec;
+  return m;
+}
+const REC_META = {
+  go:{label:'GO', icon:'✅', cls:'rec-go'},
+  conditions:{label:'GO WITH CONDITIONS', icon:'⚠️', cls:'rec-conditions'},
+  nogo:{label:'NO-GO', icon:'⛔', cls:'rec-nogo'},
+};
+
+/* ════════════════════════════════════════════════════════════════
+   GLOBAL CHROME (appbar + tabs)
+   ════════════════════════════════════════════════════════════════ */
+function updateChrome(){
+  const m = metrics();
+  $('#apb-label').textContent = `${m.sectionsPassed} / ${m.sectionsTotal}`;
+  $('#apb-fill').style.width = (m.sectionsPassed/m.sectionsTotal*100) + '%';
+  const rm = REC_META[m.effectiveRec];
+  const pill = $('#readiness-pill');
+  pill.className = 'readiness-pill ' + rm.cls;
+  $('#rec-icon').textContent = rm.icon;
+  $('#rec-text').textContent = rm.label;
+  $('#rec-pct').textContent = m.readiness + '%';
+  $('#tc-issues').textContent = m.total;
+}
+
+function switchView(v){
+  activeView = v;
+  $$('.tab').forEach(t=>t.setAttribute('aria-current', t.dataset.view===v ? 'page':'false'));
+  $$('.view').forEach(sec=>{
+    const on = sec.id === 'view-'+v;
+    sec.classList.toggle('active', on);
+    sec.hidden = !on;
+  });
+  if (v==='issues') renderIssues();
+  if (v==='dashboard') renderDashboard();
+  if (v==='launch') renderLaunch();
+  if (v==='export') renderExport();
+  window.scrollTo(0,0);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   SECTIONS — rail + panel
+   ════════════════════════════════════════════════════════════════ */
+function renderRail(){
+  const rail = $('#rail-list');
+  rail.innerHTML = SECTIONS.map((s,i)=>{
+    const st = sectionState(s.id).status;
+    const cur = s.id===activeSection;
+    const issueCount = sectionIssues(s.id).filter(x=>OPEN_STATES.includes(x.stat)).length;
+    return `<button class="rail-item" data-section="${s.id}" aria-current="${cur}">
+      <span class="rail-num">${String(i+1).padStart(2,'0')}</span>
+      <span class="rail-ico" aria-hidden="true">${s.ico}</span>
+      <span class="rail-title">${esc(s.title)}${issueCount?` <span style="color:var(--p0);font-weight:800">· ${issueCount}</span>`:''}</span>
+      <span class="rail-status"><span class="status-dot sd-${st}" title="${st}"></span></span>
+    </button>`;
+  }).join('');
+}
+
+function renderSection(){
+  const s = sectionDef(activeSection);
+  const ss = sectionState(s.id);
+  const idx = SECTIONS.findIndex(x=>x.id===s.id);
+  const sv = sev(s.sev);
+  const shots = state.shotOrder.map(id=>state.screenshots[id]).filter(sh=>sh && sh.section===s.id);
+  const issues = sectionIssues(s.id);
+
+  const stepsHTML = `
+    <div class="steps">
+      <div class="step"><span class="step-n">1</span><div class="step-t">Open</div><div class="step-d">${esc(s.url)}</div></div>
+      <div class="step"><span class="step-n">2</span><div class="step-t">Viewport</div><div class="step-d">${esc(s.vp)}</div></div>
+      <div class="step"><span class="step-n">3</span><div class="step-t">Check</div><div class="step-d">Work the checklist below</div></div>
+      <div class="step"><span class="step-n">4</span><div class="step-t">Pass</div><div class="step-d">All critical items hold</div></div>
+      <div class="step"><span class="step-n">5</span><div class="step-t">Fail</div><div class="step-d">Any critical item breaks</div></div>
+      <div class="step"><span class="step-n">6</span><div class="step-t">Capture</div><div class="step-d">Paste <code>Ctrl+V</code> a screenshot</div></div>
+      <div class="step"><span class="step-n">7</span><div class="step-t">Annotate</div><div class="step-d">Shapes auto-create issues</div></div>
+      <div class="step"><span class="step-n">8</span><div class="step-t">Complete</div><div class="step-d">Set status → Passed</div></div>
+    </div>`;
+
+  const checksHTML = s.checks.map((c,i)=>{
+    const id = `${s.id}-${i}`;
+    const done = !!ss.checks[id];
+    return `<label class="check ${done?'done':''}" for="chk-${id}">
+      <input type="checkbox" id="chk-${id}" data-check="${id}" ${done?'checked':''}>
+      <span class="ctext">${c.t}</span>
+      <span class="chip chip-${c.p}">${sev(c.p).glyph} ${sev(c.p).short}</span>
+    </label>`;
+  }).join('');
+
+  const passHTML = s.pass.map(x=>`<li>${esc(x)}</li>`).join('');
+  const failHTML = s.fail.map(x=>`<li>${esc(x)}</li>`).join('');
+
+  const shotsHTML = shots.length ? `<div class="shots-grid">${shots.map(renderShotCard).join('')}</div>` : '';
+
+  const issuesHTML = issues.length
+    ? `<div class="block-title" id="sec-issues">🐞 Issues in this section <span style="color:var(--faint);font-weight:600">(${issues.length})</span></div>
+       <div class="section-issues">${issues.map(i=>renderIssueCard(i)).join('')}</div>`
+    : '';
+
+  const statusOpts = [
+    {k:'in-progress', l:'In progress', g:'◐'},
+    {k:'passed', l:'Passed', g:'✓'},
+    {k:'failed', l:'Failed', g:'✕'},
+    {k:'blocked', l:'Blocked', g:'⚠'},
+  ].map(o=>`<button class="status-opt o-${o.k}" data-status="${o.k}" aria-pressed="${ss.status===o.k}">${o.g} ${o.l}</button>`).join('');
+
+  $('#section-panel').innerHTML = `
+  <article class="panel">
+    <div class="panel-head">
+      <div class="panel-eyebrow">
+        <span class="panel-num">SECTION ${String(idx+1).padStart(2,'0')} / 14</span>
+        <span class="sev-badge ${sv.cls}">${sv.glyph} ${sv.label}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span class="panel-ico" aria-hidden="true">${s.ico}</span>
+        <h1 class="panel-title">${esc(s.title)}</h1>
+      </div>
+      <p class="panel-why">${esc(s.why)}</p>
+    </div>
+
+    ${stepsHTML}
+
+    <div class="openbar">
+      <span class="lbl">Open</span>
+      <span class="url" id="open-url">${esc(s.url)}</span>
+      <button class="mini-btn" id="copy-url">Copy URL</button>
+      ${/^https?:/.test(s.url)?`<a class="mini-btn primary" href="${esc(s.url)}" target="_blank" rel="noopener">Open ↗</a>`:''}
+      <span class="vp">📐 ${esc(s.vp)}</span>
+    </div>
+
+    <div class="block-title">✓ Checklist — tick each as you verify</div>
+    <div class="checks">${checksHTML}</div>
+
+    <div class="pf-grid">
+      <div class="pf pass"><h4>✓ Pass criteria</h4><ul>${passHTML}</ul></div>
+      <div class="pf fail"><h4>✕ Fail criteria</h4><ul>${failHTML}</ul></div>
+    </div>
+
+    ${s.tip?`<div class="tip">${s.tip}</div>`:''}
+
+    <div class="notes">
+      <label for="notes-${s.id}">Section notes</label>
+      <textarea class="area" id="notes-${s.id}" data-notes placeholder="Anything you observed, context for issues, the awin URL, device details…">${esc(ss.notes)}</textarea>
+    </div>
+
+    <div class="block-title">📸 Screenshot workspace</div>
+    <div class="workspace">
+      <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Paste a screenshot">
+        <div class="dz-icon" aria-hidden="true">📋</div>
+        <div class="dz-main">Press <span class="dz-kbd"><kbd>Ctrl</kbd>+<kbd>V</kbd></span> to paste a screenshot</div>
+        <div class="dz-sub">Capture with <kbd>Win</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd> · or drag an image here · no uploads, no file pickers</div>
+        <div class="dz-actions">
+          <button class="mini-btn" id="paste-btn">📋 Paste from clipboard</button>
+          ${shots.length?`<button class="mini-btn" id="clear-shots">Clear all (${shots.length})</button>`:''}
+        </div>
+      </div>
+      ${shotsHTML}
+    </div>
+
+    ${issuesHTML}
+
+    <div class="section-foot">
+      <div>
+        <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:6px">Section status</div>
+        <div class="status-set">${statusOpts}</div>
+      </div>
+      <div class="nav-btns">
+        ${idx>0?`<button class="mini-btn" id="prev-sec">← ${esc(SECTIONS[idx-1].title)}</button>`:''}
+        ${idx<SECTIONS.length-1?`<button class="mini-btn primary" id="next-sec">${esc(SECTIONS[idx+1].title)} →</button>`:''}
+      </div>
+    </div>
+  </article>`;
+
+  wireSection();
+}
+
+function renderShotCard(sh){
+  const issues = sh.order.map(id=>state.issues[id]).filter(Boolean);
+  const mini = issues.map(i=>{
+    const c = color(i.color);
+    const a = anchor(i);
+    return `<div class="shot-callout-mini" style="left:${a.x/sh.w*100}%;top:${a.y/sh.h*100}%;background:${c.hex}">${calloutNum(i)}</div>`;
+  }).join('');
+  const svg = renderSVG(sh, true);
+  return `<div class="shot-card" data-shot="${sh.id}">
+    <button class="shot-thumb" data-edit="${sh.id}" aria-label="Annotate ${sh.code}">
+      <img src="${sh.src}" alt="Screenshot ${sh.code}">
+      <svg class="shot-svg" viewBox="0 0 ${sh.w} ${sh.h}" preserveAspectRatio="none" aria-hidden="true">${svg}</svg>
+      ${mini}
+      <span class="shot-overlay-edit"><span>✎ Annotate</span></span>
+    </button>
+    <div class="shot-foot">
+      <div><span class="shot-code">${sh.code}</span> <span class="shot-tags">· ${issues.length} callout${issues.length===1?'':'s'}</span></div>
+      <div class="shot-foot-btns">
+        <button class="tiny-btn" data-replace="${sh.id}">Replace</button>
+        <button class="tiny-btn danger" data-delshot="${sh.id}">Delete</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function wireSection(){
+  const s = sectionDef(activeSection);
+  $$('#section-panel [data-check]').forEach(cb=>cb.addEventListener('change',()=>{
+    sectionState(s.id).checks[cb.dataset.check] = cb.checked;
+    cb.closest('.check').classList.toggle('done', cb.checked);
+    save();
+  }));
+  const ta = $('#section-panel [data-notes]');
+  if (ta) ta.addEventListener('input',()=>{ sectionState(s.id).notes = ta.value; save(); });
+  $$('#section-panel .status-opt').forEach(b=>b.addEventListener('click',()=>{
+    const cur = sectionState(s.id).status;
+    sectionState(s.id).status = (cur===b.dataset.status) ? 'not-started' : b.dataset.status;
+    save(); renderRail(); renderSection(); updateChrome();
+    if (sectionState(s.id).status==='passed') toast('Section marked Passed','ok');
+  }));
+  const cu = $('#copy-url'); if (cu) cu.addEventListener('click',()=>{ copyText(s.url); toast('URL copied','ok'); });
+  const pv = $('#prev-sec'); if (pv) pv.addEventListener('click',()=>{ const i=SECTIONS.findIndex(x=>x.id===s.id); openSection(SECTIONS[i-1].id); });
+  const nx = $('#next-sec'); if (nx) nx.addEventListener('click',()=>{ const i=SECTIONS.findIndex(x=>x.id===s.id); openSection(SECTIONS[i+1].id); });
+
+  const dz = $('#dropzone');
+  if (dz){
+    dz.addEventListener('click',(e)=>{ if(e.target.closest('button'))return; pasteFromClipboard(); });
+    dz.addEventListener('keydown',(e)=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); pasteFromClipboard(); }});
+    dz.addEventListener('dragover',(e)=>{ e.preventDefault(); dz.classList.add('drag'); });
+    dz.addEventListener('dragleave',()=>dz.classList.remove('drag'));
+    dz.addEventListener('drop',(e)=>{
+      e.preventDefault(); dz.classList.remove('drag');
+      const f = e.dataTransfer.files[0];
+      if (f && f.type.startsWith('image/')) addImage(f);
+    });
+  }
+  const pb = $('#paste-btn'); if (pb) pb.addEventListener('click', pasteFromClipboard);
+  const cs = $('#clear-shots'); if (cs) cs.addEventListener('click',()=>{
+    if (!confirm('Delete all screenshots and their issues in this section?')) return;
+    state.shotOrder.filter(id=>state.screenshots[id] && state.screenshots[id].section===s.id).forEach(deleteShot);
+    save(); renderSection(); renderRail(); updateChrome();
+  });
+  $$('#section-panel [data-edit]').forEach(b=>b.addEventListener('click',()=>openEditor(b.dataset.edit)));
+  $$('#section-panel [data-replace]').forEach(b=>b.addEventListener('click',()=>{
+    pendingReplace = b.dataset.replace; toast('Press Ctrl+V to replace this screenshot','ok');
+  }));
+  $$('#section-panel [data-delshot]').forEach(b=>b.addEventListener('click',()=>{
+    if (!confirm('Delete this screenshot and its issues?')) return;
+    deleteShot(b.dataset.delshot); save(); renderSection(); renderRail(); updateChrome();
+  }));
+  wireIssueCards($('#section-panel'), ()=>{ renderSection(); renderRail(); updateChrome(); });
+}
+
+function openSection(id){
+  activeSection = id; state.activeSection = id; save();
+  renderRail(); renderSection();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+/* ════════════════════════════════════════════════════════════════
+   SCREENSHOTS — paste / process / add / replace / delete
+   ════════════════════════════════════════════════════════════════ */
+function processImage(blob){
+  return new Promise((res, rej)=>{
+    const img = new Image();
+    img.onload = ()=>{
+      const maxDim = 1600;
+      const scale = Math.min(1, maxDim/Math.max(img.width, img.height));
+      const w = Math.max(1, Math.round(img.width*scale)), h = Math.max(1, Math.round(img.height*scale));
+      const c = document.createElement('canvas'); c.width=w; c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      let src;
+      try { src = c.toDataURL('image/jpeg', 0.85); } catch(e){ src = c.toDataURL(); }
+      URL.revokeObjectURL(img.src);
+      res({src, w, h});
+    };
+    img.onerror = rej;
+    img.src = URL.createObjectURL(blob);
+  });
+}
+async function addImage(blob){
+  try {
+    const {src, w, h} = await processImage(blob);
+    if (pendingReplace && state.screenshots[pendingReplace]){
+      const sh = state.screenshots[pendingReplace];
+      sh.src = src; sh.w = w; sh.h = h;
+      const wasReplace = pendingReplace; pendingReplace = null;
+      save(); if (activeView==='sections') renderSection();
+      toast('Screenshot replaced — annotations kept','ok');
+      if ($('#editor').classList.contains('open') && currentEdit===wasReplace) renderEditor();
+      return;
+    }
+    state.shotSeq++;
+    const id = 'shot_'+state.shotSeq;
+    const code = 'IMG-'+state.shotSeq;
+    state.screenshots[id] = { id, code, section:activeSection, src, w, h, order:[], createdAt:Date.now() };
+    state.shotOrder.push(id);
+    save();
+    if (activeView!=='sections'){ switchView('sections'); }
+    renderSection(); renderRail();
+    toast('Screenshot added to '+sectionDef(activeSection).title+' — click to annotate','ok');
+  } catch(e){ toast('Could not read that image','err'); }
+}
+async function pasteFromClipboard(){
+  if (!navigator.clipboard || !navigator.clipboard.read){ toast('Use Ctrl+V to paste','err'); return; }
+  try {
+    const items = await navigator.clipboard.read();
+    for (const it of items){
+      const type = it.types.find(t=>t.startsWith('image/'));
+      if (type){ const blob = await it.getType(type); addImage(blob); return; }
+    }
+    toast('No image on the clipboard — capture one first','err');
+  } catch(e){ toast('Clipboard blocked — press Ctrl+V instead','err'); }
+}
+function deleteShot(id){
+  const sh = state.screenshots[id]; if (!sh) return;
+  sh.order.slice().forEach(iid=>{ delete state.issues[iid]; });
+  delete state.screenshots[id];
+  state.shotOrder = state.shotOrder.filter(x=>x!==id);
+}
+// Global paste — the hero workflow
+window.addEventListener('paste', (e)=>{
+  const items = e.clipboardData && e.clipboardData.items;
+  if (!items) return;
+  for (const it of items){
+    if (it.type && it.type.startsWith('image/')){
+      e.preventDefault();
+      const f = it.getAsFile();
+      if (f) addImage(f);
+      return;
+    }
+  }
+});
+
+/* ════════════════════════════════════════════════════════════════
+   ISSUE / MARKER MODEL
+   ════════════════════════════════════════════════════════════════ */
+function createIssue(shotId, colorKey, type, geom, text){
+  state.issueSeq++;
+  const id = 'CC-'+String(state.issueSeq).padStart(3,'0');
+  const sh = state.screenshots[shotId];
+  const col = color(colorKey);
+  const issue = {
+    id, section: sh.section, shot: shotId,
+    color: colorKey, type, geom, text: text||'',
+    sev: col.sev, category: col.cat || '',
+    desc:'', rec:'', stat: col.sev==='positive'?'positive':'open',
+    verify:'', url: sectionDef(sh.section).url, ts: Date.now(),
+  };
+  state.issues[id] = issue;
+  sh.order.push(id);
+  save();
+  return issue;
+}
+function deleteIssue(id){
+  const i = state.issues[id]; if(!i) return;
+  const sh = state.screenshots[i.shot];
+  if (sh) sh.order = sh.order.filter(x=>x!==id);
+  delete state.issues[id];
+  save();
+}
+// anchor point (natural coords) for a callout badge
+function anchor(i){
+  const g = i.geom;
+  switch(i.type){
+    case 'circle': return {x:g.cx, y:g.cy-g.ry};
+    case 'rect': return {x:g.x, y:g.y};
+    case 'arrow': return {x:g.x1, y:g.y1};
+    case 'text': return {x:g.x, y:g.y-2};
+    case 'pencil': case 'highlighter': return g.pts && g.pts.length ? {x:g.pts[0][0], y:g.pts[0][1]} : {x:0,y:0};
+    default: return {x:0,y:0};
+  }
+}
+function translateIssue(i, dx, dy){
+  const g = i.geom;
+  switch(i.type){
+    case 'circle': g.cx+=dx; g.cy+=dy; break;
+    case 'rect': g.x+=dx; g.y+=dy; break;
+    case 'arrow': g.x1+=dx; g.y1+=dy; g.x2+=dx; g.y2+=dy; break;
+    case 'text': g.x+=dx; g.y+=dy; break;
+    case 'pencil': case 'highlighter': g.pts = g.pts.map(p=>[p[0]+dx, p[1]+dy]); break;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   SVG RENDERING (shared by thumb + editor)
+   ════════════════════════════════════════════════════════════════ */
+function strokeW(sh){ return Math.max(3, sh.w*0.004); }
+function arrowPath(g, sw){
+  const ang = Math.atan2(g.y2-g.y1, g.x2-g.x1);
+  const len = sw*3.6;
+  const a1 = ang + Math.PI*0.82, a2 = ang - Math.PI*0.82;
+  const p1 = [g.x2 + len*Math.cos(a1), g.y2 + len*Math.sin(a1)];
+  const p2 = [g.x2 + len*Math.cos(a2), g.y2 + len*Math.sin(a2)];
+  return {head:`${g.x2},${g.y2} ${p1[0]},${p1[1]} ${p2[0]},${p2[1]}`};
+}
+function ptsToPath(pts){ return pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' '); }
+function shapeSVG(i, sh, selected){
+  const g=i.geom, c=color(i.color).hex, sw=strokeW(sh);
+  const selAttr = selected ? ` stroke-dasharray="${sw*2} ${sw*1.5}"` : '';
+  const common = `data-id="${i.id}" fill="none" stroke="${c}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"${selAttr}`;
+  switch(i.type){
+    case 'circle': return `<ellipse ${common} cx="${g.cx}" cy="${g.cy}" rx="${Math.abs(g.rx)}" ry="${Math.abs(g.ry)}"/>`;
+    case 'rect': return `<rect ${common} x="${Math.min(g.x,g.x+g.w)}" y="${Math.min(g.y,g.y+g.h)}" width="${Math.abs(g.w)}" height="${Math.abs(g.h)}" rx="${sw}"/>`;
+    case 'arrow': { const h=arrowPath(g,sw); return `<line ${common} x1="${g.x1}" y1="${g.y1}" x2="${g.x2}" y2="${g.y2}"/><polygon data-id="${i.id}" points="${h.head}" fill="${c}" stroke="${c}" stroke-width="${sw*0.5}" stroke-linejoin="round"/>`; }
+    case 'pencil': return `<path ${common} d="${ptsToPath(g.pts)}"/>`;
+    case 'highlighter': return `<path data-id="${i.id}" fill="none" stroke="${c}" stroke-opacity="0.4" stroke-width="${sh.w*0.022}" stroke-linecap="round" stroke-linejoin="round" d="${ptsToPath(g.pts)}"/>`;
+    case 'text': {
+      const fs = Math.max(16, sh.w*0.024);
+      const w = (i.text||'Text').length * fs*0.58 + fs*0.6;
+      return `<g data-id="${i.id}"><rect x="${g.x-fs*0.3}" y="${g.y-fs}" width="${w}" height="${fs*1.4}" rx="${fs*0.25}" fill="${c}"/><text x="${g.x}" y="${g.y+fs*0.1}" font-family="-apple-system,Segoe UI,sans-serif" font-size="${fs}" font-weight="700" fill="#fff">${esc(i.text||'Text')}</text></g>`;
+    }
+  }
+  return '';
+}
+function renderSVG(sh, plain){
+  return sh.order.map(id=>{ const i=state.issues[id]; return i?shapeSVG(i, sh, false):''; }).join('')
+    + (plain?'':'');
+}
+
+/* ════════════════════════════════════════════════════════════════
+   ANNOTATION EDITOR
+   ════════════════════════════════════════════════════════════════ */
+let currentEdit = null;
+let edTool = 'circle';
+let edColor = 'red';
+let edSelected = null;
+let draft = null;
+let dragMove = null;
+
+function openEditor(shotId){
+  currentEdit = shotId; edSelected = null;
+  const sh = state.screenshots[shotId];
+  $('#ed-code').textContent = sh.code + ' · ' + sectionDef(sh.section).title;
+  $('#ed-img').src = sh.src;
+  $('#ed-svg').setAttribute('viewBox', `0 0 ${sh.w} ${sh.h}`);
+  buildTools(); buildColors();
+  $('#ed-backdrop').classList.add('open');
+  $('#editor').classList.add('open');
+  renderEditor();
+  setTimeout(()=>$('#ed-done').focus(), 50);
+}
+function closeEditor(){
+  $('#ed-backdrop').classList.remove('open');
+  $('#editor').classList.remove('open');
+  currentEdit = null; draft = null; edSelected = null;
+  if (activeView==='sections') { renderSection(); renderRail(); }
+  updateChrome();
+  if (activeView==='issues') renderIssues();
+}
+function buildTools(){
+  $('#ed-tools').innerHTML = TOOLS.map(t=>`<button class="tool" data-tool="${t.key}" title="${t.label}" aria-label="${t.label}" aria-pressed="${edTool===t.key}">${t.glyph}</button>`).join('');
+  $$('#ed-tools .tool').forEach(b=>b.addEventListener('click',()=>{ edTool=b.dataset.tool; edSelected=null; buildTools(); renderEditor(); }));
+}
+function buildColors(){
+  $('#ed-colors').innerHTML = COLORS.map(c=>`<button class="swatch" data-color="${c.key}" title="${c.label}" aria-label="${c.label} (${sev(c.sev).short})" aria-pressed="${edColor===c.key}" style="background:${c.hex}"></button>`).join('');
+  $$('#ed-colors .swatch').forEach(b=>b.addEventListener('click',()=>{ edColor=b.dataset.color; buildColors(); }));
+}
+function renderEditor(){
+  const sh = state.screenshots[currentEdit]; if(!sh) return;
+  const svg = $('#ed-svg');
+  const draftSVG = draft ? shapeSVG({...draft, id:'__draft__'}, sh, false) : '';
+  svg.innerHTML = sh.order.map(id=>{ const i=state.issues[id]; return i?shapeSVG(i, sh, edSelected===id):''; }).join('') + draftSVG;
+  svg.classList.toggle('tool-draw', edTool!=='select');
+  // callouts
+  $('#ed-callouts').innerHTML = sh.order.map(id=>{
+    const i=state.issues[id]; if(!i) return '';
+    const a=anchor(i), c=color(i.color);
+    return `<div class="ed-callout ${edSelected===id?'sel':''}" data-callout="${id}" style="left:${a.x/sh.w*100}%;top:${a.y/sh.h*100}%;background:${c.hex}">${calloutNum(i)}</div>`;
+  }).join('');
+  $$('#ed-callouts .ed-callout').forEach(b=>b.addEventListener('click',()=>{
+    edSelected=b.dataset.callout; renderEditor();
+    const card=$(`#ed-cards [data-issue="${b.dataset.callout}"]`);
+    if(card){ card.scrollIntoView({block:'center'}); card.style.outline='3px solid var(--ring)'; setTimeout(()=>card.style.outline='',1200); }
+  }));
+  // cards
+  const issues = sh.order.map(id=>state.issues[id]).filter(Boolean);
+  $('#ed-cards').innerHTML = issues.length ? issues.map(i=>renderIssueCard(i, true)).join('')
+    : '<div style="font-size:13px;color:var(--muted);text-align:center;padding:20px">No callouts yet. Draw on the screenshot to create one.</div>';
+  wireIssueCards($('#ed-side'), ()=>renderEditor());
+}
+// pointer → svg coords
+function evtXY(e){
+  const sh = state.screenshots[currentEdit];
+  const r = $('#ed-svg').getBoundingClientRect();
+  const x = (e.clientX - r.left)/r.width*sh.w;
+  const y = (e.clientY - r.top)/r.height*sh.h;
+  return [Math.max(0,Math.min(sh.w,x)), Math.max(0,Math.min(sh.h,y))];
+}
+function edPointerDown(e){
+  if (!currentEdit) return;
+  const sh = state.screenshots[currentEdit];
+  const [x,y] = evtXY(e);
+  if (edTool==='select'){
+    const id = e.target && e.target.getAttribute && e.target.getAttribute('data-id');
+    if (id && state.issues[id]){ edSelected=id; dragMove={id, lastX:x, lastY:y, moved:false}; $('#ed-svg').setPointerCapture(e.pointerId); renderEditor(); }
+    else { edSelected=null; renderEditor(); }
+    return;
+  }
+  if (edTool==='text'){
+    const txt = prompt('Text label:'); if (txt===null||txt==='') return;
+    const fs = Math.max(16, sh.w*0.024);
+    const issue = createIssue(currentEdit, edColor, 'text', {x, y:y+fs*0.3}, txt);
+    autofill(issue); renderEditor(); return;
+  }
+  draft = { type:edTool, color:edColor, geom:null };
+  if (edTool==='circle') draft.geom={cx:x, cy:y, rx:0, ry:0, _ox:x, _oy:y};
+  else if (edTool==='rect') draft.geom={x, y, w:0, h:0};
+  else if (edTool==='arrow') draft.geom={x1:x, y1:y, x2:x, y2:y};
+  else if (edTool==='pencil'||edTool==='highlighter') draft.geom={pts:[[x,y]]};
+  $('#ed-svg').setPointerCapture(e.pointerId);
+}
+function edPointerMove(e){
+  if (!currentEdit) return;
+  const [x,y] = evtXY(e);
+  if (dragMove){
+    const i=state.issues[dragMove.id]; if(!i) return;
+    translateIssue(i, x-dragMove.lastX, y-dragMove.lastY);
+    dragMove.lastX=x; dragMove.lastY=y; dragMove.moved=true;
+    renderEditor(); return;
+  }
+  if (!draft) return;
+  const g=draft.geom;
+  if (draft.type==='circle'){ g.cx=(g._ox+x)/2; g.cy=(g._oy+y)/2; g.rx=Math.abs(x-g._ox)/2; g.ry=Math.abs(y-g._oy)/2; }
+  else if (draft.type==='rect'){ g.w=x-g.x; g.h=y-g.y; }
+  else if (draft.type==='arrow'){ g.x2=x; g.y2=y; }
+  else if (draft.type==='pencil'||draft.type==='highlighter'){ const last=g.pts[g.pts.length-1]; if(Math.hypot(x-last[0],y-last[1])>2) g.pts.push([x,y]); }
+  renderEditor();
+}
+function edPointerUp(e){
+  if (dragMove){ if(dragMove.moved) save(); dragMove=null; return; }
+  if (!draft) return;
+  const g=draft.geom; let valid=true;
+  if (draft.type==='circle') valid = g.rx>3 && g.ry>3;
+  else if (draft.type==='rect') valid = Math.abs(g.w)>5 && Math.abs(g.h)>5;
+  else if (draft.type==='arrow') valid = Math.hypot(g.x2-g.x1,g.y2-g.y1)>8;
+  else if (draft.type==='pencil'||draft.type==='highlighter') valid = g.pts.length>1;
+  if (valid){
+    if (draft.type==='circle'){ delete g._ox; delete g._oy; }
+    const issue = createIssue(currentEdit, draft.color, draft.type, g);
+    autofill(issue);
+    edSelected = issue.id;
+  }
+  draft=null; renderEditor();
+}
+function autofill(issue){
+  toast(`Callout #${calloutNum(issue)} → issue ${issue.id} created`, 'ok');
+}
+
+/* ════════════════════════════════════════════════════════════════
+   ISSUE CARD (editable; used in section, editor side, issues view)
+   ════════════════════════════════════════════════════════════════ */
+function renderIssueCard(i, compact){
+  const c = color(i.color);
+  const cn = calloutNum(i);
+  const sh = state.screenshots[i.shot];
+  const flow = FLOW.map((fk,idx)=>{
+    const curIdx = FLOW.indexOf(i.stat);
+    let cls=''; if (i.stat!=='positive'){ if (fk===i.stat) cls='active'; else if (curIdx>idx) cls='passed'; }
+    return `<span class="flow-step ${cls}">${status(fk).label.replace('Ready For Verification','Ready')}</span>` + (idx<FLOW.length-1?'<span class="flow-arrow">›</span>':'');
+  }).join('');
+  const stOpts = STATUSES.map(s=>`<option value="${s.key}" ${i.stat===s.key?'selected':''}>${s.glyph} ${s.label}</option>`).join('');
+  const sevOpts = SEVS.map(s=>`<option value="${s.key}" ${i.sev===s.key?'selected':''}>${s.glyph} ${s.label}</option>`).join('');
+  const catOpts = ['',...CATEGORIES].map(cat=>`<option value="${cat}" ${i.category===cat?'selected':''}>${cat||'— category —'}</option>`).join('');
+  const st = status(i.stat);
+  return `<div class="issue-card sev-l-${i.sev}" data-issue="${i.id}">
+    <div class="ic-head">
+      <span class="ic-callout" style="background:${c.hex}">${cn}</span>
+      <span class="ic-id">${i.id}</span>
+      <span class="sev-badge ${sev(i.sev).cls}" data-sevbadge>${sev(i.sev).glyph} ${sev(i.sev).short}</span>
+      <span class="ic-spacer"></span>
+      <span class="status-pill ${st.cls}" data-statpill>${st.glyph} ${st.label}</span>
+    </div>
+    <div class="ic-body">
+      <div class="status-flow">${flow}</div>
+      <div class="ic-row">
+        <div class="ic-field"><label>Severity</label><select data-f="sev">${sevOpts}</select></div>
+        <div class="ic-field"><label>Category</label><select data-f="category">${catOpts}</select></div>
+        <div class="ic-field"><label>Status</label><select data-f="stat">${stOpts}</select></div>
+      </div>
+      <div class="ic-field"><label>Description — what's wrong</label><textarea data-f="desc" placeholder="Describe the issue clearly…">${esc(i.desc)}</textarea></div>
+      <div class="ic-field"><label>Recommendation — how to fix</label><textarea data-f="rec" placeholder="What should change…">${esc(i.rec)}</textarea></div>
+      <div class="ic-field"><label>Verification — evidence the fix works</label><textarea data-f="verify" placeholder="Re-tested on …, screenshot IMG-…, confirmed.">${esc(i.verify)}</textarea></div>
+      <div class="ic-field"><label>URL</label><input data-f="url" value="${esc(i.url)}"></div>
+      <div class="ic-meta">
+        <span>📐 ${esc(sectionDef(i.section).title)}</span>
+        <span>🖼 <code>${sh?sh.code:'—'}</code> · Callout #${cn}</span>
+        <span>🕑 ${new Date(i.ts).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</span>
+      </div>
+    </div>
+    <div class="ic-foot">
+      ${i.stat!=='verified'?`<button class="mini-btn" data-act="verify">✓ Mark Verified</button>`:''}
+      ${i.stat==='verified'?`<button class="mini-btn" data-act="close">Close issue</button>`:''}
+      <button class="mini-btn" data-act="advance">Advance status ›</button>
+      ${!compact?`<button class="mini-btn" data-act="goshot">View screenshot</button>`:''}
+      <span style="flex:1"></span>
+      <button class="tiny-btn danger" data-act="del">Delete</button>
+    </div>
+  </div>`;
+}
+function wireIssueCards(root, after){
+  $$('[data-issue]', root).forEach(card=>{
+    const id = card.dataset.issue; const i = state.issues[id]; if(!i) return;
+    $$('select[data-f], input[data-f], textarea[data-f]', card).forEach(f=>{
+      const ev = f.tagName==='SELECT' ? 'change' : 'input';
+      f.addEventListener(ev, ()=>{
+        i[f.dataset.f] = f.value;
+        if (f.dataset.f==='sev'){
+          // keep colour roughly in sync with severity for the callout
+          const cm = COLORS.find(c=>c.sev===f.value); if (cm) i.color=cm.key;
+        }
+        save();
+        if (f.dataset.f==='sev' || f.dataset.f==='stat'){ refreshCard(card, i); updateChrome(); if(after) after(); }
+        else updateChrome();
+      });
+    });
+    $$('[data-act]', card).forEach(b=>b.addEventListener('click',()=>{
+      const act=b.dataset.act;
+      if (act==='del'){ if(!confirm('Delete issue '+id+'? This removes its callout too.'))return; deleteIssue(id); }
+      else if (act==='verify'){ i.stat='verified'; if(!i.verify) i.verify='Verified on '+nowStamp(); save(); }
+      else if (act==='close'){ i.stat='closed'; save(); }
+      else if (act==='advance'){ const idx=FLOW.indexOf(i.stat); if(idx>=0 && idx<FLOW.length-1){ i.stat=FLOW[idx+1]; save(); } }
+      else if (act==='goshot'){ openEditor(i.shot); return; }
+      if (after) after(); else { renderEditor && renderEditor(); }
+      updateChrome();
+      if (activeView==='issues') renderIssues();
+    }));
+  });
+}
+function refreshCard(card, i){
+  const fresh = document.createElement('div'); fresh.innerHTML = renderIssueCard(i, card.closest('#ed-side')?true:false);
+  const node = fresh.firstElementChild;
+  card.replaceWith(node);
+  wireIssueCards(node.parentElement, null);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   ISSUES VIEW
+   ════════════════════════════════════════════════════════════════ */
+function renderIssues(){
+  const fbox = $('#issue-filters');
+  const statusChips = [['all','All']].concat(STATUSES.map(s=>[s.key, s.label]));
+  const sevChips = [['all','All severities']].concat(SEVS.map(s=>[s.key, s.short]));
+  fbox.innerHTML =
+    `<span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Status</span>` +
+    statusChips.map(([k,l])=>`<button class="filter-chip" data-fstat="${k}" aria-pressed="${issueFilter.status===k}">${l}</button>`).join('') +
+    `<span style="width:8px"></span><span style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Severity</span>` +
+    sevChips.map(([k,l])=>`<button class="filter-chip" data-fsev="${k}" aria-pressed="${issueFilter.sev===k}">${l}</button>`).join('');
+  $$('#issue-filters [data-fstat]').forEach(b=>b.addEventListener('click',()=>{ issueFilter.status=b.dataset.fstat; renderIssues(); }));
+  $$('#issue-filters [data-fsev]').forEach(b=>b.addEventListener('click',()=>{ issueFilter.sev=b.dataset.fsev; renderIssues(); }));
+
+  let list = Object.values(state.issues);
+  if (issueFilter.status!=='all') list = list.filter(i=>i.stat===issueFilter.status);
+  if (issueFilter.sev!=='all') list = list.filter(i=>i.sev===issueFilter.sev);
+  list.sort((a,b)=>{ const o=['p0','p1','p2','p3','positive']; return o.indexOf(a.sev)-o.indexOf(b.sev) || a.ts-b.ts; });
+
+  const grid = $('#issues-grid');
+  if (!list.length){
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="es-ico">🐞</div><div style="font-weight:700;font-size:16px">No issues ${Object.keys(state.issues).length?'match this filter':'yet'}</div><div style="margin-top:4px">Annotate a screenshot in any test section to create one.</div></div>`;
+    return;
+  }
+  grid.innerHTML = list.map(i=>renderIssueCard(i)).join('');
+  wireIssueCards(grid, ()=>renderIssues());
+}
+
+/* ════════════════════════════════════════════════════════════════
+   DASHBOARD
+   ════════════════════════════════════════════════════════════════ */
+function ringSVG(pct, color){
+  const r=52, c=2*Math.PI*r, off=c*(1-pct/100);
+  return `<svg class="gauge" width="128" height="128" viewBox="0 0 128 128" aria-hidden="true">
+    <circle cx="64" cy="64" r="${r}" fill="none" stroke="var(--border)" stroke-width="12"/>
+    <circle cx="64" cy="64" r="${r}" fill="none" stroke="${color}" stroke-width="12" stroke-linecap="round"
+      stroke-dasharray="${c}" stroke-dashoffset="${off}" transform="rotate(-90 64 64)"/>
+    <text x="64" y="60" text-anchor="middle" font-size="30" font-weight="900" fill="var(--text)">${pct}</text>
+    <text x="64" y="80" text-anchor="middle" font-size="11" fill="var(--muted)" font-weight="700">PERCENT</text>
+  </svg>`;
+}
+function renderDashboard(){
+  const m = metrics();
+  const rm = REC_META[m.effectiveRec];
+  const recColor = m.effectiveRec==='go'?'var(--pos)':m.effectiveRec==='conditions'?'var(--p1)':'var(--p0)';
+  const sevTotal = m.p0+m.p1+m.p2+m.p3+m.positives;
+  const seg = (n,cls,lbl)=> n? `<span class="${cls}" style="flex:${n}" title="${lbl}: ${n}">${n}</span>`:'';
+  const sevbar = sevTotal ? `<div class="sevbar">${seg(m.p0,'b-p0','P0')}${seg(m.p1,'b-p1','P1')}${seg(m.p2,'b-p2','P2')}${seg(m.p3,'b-p3','P3')}${seg(m.positives,'b-pos','Positive')}</div>`
+    : `<div class="sevbar"><span class="b-none" style="flex:1">No issues logged</span></div>`;
+
+  const secrows = SECTIONS.map(s=>{
+    const ss=sectionState(s.id);
+    const total=s.checks.length, done=s.checks.filter((_,i)=>ss.checks[`${s.id}-${i}`]).length;
+    const stMap={'passed':'✓ Passed','failed':'✕ Failed','in-progress':'◐ In progress','blocked':'⚠ Blocked','not-started':'○ Not started'};
+    const barColor = ss.status==='failed'?'var(--p0)':ss.status==='blocked'?'var(--p2)':'var(--pos)';
+    return `<div class="secrow">
+      <span class="si">${s.ico}</span>
+      <span class="sn">${esc(s.title)} <span style="color:var(--muted);font-weight:600;font-size:11px">· ${stMap[ss.status]}</span></span>
+      <span class="sbar"><i style="width:${total?done/total*100:0}%;background:${barColor}"></i></span>
+      <span class="sc">${done}/${total}</span>
+    </div>`;
+  }).join('');
+
+  $('#dashboard-body').innerHTML = `
+    <h1 style="font-size:24px;font-weight:800;margin-bottom:4px">Command Centre</h1>
+    <p style="color:var(--muted);margin-bottom:18px">Live QA telemetry · ${daysLeft()} days to launch (1 July 2026)</p>
+    <div class="dash-hero">
+      <div class="card">
+        <h2>Launch Readiness</h2>
+        <div class="gauge-wrap">
+          ${ringSVG(m.readiness, recColor)}
+          <div class="gauge-meta">
+            <div class="big" style="color:${recColor}">${rm.icon} ${rm.label}</div>
+            <div class="lbl">${m.sectionsPassed}/${m.sectionsTotal} sections passed · ${m.coverage}% coverage · ${m.issueHealth}% issue health</div>
+            <div class="gauge-rec"><span class="sev-badge ${m.p0open?'sev-p0':m.p1open?'sev-p1':'sev-positive'}">${m.p0open} P0 · ${m.p1open} P1 open</span></div>
+          </div>
+        </div>
+        <div style="margin-top:16px">${sevbar}</div>
+      </div>
+      <div class="card">
+        <h2>Issue Totals</h2>
+        <div class="stat-grid">
+          <div class="stat"><div class="n">${m.total}</div><div class="l">Total</div></div>
+          <div class="stat"><div class="n" style="color:var(--st-prog)">${m.open}</div><div class="l">Open</div></div>
+          <div class="stat ok"><div class="n">${m.verified}</div><div class="l">Verified</div></div>
+          <div class="stat"><div class="n" style="color:var(--muted)">${m.closed}</div><div class="l">Closed</div></div>
+        </div>
+        <div class="stat-grid" style="margin-top:12px">
+          <div class="stat p0"><div class="n">${m.p0}</div><div class="l">▲ P0</div></div>
+          <div class="stat p1"><div class="n">${m.p1}</div><div class="l">▲ P1</div></div>
+          <div class="stat p2"><div class="n">${m.p2}</div><div class="l">◆ P2</div></div>
+          <div class="stat p3"><div class="n">${m.p3}</div><div class="l">▼ P3</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Section Completion — ${m.sectionsPassed}/${m.sectionsTotal} passed</h2>
+      <div class="seclist">${secrows}</div>
+    </div>`;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   LAUNCH CENTRE
+   ════════════════════════════════════════════════════════════════ */
+function renderLaunch(){
+  const m = metrics();
+  const rm = REC_META[m.effectiveRec];
+  const reasons = [];
+  if (m.p0open>0) reasons.push(`${m.p0open} P0 (critical) issue${m.p0open>1?'s':''} still open`);
+  if (m.p1open>0) reasons.push(`${m.p1open} P1 (high) issue${m.p1open>1?'s':''} still open`);
+  if (m.sectionsPassed<m.sectionsTotal) reasons.push(`${m.sectionsTotal-m.sectionsPassed} section${m.sectionsTotal-m.sectionsPassed>1?'s':''} not yet passed`);
+  const reasonText = reasons.length ? reasons.join(' · ') : 'All critical sections passed and no blocking issues open.';
+
+  const risks = openIssues().filter(i=>i.sev==='p0'||i.sev==='p1')
+    .sort((a,b)=>(a.sev>b.sev?1:-1))
+    .map(i=>`<div class="risk"><span class="rsev sev-badge ${sev(i.sev).cls}">${sev(i.sev).glyph} ${sev(i.sev).short}</span>
+      <span class="rtext"><b>${i.id}</b> · ${esc(sectionDef(i.section).title)} · <span class="status-pill ${status(i.stat).cls}" style="font-size:10px;padding:1px 7px">${status(i.stat).glyph} ${status(i.stat).label}</span><br>${esc(i.desc||'(no description yet)')}</span></div>`).join('');
+
+  const secChecklist = SECTIONS.filter(s=>s.sev==='p0').map(s=>{
+    const st=sectionState(s.id).status;
+    const ok = st==='passed';
+    return `<div class="risk" style="border-color:${ok?'var(--pos-bd)':'var(--border)'}">
+      <span class="rsev">${ok?'✅':st==='failed'?'❌':st==='blocked'?'⚠️':'⬜'}</span>
+      <span class="rtext"><b>${esc(s.title)}</b> — ${ok?'Passed':st==='not-started'?'Not started':st}</span></div>`;
+  }).join('');
+
+  $('#launch-body').innerHTML = `
+    <h1 style="font-size:24px;font-weight:800;margin-bottom:4px">Launch Command Centre</h1>
+    <p style="color:var(--muted);margin-bottom:18px">The final screen before you ship. ${daysLeft()} days to launch.</p>
+
+    <div class="launch-banner ${rm.cls}">
+      <div style="font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)">Launch Recommendation</div>
+      <div class="lb-verdict">${rm.icon} ${rm.label}</div>
+      <div class="lb-sub">Computed launch readiness: <b>${m.readiness}%</b></div>
+      <div class="lb-reasons">${esc(reasonText)}</div>
+      ${state.verdict?`<div style="margin-top:8px;font-size:12px;color:var(--muted)">Manual override active (computed: ${REC_META[m.rec].label}). <button class="tiny-btn" id="clear-override">Clear override</button></div>`:''}
+      <div class="override">
+        <button class="ov-btn ${m.effectiveRec==='go'?'sel-go':''}" data-ov="go">✅ GO</button>
+        <button class="ov-btn ${m.effectiveRec==='conditions'?'sel-conditions':''}" data-ov="conditions">⚠️ GO WITH CONDITIONS</button>
+        <button class="ov-btn ${m.effectiveRec==='nogo'?'sel-nogo':''}" data-ov="nogo">⛔ NO-GO</button>
+      </div>
+    </div>
+
+    <div class="stat-grid" style="margin-bottom:16px">
+      <div class="stat p0"><div class="n">${m.p0open}</div><div class="l">▲ P0 Open</div></div>
+      <div class="stat p1"><div class="n">${m.p1open}</div><div class="l">▲ P1 Open</div></div>
+      <div class="stat p2"><div class="n">${m.p2open}</div><div class="l">◆ P2 Open</div></div>
+      <div class="stat p3"><div class="n">${m.p3open}</div><div class="l">▼ P3 Open</div></div>
+    </div>
+    <div class="stat-grid" style="margin-bottom:18px">
+      <div class="stat ok"><div class="n">${m.verified}</div><div class="l">✓ Verified Fixes</div></div>
+      <div class="stat"><div class="n" style="color:var(--muted)">${m.closed}</div><div class="l">Closed</div></div>
+      <div class="stat"><div class="n">${m.sectionsPassed}/${m.sectionsTotal}</div><div class="l">Sections Passed</div></div>
+      <div class="stat"><div class="n" style="color:var(--pos)">${m.positives}</div><div class="l">★ Positives</div></div>
+    </div>
+
+    <div class="dash-hero" style="grid-template-columns:1fr 1fr">
+      <div class="card">
+        <h2>Outstanding Risks (open P0 / P1)</h2>
+        ${risks || '<div class="empty-state" style="padding:24px"><div class="es-ico">🎉</div><div style="font-weight:700">No blocking risks open</div></div>'}
+      </div>
+      <div class="card">
+        <h2>Critical Section Gate</h2>
+        <div class="risk-list">${secChecklist}</div>
+      </div>
+    </div>`;
+
+  $$('#launch-body [data-ov]').forEach(b=>b.addEventListener('click',()=>{
+    state.verdict = state.verdict===b.dataset.ov ? null : b.dataset.ov;
+    save(); renderLaunch(); updateChrome();
+  }));
+  const co=$('#clear-override'); if(co) co.addEventListener('click',()=>{ state.verdict=null; save(); renderLaunch(); updateChrome(); });
+}
+
+/* ════════════════════════════════════════════════════════════════
+   EXPORTS
+   ════════════════════════════════════════════════════════════════ */
+function mdHeader(){
+  const m=metrics();
+  return `# Catch Comics — Smoke Test V3 Report\n\n`+
+    `- **Date:** ${state.meta.date||nowStamp()}\n- **Tester:** ${state.meta.tester||'—'}\n- **Device:** ${state.meta.device||'—'}\n`+
+    `- **Environment:** ${state.meta.env}\n- **Launch readiness:** ${m.readiness}% · **Recommendation:** ${REC_META[m.effectiveRec].label}\n\n`;
+}
+function buildSmokeReport(){
+  let o = mdHeader();
+  SECTIONS.forEach((s,idx)=>{
+    const ss=sectionState(s.id);
+    const stMap={'passed':'✅ PASSED','failed':'❌ FAILED','in-progress':'🔵 IN PROGRESS','blocked':'⚠️ BLOCKED','not-started':'⬜ NOT STARTED'};
+    o += `## ${idx+1}. ${s.title} — ${stMap[ss.status]}\n`;
+    o += `*${s.url} · ${s.vp}*\n\n`;
+    s.checks.forEach((c,i)=>{ const done=ss.checks[`${s.id}-${i}`]; o += `- [${done?'x':' '}] (${sev(c.p).short}) ${c.t.replace(/<[^>]+>/g,'')}\n`; });
+    if (ss.notes) o += `\n**Notes:** ${ss.notes}\n`;
+    const iss=sectionIssues(s.id);
+    if (iss.length){ o += `\n**Issues:** ${iss.map(i=>i.id+' ('+sev(i.sev).short+'/'+status(i.stat).label+')').join(', ')}\n`; }
+    o += `\n`;
+  });
+  return o;
+}
+function buildIssueRegister(){
+  const list=Object.values(state.issues).sort((a,b)=>{const o=['p0','p1','p2','p3','positive'];return o.indexOf(a.sev)-o.indexOf(b.sev)||a.ts-b.ts;});
+  let o = mdHeader() + `## Issue Register (${list.length})\n\n`;
+  if(!list.length) return o+'_No issues logged._\n';
+  o += `| ID | Sev | Status | Section | Callout | Category | Description |\n|----|-----|--------|---------|---------|----------|-------------|\n`;
+  list.forEach(i=>{ o += `| ${i.id} | ${sev(i.sev).short} | ${status(i.stat).label} | ${sectionDef(i.section).title} | ${state.screenshots[i.shot]?state.screenshots[i.shot].code:'—'} #${calloutNum(i)} | ${i.category||'—'} | ${(i.desc||'').replace(/\n/g,' ').replace(/\|/g,'/')||'—'} |\n`; });
+  return o;
+}
+function buildIssueCards(){
+  const list=Object.values(state.issues).sort((a,b)=>{const o=['p0','p1','p2','p3','positive'];return o.indexOf(a.sev)-o.indexOf(b.sev)||a.ts-b.ts;});
+  let o = mdHeader() + `## Issue Cards — detailed (${list.length})\n\n`;
+  if(!list.length) return o+'_No issues logged._\n';
+  list.forEach(i=>{
+    const sh=state.screenshots[i.shot];
+    o += `### ${i.id} · ${sev(i.sev).label} · ${status(i.stat).label}\n`;
+    o += `- **Section:** ${sectionDef(i.section).title}\n- **URL:** ${i.url}\n- **Screenshot:** ${sh?sh.code:'—'} · Callout #${calloutNum(i)}\n- **Category:** ${i.category||'—'}\n`;
+    o += `- **Description:** ${i.desc||'—'}\n- **Recommendation:** ${i.rec||'—'}\n- **Verification:** ${i.verify||'—'}\n- **Logged:** ${new Date(i.ts).toLocaleString('en-GB')}\n\n`;
+  });
+  return o;
+}
+function buildLaunchSummary(){
+  const m=metrics();
+  let o = mdHeader() + `## Launch Readiness Summary\n\n`;
+  o += `**Recommendation: ${REC_META[m.effectiveRec].label}** (computed ${REC_META[m.rec].label}${state.verdict?', manually overridden':''})\n\n`;
+  o += `- Launch readiness: **${m.readiness}%** (coverage ${m.coverage}% · issue health ${m.issueHealth}%)\n`;
+  o += `- Sections passed: ${m.sectionsPassed}/${m.sectionsTotal}\n`;
+  o += `- Open — P0: ${m.p0open} · P1: ${m.p1open} · P2: ${m.p2open} · P3: ${m.p3open}\n`;
+  o += `- Verified fixes: ${m.verified} · Closed: ${m.closed} · Positives: ${m.positives}\n\n`;
+  const risks=openIssues().filter(i=>i.sev==='p0'||i.sev==='p1');
+  o += `### Outstanding risks (${risks.length})\n`;
+  o += risks.length ? risks.map(i=>`- **${i.id}** (${sev(i.sev).short}, ${status(i.stat).label}) ${sectionDef(i.section).title}: ${i.desc||'(no description)'}`).join('\n')+'\n' : '_None._\n';
+  return o;
+}
+function buildVerificationReport(){
+  const list=Object.values(state.issues).filter(i=>['fixed','ready','verified'].includes(i.stat));
+  let o = mdHeader() + `## Verification Report (${list.length})\n\n`;
+  if(!list.length) return o+'_No issues are in a verification state yet._\n';
+  ['ready','fixed','verified'].forEach(stk=>{
+    const g=list.filter(i=>i.stat===stk); if(!g.length) return;
+    o += `### ${status(stk).label} (${g.length})\n`;
+    g.forEach(i=>{ o += `- **${i.id}** ${sectionDef(i.section).title} (${sev(i.sev).short}): ${i.desc||'—'}\n  - Verification: ${i.verify||'_pending_'}\n`; });
+    o += `\n`;
+  });
+  return o;
+}
+const EXPORTS = [
+  {id:'smoke', ico:'🧪', title:'Smoke Test Report', desc:'Every section, status, checklist and notes.', fn:buildSmokeReport},
+  {id:'register', ico:'📋', title:'Issue Register', desc:'All issues as a Markdown table.', fn:buildIssueRegister},
+  {id:'cards', ico:'🃏', title:'Issue Cards', desc:'Detailed per-issue — paste to Claude to fix.', fn:buildIssueCards},
+  {id:'launch', ico:'🚀', title:'Launch Readiness Summary', desc:'Verdict, metrics and outstanding risks.', fn:buildLaunchSummary},
+  {id:'verify', ico:'✅', title:'Verification Report', desc:'Issues in Fixed / Ready / Verified states.', fn:buildVerificationReport},
+];
+/* ─── V3: render an annotated screenshot to a data URL (for embedding) ─── */
+async function renderShotDataURL(sh, mime, quality){
+  return new Promise(res=>{
+    const img=new Image();
+    img.onload=()=>{
+      const c=document.createElement('canvas'); c.width=sh.w; c.height=sh.h;
+      const ctx=c.getContext('2d'); ctx.drawImage(img,0,0,sh.w,sh.h);
+      sh.order.forEach(id=>{ const i=state.issues[id]; if(i) drawMarkerCtx(ctx,i,sh); });
+      try{ res(c.toDataURL(mime||'image/jpeg', quality||0.85)); }catch(e){ res(null); }
+    };
+    img.onerror=()=>res(null);
+    img.src=sh.src;
+  });
+}
+
+/* ─── V3: import a V2 session (V2 stays untouched) ─── */
+function hasV2Data(){
+  try{ const r=localStorage.getItem('cc-smoke-test-v2'); if(!r) return false;
+    const s=JSON.parse(r);
+    return !!(s && ((s.shotOrder&&s.shotOrder.length)||(s.issues&&Object.keys(s.issues).length)||(s.sections&&Object.keys(s.sections).length)));
+  }catch(e){ return false; }
+}
+function importFromV2(){
+  let raw; try{ raw=localStorage.getItem('cc-smoke-test-v2'); }catch(e){}
+  if(!raw){ toast('No V2 session found in this browser','err'); return; }
+  if(!confirm('Import your Smoke Test V2 session into V3?\n\nThis copies your V2 testing into V3 and replaces the current V3 data. Smoke Test V2 itself is not changed.')) return;
+  try{
+    const s=JSON.parse(raw);
+    localStorage.setItem(KEY, JSON.stringify(s));
+    state=loadState(); activeSection=state.activeSection||SECTIONS[0].id;
+    applyTheme();
+    const md=$('#meta-date'), mt=$('#meta-tester'), mv=$('#meta-device'), me=$('#meta-env');
+    if(md) md.value=state.meta.date||''; if(mt) mt.value=state.meta.tester||''; if(mv) mv.value=state.meta.device||''; if(me) me.value=state.meta.env||'production';
+    renderRail(); renderSection(); updateChrome(); renderExport();
+    toast('Imported V2 session into V3','ok');
+  }catch(e){ toast('Could not import V2 data','err'); }
+}
+
+/* ─── V3: self-contained master report (HTML with embedded evidence) ─── */
+async function buildMasterReportHTML(){
+  const m=metrics();
+  const SEVH={p0:'#DC2626',p1:'#EA580C',p2:'#B45309',p3:'#2563EB',positive:'#16A34A'};
+  const STH={open:'#6B7280',diagnosed:'#6366F1','in-progress':'#3B82F6',fixed:'#0D9488',ready:'#8B5CF6',verified:'#16A34A',closed:'#334155',positive:'#16A34A'};
+  const STW={passed:'PASSED',failed:'FAILED','in-progress':'IN PROGRESS',blocked:'BLOCKED','not-started':'NOT STARTED'};
+  const STC={passed:'#16A34A',failed:'#DC2626','in-progress':'#3B82F6',blocked:'#B45309','not-started':'#9CA3AF'};
+  const verifWord=i=>(i.stat==='verified'||i.stat==='closed')?'Passed':i.stat==='ready'?'Awaiting check':i.stat==='fixed'?'Fix pending check':'Pending';
+  const repSev=k=>`<span class="rb" style="background:${SEVH[k]}1a;color:${SEVH[k]};border-color:${SEVH[k]}">${sev(k).glyph} ${esc(sev(k).short)}</span>`;
+  const repStat=k=>`<span class="rb" style="background:${STH[k]}1a;color:${STH[k]};border-color:${STH[k]}">${status(k).glyph} ${esc(status(k).label)}</span>`;
+
+  // Pre-render every annotated screenshot to an embedded JPEG data URL
+  const shotImg={};
+  for(const id of state.shotOrder){ const sh=state.screenshots[id]; if(sh) shotImg[id]=await renderShotDataURL(sh,'image/jpeg',0.85); }
+
+  let body='', toc='';
+  SECTIONS.forEach((s,idx)=>{
+    const ss=sectionState(s.id), nn=String(idx+1).padStart(2,'0');
+    const stCol=STC[ss.status], stWord=STW[ss.status];
+    toc+=`<a href="#sec-${s.id}"><span>${nn}. ${esc(s.title)}</span><span class="toc-st" style="color:${stCol}">${stWord}</span></a>`;
+    const doneN=s.checks.filter((_,i)=>ss.checks[`${s.id}-${i}`]).length;
+    const chk=s.checks.map((c,i)=>{ const done=!!ss.checks[`${s.id}-${i}`];
+      return `<li class="${done?'ok':'no'}"><span class="ck">${done?'✓':'▢'}</span><span class="cs" style="color:${SEVH[c.p]}">${esc(sev(c.p).short)}</span> ${esc(c.t.replace(/<[^>]+>/g,''))}</li>`; }).join('');
+    const shots=state.shotOrder.map(id=>state.screenshots[id]).filter(sh=>sh&&sh.section===s.id);
+    let ev='';
+    if(shots.length){
+      shots.forEach(sh=>{
+        const issues=sh.order.map(id=>state.issues[id]).filter(Boolean);
+        const legend=issues.map(i=>`<span class="lg" style="background:${color(i.color).hex}">${calloutNum(i)}</span>`).join('');
+        ev+=`<figure class="ev">${shotImg[sh.id]?`<img src="${shotImg[sh.id]}" alt="Annotated screenshot ${esc(sh.code)}">`:'<div class="noimg">[image unavailable]</div>'}<figcaption><b>${esc(sh.code)}</b> · ${esc(sectionDef(sh.section).title)} · ${issues.length} callout(s) ${legend}</figcaption></figure>`;
+        ev+=issues.map(i=>{
+          const cn=calloutNum(i), passed=(i.stat==='verified'||i.stat==='closed');
+          const vc=passed?'#16A34A':'#9CA3AF';
+          return `<div class="card" style="border-left-color:${SEVH[i.sev]||'#ccc'}">
+            <div class="card-h"><span class="co" style="background:${color(i.color).hex}">#${cn}</span><b>Issue ${esc(i.id)}</b> ${repSev(i.sev)} ${repStat(i.stat)} <span class="rb" style="background:${vc}1a;color:${vc};border-color:${vc}">Verification: ${esc(verifWord(i))}</span></div>
+            <table class="kv">
+              <tr><td>Category</td><td>${esc(i.category||'—')}</td></tr>
+              <tr><td>Issue</td><td>${esc(i.desc||'—')}</td></tr>
+              <tr><td>Recommendation</td><td>${esc(i.rec||'—')}</td></tr>
+              <tr><td>Verification notes</td><td>${esc(i.verify||'—')}</td></tr>
+              <tr><td>Evidence</td><td>${esc(sh.code)} · Callout #${cn}</td></tr>
+              <tr><td>URL</td><td>${esc(i.url||'—')}</td></tr>
+              <tr><td>Logged</td><td>${esc(new Date(i.ts).toLocaleString('en-GB'))}</td></tr>
+            </table></div>`;
+        }).join('');
+      });
+    } else {
+      ev='<p class="muted">No screenshot evidence or issues logged for this section.</p>';
+    }
+    body+=`<section class="sec" id="sec-${s.id}">
+      <h2><span class="num">${nn}</span> ${s.ico} ${esc(s.title)} <span class="st" style="background:${stCol}1a;color:${stCol};border-color:${stCol}">${stWord}</span></h2>
+      <div class="smeta">${esc(s.url)} · ${esc(s.vp)} — ${esc(s.why)}</div>
+      <h3>Checklist Results <span class="muted">(${doneN}/${s.checks.length})</span></h3>
+      <ul class="chk">${chk}</ul>
+      <h3>Notes</h3>
+      <div class="notes">${ss.notes?esc(ss.notes):'<span class="muted">—</span>'}</div>
+      <h3>Issue Cards &amp; Annotated Evidence</h3>
+      ${ev}
+    </section>`;
+  });
+
+  const risks=openIssues().filter(i=>i.sev==='p0'||i.sev==='p1').map(i=>`<li>${repSev(i.sev)} <b>${esc(i.id)}</b> · ${esc(sectionDef(i.section).title)} — ${esc(i.desc||'(no description)')}</li>`).join('') || '<li class="muted">None — no open P0 / P1 issues.</li>';
+  const allIssues=Object.values(state.issues).sort((a,b)=>{const o=['p0','p1','p2','p3','positive'];return o.indexOf(a.sev)-o.indexOf(b.sev)||a.ts-b.ts;});
+  const idxRows=allIssues.map(i=>`<tr><td>${esc(i.id)}</td><td style="color:${SEVH[i.sev]};font-weight:700">${esc(sev(i.sev).short)}</td><td>${esc(status(i.stat).label)}</td><td>${esc(sectionDef(i.section).title)}</td><td>${state.screenshots[i.shot]?esc(state.screenshots[i.shot].code):'—'} #${calloutNum(i)}</td><td>${esc(i.desc||'—')}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">No issues logged.</td></tr>';
+  const secComp=SECTIONS.map((s,i)=>{ const ss=sectionState(s.id); return `<tr><td>${String(i+1).padStart(2,'0')}. ${esc(s.title)}</td><td style="color:${STC[ss.status]};font-weight:700">${STW[ss.status]}</td></tr>`; }).join('');
+  const recMeta=REC_META[m.effectiveRec];
+
+  const CSS=`*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111827;background:#F3F4F6;line-height:1.55;font-size:14px;padding:24px;max-width:1000px;margin:0 auto}h1{font-size:22px}h2{font-size:18px}h3{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:#6B7280;margin:16px 0 8px}.rhead{display:flex;align-items:center;gap:14px;border-bottom:3px solid #E8272A;padding-bottom:16px;margin-bottom:20px}.logo{width:44px;height:44px;border-radius:10px;background:#E8272A;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:24px;flex-shrink:0}.sub{font-size:12px;color:#6B7280;margin-top:3px}.summary{background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:18px;margin-bottom:14px;display:grid;grid-template-columns:1fr auto;gap:18px;align-items:center}.meta-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.meta-grid span{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#9CA3AF;font-weight:700}.meta-grid b{font-size:15px}.verdict{text-align:center;border-radius:12px;padding:14px 24px;border:2px solid}.verdict .big{font-size:36px;font-weight:900;line-height:1}.verdict .vl{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#6B7280;margin-top:2px}.verdict .rec{font-weight:800;margin-top:8px;font-size:13px}.v-go{background:#F0FDF4;border-color:#16A34A;color:#15803D}.v-conditions{background:#FFF7ED;border-color:#EA580C;color:#C2410C}.v-nogo{background:#FEF2F2;border-color:#DC2626;color:#B91C1C}.tots{grid-column:1/-1;display:grid;grid-template-columns:repeat(8,1fr);gap:8px;border-top:1px solid #E5E7EB;padding-top:14px}.tots .t{text-align:center;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:9px 4px}.tots .t b{font-size:22px;display:block;line-height:1}.tots .t span{font-size:10px;color:#6B7280;text-transform:uppercase;letter-spacing:.04em}.cols{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}.panel{background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:16px}table.comp,table.idx{width:100%;border-collapse:collapse;font-size:12.5px}table.comp td{padding:5px 4px;border-bottom:1px solid #F3F4F6}.risks{list-style:none;display:flex;flex-direction:column;gap:7px;font-size:12.5px}.risks li{padding:8px 10px;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px}.toc{background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:12px 16px;margin-bottom:22px;display:grid;grid-template-columns:repeat(2,1fr);gap:2px}.toc a{display:flex;justify-content:space-between;gap:10px;text-decoration:none;color:#111827;font-size:12.5px;padding:5px 7px;border-radius:6px}.toc a:hover{background:#F3F4F6}.toc-st{font-size:10px;font-weight:800;text-transform:uppercase;white-space:nowrap}.sec{background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:20px;margin-bottom:16px}.sec h2{display:flex;align-items:center;gap:10px;border-bottom:1px solid #E5E7EB;padding-bottom:12px;flex-wrap:wrap}.sec .num{font-size:12px;color:#9CA3AF;font-weight:800}.st{font-size:11px;font-weight:800;padding:2px 10px;border-radius:99px;border:1px solid;text-transform:uppercase}.smeta{font-size:12px;color:#6B7280;margin-top:8px}ul.chk{list-style:none;display:flex;flex-direction:column;gap:4px}ul.chk li{font-size:13px;display:flex;gap:8px;align-items:baseline}ul.chk li.no{color:#9CA3AF}ul.chk .ck{font-weight:900;color:#16A34A;width:14px;flex-shrink:0}ul.chk li.no .ck{color:#D1D5DB}ul.chk .cs{font-size:10px;font-weight:800;width:24px;flex-shrink:0}.notes{font-size:13px;white-space:pre-wrap;background:#F9FAFB;border:1px solid #F3F4F6;border-radius:8px;padding:10px 12px}figure.ev{margin:14px 0 10px;border:1px solid #E5E7EB;border-radius:10px;overflow:hidden;page-break-inside:avoid}figure.ev img{width:100%;display:block;background:#fff}figure.ev figcaption{font-size:12px;color:#374151;padding:9px 12px;background:#F9FAFB;border-top:1px solid #E5E7EB;display:flex;align-items:center;gap:8px;flex-wrap:wrap}.lg{display:inline-grid;place-items:center;width:19px;height:19px;border-radius:50%;color:#fff;font-size:10px;font-weight:800;border:1.5px solid #fff;box-shadow:0 0 0 1px #D1D5DB}.card{border:1px solid #E5E7EB;border-left:4px solid #ccc;border-radius:10px;padding:12px 13px;margin:10px 0;page-break-inside:avoid}.card-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px}.co{display:inline-grid;place-items:center;width:23px;height:23px;border-radius:50%;color:#fff;font-size:11px;font-weight:800;flex-shrink:0}.rb{font-size:10.5px;font-weight:800;padding:2px 9px;border-radius:99px;border:1px solid;white-space:nowrap}table.kv{width:100%;border-collapse:collapse;font-size:12.5px}table.kv td{padding:6px;vertical-align:top;border-bottom:1px solid #F3F4F6}table.kv tr:last-child td{border-bottom:none}table.kv td:first-child{width:140px;color:#6B7280;font-weight:700;text-transform:uppercase;font-size:9.5px;letter-spacing:.04em}table.idx th{font-size:10px;text-transform:uppercase;color:#6B7280;text-align:left;padding:7px 4px;border-bottom:2px solid #E5E7EB}table.idx td{padding:6px 4px;border-bottom:1px solid #F3F4F6;font-size:12px}.muted{color:#9CA3AF}.noimg{padding:34px;text-align:center;color:#9CA3AF}.rfoot{text-align:center;font-size:11px;color:#9CA3AF;padding:22px}@media print{body{background:#fff;padding:0;max-width:none;font-size:12px}.sec,.panel,.summary,.toc,figure.ev,.card{break-inside:avoid;box-shadow:none}.toc a:hover{background:none}}@media(max-width:720px){.summary{grid-template-columns:1fr}.cols,.toc,.meta-grid{grid-template-columns:1fr}.tots{grid-template-columns:repeat(4,1fr)}}`;
+
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Catch Comics — Smoke Test Master Report</title><style>${CSS}</style></head><body>
+<header class="rhead"><div class="logo">C</div><div><h1>Catch Comics — Smoke Test Master Report</h1><div class="sub">Generated ${esc(nowStamp())} · Smoke Test V3 · Self-contained evidence report (annotated screenshots embedded inline)</div></div></header>
+<section class="summary">
+  <div class="meta-grid">
+    <div><span>Date</span><b>${esc(state.meta.date||'—')}</b></div>
+    <div><span>Tester</span><b>${esc(state.meta.tester||'—')}</b></div>
+    <div><span>Device</span><b>${esc(state.meta.device||'—')}</b></div>
+    <div><span>Environment</span><b>${esc(state.meta.env||'—')}</b></div>
+  </div>
+  <div class="verdict v-${m.effectiveRec}"><div class="big">${m.readiness}%</div><div class="vl">Launch readiness</div><div class="rec">${recMeta.icon} ${esc(recMeta.label)}</div></div>
+  <div class="tots">
+    <div class="t"><b>${m.total}</b><span>Total</span></div>
+    <div class="t"><b style="color:#3B82F6">${m.open}</b><span>Open</span></div>
+    <div class="t"><b style="color:#16A34A">${m.verified}</b><span>Verified</span></div>
+    <div class="t"><b style="color:#334155">${m.closed}</b><span>Closed</span></div>
+    <div class="t"><b style="color:#DC2626">${m.p0}</b><span>P0</span></div>
+    <div class="t"><b style="color:#EA580C">${m.p1}</b><span>P1</span></div>
+    <div class="t"><b style="color:#B45309">${m.p2}</b><span>P2</span></div>
+    <div class="t"><b style="color:#2563EB">${m.p3}</b><span>P3</span></div>
+  </div>
+</section>
+<div class="cols">
+  <div class="panel"><h3>Section completion — ${m.sectionsPassed}/${m.sectionsTotal} passed</h3><table class="comp"><tbody>${secComp}</tbody></table></div>
+  <div class="panel"><h3>Outstanding risks (open P0 / P1)</h3><ul class="risks">${risks}</ul></div>
+</div>
+<nav class="toc">${toc}</nav>
+${body}
+<section class="sec"><h2><span class="num">＃</span> Appendix · Issue Index (${allIssues.length})</h2><table class="idx"><thead><tr><th>ID</th><th>Sev</th><th>Status</th><th>Section</th><th>Evidence</th><th>Description</th></tr></thead><tbody>${idxRows}</tbody></table></section>
+<footer class="rfoot">Catch Comics · Smoke Test V3 · Generated ${esc(nowStamp())} · Self-contained — annotated screenshots embedded inline, no separate files required.</footer>
+</body></html>`;
+}
+function downloadHTMLFile(name, html){
+  const blob=new Blob([html],{type:'text/html'}); const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(url),2000);
+}
+async function openMasterReport(){
+  toast('Rendering master report…');
+  const html=await buildMasterReportHTML();
+  const blob=new Blob([html],{type:'text/html'}); const url=URL.createObjectURL(blob);
+  const w=window.open(url,'_blank');
+  if(!w){ toast('Popup blocked — downloading instead','err'); downloadHTMLFile('catch-comics-master-report.html',html); }
+  else toast('Master report opened in a new tab','ok');
+  setTimeout(()=>URL.revokeObjectURL(url),20000);
+}
+async function downloadMasterReport(){
+  toast('Rendering master report…');
+  const html=await buildMasterReportHTML();
+  downloadHTMLFile('catch-comics-smoke-test-master-report.html', html);
+  toast('Master report downloaded','ok');
+}
+async function downloadShotPNG(id){
+  const sh=state.screenshots[id]; if(!sh) return;
+  const url=await renderShotDataURL(sh,'image/png',1.0);
+  if(!url){ toast('Could not render image','err'); return; }
+  const a=document.createElement('a'); a.href=url; a.download=`${sh.code}-${sh.section}-annotated.png`; a.click();
+  toast(sh.code+' downloaded','ok');
+}
+
+function renderExport(){
+  const grid=$('#export-grid');
+  const v2 = hasV2Data();
+  const banner = v2 ? `<div class="exp-card" style="grid-column:1/-1;border-color:var(--p3-bd);background:var(--p3-bg)">
+      <h3>↪ Import test session from V2</h3>
+      <p>A Smoke Test V2 session was found in this browser. V3 keeps its own separate data — pull your V2 testing in to build the master report from it. <b>V2 is not modified.</b></p>
+      <div class="exp-actions"><button class="mini-btn primary" id="import-v2">Import from V2</button></div></div>` : '';
+
+  const headline = `<div class="exp-card" style="grid-column:1/-1;border:2px solid var(--brand);background:var(--surface-2)">
+      <h3>⭐ Self-Contained Master Report (HTML) <span style="font-size:10px;font-weight:800;color:var(--brand);border:1px solid var(--brand);border-radius:99px;padding:1px 8px;vertical-align:middle">NEW IN V3</span></h3>
+      <p>One standalone file with <b>everything together</b>, per section: checklist results → notes → issue cards → <b>annotated screenshots embedded inline</b> as evidence → statuses → verification. Readable without opening any separate PNG. Open in any browser, or print to PDF with Ctrl+P.</p>
+      <div class="exp-actions">
+        <button class="mini-btn primary" id="rep-open">Open report ↗</button>
+        <button class="mini-btn" id="rep-dl">Download .html</button>
+      </div></div>`;
+
+  const mdCards = EXPORTS.map(e=>`<div class="exp-card">
+      <h3>${e.ico} ${e.title}</h3><p>${e.desc}</p>
+      <div class="exp-actions">
+        <button class="mini-btn" data-prev="${e.id}">Preview</button>
+        <button class="mini-btn" data-copy="${e.id}">Copy</button>
+        <button class="mini-btn primary" data-dl="${e.id}">Download .md</button>
+      </div></div>`).join('');
+
+  const mdMaster = `<div class="exp-card" style="border-color:var(--brand);">
+        <h3>📦 Master Report (Markdown)</h3><p>Everything (smoke + register + cards + launch + verification) as one Markdown file — paste back into Claude.</p>
+        <div class="exp-actions"><button class="mini-btn" data-prev="master">Preview</button><button class="mini-btn" data-copy="master">Copy</button><button class="mini-btn primary" data-dl="master">Download .md</button></div></div>`;
+
+  const bulkPng = `<div class="exp-card" style="border-color:var(--p3-bd);background:var(--p3-bg)">
+        <h3>🖼️ Annotated Screenshots (PNG)</h3><p>Download every screenshot with callouts &amp; shapes burned in as individual PNG files.</p>
+        <div class="exp-actions"><button class="mini-btn primary" id="dl-shots">Download ${state.shotOrder.length} PNG${state.shotOrder.length===1?'':'s'}</button></div></div>`;
+
+  const shotBtns = state.shotOrder.map(id=>{ const sh=state.screenshots[id]; return sh?`<button class="mini-btn" data-shotpng="${id}">${esc(sh.code)} ↓</button>`:''; }).join('');
+  const individual = `<div class="exp-card">
+        <h3>🗂️ Individual Screenshots</h3><p>Download any single annotated screenshot as a crisp PNG.</p>
+        <div class="exp-actions" style="flex-wrap:wrap">${shotBtns || '<span style="font-size:12px;color:var(--muted)">No screenshots yet</span>'}</div></div>`;
+
+  grid.innerHTML = banner + headline + mdCards + mdMaster + bulkPng + individual;
+
+  const get = id => id==='master'
+    ? [buildSmokeReport(),buildIssueRegister(),buildIssueCards(),buildLaunchSummary(),buildVerificationReport()].join('\n\n---\n\n')
+    : EXPORTS.find(e=>e.id===id).fn();
+  $$('#export-grid [data-prev]').forEach(b=>b.addEventListener('click',()=>{ $('#export-preview').value=get(b.dataset.prev); }));
+  $$('#export-grid [data-copy]').forEach(b=>b.addEventListener('click',()=>{ copyText(get(b.dataset.copy)); toast('Copied to clipboard','ok'); }));
+  $$('#export-grid [data-dl]').forEach(b=>b.addEventListener('click',()=>{
+    const name = b.dataset.dl==='master'?'catch-comics-smoke-test-report':'catch-comics-'+b.dataset.dl;
+    downloadText(name+'.md', get(b.dataset.dl));
+  }));
+  $('#dl-shots').addEventListener('click', exportAllShots);
+  $$('#export-grid [data-shotpng]').forEach(b=>b.addEventListener('click',()=>downloadShotPNG(b.dataset.shotpng)));
+  const repOpen=$('#rep-open'); if(repOpen) repOpen.addEventListener('click', openMasterReport);
+  const repDl=$('#rep-dl'); if(repDl) repDl.addEventListener('click', downloadMasterReport);
+  const imp=$('#import-v2'); if(imp) imp.addEventListener('click', importFromV2);
+}
+
+/* draw a marker onto a 2D canvas (for PNG export) */
+function drawMarkerCtx(ctx, i, sh){
+  const g=i.geom, c=color(i.color).hex, sw=strokeW(sh);
+  ctx.save(); ctx.strokeStyle=c; ctx.fillStyle=c; ctx.lineWidth=sw; ctx.lineCap='round'; ctx.lineJoin='round';
+  if (i.type==='circle'){ ctx.beginPath(); ctx.ellipse(g.cx,g.cy,Math.abs(g.rx),Math.abs(g.ry),0,0,Math.PI*2); ctx.stroke(); }
+  else if (i.type==='rect'){ ctx.strokeRect(Math.min(g.x,g.x+g.w),Math.min(g.y,g.y+g.h),Math.abs(g.w),Math.abs(g.h)); }
+  else if (i.type==='arrow'){ ctx.beginPath(); ctx.moveTo(g.x1,g.y1); ctx.lineTo(g.x2,g.y2); ctx.stroke();
+    const h=arrowPath(g,sw).head.split(' ').map(p=>p.split(',').map(Number)); ctx.beginPath(); ctx.moveTo(h[0][0],h[0][1]); ctx.lineTo(h[1][0],h[1][1]); ctx.lineTo(h[2][0],h[2][1]); ctx.closePath(); ctx.fill(); }
+  else if (i.type==='pencil'){ ctx.beginPath(); g.pts.forEach((p,idx)=>idx?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1])); ctx.stroke(); }
+  else if (i.type==='highlighter'){ ctx.globalAlpha=0.4; ctx.lineWidth=sh.w*0.022; ctx.beginPath(); g.pts.forEach((p,idx)=>idx?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1])); ctx.stroke(); ctx.globalAlpha=1; }
+  else if (i.type==='text'){ const fs=Math.max(16,sh.w*0.024); const w=(i.text||'Text').length*fs*0.58+fs*0.6; ctx.fillRect(g.x-fs*0.3,g.y-fs,w,fs*1.4); ctx.fillStyle='#fff'; ctx.font=`700 ${fs}px -apple-system,Segoe UI,sans-serif`; ctx.textBaseline='alphabetic'; ctx.fillText(i.text||'Text',g.x,g.y+fs*0.1); }
+  ctx.restore();
+  // callout badge
+  const a=anchor(i), r=Math.max(11, sh.w*0.013);
+  ctx.save(); ctx.beginPath(); ctx.arc(a.x,a.y,r,0,Math.PI*2); ctx.fillStyle=c; ctx.fill(); ctx.lineWidth=r*0.18; ctx.strokeStyle='#fff'; ctx.stroke();
+  ctx.fillStyle='#fff'; ctx.font=`800 ${r*1.1}px -apple-system,Segoe UI,sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(String(calloutNum(i)),a.x,a.y+r*0.05); ctx.restore();
+}
+function exportShot(sh){
+  return new Promise(res=>{
+    const img=new Image();
+    img.onload=()=>{
+      const c=document.createElement('canvas'); c.width=sh.w; c.height=sh.h;
+      const ctx=c.getContext('2d'); ctx.drawImage(img,0,0,sh.w,sh.h);
+      sh.order.forEach(id=>{ const i=state.issues[id]; if(i) drawMarkerCtx(ctx,i,sh); });
+      c.toBlob(b=>res(b),'image/png');
+    };
+    img.src=sh.src;
+  });
+}
+async function exportAllShots(){
+  if(!state.shotOrder.length){ toast('No screenshots to export','err'); return; }
+  toast('Rendering annotated PNGs…');
+  for (const id of state.shotOrder){
+    const sh=state.screenshots[id]; if(!sh) continue;
+    const blob=await exportShot(sh);
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download=`${sh.code}-${sh.section}-annotated.png`; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    await new Promise(r=>setTimeout(r,250));
+  }
+  toast('Annotated screenshots downloaded','ok');
+}
+function copyText(t){
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).catch(()=>fallbackCopy(t));
+  else fallbackCopy(t);
+}
+function fallbackCopy(t){ const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy');}catch(e){} ta.remove(); }
+function downloadText(name, text){
+  const blob=new Blob([text],{type:'text/markdown'}); const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   WIRING — global
+   ════════════════════════════════════════════════════════════════ */
+$$('.tab').forEach(t=>t.addEventListener('click',()=>switchView(t.dataset.view)));
+
+// meta fields
+function bindMeta(id, key){ const el=$('#'+id); el.value=state.meta[key]||''; el.addEventListener('input',()=>{ state.meta[key]=el.value; save(); }); }
+bindMeta('meta-date','date'); bindMeta('meta-tester','tester'); bindMeta('meta-device','device');
+$('#meta-env').value=state.meta.env||'production';
+$('#meta-env').addEventListener('change',()=>{ state.meta.env=$('#meta-env').value; save(); });
+
+// theme
+function applyTheme(){ document.documentElement.setAttribute('data-theme', state.theme||'light'); $('#theme-btn').textContent = state.theme==='dark'?'☀':'◐'; }
+$('#theme-btn').addEventListener('click',()=>{ state.theme = (state.theme==='dark')?'light':'dark'; save(); applyTheme(); });
+
+// help
+$('#help-btn').addEventListener('click',()=>$('#help-modal').classList.add('open'));
+$('#help-close').addEventListener('click',()=>$('#help-modal').classList.remove('open'));
+$('#help-modal').addEventListener('click',e=>{ if(e.target===$('#help-modal')) $('#help-modal').classList.remove('open'); });
+
+// editor wiring
+$('#ed-done').addEventListener('click', closeEditor);
+$('#ed-backdrop').addEventListener('click', closeEditor);
+$('#ed-undo').addEventListener('click',()=>{
+  const sh=state.screenshots[currentEdit]; if(!sh||!sh.order.length) return;
+  deleteIssue(sh.order[sh.order.length-1]); renderEditor();
+});
+$('#ed-clear').addEventListener('click',()=>{
+  const sh=state.screenshots[currentEdit]; if(!sh||!sh.order.length) return;
+  if(!confirm('Clear all annotations on this screenshot?')) return;
+  sh.order.slice().forEach(deleteIssue); renderEditor();
+});
+const svg=$('#ed-svg');
+svg.addEventListener('pointerdown', edPointerDown);
+svg.addEventListener('pointermove', edPointerMove);
+svg.addEventListener('pointerup', edPointerUp);
+svg.addEventListener('pointercancel', edPointerUp);
+
+// keyboard
+window.addEventListener('keydown',(e)=>{
+  if ($('#editor').classList.contains('open')){
+    if (e.key==='Escape'){ closeEditor(); return; }
+    const tag=(e.target.tagName||'').toLowerCase();
+    if (tag==='input'||tag==='textarea'||tag==='select') return;
+    const map={v:'select',c:'circle',r:'rect',a:'arrow',p:'pencil',h:'highlighter',t:'text'};
+    if (map[e.key.toLowerCase()]){ edTool=map[e.key.toLowerCase()]; edSelected=null; buildTools(); renderEditor(); }
+    const cmap={'1':'red','2':'orange','3':'yellow','4':'blue','5':'green'};
+    if (cmap[e.key]){ edColor=cmap[e.key]; buildColors(); }
+    if ((e.key==='Delete'||e.key==='Backspace') && edSelected){ deleteIssue(edSelected); edSelected=null; renderEditor(); }
+  } else {
+    if (e.key==='Escape') $('#help-modal').classList.remove('open');
+  }
+});
+$('#rail-list').addEventListener('click',e=>{ const b=e.target.closest('[data-section]'); if(b) openSection(b.dataset.section); });
+
+/* ════════════════════════════════════════════════════════════════
+   INIT
+   ════════════════════════════════════════════════════════════════ */
+function init(){
+  applyTheme();
+  if (!state.meta.date){ state.meta.date = new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}); $('#meta-date').value=state.meta.date; }
+  renderRail();
+  renderSection();
+  updateChrome();
+}
+init();
+</script>
+</body>
+</html>

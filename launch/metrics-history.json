@@ -88,5 +88,25 @@
     "descCount": 28707,
     "listingCount": 263139,
     "matchedCount": 103511
+  },
+  {
+    "date": "2026-06-27",
+    "capturedAt": "2026-06-27T11:05:27.461Z",
+    "total": 63573,
+    "cvCount": 9835,
+    "coverCount": 23759,
+    "descCount": 28991,
+    "listingCount": 266471,
+    "matchedCount": 105141
+  },
+  {
+    "date": "2026-06-30",
+    "capturedAt": "2026-06-30T20:39:08.092Z",
+    "total": 72265,
+    "cvCount": 9841,
+    "coverCount": 25490,
+    "descCount": 30729,
+    "listingCount": 292425,
+    "matchedCount": 127127
   }
 ]
