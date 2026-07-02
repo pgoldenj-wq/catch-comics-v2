@@ -91,6 +91,12 @@ next-env.d.ts
 /scripts/.cover-upgrade-log-*.json
 /scripts/.cover-trim-log-*.jsonl
 /scripts/.cover-trim-backup/
+/scripts/diagnose-surface-covers.ts
+/scripts/diagnose-blur-sources.ts
+/scripts/diagnose-blur-cohorts.ts
+/scripts/diagnose-cohort2-upsize.ts
+/scripts/diagnose-amazon-gb-source.ts
+/scripts/verify-trim-prod.ts
 
 # CV enrichment checkpoints — local machine state, not source code
 /scripts/.enrich-catalogue-checkpoint.json
