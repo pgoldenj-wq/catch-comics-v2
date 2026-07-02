@@ -135,7 +135,29 @@ export async function downloadAndStoreCover(
       return null
     }
 
-    const processed = await sharp(buffer)
+    // ── Letterbox-trim for hi-res SQUARE sources ────────────────────────────
+    // Some retailer CDNs (Shopify) serve covers as 1500×1500 / 2400×2400 squares
+    // with white letterbox bars. Trim the bars and keep the result ONLY if it is
+    // a genuine comic portrait (aspect 1.2–1.7); otherwise fall through and use
+    // the original buffer unchanged. Small squares (product thumbs) are left
+    // alone — trimming a 200×200 thumbnail has nothing to recover.
+    let working: Buffer = buffer
+    const srcAspect = height / width
+    if (width >= 800 && srcAspect >= 0.9 && srcAspect <= 1.1) {
+      try {
+        const trimmed = await sharp(buffer)
+          .flatten({ background: '#ffffff' })
+          .trim({ threshold: 25 })
+          .toBuffer()
+        const tm = await sharp(trimmed).metadata()
+        const tAspect = (tm.height ?? 0) / (tm.width ?? 1)
+        if ((tm.width ?? 0) >= 300 && tAspect >= 1.2 && tAspect <= 1.7) {
+          working = trimmed
+        }
+      } catch { /* trim failed — keep original buffer */ }
+    }
+
+    const processed = await sharp(working)
       .resize(MAX_WIDTH, undefined, {
         fit:        'inside',
         withoutEnlargement: true,   // don't upscale small images
