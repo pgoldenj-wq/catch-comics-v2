@@ -40,11 +40,13 @@ const TIMEOUT_MS  = 10_000
 // sha256[:16] of the processed WebP — captured by scripts/cover-r2-fullscan.ts.
 // Guard below rejects them so we never bake one into R2 or overwrite a good
 // cover with one. Add new signatures here if verify:covers surfaces more.
-const PLACEHOLDER_HASHES = new Set<string>([
+export const PLACEHOLDER_HASHES = new Set<string>([
   '06661fd690879985', // Open Library "no cover" (3484b) — 15,313 occurrences
   '2cafc2b0f16dfe03', // Google Books "no preview" (4558b) — 9,414 occurrences
   '307a2fbbc46139a8', // misc placeholder (876b)
   'b3165c10e262603d', // misc placeholder (836b)
+  'f2161a2b764f9dd6', // misc placeholder (recovery scripts)
+  '61a456d23edb8d69', // misc placeholder (recovery scripts)
 ])
 
 // Browser-like headers — defeats Cloudflare anti-scraping on CV and similar CDNs.
@@ -151,7 +153,12 @@ export async function downloadAndStoreCover(
           .toBuffer()
         const tm = await sharp(trimmed).metadata()
         const tAspect = (tm.height ?? 0) / (tm.width ?? 1)
-        if ((tm.width ?? 0) >= 300 && tAspect >= 1.2 && tAspect <= 1.7) {
+        // Accept only PILLARBOX-shaped trims: side bars removed, ~full height
+        // retained. A cover whose own art has white margins would lose height
+        // when trimmed (a tight crop into the artwork) — reject those and keep
+        // the original buffer. Also kills degenerate slivers.
+        const heightRetained = (tm.height ?? 0) >= Math.round(height * 0.92)
+        if ((tm.width ?? 0) >= 300 && heightRetained && tAspect >= 1.2 && tAspect <= 1.7) {
           working = trimmed
         }
       } catch { /* trim failed — keep original buffer */ }
