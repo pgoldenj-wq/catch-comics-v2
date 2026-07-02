@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Smoke Test V3 — Production Triage Patch · 02 Jul 2026</title>
+<style>
+  :root{--bg:#F8F7F4;--card:#fff;--text:#111827;--muted:#6B7280;--border:#E5E7EB;--red:#DC2626;--green:#16A34A;--amber:#D97706;--navy:#111827}
+  body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);margin:0;padding:32px 20px;line-height:1.5}
+  .wrap{max-width:860px;margin:0 auto}
+  h1{font-size:22px;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:24px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px 22px;margin-bottom:16px}
+  .ok{border-left:4px solid var(--green)}
+  .warn{border-left:4px solid var(--amber)}
+  .err{border-left:4px solid var(--red)}
+  .metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin:12px 0}
+  .metric{background:var(--bg);border-radius:8px;padding:10px 12px;text-align:center}
+  .metric .n{font-size:24px;font-weight:800}
+  .metric .l{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  .rec{display:inline-block;padding:4px 14px;border-radius:999px;font-weight:800;font-size:14px}
+  .rec-nogo{background:#FEE2E2;color:var(--red)}
+  .rec-conditions{background:#FEF3C7;color:var(--amber)}
+  .rec-go{background:#DCFCE7;color:var(--green)}
+  ul.log{font-size:13px;padding-left:18px;margin:8px 0}
+  ul.log li{margin-bottom:3px}
+  .tag{font-weight:700}
+  button,a.btn{display:inline-block;background:var(--navy);color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;margin-right:10px}
+  button.secondary,a.btn.secondary{background:#fff;color:var(--text);border:1px solid var(--border)}
+  button.danger{background:var(--red)}
+  code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Production Triage Patch — 02 Jul 2026</h1>
+  <div class="sub">Applies the production-verified triage (all 21 issues re-tested against www.catchcomics.com) to your Smoke Test V3 session. A backup of the current session is stored under <code>cc-smoke-test-v3-backup-20260702-triage</code> before anything changes. Safe to open more than once — every change is idempotent.</div>
+  <div class="card warn" style="font-size:13px"><strong>Before applying:</strong> close any open Smoke Test V3 tabs (its autosave could overwrite this patch). Reopen V3 after.</div>
+  <div id="app"></div>
+</div>
+<script>
+const KEY = 'cc-smoke-test-v3';
+const BACKUP = 'cc-smoke-test-v3-backup-20260702-triage';
+const STAMP = '[Triage 02 Jul 2026]';
+const OPEN_STATES = ['open','diagnosed','in-progress','fixed','ready'];
+const SECTION_IDS = ['homepage','search','series-index','series-pages','product','offerstable','affiliate','mobile','loading','route','errors','covers','recommendation','launch-readiness'];
+
+function note(cur, txt){
+  if ((cur||'').includes(STAMP)) return cur;
+  return (cur ? cur + '\n\n' : '') + STAMP + ' ' + txt;
+}
+
+/* ── the triage, as data ─────────────────────────────────────── */
+const UPDATES = [
+  // FIXED — production-verified
+  {id:'CC-007', set:{stat:'verified'}, verify:'Production-verified: hover-enlarge on Top Deals overlays neighbouring cards (z-index bloom, commit 8c54181) — no clipping. Live hover test + screenshot.'},
+  {id:'CC-009', set:{stat:'verified'}, verify:"Production-verified via /api/homepage-deals: 12/12 items are comics/manga; 'Barrel of Monkeys'-class pollution gone (Cover Zero purge). Borderline: 'Life-Changing Manga of Tidying Up' present — it is genuinely a manga."},
+  {id:'CC-010', set:{stat:'verified'}, verify:'Production-verified: 12/12 Top Deals covers served from images.catchcomics.com (R2-only gate, commit 9caa287); artwork visually confirmed real.'},
+  {id:'CC-014', set:{stat:'verified'}, verify:'Production-verified on /series/invincible: sequence runs Vol 12 → Vol 13 New Ed → Vol 14 New Ed with no unlabelled card; all covers load from R2. Vol 13 vs Vol 14 cover files byte-compared — different images (91,054 vs 93,882 bytes).'},
+  {id:'CC-023', set:{stat:'verified'}, verify:"Production-verified: single-issue pages (Absolute Batman #2) share the volume-page layout system — same header, hero, metadata fields, prev/next issue rail. Residual nit: empty 'Character Tags:' label shows when no tags (not blocking)."},
+
+  // MERGE — close duplicates into primaries
+  {id:'CC-026', set:{stat:'closed'}, verify:"Closed as duplicate — merged into CC-013. 'Repititious' decoded from evidence IMG-19: autocomplete shows duplicate identical series suggestions."},
+  {id:'CC-018', set:{stat:'closed'}, verify:"Closed as duplicate — merged into CC-024 (duplicate 'Prices for' selector)."},
+  {id:'CC-012', set:{stat:'closed'}, verify:'Closed as duplicate — merged into CC-024. Description was accidentally pasted cookie-banner text; the annotation highlights the search-page toolbar containing the duplicated selector.'},
+  {id:'CC-013', desc:"MERGED SCOPE — absorbs CC-026 (autocomplete duplicates / volume discovery). Live production check: 'Saga Vol' returns six identical 'Saga' series rows (incl. foreign-language editions) plus Combat Fairies Vol 2 and Le Vol du corbeau; zero individual Saga volumes. Fix scope: dedupe suggestion entries AND surface individual volumes for series+vol queries."},
+  {id:'CC-024', desc:"MERGED SCOPE — absorbs CC-018 and CC-012 (same defect). Confirmed still live in production 02 Jul: 'Prices for: GB UK / US US' renders under the search bar duplicating the header region toggle. Header selector should be the single source of truth."},
+
+  // RECLASSIFY — fix path changed
+  {id:'CC-019', set:{category:'Data'}, desc:"RECLASSIFIED Search → Catalogue ingestion. Root cause: Jujutsu Kaisen Vol 1 is not in the catalogue — all 80 results checked, 49 other 'Vol 1' titles, none JJK. The 26 Jun ranking overhaul is working; the fix is ingestion of missing flagship Vol 1s (same class as Batman: Year One / Maus gaps). Route to catalogue track."},
+  {id:'CC-016', set:{category:'Data'}, desc:'RECLASSIFIED Feature → Data coverage. The creators block shipped (commit b750973) and is live in code; cv_metadata.creators is simply empty for flagship volumes (Absolute Batman Vol 1 renders no credits). Fix is creator-data enrichment coverage, not UI work.'},
+
+  // DOWNGRADE — polish, not trust
+  {id:'CC-006', set:{sev:'p2', color:'yellow'}, verify:'Downgraded P0 → P2 in production triage: visual polish, not collector-trust-critical.'},
+  {id:'CC-011', set:{sev:'p2', color:'yellow'}, verify:'Downgraded P0 → P2 in production triage: visual polish, not collector-trust-critical.'},
+  {id:'CC-017', set:{sev:'p2', color:'yellow'}, verify:'Downgraded P0 → P2 in production triage: visual polish, not collector-trust-critical.'},
+
+  // CLOSE — artifacts / unusable cards
+  {id:'CC-003', set:{stat:'closed'}, verify:"Closed — not an issue: auto-created card for the second pencil-line callout of CC-002's annotation (the masking-viewport line)."},
+  {id:'CC-015', set:{stat:'closed'}, verify:'Closed — no description and evidence image mislinked (shows an Ultimate Spider-Man product page, not the Invincible series page). Re-report if the underlying observation still stands.'},
+
+  // LEAVE UNVERIFIED — needs re-reporting
+  {id:'CC-020', verify:"Left open/unverified in triage — description is a fragment ('to say comic') and evidence image IMG-15 is missing from the master-report export. Needs re-reporting with proper evidence before it can be diagnosed."},
+];
+
+const NEW_ISSUES = [
+  {
+    id:'CC-027', section:'search', sev:'p0', category:'Trust', stat:'open', color:'red',
+    text:'Flagship search cards render letter placeholders instead of covers',
+    desc:"Search result cards render a grey letter placeholder for flagship titles whose product pages have real covers. Example: 'Absolute Batman Volume 1 The Zoo' shows an 'A' placeholder in search results while its product page displays the real cover. Root-cause hypothesis: cover_image_url is NULL after the Cover Zero placeholder nulling, and search cards have no fallback path (the product hero does). Flagship search results showing placeholders is a direct trust failure at the primary discovery surface. Need root cause and a systemic fix, not a spot patch.",
+    rec:'Diagnose why cover_image_url is NULL for flagship products with valid covers; either re-backfill real covers to R2 for high-traffic titles or give search cards the same fallback the product hero uses. Add a regression check: top flagship searches must not render letter placeholders.',
+    url:'https://www.catchcomics.com/search?q=absolute+batman'
+  },
+  {
+    id:'CC-028', section:'product', sev:'p0', category:'Data', stat:'open', color:'red',
+    text:"Incorrect 'Collects X issues' metadata on collected editions",
+    desc:"Collected-edition pages show the ComicVine parent-series issue count as the collection's contents. Example: Absolute Batman Volume 1 The Zoo displays 'Collects 21 issues' — 21 is the current issue count of the ongoing Absolute Batman series; the Vol 1 hardcover collects roughly #1–6. Wrong data is worse than missing data — this is a collector-trust failure on the highest-value pages.",
+    rec:"Stop labelling the CV volume issue count as 'Collects N issues'. Either derive the true collected contents, or relabel honestly ('21 issues in series'), or hide the count on collected editions until it is accurate.",
+    url:'https://www.catchcomics.com/product/absolute-batman-volume-1-the-zoo-505259'
+  },
+];
+
+/* ── metrics (same formula as Smoke Test V3) ─────────────────── */
+function metrics(s){
+  const issues = Object.values(s.issues||{});
+  const real = issues.filter(i=>i.sev!=='positive');
+  const m = {total:issues.length, open:0, verified:0, closed:0, p0:0,p1:0,p2:0,p3:0, p0open:0,p1open:0,p2open:0,p3open:0};
+  issues.forEach(i=>{
+    if (OPEN_STATES.includes(i.stat)) m.open++;
+    if (i.stat==='verified') m.verified++;
+    if (i.stat==='closed') m.closed++;
+  });
+  real.forEach(i=>{ m[i.sev]++; if (OPEN_STATES.includes(i.stat)) m[i.sev+'open']++; });
+  const passed = SECTION_IDS.filter(id=>s.sections && s.sections[id] && s.sections[id].status==='passed').length;
+  m.sectionsPassed = passed;
+  m.coverage = Math.round(passed/SECTION_IDS.length*100);
+  const penalty = Math.min(100, m.p0open*40 + m.p1open*15 + m.p2open*5 + m.p3open*2);
+  m.issueHealth = 100 - penalty;
+  m.readiness = Math.max(0, Math.round(0.6*m.coverage + 0.4*m.issueHealth));
+  m.rec = m.p0open>0 ? 'nogo' : (m.p1open>0 || passed<SECTION_IDS.length) ? 'conditions' : 'go';
+  return m;
+}
+const REC = {nogo:['⛔ NO-GO','rec-nogo'], conditions:['⚠️ GO WITH CONDITIONS','rec-conditions'], go:['✅ GO','rec-go']};
+
+/* ── apply ───────────────────────────────────────────────────── */
+function apply(s){
+  const log = [];
+  UPDATES.forEach(u=>{
+    const i = s.issues[u.id];
+    if (!i){ log.push(u.id+' — not found in session, skipped'); return; }
+    const already = (i.verify||'').includes(STAMP) || (i.desc||'').includes(STAMP);
+    if (u.set) Object.assign(i, u.set);
+    if (u.verify) i.verify = note(i.verify, u.verify);
+    if (u.desc) i.desc = note(i.desc, u.desc);
+    log.push(u.id+' — '+(already?'already patched (no-op)':'updated'+(u.set&&u.set.stat?' → '+u.set.stat:'')+(u.set&&u.set.sev?' → '+u.set.sev.toUpperCase():'')));
+  });
+  NEW_ISSUES.forEach(n=>{
+    if (s.issues[n.id]){ log.push(n.id+' — already exists (no-op)'); return; }
+    s.issues[n.id] = {
+      id:n.id, section:n.section, shot:null, color:n.color, type:'rect',
+      geom:{x:0,y:0,w:0,h:0}, text:n.text, sev:n.sev, category:n.category,
+      desc:STAMP+' '+n.desc, rec:n.rec, stat:n.stat, verify:'', url:n.url, ts:Date.now(),
+    };
+    log.push(n.id+' — created (new P0: '+n.text+')');
+  });
+  s.issueSeq = Math.max(s.issueSeq||0, 28);
+  return log;
+}
+
+/* ── UI flow ─────────────────────────────────────────────────── */
+const app = document.getElementById('app');
+function metricCard(title, m, cls){
+  return '<div class="card '+(cls||'')+'"><strong>'+title+'</strong>'
+    + '<div class="metric-grid">'
+    + '<div class="metric"><div class="n">'+m.p0open+'</div><div class="l">P0 open</div></div>'
+    + '<div class="metric"><div class="n">'+m.p1open+'</div><div class="l">P1 open</div></div>'
+    + '<div class="metric"><div class="n">'+m.p2open+'</div><div class="l">P2 open</div></div>'
+    + '<div class="metric"><div class="n">'+m.verified+'</div><div class="l">Verified</div></div>'
+    + '<div class="metric"><div class="n">'+m.closed+'</div><div class="l">Closed</div></div>'
+    + '<div class="metric"><div class="n">'+m.readiness+'%</div><div class="l">Readiness</div></div>'
+    + '</div>'
+    + '<span class="rec '+REC[m.rec][1]+'">'+REC[m.rec][0]+'</span>'
+    + '</div>';
+}
+function run(){
+  const raw = localStorage.getItem(KEY);
+  if (!raw){
+    app.innerHTML = '<div class="card err"><strong>No Smoke Test V3 session found in this browser.</strong><br>Open this file in the browser (and profile) where you normally run <code>smoke-test-v3.html</code> from <code>file://</code>.</div>';
+    return;
+  }
+  let s;
+  try { s = JSON.parse(raw); } catch(e){ app.innerHTML = '<div class="card err">Session data is corrupt — nothing was changed.</div>'; return; }
+  if (s.version !== 2){ app.innerHTML = '<div class="card err">Unexpected session version ('+s.version+') — nothing was changed.</div>'; return; }
+
+  const before = metrics(s);
+  // backup FIRST — never overwrite an existing backup (preserves the pre-patch original across re-runs)
+  let backedUp = !!localStorage.getItem(BACKUP);
+  if (!backedUp){
+    try { localStorage.setItem(BACKUP, raw); backedUp = true; }
+    catch(e){ backedUp = false; }
+  }
+  if (!backedUp){
+    const blob = new Blob([raw], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    app.innerHTML = '<div class="card warn"><strong>Storage is too full to keep an automatic backup.</strong><br>Download a manual backup first, then apply.</div>'
+      + '<a class="btn secondary" href="'+url+'" download="cc-smoke-test-v3-backup-20260702.json">Download backup</a>'
+      + '<button id="force">I saved the backup — apply the patch</button>';
+    document.getElementById('force').onclick = ()=>{ doApply(s, before); };
+    return;
+  }
+  doApply(s, before);
+}
+function doApply(s, before){
+  const log = apply(s);
+  try { localStorage.setItem(KEY, JSON.stringify(s)); }
+  catch(e){ app.innerHTML = '<div class="card err">Could not save — storage quota. Nothing was changed (your session is intact).</div>'; return; }
+  const after = metrics(s);
+  app.innerHTML =
+    '<div class="card ok"><strong>✔ Patch applied.</strong> Backup preserved under <code>'+BACKUP+'</code>.</div>'
+    + metricCard('Before', before)
+    + metricCard('After — honest state', after, 'ok')
+    + '<div class="card"><strong>Change log</strong><ul class="log">'+log.map(l=>'<li>'+l+'</li>').join('')+'</ul></div>'
+    + '<a class="btn" href="smoke-test-v3.html">Open Smoke Test V3</a>'
+    + '<button class="secondary" id="revert">Revert to backup</button>';
+  document.getElementById('revert').onclick = ()=>{
+    if (!confirm('Restore the pre-patch session from backup? Any V3 edits made after applying will be lost.')) return;
+    localStorage.setItem(KEY, localStorage.getItem(BACKUP));
+    location.reload();
+  };
+}
+run();
+</script>
+</body>
+</html>
