@@ -35,7 +35,7 @@ import CVCharacterTags                   from '@/components/CVCharacterTags'
 import CVCoverImage                      from '@/components/CVCoverImage'
 import IssueListGrid                     from '@/components/IssueListGrid'
 import IssueCountLine                    from '@/components/IssueCountLine'
-import { isBadCoverUrl }                 from '@/lib/images/url-filters'
+import { isBadCoverUrl, canUseNextImage } from '@/lib/images/url-filters'
 import { seriesNameToSlug, getSeriesEntry } from '@/lib/series/registry'
 
 // ISR: cache each product page for 1 hour, then regenerate in the background.
@@ -678,14 +678,12 @@ export default async function ProductPage(
                   )}
                   <LabeledRow label="Status" value={statusLabel(bestListing)} />
                   {/* T1-B + T1-I: Character Tags hidden on mobile (async chips
-                      add scroll debt); min-h prevents layout shift during hydration. */}
+                      add scroll debt). withRow — the component owns the labeled
+                      row so no orphaned "Character Tags:" label renders on issues
+                      whose CV record has no characters (e.g. most single issues). */}
                   {product.comicvineId && (
                     <div className="hidden sm:block">
-                      <LabeledRow label="Character Tags">
-                        <div className="min-h-[28px]">
-                          <CVCharacterTags comicvineId={product.comicvineId} darkBg />
-                        </div>
-                      </LabeledRow>
+                      <CVCharacterTags comicvineId={product.comicvineId} darkBg withRow />
                     </div>
                   )}
                 </dl>
@@ -960,14 +958,28 @@ function RelatedCard({ r }: {
       className="group flex gap-3 rounded-lg p-2 -mx-2 hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-[#E8272A] focus:ring-offset-1"
     >
       <div className="cover-card-sm flex-shrink-0 w-[56px] h-[80px] rounded overflow-hidden bg-gray-100 shadow-sm">
+        {/* next/image only for allowlisted hosts — a DB cover URL on any other
+            host crashes the page in dev and 400s in production (war-room find:
+            AWIN productserve URLs reached cover_image_url). */}
         {r.coverImageUrl && !isBadCoverUrl(r.coverImageUrl) ? (
-          <Image
-            src={r.coverImageUrl}
-            alt={r.title}
-            width={56}
-            height={80}
-            className="w-full h-full object-cover"
-          />
+          canUseNextImage(r.coverImageUrl) ? (
+            <Image
+              src={r.coverImageUrl}
+              alt={r.title}
+              width={56}
+              height={80}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={r.coverImageUrl}
+              alt={r.title}
+              width={56}
+              height={80}
+              className="w-full h-full object-cover"
+            />
+          )
         ) : (
           <div className="w-full h-full flex items-center justify-center text-gray-300">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
