@@ -112,6 +112,18 @@ const PHASE1_VERIFY = [
   {id:'CC-023', verify:'Residual nit closed 03 Jul: the empty Character-Tags label no longer renders on issues without character data (production-verified on Absolute Batman #2 — page also hardened against non-allowlisted cover hosts).'},
 ];
 
+/* ── Phase 2 production verification (deployed main e9c28ef, 03 Jul 2026) ── */
+const STAMP3 = '[Verified 03 Jul 2026 — monster mode]';
+function note3(cur, txt){
+  if ((cur||'').includes(STAMP3)) return cur;
+  return (cur ? cur + '\n\n' : '') + STAMP3 + ' ' + txt;
+}
+const PHASE2_VERIFY = [
+  {id:'CC-025', set:{stat:'verified'}, verify:"Production-verified (main e9c28ef): full corpus passes — 'absolute batman issue 2' / 'number 2' / 'no. 2' all rank Absolute Batman #2 first with weakMatch=false; 'saga issue 5' → Saga #5; vol/volume queries untouched. Implemented as a query rewrite to '#N' syntax at the top of unifiedSearch."},
+  {id:'CC-013', set:{stat:'verified'}, verify:"Production-verified (main e9c28ef): 'Saga Vol' autocomplete now returns Saga Volume 1–5 from the local catalogue (green Volume badge rows lead); 'Saga Vol 3' leads with Saga Volume 3; 'Invincible Vol' returns Invincible Volume 1–5. CV suggestion dupes removed server-side (absorbs CC-026). Residual: series with missing main-line volumes (e.g. One Piece) surface spin-offs for the gap numbers — honest data, fixed by Vol-1 ingestion (CC-019/B4)."},
+  {id:'CC-028', set:{stat:'verified'}, verify:"Production-verified (main e9c28ef): Absolute Batman Vol 1 hero reads '21 issues in this series'; zero 'Collects' claims remain on the page (grid heading relabelled too). The count is now labelled as what it is — the series total from CV."},
+];
+
 /* ── metrics (same formula as Smoke Test V3) ─────────────────── */
 function metrics(s){
   const issues = Object.values(s.issues||{});
@@ -163,6 +175,14 @@ function apply(s){
     if (u.set) Object.assign(i, u.set);
     if (u.verify) i.verify = note2(i.verify, u.verify);
     log.push(u.id+' — '+(already?'phase-1 verify already applied (no-op)':'production-verified'+(u.set&&u.set.stat?' → '+u.set.stat:'')));
+  });
+  PHASE2_VERIFY.forEach(u=>{
+    const i = s.issues[u.id];
+    if (!i){ log.push(u.id+' — not found in session, skipped'); return; }
+    const already = (i.verify||'').includes(STAMP3);
+    if (u.set) Object.assign(i, u.set);
+    if (u.verify) i.verify = note3(i.verify, u.verify);
+    log.push(u.id+' — '+(already?'phase-2 verify already applied (no-op)':'production-verified'+(u.set&&u.set.stat?' → '+u.set.stat:'')));
   });
   return log;
 }
