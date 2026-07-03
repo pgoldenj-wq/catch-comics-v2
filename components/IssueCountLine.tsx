@@ -1,10 +1,16 @@
 'use client'
 
 /**
- * IssueCountLine — renders "Collects N issues" in the hero block of a
+ * IssueCountLine — renders "N issues in this series" in the hero block of a
  * collected-edition product page. Co-exists with CVIssuesGrid; both hit
  * the same KV-cached CV endpoints so the duplicate fetch is effectively
  * free.
+ *
+ * The count is the CV volume's TOTAL issue count — the ongoing series, not
+ * the contents of this collected edition. The old "Collects N issues" label
+ * overstated the data (CC-028: Absolute Batman Vol 1 claimed "Collects 21
+ * issues" when the hardcover collects ~6). Wrong data is worse than missing
+ * data — the label now says exactly what the number is.
  *
  * Why a separate component rather than wiring CVIssuesGrid's onLoaded
  * callback back up to the hero: the product page is a server component
@@ -64,8 +70,8 @@ export default function IssueCountLine({ comicvineId, searchTitle, enabled, clas
 
   if (!enabled || count === null) return null
   return (
-    <p className="text-[13px] text-gray-500 mt-2">
-      Collects {count} issue{count === 1 ? '' : 's'}
+    <p className={className ?? 'text-[13px] text-gray-500 mt-2'}>
+      {count} issue{count === 1 ? '' : 's'} in this series
     </p>
   )
 }

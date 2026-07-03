@@ -739,15 +739,18 @@ export default async function ProductPage(
           <div className="max-w-6xl mx-auto px-4 py-10 sm:py-14">
             <div className="md:grid md:grid-cols-[240px_1fr_320px] md:gap-8 md:items-start">
 
-              {/* LEFT — Issue grid (issues / collects).  order-2 on mobile
-                  so pricing appears first, order-1 on md+ for left column. */}
+              {/* LEFT — Issue grid.  order-2 on mobile so pricing appears
+                  first, order-1 on md+ for left column. The grid lists the
+                  SERIES' issues from CV on both page types — a collected
+                  edition's grid is not its contents, so the old
+                  "Collects Issues" label overstated the data (CC-028). */}
               <div className="order-2 md:order-1 min-w-0 mt-10 md:mt-0">
                 <IssueListGrid
                   comicvineId={cvVolumeId}
                   searchTitle={product.seriesName ?? product.title}
                   productSlug={slug}
                   comicTitle={product.seriesName ?? product.title}
-                  label={isCollectedEdition ? 'Collects Issues' : 'Issues in this series'}
+                  label={'Issues in this series'}
                   columns={2}
                   currentIssueId={product.format === 'SINGLE_ISSUE' ? product.comicvineId : null}
                 />
