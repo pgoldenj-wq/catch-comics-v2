@@ -354,9 +354,17 @@ export default async function ProductPage(
   }
   // Order roles editorially — writer first, then visual roles
   const ROLE_ORDER = ['writer','penciler','penciller','artist','inker','colorist','cover','letterer','editor']
-  const orderedCreators = ROLE_ORDER
+  let orderedCreators = ROLE_ORDER
     .filter(r => creatorsByRole.has(r))
     .map(r => ({ role: r, names: creatorsByRole.get(r)! }))
+  // CC-016 fallback: CV volume-level `people` carry no roles (roles only exist
+  // on issue credits), so role-grouping yields nothing and the block vanished
+  // even with creators stored. Until the roled backfill covers a product, show
+  // the first few names under a generic label — CV orders people by credit
+  // count, so the core team leads. Capped: some volumes list 100+ names.
+  if (orderedCreators.length === 0 && creatorsByRole.has('creator')) {
+    orderedCreators = [{ role: 'creators', names: creatorsByRole.get('creator')!.slice(0, 6) }]
+  }
 
   const [related, dynamicLinks, singleIssues, collectedEditions, siblingIssues, siblingIssueCount] = await Promise.all([
     getRelated(product.id, product.seriesName, product.publisher, product.format),
