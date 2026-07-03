@@ -144,6 +144,16 @@ const CC019_VERIFY = [
   {id:'CC-019', set:{stat:'verified'}, verify:"Production-verified: 'jujutsu kaisen volume 1' AND 'jujutsu kaisen vol 1' both rank Jujutsu Kaisen Vol 1 first with weakMatch=false (was: Vol 30, weak). Root causes were data, two kinds: JJK V1 never existed in any feed (created via repair-flagship-vol1.ts — OL-verified metadata, R2 cover); One Piece V1 existed but with NULL seriesName/volumeNumber and format OTHER (filled). Autocomplete 'Jujutsu Kaisen Vol' leads with Vol 1; 'One Piece Vol' leads with the real Vol 1 (suggester sampling widened 60→400 — big franchises lost their Vol 1 to spin-offs at the old cap). New JJK V1 product page renders with cover. Systemic audit: only 3 Vol-1-gap cohorts remain catalogue-wide (Bakemonogatari v6+, Natsume v2+, one non-comic) — ingestion backlog, not launch-blocking. Note: title uses the cohort's 'Vol. N Volume N' convention deliberately — Postgres FTS doesn't stem vol/volume, the suffix makes both query forms match (proper synonym-dictionary fix backlogged)."},
 ];
 
+/* ── CC-016 production verification (main 7b6388c + data backfill, 03 Jul 2026) ── */
+const STAMP6 = '[Verified 03 Jul 2026 — CC-016]';
+function note6(cur, txt){
+  if ((cur||'').includes(STAMP6)) return cur;
+  return (cur ? cur + '\n\n' : '') + STAMP6 + ' ' + txt;
+}
+const CC016_VERIFY = [
+  {id:'CC-016', set:{stat:'verified'}, verify:"Production-verified: Absolute Batman Vol 1 hero shows 'Writer: Scott Snyder | Artist: Nick Dragotta | Colorist: Frank Martin Jr.' Root cause was rendering, not missing data: CV volume-level people carry NO roles (roles only exist on issue-detail person_credits) and the role-grouped block silently dropped role-less entries — 110 stored names rendered as nothing. Fixes: (1) backfill-volume-creators.ts replaces role-less people with the ROLED credits of the volume's first issue (CV /issues/ LIST silently omits person_credits — detail endpoint only); Absolute line + top-40 priority products backfilled. (2) Page fallback shows first 6 role-less names for the un-backfilled tail. Trust gate: 4 products (Absolute GL/Flash/MM) had wrong-era credits exposing WRONG comicvine_id matches (classic volumes matched to 2025 Absolute titles) — creators reverted, flagged cv_match_suspect, backfill hardened to never touch flagged products. CV re-match of the Absolute line is a NEW backlog item."},
+];
+
 /* ── metrics (same formula as Smoke Test V3) ─────────────────── */
 function metrics(s){
   const issues = Object.values(s.issues||{});
@@ -219,6 +229,14 @@ function apply(s){
     if (u.set) Object.assign(i, u.set);
     if (u.verify) i.verify = note5(i.verify, u.verify);
     log.push(u.id+' — '+(already?'CC-019 verify already applied (no-op)':'production-verified'+(u.set&&u.set.stat?' → '+u.set.stat:'')));
+  });
+  CC016_VERIFY.forEach(u=>{
+    const i = s.issues[u.id];
+    if (!i){ log.push(u.id+' — not found in session, skipped'); return; }
+    const already = (i.verify||'').includes(STAMP6);
+    if (u.set) Object.assign(i, u.set);
+    if (u.verify) i.verify = note6(i.verify, u.verify);
+    log.push(u.id+' — '+(already?'CC-016 verify already applied (no-op)':'production-verified'+(u.set&&u.set.stat?' → '+u.set.stat:'')));
   });
   return log;
 }
