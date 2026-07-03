@@ -118,7 +118,13 @@ async function createCanonical(isbn13: string, row: Record<string, string>): Pro
         canonicalSlug : makeSlug(title, isbn13),
         publisher     : row['brand']              || null,
         description   : row['description']        || null,
-        coverImageUrl : row['merchant_image_url'] || row['aw_image_url'] || null,
+        // NEVER seed cover_image_url from feed images. merchant_image_url /
+        // aw_image_url are AWIN proxy thumbs (images2.productserve.com,
+        // 200×200 white-letterboxed) — not covers. They violated the Cover
+        // Zero policy and crash-classed product pages (host not in
+        // next/image remotePatterns). Covers come from the CV/R2 enrichment
+        // pipeline; a NULL cover renders the designed fallback instead.
+        coverImageUrl : null,
       },
     })
     canonCache.set(isbn13, cp.id)
