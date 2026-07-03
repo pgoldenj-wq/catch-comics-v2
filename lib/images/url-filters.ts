@@ -41,7 +41,30 @@ export function isBadCoverUrl(url: string | null | undefined): boolean {
   if (/\/uploads\/[^/]+\/0\/\d+\//.test(u)) return true   // CV system placeholder
   if (u.includes('books.google.com'))        return true   // GB "no preview" JPEG
   if (u.includes('covers.openlibrary.org'))  return true   // OL direct: 1×1 dead GIF / fragile hotlink
+  if (u.includes('productserve.com'))        return true   // AWIN image proxy: 200×200 white-letterboxed
+                                                           // retailer thumbs — not covers. Also crashes
+                                                           // next/image in dev (host not in remotePatterns).
   return false
+}
+
+/**
+ * next/image is only safe for hosts allowlisted in next.config.ts →
+ * images.remotePatterns. Feeding it any other host throws in dev and 400s
+ * via /_next/image in production (broken image). Cover URLs come from the
+ * DB and can contain retailer/proxy hosts — always branch to a raw <img>
+ * when this returns false. Keep the list in sync with next.config.ts.
+ */
+const NEXT_IMAGE_HOSTS = [
+  'images.catchcomics.com',
+  'r2.dev',                    // *.r2.dev + pub-*.r2.dev legacy
+  'books.google.com',
+  'covers.openlibrary.org',
+  'comicvine.gamespot.com',
+  'images-eu.bookshop.org',
+]
+export function canUseNextImage(url: string | null | undefined): boolean {
+  if (!url) return false
+  return NEXT_IMAGE_HOSTS.some(h => url.includes(h))
 }
 
 /**

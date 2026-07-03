@@ -687,9 +687,12 @@ function SearchResults() {
             </div>
           )}
 
-          {/* ── REGION TOGGLE — mobile only. Desktop uses the header pills. */}
+          {/* ── REGION TOGGLE — mobile only. Desktop uses the header pills.
+              display must come from the classes, not inline style — an inline
+              display:flex overrides md:hidden's display:none and the toggle
+              leaks onto desktop, duplicating the header selector (CC-024). */}
           {!loading && !error && (
-            <div className="md:hidden" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+            <div className="flex md:hidden" style={{ alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
               <span style={{ fontSize: '11px', color: '#6B7280', flexShrink: 0 }}>Prices for:</span>
               {(['uk', 'us'] as const).map(r => (
                 <button

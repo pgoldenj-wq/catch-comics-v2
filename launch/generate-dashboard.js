@@ -42,6 +42,13 @@ const NOW         = new Date();
   } catch {}
 })();
 
+// ── Smoke Test V3 production-QA verdict (the launch gate) ──────────────────────
+// Source of truth: launch/smoke-verdict.json — update it after each Smoke Test
+// triage pass. When present, the dashboard headline readiness/verdict renders
+// from it; the workstream table below stays as infra-completion tracking.
+let SMOKE = null;
+try { SMOKE = JSON.parse(fs.readFileSync(path.join(LAUNCH_DIR, 'smoke-verdict.json'), 'utf8')); } catch {}
+
 // ── Impact weights (single source of truth for launch readiness gain %) ────────
 const IMPACT = {
   'CV Enrichment':    { impact: 'High',   gain: 12 },
@@ -611,8 +618,8 @@ a{color:inherit;text-decoration:none}
 <div class="brief-grid">
   <div class="brief-main">
     <div class="brief-greeting">Good morning, Joe.</div>
-    <div class="brief-readiness">${overallPct}%</div>
-    <div class="brief-readiness-label">Launch Readiness</div>
+    <div class="brief-readiness">${SMOKE ? SMOKE.p0open + ' P0' : overallPct + '%'}</div>
+    <div class="brief-readiness-label">${SMOKE ? `Open blockers · ${SMOKE.verdictIcon} ${SMOKE.verdict} (readiness ${SMOKE.readiness}%)` : 'Launch Readiness'}</div>
     <div class="brief-delta">
       <div style="font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Since yesterday</div>
       ${briefDelta}
@@ -620,13 +627,13 @@ a{color:inherit;text-decoration:none}
   </div>
   <div class="brief-blocker">
     <div class="brief-section-label">Biggest Blocker</div>
-    <div class="brief-blocker-text">${biggestBlocker ? esc(biggestBlocker.title) : 'None — all clear'}</div>
-    <div style="font-size:11px;color:var(--muted2)">${biggestBlocker ? esc(biggestBlocker.shortStatus) : ''}</div>
+    <div class="brief-blocker-text">${SMOKE ? esc(SMOKE.biggestBlocker) : (biggestBlocker ? esc(biggestBlocker.title) : 'None — all clear')}</div>
+    <div style="font-size:11px;color:var(--muted2)">${SMOKE ? esc(SMOKE.biggestBlockerSub) : (biggestBlocker ? esc(biggestBlocker.shortStatus) : '')}</div>
   </div>
   <div class="brief-action">
     <div class="brief-section-label">Recommended Action</div>
-    <div class="brief-action-text">${nextAction ? esc(nextAction.title) : (topGainItem ? esc(topGainItem.title) : 'Update WEEK.md')}</div>
-    ${topGainItem ? `<div class="brief-action-impact">Expected impact: +${topGainItem.gain}% launch readiness</div>` : ''}
+    <div class="brief-action-text">${SMOKE ? esc(SMOKE.recommendedAction) : (nextAction ? esc(nextAction.title) : (topGainItem ? esc(topGainItem.title) : 'Update WEEK.md'))}</div>
+    ${SMOKE ? `<div class="brief-action-impact">${esc(SMOKE.recommendedImpact)}</div>` : (topGainItem ? `<div class="brief-action-impact">Expected impact: +${topGainItem.gain}% launch readiness</div>` : '')}
   </div>
 </div>`;
 
@@ -812,10 +819,28 @@ a{color:inherit;text-decoration:none}
   <div class="mono-row"><span class="mono-label" style="color:var(--muted2)">Monitor Waterstones + Zavvi AWIN</span><span class="mono-val" style="color:var(--muted2)">Pending approval — no action needed until approved</span></div>
 </div>`;
 
-  // Launch Readiness
+  // Smoke Test V3 verdict card — the product-QA launch gate
+  const SMOKE_CARD = SMOKE ? `
+<div class="card gap">
+  <h2>Smoke Test V3 — Production Triage Verdict · ${esc(SMOKE.date)}</h2>
+  <div class="health-grid">
+    <div class="hstat"><div class="hstat-num" style="color:var(--red)">${SMOKE.p0open}</div><div class="hstat-label">P0 open</div><div class="hstat-sub">of ${SMOKE.p0total} P0 cards</div></div>
+    <div class="hstat"><div class="hstat-num">${SMOKE.p1open}</div><div class="hstat-label">P1 open</div></div>
+    <div class="hstat"><div class="hstat-num">${SMOKE.p2open}</div><div class="hstat-label">P2 open</div></div>
+    <div class="hstat"><div class="hstat-num" style="color:#22C55E">${SMOKE.verified}</div><div class="hstat-label">Verified fixed</div><div class="hstat-sub">production evidence</div></div>
+    <div class="hstat"><div class="hstat-num">${SMOKE.closed}</div><div class="hstat-label">Closed</div><div class="hstat-sub">dupes / artifacts</div></div>
+    <div class="hstat"><div class="hstat-num" style="color:var(--red)">${esc(SMOKE.verdict)}</div><div class="hstat-label">Verdict</div><div class="hstat-sub">readiness ${SMOKE.readiness}%</div></div>
+  </div>
+  <div style="font-size:11px;color:var(--muted2);margin-top:10px;line-height:1.6">
+    <strong style="color:var(--text)">Open P0s:</strong> ${esc(SMOKE.openP0s)}<br>
+    <strong style="color:var(--text)">Verified fixed ${esc(SMOKE.date)}:</strong> ${esc(SMOKE.verifiedList)}
+  </div>
+</div>` : '';
+
+  // Workstream completion (infra/setup) — not the product-QA gate
   const LR_TABLE = `
 <div class="card gap">
-  <h2>Launch Readiness — ${overallPct}% · ${todoHighGain > 0 ? todoHighGain+'% potential gain remaining' : 'all done!'}</h2>
+  <h2>Workstream Completion — ${overallPct}% (infra &amp; setup) · ${SMOKE ? 'product QA verdict above is the launch gate' : (todoHighGain > 0 ? todoHighGain+'% potential gain remaining' : 'all done!')}</h2>
   <table class="lr-table">
     <thead><tr>
       <td class="lr-title" style="color:var(--muted);font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding-bottom:6px">Requirement</td>
@@ -911,14 +936,14 @@ ${staleWarning}
 <!-- Progress bar -->
 <div class="prog">
   <div class="prog-top">
-    <span class="prog-label">Launch readiness — computed from statuses</span>
-    <span class="prog-pct">${overallPct}%</span>
+    <span class="prog-label">${SMOKE ? `Launch readiness — Smoke Test V3 verdict (production triage ${esc(SMOKE.date)})` : 'Launch readiness — computed from statuses'}</span>
+    <span class="prog-pct">${SMOKE ? `${SMOKE.readiness}% · ${SMOKE.verdictIcon} ${SMOKE.verdict}` : overallPct + '%'}</span>
   </div>
   <div class="prog-track">
-    <div class="prog-fill" style="width:${Math.min(100,overallPct)}%"></div>
-    <div class="prog-exp" style="left:${Math.min(99,expectedPct)}%" title="Expected ${expectedPct}% at day ${daysPassed}"></div>
+    <div class="prog-fill" style="width:${Math.min(100, SMOKE ? SMOKE.readiness : overallPct)}%"></div>
+    ${SMOKE ? '' : `<div class="prog-exp" style="left:${Math.min(99,expectedPct)}%" title="Expected ${expectedPct}% at day ${daysPassed}"></div>`}
   </div>
-  <div class="prog-sub">Expected pace: ${expectedPct}% at day ${daysPassed} of ${totalDays}</div>
+  <div class="prog-sub">${SMOKE ? esc(SMOKE.progSub) : `Expected pace: ${expectedPct}% at day ${daysPassed} of ${totalDays}`}</div>
 </div>
 
 <!-- Morning Brief -->
@@ -946,7 +971,10 @@ ${CATALOGUE_HEALTH}
 <!-- Manual Monetisation Actions -->
 ${MONO_ACTIONS}
 
-<!-- Launch Readiness -->
+<!-- Smoke Test V3 verdict (product-QA launch gate) -->
+${SMOKE_CARD}
+
+<!-- Workstream completion -->
 ${LR_TABLE}
 
 <!-- Critical Path + This Week -->

@@ -85,9 +85,9 @@ export default function Home() {
   const [region, setRegion]           = useState<'uk' | 'us'>('uk');
   const [dealCovers, setDealCovers]   = useState<Record<number, string>>({});
   const [liveDeals, setLiveDeals]     = useState<LiveDeal[] | null>(null);
-  const [carouselOffset, setCarouselOffset] = useState(0);
   const [hoverZone, setHoverZone]     = useState<HoverZone>(null);
   const carouselRef   = useRef<HTMLDivElement>(null);
+  const trackRef      = useRef<HTMLDivElement>(null);
   const offsetRef     = useRef(0);
   const hoverZoneRef  = useRef<HoverZone>(null);
   const router = useRouter();
@@ -124,20 +124,30 @@ export default function Home() {
     });
   }, [liveDeals]);
 
-  // Infinite carousel — default left-scroll, speed up/reverse on hover zones
+  // Writes the current offset straight to the track's transform. The previous
+  // implementation called setState every 16ms, re-rendering the entire page at
+  // 60fps forever — direct DOM mutation keeps the drift off the React render path.
+  const applyCarouselOffset = () => {
+    if (trackRef.current) trackRef.current.style.transform = `translateX(-${offsetRef.current}px)`;
+  };
+
+  // Infinite carousel — default left-scroll, speed up/reverse on hover zones.
+  // Auto-drift is disabled under prefers-reduced-motion; arrows still work.
   useEffect(() => {
     offsetRef.current = SET_W;
-    setCarouselOffset(SET_W);
+    applyCarouselOffset();
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const tick = () => {
       const zone  = hoverZoneRef.current;
       const speed = zone === 'right' ? 0.55 : zone === 'left' ? -0.55 : 0.1;
       offsetRef.current += speed;
       if (offsetRef.current >= SET_W * 2) offsetRef.current -= SET_W;
       if (offsetRef.current <  SET_W)     offsetRef.current += SET_W;
-      setCarouselOffset(offsetRef.current);
+      applyCarouselOffset();
     };
     const id = setInterval(tick, 16);
     return () => clearInterval(id);
+    // applyCarouselOffset intentionally omitted — only touches refs
   }, [SET_W]);
 
   // Manual arrow scroll — snaps by one card width and keeps offset in loop range
@@ -147,7 +157,7 @@ export default function Home() {
     if (next >= SET_W * 2) next -= SET_W;
     if (next < SET_W)      next += SET_W;
     offsetRef.current = next;
-    setCarouselOffset(next);
+    applyCarouselOffset();
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -274,6 +284,7 @@ export default function Home() {
           .cover-sway-1 { animation: none; transform: rotate(-5deg); }
           .cover-sway-2 { animation: none; transform: rotate(2deg);  }
           .cover-sway-3 { animation: none; transform: rotate(-3deg); }
+          .pub-track    { animation: none; }
         }
 
         /* ── Mobile hero: hide covers, full-width copy + search ─────────── */
@@ -497,7 +508,7 @@ export default function Home() {
 
           {/* RIGHT — book covers + publisher strip.
               overflow:visible so covers can scale beyond container bounds on hover. */}
-          <div className="hero-right" style={{ position: 'relative', flex: 1, overflow: 'visible', display: 'flex', flexDirection: 'column', justifyContent: 'center', borderRadius: '0 28px 28px 0' }}>
+          <div className="hero-right" style={{ position: 'relative', flex: 1, minWidth: 0, overflow: 'visible', display: 'flex', flexDirection: 'column', justifyContent: 'center', borderRadius: '0 28px 28px 0' }}>
             {/* Right-edge fade so covers dissolve naturally into the card border */}
             <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '56px', zIndex: 20, pointerEvents: 'none', background: 'linear-gradient(to left, #111827 0%, transparent 100%)' }} />
 
@@ -647,8 +658,11 @@ export default function Home() {
             </svg>
           </button>
 
-          {/* 3 copies for seamless infinite loop */}
-          <div style={{ display: 'flex', gap: '12px', transform: `translateX(-${carouselOffset}px)`, willChange: 'transform' }}>
+          {/* 3 copies for seamless infinite loop. alignItems flex-start pins all
+              cover boxes to the same top edge — the browser's native <button>
+              vertical centering inside stretched flex items shifted cards with a
+              missing publisher line ~8px lower (CC-008). */}
+          <div ref={trackRef} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', transform: 'translateX(0)', willChange: 'transform' }}>
             {[...activeDeals, ...activeDeals, ...activeDeals].map((deal, i) => {
               // Branch: live DB deal vs static fallback deal
               const isLive  = liveDeals !== null
@@ -728,8 +742,9 @@ export default function Home() {
                     {title}
                   </div>
 
-                  {/* Publisher */}
-                  <div style={{ fontSize: '10px', color: '#6B7280', marginTop: '2px' }}>
+                  {/* Publisher — minHeight reserves the line when publisher is null
+                      so every card keeps identical content height */}
+                  <div style={{ fontSize: '10px', color: '#6B7280', marginTop: '2px', minHeight: '13px' }}>
                     {publisher}
                   </div>
 
