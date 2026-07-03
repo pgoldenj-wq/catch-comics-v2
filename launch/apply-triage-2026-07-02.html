@@ -99,6 +99,19 @@ const NEW_ISSUES = [
   },
 ];
 
+/* ── Phase 1 production verification (deployed main a52c689, 03 Jul 2026) ── */
+const STAMP2 = '[Verified 03 Jul 2026]';
+function note2(cur, txt){
+  if ((cur||'').includes(STAMP2)) return cur;
+  return (cur ? cur + '\n\n' : '') + STAMP2 + ' ' + txt;
+}
+const PHASE1_VERIFY = [
+  {id:'CC-002', set:{stat:'verified'}, verify:'Production-verified post-deploy (main a52c689): marquee wrapper right edge equals hero card right edge (1312px == 1312px); logos fade at the card boundary, none render outside. Root cause was flexbox min-width:auto inflation of hero-right — fixed with minWidth:0.'},
+  {id:'CC-008', set:{stat:'verified'}, verify:'Production-verified post-deploy: all 8 Top Deals cover boxes top-aligned at 620px. Root cause: native button vertical centering + null-publisher cards; fixed with alignItems:flex-start on the track + reserved publisher line height.'},
+  {id:'CC-024', set:{stat:'verified'}, verify:'Production-verified post-deploy: the duplicated Prices-for toggle is display:none at desktop widths; kept on mobile where it is the only region control. Root cause: inline display:flex overrode md:hidden (inline styles beat stylesheet rules).'},
+  {id:'CC-023', verify:'Residual nit closed 03 Jul: the empty Character-Tags label no longer renders on issues without character data (production-verified on Absolute Batman #2 — page also hardened against non-allowlisted cover hosts).'},
+];
+
 /* ── metrics (same formula as Smoke Test V3) ─────────────────── */
 function metrics(s){
   const issues = Object.values(s.issues||{});
@@ -143,6 +156,14 @@ function apply(s){
     log.push(n.id+' — created (new P0: '+n.text+')');
   });
   s.issueSeq = Math.max(s.issueSeq||0, 28);
+  PHASE1_VERIFY.forEach(u=>{
+    const i = s.issues[u.id];
+    if (!i){ log.push(u.id+' — not found in session, skipped'); return; }
+    const already = (i.verify||'').includes(STAMP2);
+    if (u.set) Object.assign(i, u.set);
+    if (u.verify) i.verify = note2(i.verify, u.verify);
+    log.push(u.id+' — '+(already?'phase-1 verify already applied (no-op)':'production-verified'+(u.set&&u.set.stat?' → '+u.set.stat:'')));
+  });
   return log;
 }
 
