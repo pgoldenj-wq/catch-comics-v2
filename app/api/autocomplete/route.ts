@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { autocompleteCache }         from '@/lib/cache'
 import { cvFetch }                   from '@/lib/comicvine'
+import { prisma }                    from '@/lib/prisma'
 
 // ── Curated dictionary ────────────────────────────────────────────────────────
 
@@ -132,6 +133,68 @@ function titleType(name: string): string {
   return MANGA_TITLES.has(name) ? 'Manga' : 'Series'
 }
 
+// ── Volume discovery (CC-013) ─────────────────────────────────────────────────
+// Collectors type "Saga Vol" / "Saga Vol 3" expecting individual volumes, not
+// just the parent series. When the query ends with a vol/volume token, surface
+// real volumes from the LOCAL catalogue (never CV — suggestions must only offer
+// things our search can actually deliver).
+
+const VOL_TITLE_RE = /\bvol(?:ume)?\.?\s*0*(\d+)\b/i
+
+async function volumeSuggestions(q: string): Promise<Suggestion[]> {
+  const m = q.match(/^(.{2,}?)\s+vol(?:ume)?\.?\s*(\d*)\s*$/i)
+  if (!m) return []
+  const series  = m[1].trim()
+  const typedNo = m[2] // '' when the user stopped at "vol"
+
+  try {
+    const rows = await prisma.canonicalProduct.findMany({
+      where: {
+        deletedAt: null,
+        format:    { not: 'SINGLE_ISSUE' },
+        OR: [
+          { seriesName: { equals: series, mode: 'insensitive' } },
+          { title:      { startsWith: series, mode: 'insensitive' } },
+        ],
+      },
+      select: { title: true, publisher: true, volumeNumber: true, seriesName: true },
+      take: 60,
+    })
+
+    // Pick the best representative per volume number: exact series match beats
+    // startsWith spin-offs ("Invincible" beats "Invincible Universe: Capes"),
+    // then shortest title (closest to the plain main-series naming).
+    const sl = series.toLowerCase()
+    rows.sort((a, b) => {
+      const aExact = (a.seriesName ?? '').toLowerCase() === sl ? 0 : 1
+      const bExact = (b.seriesName ?? '').toLowerCase() === sl ? 0 : 1
+      return aExact - bExact || a.title.length - b.title.length
+    })
+
+    // volumeNumber column is often NULL — fall back to parsing from the title.
+    const byVol = new Map<number, { title: string; publisher: string | null }>()
+    for (const r of rows) {
+      const parsed = r.volumeNumber ?? (() => {
+        const t = r.title.match(VOL_TITLE_RE)
+        return t ? parseInt(t[1], 10) : null
+      })()
+      if (parsed === null || Number.isNaN(parsed)) continue
+      if (typedNo && !String(parsed).startsWith(typedNo)) continue
+      if (!byVol.has(parsed)) byVol.set(parsed, { title: r.title, publisher: r.publisher })
+    }
+
+    return [...byVol.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .slice(0, 5)
+      .map(([, v]) => ({
+        id: 0, name: v.title, type: 'Volume',
+        year: '', publisher: v.publisher ?? '', image: '', count: 1,
+      }))
+  } catch {
+    return [] // DB hiccup — autocomplete degrades to series suggestions
+  }
+}
+
 export async function GET(req: NextRequest) {
   const q    = req.nextUrl.searchParams.get('q') || ''
   const mode = req.nextUrl.searchParams.get('mode') || 'suggest'
@@ -178,20 +241,24 @@ export async function GET(req: NextRequest) {
 
   const curatedMatches = [...prefixMatches, ...substringMatches].slice(0, 6)
 
+  // Local-catalogue volumes lead when the query carries volume intent —
+  // "Saga Vol" should offer Saga Vol 1/2/3…, not just the Saga series row.
+  const volumes = await volumeSuggestions(q)
+
   // Helper: write to cache then respond — single source of truth
   const respond = (body: { results: Suggestion[]; correction: null }) => {
     autocompleteCache.set(suggestCacheKey, body)
     return NextResponse.json(body)
   }
 
-  if (curatedMatches.length >= 4) {
-    return respond({ results: curatedMatches, correction: null })
+  if (volumes.length + curatedMatches.length >= 4) {
+    return respond({ results: [...volumes, ...curatedMatches].slice(0, 8), correction: null })
   }
 
   // ── Supplement with Comic Vine ────────────────────────────────────────────
   const apiKey = process.env.COMIC_VINE_API_KEY
   if (!apiKey) {
-    return respond({ results: curatedMatches, correction: null })
+    return respond({ results: [...volumes, ...curatedMatches].slice(0, 8), correction: null })
   }
 
   try {
@@ -200,26 +267,42 @@ export async function GET(req: NextRequest) {
     if (!res) return respond({ results: curatedMatches, correction: null })
     const data = await res.json()
 
-    const curatedNames = new Set(curatedMatches.map(c => c.name.toLowerCase()))
+    // Dedupe by normalised name against curated/volume rows AND within the CV
+    // results themselves — CV returns every international edition as its own
+    // volume, so a query like "saga vol" yields six identical "Saga" entries
+    // that ate the suggestion slots before this pass (CC-026 'repetitious').
+    const seenNames = new Set([
+      ...curatedMatches.map(c => c.name.toLowerCase()),
+      ...volumes.map(v => v.name.toLowerCase()),
+    ])
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const apiSuggestions: Suggestion[] = (data.results || []).map((r: any) => ({
-      id:        r.id,
-      name:      r.name,
-      type:      titleType(r.name),
-      year:      r.start_year || '',
-      publisher: r.publisher?.name || '',
-      image:     r.image?.small_url || '',
-      count:     1,
-    }))
+    const apiSuggestions: Suggestion[] = (data.results || [])
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .filter((r: any) => {
+        const k = (r.name || '').toLowerCase().trim()
+        if (!k || seenNames.has(k)) return false
+        seenNames.add(k)
+        return true
+      })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((r: any) => ({
+        id:        r.id,
+        name:      r.name,
+        type:      titleType(r.name),
+        year:      r.start_year || '',
+        publisher: r.publisher?.name || '',
+        image:     r.image?.small_url || '',
+        count:     1,
+      }))
 
-    // Deduplicate against curated; prefer prefix matches from API too
-    const apiPrefix    = apiSuggestions.filter(s => s.name.toLowerCase().startsWith(ql) && !curatedNames.has(s.name.toLowerCase()))
-    const apiSubstring = apiSuggestions.filter(s => !s.name.toLowerCase().startsWith(ql) && !curatedNames.has(s.name.toLowerCase()))
+    // Prefer prefix matches from API too
+    const apiPrefix    = apiSuggestions.filter(s => s.name.toLowerCase().startsWith(ql))
+    const apiSubstring = apiSuggestions.filter(s => !s.name.toLowerCase().startsWith(ql))
     const apiDeduped   = [...apiPrefix, ...apiSubstring]
 
-    const merged = [...curatedMatches, ...apiDeduped].slice(0, 8)
+    const merged = [...volumes, ...curatedMatches, ...apiDeduped].slice(0, 8)
     return respond({ results: merged, correction: null })
   } catch {
-    return respond({ results: curatedMatches, correction: null })
+    return respond({ results: [...volumes, ...curatedMatches].slice(0, 8), correction: null })
   }
 }

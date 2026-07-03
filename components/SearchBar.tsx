@@ -31,6 +31,7 @@ const POPULAR_SEARCHES = [
 const TYPE_BADGE: Record<string, { bg: string; color: string }> = {
   'Manga':  { bg: '#FEF3C7', color: '#92400E' },
   'Series': { bg: '#DBEAFE', color: '#1E40AF' },
+  'Volume': { bg: '#DCFCE7', color: '#166534' },  // local-catalogue volume rows (CC-013)
 }
 
 export default function SearchBar({ initialQuery = '', region, variant = 'hero' }: SearchBarProps) {
