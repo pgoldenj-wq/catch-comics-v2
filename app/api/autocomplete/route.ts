@@ -158,7 +158,10 @@ async function volumeSuggestions(q: string): Promise<Suggestion[]> {
         ],
       },
       select: { title: true, publisher: true, volumeNumber: true, seriesName: true },
-      take: 60,
+      // Big franchises (One Piece: 100+ rows with spin-offs/box sets) need a
+      // large sample — at take:60 unordered, the real "One Piece, Vol. 1" can
+      // miss the cut while spin-offs make it in (found in CC-019 diagnosis).
+      take: 400,
     })
 
     // Pick the best representative per volume number: exact series match beats
