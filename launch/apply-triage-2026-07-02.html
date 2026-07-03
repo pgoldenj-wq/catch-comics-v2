@@ -124,6 +124,16 @@ const PHASE2_VERIFY = [
   {id:'CC-028', set:{stat:'verified'}, verify:"Production-verified (main e9c28ef): Absolute Batman Vol 1 hero reads '21 issues in this series'; zero 'Collects' claims remain on the page (grid heading relabelled too). The count is now labelled as what it is — the series total from CV."},
 ];
 
+/* ── B1 + CC-027 production verification (main 04a4549, 03 Jul 2026) ── */
+const STAMP4 = '[Verified 03 Jul 2026 — B1/CC-027]';
+function note4(cur, txt){
+  if ((cur||'').includes(STAMP4)) return cur;
+  return (cur ? cur + '\n\n' : '') + STAMP4 + ' ' + txt;
+}
+const B1_VERIFY = [
+  {id:'CC-027', set:{stat:'verified'}, verify:"Production-verified (main 04a4549): search cards now mount a live CV cover fallback when cover_image_url is NULL but the product is CV-matched — same /api/comic source the product hero uses, KV-cached; renders nothing until a real filtered cover resolves (letter fallback meanwhile, never a placeholder graphic or wrong cover). Verified live: Crossplay Love Otaku x Punk Vol 14 (null cover) shows its CV cover in search; 'absolute batman' top 8 cards all show real covers, 0 letter placeholders. 351 null-cover CV-matched products benefit. B1 root cause also closed: sync-awin-feed no longer seeds cover_image_url from AWIN proxy images; 462 existing productserve cover URLs nulled (0 remain); purged product pages verified rendering (The Boys Omnibus Vol 6)."},
+];
+
 /* ── metrics (same formula as Smoke Test V3) ─────────────────── */
 function metrics(s){
   const issues = Object.values(s.issues||{});
@@ -183,6 +193,14 @@ function apply(s){
     if (u.set) Object.assign(i, u.set);
     if (u.verify) i.verify = note3(i.verify, u.verify);
     log.push(u.id+' — '+(already?'phase-2 verify already applied (no-op)':'production-verified'+(u.set&&u.set.stat?' → '+u.set.stat:'')));
+  });
+  B1_VERIFY.forEach(u=>{
+    const i = s.issues[u.id];
+    if (!i){ log.push(u.id+' — not found in session, skipped'); return; }
+    const already = (i.verify||'').includes(STAMP4);
+    if (u.set) Object.assign(i, u.set);
+    if (u.verify) i.verify = note4(i.verify, u.verify);
+    log.push(u.id+' — '+(already?'B1/CC-027 verify already applied (no-op)':'production-verified'+(u.set&&u.set.stat?' → '+u.set.stat:'')));
   });
   return log;
 }
