@@ -52,6 +52,9 @@ export interface CanonicalSearchResult {
   format:       string       // ProductFormat enum value
   isbn13:       string | null
   coverImageUrl: string | null
+  /** CV volume/issue id when matched — lets search cards use the same live
+   *  CV cover fallback the product hero uses (CC-027). */
+  comicvineId:  string | null
   canonicalSlug: string
   /** Volume number (1-based) when known — drives Vol-1 preference for series queries */
   volumeNumber: number | null

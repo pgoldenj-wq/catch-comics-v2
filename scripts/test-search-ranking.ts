@@ -15,7 +15,7 @@ function mk(title: string, o: Partial<CanonicalSearchResult> = {}): CanonicalSea
   return {
     type: 'canonical', id: `id${n++}`, title, seriesName: o.seriesName ?? null,
     publisher: o.publisher ?? 'Image Comics', format: o.format ?? 'TPB',
-    isbn13: null, coverImageUrl: 'https://images.catchcomics.com/x.webp', canonicalSlug: `s${n}`,
+    isbn13: null, coverImageUrl: 'https://images.catchcomics.com/x.webp', comicvineId: null, canonicalSlug: `s${n}`,
     volumeNumber: o.volumeNumber ?? null, releaseDate: o.releaseDate ?? '2020-01-01',
     offers: o.offers ?? [], totalOffers: o.totalOffers ?? 0, score: o.score ?? 0.05,
   }

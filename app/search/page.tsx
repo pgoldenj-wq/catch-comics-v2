@@ -96,6 +96,42 @@ function PriceTag({
   )
 }
 
+/** CC-027 — live CV cover fallback for search cards. Only mounts when the DB
+ *  cover is missing/bad but the product is CV-matched: the product hero shows
+ *  a real cover in that case (same /api/comic source, KV-cached server-side),
+ *  so search must not show a letter placeholder for the same product. Renders
+ *  nothing until a real, filtered cover URL resolves — the letter fallback
+ *  stays visible meanwhile; never a placeholder graphic, never a wrong cover
+ *  (the id is the product's own verified CV match). */
+function CVCardCover({ comicvineId, alt }: { comicvineId: string; alt: string }) {
+  const [src, setSrc] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    fetch(`/api/comic/${comicvineId}`)
+      .then(r => r.json())
+      .then(d => {
+        const img = d.comic?.image?.medium_url || d.comic?.image?.original_url
+        if (!cancelled && img && !isBadCoverUrl(img)) setSrc(img)
+      })
+      .catch(() => { /* letter fallback stays */ })
+    return () => { cancelled = true }
+  }, [comicvineId])
+
+  if (!src) return null
+  return (
+    <img
+      src={adjustImgSrc(src)}
+      alt={alt}
+      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px' }}
+      onLoad={e => {
+        const img = e.currentTarget
+        if (img.naturalWidth <= 1 || img.naturalHeight <= 1) img.style.display = 'none'
+      }}
+      onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+    />
+  )
+}
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface ComicResult {
@@ -113,6 +149,8 @@ interface ComicResult {
   isbn10?: string
   /** Present for canonical (DB) results — routes to /product/[slug] */
   canonicalSlug?: string
+  /** CV id when matched — enables the live CV cover fallback (CC-027) */
+  comicvineId?: string | null
   // Unified mode — inline offers
   offers?: Array<{
     listingId: string; retailerName: string; retailerUrl: string
@@ -508,6 +546,7 @@ function SearchResults() {
             (r: {
               id: string; title: string; publisher: string | null; format: string
               releaseDate: string | null; coverImageUrl: string | null; isbn13: string | null
+              comicvineId: string | null
               canonicalSlug: string
               offers: Array<{ listingId: string; retailerName: string; retailerUrl: string; priceAmount: number; currency: string; stockStatus: string; condition: string }>
             }) => {
@@ -521,6 +560,7 @@ function SearchResults() {
                 source:         'canonical',
                 type:           r.format === 'SINGLE_ISSUE' ? 'issue' : 'volume',
                 isbn13:         r.isbn13 ?? undefined,
+                comicvineId:    r.comicvineId,
                 canonicalSlug:  r.canonicalSlug,
                 offers:         r.offers,
               }
@@ -913,6 +953,11 @@ function SearchResults() {
                           }}
                           onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
                         />
+                      )}
+                      {/* CC-027: DB cover missing but product is CV-matched —
+                          fetch the same cover its product page shows. */}
+                      {!comic.image?.medium_url && comic.comicvineId && (
+                        <CVCardCover comicvineId={comic.comicvineId} alt={comic.name} />
                       )}
                     </div>
 
