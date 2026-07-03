@@ -83,6 +83,10 @@ async function main() {
       AND cp.format::text <> 'SINGLE_ISSUE'
       AND cp.cv_metadata IS NOT NULL
       AND cp.cv_metadata->>'creators_source' IS NULL
+      -- Never touch products whose CV match is flagged wrong (classic volume
+      -- matched to a modern title) — backfilling those displays wrong-era
+      -- creators. Fix the match first, then clear the flag.
+      AND cp.cv_metadata->>'cv_match_suspect' IS NULL
       AND (
         jsonb_array_length(coalesce(cp.cv_metadata->'creators','[]'::jsonb)) = 0
         OR NOT (cp.cv_metadata->'creators'->0 ? 'role')
