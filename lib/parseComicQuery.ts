@@ -28,6 +28,24 @@ export interface ParsedQuery {
   raw: string
 }
 
+/**
+ * normalizeIssueSyntax — rewrite collector phrasings of single-issue intent
+ * into the catalogue's "#N" syntax before search runs (CC-025).
+ *
+ *   "absolute batman issue 2"  → "absolute batman #2"
+ *   "batman issue #5"          → "batman #5"
+ *   "spider-man number 3"      → "spider-man #3"
+ *   "saga no. 5"               → "saga #5"
+ *
+ * Volume phrasings ("vol 2" / "volume 2") are deliberately untouched — they
+ * carry volume intent, not issue intent. Bare "no 5" (no dot) is also left
+ * alone: too ambiguous in natural titles. A normal user should not need to
+ * know comic-shop "#" syntax to find single issues.
+ */
+export function normalizeIssueSyntax(query: string): string {
+  return query.replace(/\b(?:issue|number|no\.)\s*#?0*(\d{1,4})\b/gi, '#$1')
+}
+
 export function parseComicQuery(query: string): ParsedQuery {
   let q = query.trim()
 

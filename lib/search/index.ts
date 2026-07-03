@@ -14,6 +14,7 @@
 import { queryCanonical }                    from './queryA'
 import { queryUnmatched }                    from './queryB'
 import { queryEbay }                         from './queryC'
+import { normalizeIssueSyntax }              from '../parseComicQuery'
 import { applyScores, isStaleDud, titleMatchSignal, STRONG_MATCH_FLOOR } from './score'
 import { makeCacheKey, shouldBypassCache, getCached, setCached } from './cache'
 import type {
@@ -119,7 +120,11 @@ function mergeEbayMatches(
 
 // ── Main entry point ──────────────────────────────────────────────────────────
 
-export async function unifiedSearch(sq: SearchQuery): Promise<UnifiedSearchResult> {
+export async function unifiedSearch(sqIn: SearchQuery): Promise<UnifiedSearchResult> {
+  // Collector phrasing → catalogue syntax ("absolute batman issue 2" → "… #2")
+  // BEFORE the cache key and every downstream query/score/weak-match consumer,
+  // so all of them see the form the catalogue actually stores (CC-025).
+  const sq = { ...sqIn, q: normalizeIssueSyntax(sqIn.q) }
   const start   = Date.now()
   const cacheKey = makeCacheKey(sq.q, sq.region)
   const bypass   = shouldBypassCache(sq)
