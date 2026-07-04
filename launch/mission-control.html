@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Catch Comics — Mission Control</title>
+<style>
+/* ═══ Mission Control V2 — Founder command centre ═════════════════════
+   One screen. One question: "Can I launch on Sunday 26 July 2026?"
+   And if not: "What exactly must I do next?"
+   ══════════════════════════════════════════════════════════════════ */
+:root {
+  --bg:#0E1116; --panel:#161B22; --panel2:#1C2330; --line:#2A3240;
+  --ink:#F3F4F6; --ink2:#9CA3AF; --ink3:#6B7280;
+  --red:#F87171; --amber:#FBBF24; --green:#4ADE80; --accent:#E8272A;
+  --focus:#60A5FA;
+}
+* { box-sizing:border-box; }
+html,body { margin:0; background:var(--bg); color:var(--ink);
+  font:15px/1.55 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+button { font:inherit; cursor:pointer; }
+:focus-visible { outline:3px solid var(--focus); outline-offset:2px; border-radius:8px; }
+a { color:var(--ink); }
+
+.wrap { max-width:960px; margin:0 auto; padding:28px 20px 80px; }
+
+/* ── Mission status hero ── */
+.hero { text-align:center; padding:34px 20px 26px; }
+.hero .brand { font-size:13px; font-weight:700; letter-spacing:.28em; color:var(--ink2); text-transform:uppercase; }
+.hero h1 { font-size:clamp(26px,5vw,40px); margin:10px 0 2px; letter-spacing:-0.02em; }
+.hero .date { font-size:clamp(17px,3vw,22px); color:var(--ink2); }
+.countdown { font-size:clamp(44px,9vw,84px); font-weight:800; letter-spacing:-0.04em; margin:16px 0 2px;
+  font-variant-numeric:tabular-nums; }
+.countdown small { font-size:.32em; font-weight:700; letter-spacing:.18em; color:var(--ink2); vertical-align:middle; }
+
+.readybar { height:22px; border-radius:11px; background:var(--panel2); border:1px solid var(--line);
+  overflow:hidden; margin:20px auto 8px; max-width:620px; }
+.readybar > div { height:100%; border-radius:11px 0 0 11px; background:linear-gradient(90deg,#DC2626,#F59E0B,#22C55E);
+  background-size:620px 100%; transition:width .6s ease; }
+.readypct { font-size:20px; font-weight:800; }
+.readyhow { font-size:12px; color:var(--ink3); max-width:640px; margin:6px auto 0; }
+
+.verdict { display:inline-block; margin-top:18px; padding:14px 30px; border-radius:16px;
+  font-size:22px; font-weight:800; letter-spacing:.02em; }
+.verdict.nogo   { background:#3B1214; color:var(--red);   border:2px solid #7F1D1D; }
+.verdict.notyet { background:#3A2A08; color:var(--amber); border:2px solid #92660D; }
+.verdict.go     { background:#0E2D18; color:var(--green); border:2px solid #166534; }
+.verdictsub { margin-top:10px; font-size:15px; color:var(--ink2); }
+.verdictsub strong { color:var(--ink); }
+
+/* ── Cards ── */
+.card { background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:22px; margin-top:18px; }
+.card h2 { margin:0 0 14px; font-size:13px; font-weight:800; letter-spacing:.18em; text-transform:uppercase; color:var(--ink2); }
+
+/* next action */
+.nextaction { display:flex; flex-wrap:wrap; align-items:center; gap:16px; border:2px solid var(--accent); }
+.nextaction .na-label { font-size:12px; font-weight:800; letter-spacing:.16em; color:var(--accent); text-transform:uppercase; }
+.nextaction .na-title { font-size:22px; font-weight:800; flex:1 1 260px; }
+.bigbtn { background:var(--accent); border:none; color:#fff; font-weight:800; font-size:16px;
+  border-radius:14px; padding:16px 26px; min-height:56px; }
+.bigbtn:hover { background:#c41f22; }
+.ghostbtn { background:none; border:1px solid var(--line); color:var(--ink); border-radius:12px;
+  padding:10px 16px; font-weight:600; min-height:44px; }
+.ghostbtn:hover { background:var(--panel2); }
+
+/* what next list */
+.todo { display:flex; align-items:center; gap:14px; padding:13px 10px; border-radius:12px; }
+.todo:hover { background:var(--panel2); }
+.todo .box { width:22px; height:22px; border:2px solid var(--ink3); border-radius:6px; flex-shrink:0; }
+.todo .t { flex:1; font-size:16px; }
+.todo .t small { display:block; color:var(--ink3); font-size:12px; }
+
+/* checklists */
+.checkgrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:18px; }
+.chk { display:flex; align-items:center; gap:12px; padding:11px 8px; border-radius:10px; font-size:15px; min-height:48px; }
+.chk:hover { background:var(--panel2); }
+.chk input { width:22px; height:22px; accent-color:#22C55E; flex-shrink:0; cursor:pointer; }
+.chk.auto { cursor:default; }
+.chk .state { width:22px; text-align:center; flex-shrink:0; }
+.chk .done { color:var(--green); }
+.chk .todo-mark { color:var(--ink3); }
+.chk label { cursor:pointer; flex:1; }
+.chk .src { font-size:11px; color:var(--ink3); }
+.chk .go { margin-left:auto; }
+
+/* blockers */
+.blocker { display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding:14px; border:1px solid #7F1D1D;
+  background:#1D1113; border-radius:12px; margin-bottom:10px; }
+.blocker .b-id { font-weight:800; color:var(--red); }
+.blocker .b-desc { flex:1 1 300px; color:var(--ink2); font-size:14px; }
+
+/* wins */
+.win { padding:7px 8px; font-size:15px; color:var(--ink2); }
+.win::before { content:'✅ '; }
+
+.links { display:flex; flex-wrap:wrap; gap:10px; }
+footer { text-align:center; color:var(--ink3); font-size:12px; margin-top:26px; }
+footer button { color:var(--ink3); background:none; border:none; text-decoration:underline; }
+
+#toast { position:fixed; bottom:22px; left:50%; transform:translateX(-50%);
+  background:#F3F4F6; color:#111; border-radius:12px; padding:14px 22px; font-size:14px; font-weight:600;
+  box-shadow:0 8px 30px rgba(0,0,0,.5); opacity:0; pointer-events:none; transition:opacity .2s; z-index:60; max-width:90vw; }
+#toast.show { opacity:1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <div class="brand">Catch Comics · Mission Control</div>
+    <h1 id="missionTitle">Launch</h1>
+    <div class="date" id="launchDate"></div>
+    <div class="countdown" id="countdown"></div>
+    <div class="readybar"><div id="readyFill" style="width:0%"></div></div>
+    <div class="readypct"><span id="readyPct">–</span>% ready</div>
+    <div class="readyhow" id="readyHow"></div>
+    <div><span class="verdict notyet" id="verdict">…</span></div>
+    <div class="verdictsub" id="verdictSub"></div>
+  </div>
+
+  <div class="card nextaction" id="nextActionCard">
+    <div>
+      <div class="na-label">Next action</div>
+      <div class="na-title" id="naTitle">…</div>
+    </div>
+    <button class="bigbtn" id="naBtn">…</button>
+  </div>
+
+  <div class="card">
+    <h2>What must happen next</h2>
+    <div id="todoList"></div>
+  </div>
+
+  <div class="checkgrid">
+    <div class="card"><h2>🛡 Trust</h2><div id="trustList"></div></div>
+    <div class="card"><h2>🧪 Testing — Smoke Test V4</h2><div id="testList"></div></div>
+    <div class="card"><h2>🚀 Launch ops</h2><div id="opsList"></div></div>
+  </div>
+
+  <div class="card" id="blockersCard">
+    <h2>⛔ Open blockers — things that genuinely stop launch</h2>
+    <div id="blockerList"></div>
+  </div>
+
+  <div class="card">
+    <h2>🏆 Recent wins</h2>
+    <div id="winsList"></div>
+  </div>
+
+  <div class="card">
+    <h2>Go deeper</h2>
+    <div class="links">
+      <a class="ghostbtn" href="smoke-test-v4.html">Open Smoke Test V4</a>
+      <a class="ghostbtn" href="dashboard.html">Full dashboard (deep dive)</a>
+      <a class="ghostbtn" href="war-room-2026-07-03.md">War-room report</a>
+    </div>
+  </div>
+
+  <footer>
+    Data: founder-review.json + smoke-verdict.json (live) · ops checklist saved locally<span id="fsState"></span>.
+    <button id="connectBtn">Connect repo folder</button> to also save ops into the repo.
+  </footer>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ═══ Config ═════════════════════════════════════════════════════════ */
+const LAUNCH_DATE = new Date('2026-07-26T09:00:00+01:00'); // Sunday 26 July 2026
+const OPS_ITEMS = [
+  { id:'privacy',   label:'Privacy Policy live and reviewed', href:'https://catchcomics.com/privacy' },
+  { id:'terms',     label:'Terms live and reviewed',          href:'https://catchcomics.com/terms' },
+  { id:'analytics', label:'Analytics + error monitoring confirmed in production' },
+  { id:'mailbox',   label:'hello@catchcomics.com live and monitored' },
+  { id:'finalgo',   label:'Final GO / NO-GO review completed' },
+];
+// V4 testing pages, in founder-priority order for "what next"
+const TEST_ORDER = ['affiliate','mobile','product','search','homepage','offerstable','series-pages',
+  'series-index','errors','loading','covers','recommendation','route','launch-readiness'];
+const PAGE_TITLES = { homepage:'Homepage', search:'Search', 'series-index':'Series Index',
+  'series-pages':'Series Pages', product:'Product Pages', offerstable:'Offers Table',
+  affiliate:'Affiliate Flows', mobile:'Mobile', loading:'Loading States', route:'Route Transitions',
+  errors:'Error States', covers:'Cover Quality', recommendation:'Recommendations',
+  'launch-readiness':'Launch Readiness' };
+
+/* ═══ Local state (ops checklist) ════════════════════════════════════ */
+const KEY = 'cc-mission-control';
+let mc = (()=>{ try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.version===1) return s; } catch(e){}
+  return { version:1, ops:{} }; })();
+function saveMc(){ localStorage.setItem(KEY, JSON.stringify(mc)); writeMcToRepo(); }
+
+/* ═══ Live data ══════════════════════════════════════════════════════ */
+let FOUNDER = null, SMOKE = null;
+async function loadData(){
+  // 1) http(s): plain fetch. 2) file://: FS-handle if connected.
+  try {
+    if (location.protocol.startsWith('http')){
+      FOUNDER = await (await fetch('founder-review.json?'+Date.now())).json();
+      SMOKE   = await (await fetch('smoke-verdict.json?'+Date.now())).json();
+      return;
+    }
+  } catch(e){}
+  if (dirHandle){
+    try {
+      FOUNDER = JSON.parse(await (await (await dirHandle.getFileHandle('founder-review.json')).getFile()).text());
+      SMOKE   = JSON.parse(await (await (await dirHandle.getFileHandle('smoke-verdict.json')).getFile()).text());
+    } catch(e){}
+  }
+}
+
+/* ═══ FS handle (same pattern as Smoke Test V4) ══════════════════════ */
+let dirHandle = null;
+const idb = { db:null,
+  open(){ return new Promise((res,rej)=>{ const q = indexedDB.open('cc-mc',1);
+    q.onupgradeneeded = ()=> q.result.createObjectStore('kv');
+    q.onsuccess = ()=>{ idb.db=q.result; res(); }; q.onerror=rej; }); },
+  get(k){ return new Promise(res=>{ const t = idb.db.transaction('kv').objectStore('kv').get(k); t.onsuccess=()=>res(t.result); t.onerror=()=>res(null); }); },
+  set(k,v){ return new Promise(res=>{ const t = idb.db.transaction('kv','readwrite').objectStore('kv').put(v,k); t.onsuccess=()=>res(); t.onerror=()=>res(); }); },
+};
+async function connectRepo(){
+  if (!window.showDirectoryPicker){ toast('This browser lacks the File System Access API'); return; }
+  try {
+    dirHandle = await window.showDirectoryPicker({ id:'cc-launch', mode:'readwrite' });
+    await idb.set('dir', dirHandle);
+    document.getElementById('fsState').textContent = ' · repo connected';
+    toast('Repo connected — ops checklist will be saved to launch/mission-control.json');
+    await boot();
+  } catch(e){}
+}
+async function restoreRepo(){
+  try { await idb.open(); const h = await idb.get('dir'); if (!h) return;
+    if ((await h.queryPermission({mode:'readwrite'})) === 'granted'){ dirHandle = h; document.getElementById('fsState').textContent = ' · repo connected'; }
+  } catch(e){}
+}
+async function writeMcToRepo(){
+  if (!dirHandle) return;
+  try {
+    const fh = await dirHandle.getFileHandle('mission-control.json', { create:true });
+    const w = await fh.createWritable();
+    await w.write(JSON.stringify({ version:1, updated:new Date().toISOString(), launchDate:'2026-07-26', ops:mc.ops }, null, 2));
+    await w.close();
+  } catch(e){}
+}
+
+/* ═══ Derivations — the honest model ═════════════════════════════════
+   Readiness = Testing 50% + Trust 30% + Launch ops 20%.
+     Testing  = V4 pages marked "Looks good" / 14.
+     Trust    = verified fixes / (verified + open blockers) from smoke-verdict.
+     Ops      = ticked ops items / 5.
+   Verdict: NO-GO while any trust blocker is open.
+            NOT YET when blockers are clear but testing/ops incomplete.
+            GO only when every gate passes. No vanity numbers.          */
+function derive(){
+  const pages = (FOUNDER && FOUNDER.pages) || {};
+  const testDone = TEST_ORDER.filter(id => pages[id] && pages[id].status === 'good');
+  const testRemaining = TEST_ORDER.filter(id => !pages[id] || pages[id].status !== 'good');
+  const needsFix = TEST_ORDER.filter(id => pages[id] && pages[id].status === 'fix');
+
+  const p0open   = SMOKE ? SMOKE.p0open   : null;
+  const verified = SMOKE ? SMOKE.verified : 0;
+  const blockers = [];
+  if (SMOKE && SMOKE.p0open > 0 && SMOKE.openP0s) blockers.push({ id:'Trust', desc:SMOKE.openP0s, prompt:
+    'Catch Comics: re-verify and resolve the remaining open P0(s) from smoke-verdict.json: ' + SMOKE.openP0s + '. Diagnose honestly; wrong data is worse than missing data.' });
+  needsFix.forEach(id => blockers.push({ id:PAGE_TITLES[id], desc:'Founder marked “Needs fixing” in Smoke Test V4', prompt:'/founder-review ' + id }));
+
+  const opsDone = OPS_ITEMS.filter(o => mc.ops[o.id]);
+  const testing = testDone.length / TEST_ORDER.length;
+  const trust   = SMOKE ? (verified / Math.max(1, verified + (p0open||0))) : 0;
+  const ops     = opsDone.length / OPS_ITEMS.length;
+  const pct     = Math.round(100 * (0.5*testing + 0.3*trust + 0.2*ops));
+
+  const go     = blockers.length === 0 && testRemaining.length === 0 && opsDone.length === OPS_ITEMS.length;
+  const nogo   = blockers.length > 0;
+  const verdict = go ? 'go' : nogo ? 'nogo' : 'notyet';
+
+  // Next actions: blockers first, then untested areas (priority order), then ops
+  const todos = [];
+  blockers.forEach(b => todos.push({ t:(b.prompt.startsWith('/founder-review') ? 'Fix ' : 'Resolve ') + b.id,
+    sub:b.desc.slice(0,90), act:'claude', prompt:b.prompt }));
+  testRemaining.filter(id => !needsFix.includes(id)).forEach(id => todos.push({
+    t:'Run Smoke Test V4: ' + PAGE_TITLES[id], sub:'Review the live page, then send to Claude if anything feels wrong',
+    act:'smoke', page:id }));
+  OPS_ITEMS.filter(o => !mc.ops[o.id]).forEach(o => todos.push({ t:o.label, sub:'Launch ops', act:'ops', id:o.id }));
+
+  return { testDone, testRemaining, needsFix, blockers, opsDone, testing, trust, ops, pct, verdict, todos };
+}
+
+/* ═══ Render ═════════════════════════════════════════════════════════ */
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+let toastT = null;
+function toast(m){ const t = document.getElementById('toast'); t.textContent = m; t.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(()=>t.classList.remove('show'), 4200); }
+
+function render(){
+  const d = derive();
+  const now = new Date();
+  const days = Math.ceil((LAUNCH_DATE - now) / 86400000);
+  const postLaunch = days < 0;
+
+  document.getElementById('missionTitle').textContent = postLaunch ? 'Catch Comics is LIVE' : 'Launch';
+  document.getElementById('launchDate').textContent = postLaunch
+    ? `Launched Sunday 26 July 2026 — ${Math.abs(days)} days ago`
+    : LAUNCH_DATE.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+  document.getElementById('countdown').innerHTML = postLaunch
+    ? '🎉' : `${days} <small>DAYS REMAINING</small>`;
+
+  document.getElementById('readyFill').style.width = d.pct + '%';
+  document.getElementById('readyPct').textContent = d.pct;
+  document.getElementById('readyHow').textContent =
+    `Honest maths: testing ${d.testDone.length}/14 areas (50%) · trust ${Math.round(d.trust*100)}% verified (30%) · launch ops ${d.opsDone.length}/${OPS_ITEMS.length} (20%). No vanity metrics.`;
+
+  const v = document.getElementById('verdict');
+  v.className = 'verdict ' + d.verdict;
+  v.textContent = d.verdict === 'go' ? '🟢 GO' : d.verdict === 'nogo' ? '🔴 NOT READY — BLOCKED' : '🟡 NOT YET READY';
+  document.getElementById('verdictSub').innerHTML =
+    `<strong>${d.blockers.length}</strong> trust blocker${d.blockers.length===1?'':'s'} · <strong>${d.testRemaining.length}</strong> test area${d.testRemaining.length===1?'':'s'} remaining · <strong>${OPS_ITEMS.length - d.opsDone.length}</strong> ops item${OPS_ITEMS.length-d.opsDone.length===1?'':'s'} open`;
+
+  // Next action = first todo
+  const na = d.todos[0];
+  document.getElementById('naTitle').textContent = na ? na.t : 'Nothing — you are GO 🎉';
+  const naBtn = document.getElementById('naBtn');
+  if (na){
+    naBtn.textContent = na.act==='smoke' ? 'OPEN SMOKE TEST' : na.act==='claude' ? 'FIX WITH CLAUDE' : 'MARK DONE BELOW';
+    naBtn.onclick = ()=> actFor(na);
+  } else { naBtn.textContent = 'LAUNCH 🚀'; naBtn.onclick = ()=> toast('Ship it, Joe.'); }
+
+  // Todo list (top 5)
+  document.getElementById('todoList').innerHTML = d.todos.slice(0,5).map((t,i)=>`
+    <div class="todo">
+      <span class="box" aria-hidden="true"></span>
+      <span class="t">${esc(t.t)}<small>${esc(t.sub||'')}</small></span>
+      <button class="ghostbtn" data-todo="${i}">${t.act==='smoke'?'Open':'Go'}</button>
+    </div>`).join('') || '<div class="win" style="color:var(--green)">Everything done.</div>';
+  document.querySelectorAll('[data-todo]').forEach(b => b.onclick = ()=> actFor(d.todos[parseInt(b.dataset.todo,10)]));
+
+  // Trust checklist — auto from smoke-verdict
+  const trustRows = [
+    { label:'Search trust rebuilt (syntax, ranking, autocomplete)', done:true },
+    { label:'Cover pipeline cleaned (placeholders + proxies purged)', done:true },
+    { label:'Creator data on flagship pages', done:true },
+    { label:'Honest metadata (issue counts, Vol 1s)', done:true },
+    { label:'All P0 trust blockers cleared', done:!SMOKE || SMOKE.p0open===0,
+      src: SMOKE && SMOKE.p0open>0 ? SMOKE.p0open + ' open' : '' },
+    { label:'Affiliate chain verified end-to-end', done:(FOUNDER&&FOUNDER.pages&&FOUNDER.pages.affiliate&&FOUNDER.pages.affiliate.status==='good'),
+      src:'via Smoke Test V4 · Affiliate Flows' },
+  ];
+  document.getElementById('trustList').innerHTML = trustRows.map(r=>`
+    <div class="chk auto">
+      <span class="state ${r.done?'done':'todo-mark'}">${r.done?'✓':'○'}</span>
+      <label>${esc(r.label)} ${r.src?`<span class="src">${esc(r.src)}</span>`:''}</label>
+    </div>`).join('');
+
+  // Testing checklist — live from founder-review.json
+  const pages = (FOUNDER && FOUNDER.pages) || {};
+  document.getElementById('testList').innerHTML = TEST_ORDER.map(id=>{
+    const st = pages[id] && pages[id].status;
+    const mark = st==='good' ? '✓' : st==='fix' ? '✎' : '○';
+    const cls  = st==='good' ? 'done' : 'todo-mark';
+    return `<div class="chk auto">
+      <span class="state ${cls}" style="${st==='fix'?'color:var(--amber)':''}">${mark}</span>
+      <label>${esc(PAGE_TITLES[id])}</label>
+      <button class="ghostbtn go" data-smoke="${id}">Open</button>
+    </div>`;
+  }).join('');
+  document.querySelectorAll('[data-smoke]').forEach(b => b.onclick = ()=> openSmoke(b.dataset.smoke));
+
+  // Ops checklist — founder ticks these
+  document.getElementById('opsList').innerHTML = OPS_ITEMS.map(o=>`
+    <div class="chk">
+      <input type="checkbox" id="ops-${o.id}" ${mc.ops[o.id]?'checked':''} data-ops="${o.id}">
+      <label for="ops-${o.id}">${esc(o.label)}</label>
+      ${o.href?`<a class="ghostbtn go" href="${o.href}" target="_blank" rel="noopener">Check</a>`:''}
+    </div>`).join('');
+  document.querySelectorAll('[data-ops]').forEach(cb => cb.onchange = ()=>{ mc.ops[cb.dataset.ops] = cb.checked; saveMc(); render(); });
+
+  // Blockers
+  document.getElementById('blockersCard').style.display = d.blockers.length ? '' : 'none';
+  document.getElementById('blockerList').innerHTML = d.blockers.map((b,i)=>`
+    <div class="blocker">
+      <span class="b-id">${esc(b.id)}</span>
+      <span class="b-desc">${esc(b.desc)}</span>
+      <button class="bigbtn" style="min-height:44px;padding:10px 18px;font-size:14px" data-block="${i}">FIX WITH CLAUDE</button>
+    </div>`).join('');
+  document.querySelectorAll('[data-block]').forEach(b => b.onclick = async ()=>{
+    await navigator.clipboard.writeText(d.blockers[parseInt(b.dataset.block,10)].prompt);
+    toast('Prompt copied — paste into Claude Code');
+  });
+
+  // Wins — from smoke-verdict verifiedList
+  const wins = SMOKE && SMOKE.verifiedList ? SMOKE.verifiedList.split('·').map(s=>s.trim()).filter(Boolean).slice(0,10) : [];
+  document.getElementById('winsList').innerHTML = wins.map(w=>`<div class="win">${esc(w)}</div>`).join('')
+    || '<div class="win">Wins will appear here as fixes are verified.</div>';
+}
+
+function openSmoke(pageId){
+  // V4 restores its own last-active page; deep-link via hash for convenience
+  window.open('smoke-test-v4.html#' + pageId, '_blank');
+}
+async function actFor(t){
+  if (!t) return;
+  if (t.act === 'smoke') openSmoke(t.page);
+  else if (t.act === 'claude'){ await navigator.clipboard.writeText(t.prompt); toast('Prompt copied — paste into Claude Code'); }
+  else if (t.act === 'ops'){ document.getElementById('ops-' + t.id).focus(); toast('Tick it below when done'); }
+}
+
+/* ═══ Boot ═══════════════════════════════════════════════════════════ */
+document.getElementById('connectBtn').onclick = connectRepo;
+async function boot(){ await restoreRepo(); await loadData(); render(); }
+boot();
+setInterval(()=>render(), 60_000); // countdown stays honest without reload
+</script>
+</body>
+</html>

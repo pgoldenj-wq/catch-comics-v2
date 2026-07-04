@@ -751,6 +751,10 @@ document.addEventListener('keydown', e=>{
 document.getElementById('connectBtn').onclick = connectRepo;
 document.getElementById('importV3Btn').onclick = importV3;
 document.getElementById('exportBtn').onclick = exportJson;
+// Deep link from Mission Control: smoke-test-v4.html#mobile opens that page
+if (location.hash && PAGES.some(p => p.id === location.hash.slice(1))) {
+  state.activePage = location.hash.slice(1);
+}
 restoreRepo();
 render();
 setStorageState();
