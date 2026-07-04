@@ -79,10 +79,26 @@ main { padding:26px; max-width:880px; }
 .check label { cursor:pointer; }
 .check code { background:#F3F4F6; border-radius:4px; padding:1px 5px; font-size:13px; }
 
-/* thoughts */
-.thoughts textarea { width:100%; min-height:170px; resize:vertical; border:1px solid var(--line);
+/* thoughts / amends */
+.thoughts textarea { width:100%; min-height:110px; resize:vertical; border:1px solid var(--line);
   border-radius:12px; padding:14px; font:inherit; color:var(--ink); background:#FDFDFC; }
 .thoughts textarea:focus { border-color:var(--focus); }
+.amend { margin-bottom:14px; }
+.amendhead { display:flex; justify-content:space-between; align-items:center;
+  font-size:11px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--ink3); margin:0 0 6px; }
+.linkbtn { border:none; background:none; color:var(--accent); font-weight:600; font-size:12px;
+  padding:6px 8px; min-height:32px; }
+.linkbtn:hover { text-decoration:underline; }
+
+/* checkpoint notes */
+.addnotebtn { border:none; background:none; color:var(--ink3); font-size:12px; font-weight:600;
+  padding:6px 8px; margin-left:auto; flex-shrink:0; min-height:32px; }
+.addnotebtn:hover { color:var(--ink); }
+.checknote { display:block; width:calc(100% - 42px); margin:2px 0 8px 34px; min-height:60px;
+  resize:vertical; border:1px solid var(--line); border-radius:10px; padding:10px 12px;
+  font:inherit; font-size:13px; color:var(--ink); background:#FDFDFC; }
+.checknote:focus { border-color:var(--focus); }
 .sectionlabel { font-size:12px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
   color:var(--ink3); margin:0 0 10px; }
 
@@ -91,14 +107,21 @@ main { padding:26px; max-width:880px; }
   color:var(--ink2); font-size:14px; transition:border-color .15s, background .15s; }
 .dropzone.drag { border-color:var(--accent); background:#FEF2F2; }
 .dropzone button { border:none; background:none; color:var(--accent); font-weight:700; text-decoration:underline; padding:4px; }
-.shots { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; margin-top:14px; }
+.shots { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:12px; margin-top:14px; }
 .shot { position:relative; border:1px solid var(--line); border-radius:10px; overflow:hidden; background:#111827; }
-.shot img { width:100%; height:110px; object-fit:cover; display:block; cursor:pointer; }
+.shot img { width:100%; height:130px; object-fit:cover; display:block; cursor:pointer; }
 .shot .shotbar { display:flex; }
 .shot .shotbar button { flex:1; border:none; background:#F9FAFB; border-top:1px solid var(--line);
   font-size:12px; font-weight:600; padding:8px 4px; min-height:36px; }
 .shot .shotbar button:hover { background:#EEF2F7; }
 .shot .shotbar button.del { color:var(--accent); }
+.shot .shotnote { display:block; width:100%; border:none; border-top:1px solid var(--line);
+  padding:9px 10px; font:inherit; font-size:12.5px; line-height:1.45; color:var(--ink);
+  background:#FDFDFC; min-height:58px; resize:vertical; }
+.shot .shotnote:focus { outline-offset:-3px; }
+.shot .shotnotelabel { display:block; font-size:10px; font-weight:700; letter-spacing:.08em;
+  text-transform:uppercase; color:var(--ink3); background:#FDFDFC; border-top:1px solid var(--line);
+  padding:6px 10px 0; }
 
 /* status — two big choices */
 .statusrow { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
@@ -323,7 +346,29 @@ function load(){ try { const s = JSON.parse(localStorage.getItem(KEY)); if (s &&
 let state = load();
 let saveT = null;
 function save(){ clearTimeout(saveT); saveT = setTimeout(()=>{ try { localStorage.setItem(KEY, JSON.stringify(state)); setStorageState(); } catch(e){ toast('Storage full — export, then delete old screenshots','err'); } }, 250); }
-function P(id){ if(!state.pages[id]) state.pages[id] = { status:null, thoughts:'', checks:{}, shots:[], lastSentAt:null, lastReviewedAt:null }; return state.pages[id]; }
+function P(id){
+  if(!state.pages[id]) state.pages[id] = { status:null, amends:[''], checks:{}, checkNotes:{}, shots:[], lastSentAt:null, lastReviewedAt:null };
+  const ps = state.pages[id];
+  // Lazy migration from the v4.0 shape — existing progress is never wiped:
+  // the single thoughts box becomes Amend 1; shots/checkpoints gain note slots.
+  if (!Array.isArray(ps.amends)){
+    ps.amends = (typeof ps.thoughts === 'string' && ps.thoughts.trim()) ? [ps.thoughts] : [''];
+    delete ps.thoughts;
+  }
+  if (!ps.checkNotes) ps.checkNotes = {};
+  (ps.shots || []).forEach(s => { if (typeof s.note !== 'string') s.note = ''; });
+  return ps;
+}
+// Append a non-duplicate amend (used by the V3 importer)
+function pushAmend(ps, text){
+  if (!text || ps.amends.some(a => a.includes(text))) return false;
+  if (ps.amends.length === 1 && !ps.amends[0].trim()) ps.amends[0] = text;
+  else ps.amends.push(text);
+  return true;
+}
+// Checkpoint-note editors stay open once toggled (until the note is emptied
+// and the page re-renders) — transient UI state, deliberately not persisted.
+const openCheckNotes = new Set();
 function def(id){ return PAGES.find(p=>p.id===id); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function setStorageState(){ try { const kb = Math.round((localStorage.getItem(KEY)||'').length/1024); document.getElementById('storageState').textContent = kb > 0 ? `· autosaved (${kb} KB)` : ''; } catch(e){} }
@@ -365,21 +410,33 @@ function render(){
 
   <div class="card">
     <p class="sectionlabel">Smoke test points</p>
-    ${p.checks.map((c,i)=>`
+    ${p.checks.map((c,i)=>{
+      const note = ps.checkNotes[i] || '';
+      const showNote = note.trim() !== '' || openCheckNotes.has(p.id + ':' + i);
+      return `
       <div class="check">
         <input type="checkbox" id="ck${i}" data-ck="${i}" ${done[i]?'checked':''}>
         <label for="ck${i}">${c}</label>
-      </div>`).join('')}
+        ${showNote ? '' : `<button class="addnotebtn" data-notetoggle="${i}" aria-label="Add a note to this checkpoint">✎ Add note</button>`}
+      </div>
+      ${showNote ? `<textarea class="checknote" data-cknote="${i}" aria-label="Note for checkpoint ${i+1}"
+        placeholder="Add a note about this checkpoint…">${esc(note)}</textarea>` : ''}`;
+    }).join('')}
   </div>
 
   <div class="card thoughts">
     <p class="sectionlabel">Thoughts — what do you think?</p>
-    <textarea id="thoughts" aria-label="Your thoughts about this page" placeholder="Anything feel wrong?
+    ${ps.amends.map((a,i)=>`
+    <div class="amend">
+      <div class="amendhead"><span>Amend ${i+1}</span>
+        ${ps.amends.length > 1 ? `<button class="linkbtn" data-delamend="${i}">Delete</button>` : ''}
+      </div>
+      <textarea data-amend="${i}" aria-label="Amend ${i+1}"
+        placeholder="Describe one issue, improvement or thing that feels wrong…
 
-Layout issues. Design inconsistencies. Trust problems. Accessibility concerns.
-Things that simply don't feel right. Suggestions. Ideas. Improvements.
-
-Claude decides severity, grouping and priority — just write.">${esc(ps.thoughts)}</textarea>
+Claude decides severity, grouping and priority — just write.">${esc(a)}</textarea>
+    </div>`).join('')}
+    <button class="btn" id="addAmend">+ Add another amend</button>
   </div>
 
   <div class="card">
@@ -397,6 +454,9 @@ Claude decides severity, grouping and priority — just write.">${esc(ps.thought
           <button data-anno="${i}">✏️ Draw</button>
           <button class="del" data-del="${i}">Delete</button>
         </div>
+        <span class="shotnotelabel">Screenshot note / annotation</span>
+        <textarea class="shotnote" data-shotnote="${i}" aria-label="Note for screenshot ${i+1}"
+          placeholder="Describe what you marked up or what feels wrong in this screenshot…">${esc(s.note || '')}</textarea>
       </figure>`).join('')}
     </div>
   </div>
@@ -425,8 +485,20 @@ Claude decides severity, grouping and priority — just write.">${esc(ps.thought
 
   // wire
   main.querySelectorAll('[data-ck]').forEach(cb => cb.onchange = ()=>{ ps.checks[cb.dataset.ck] = cb.checked; ps.lastReviewedAt = Date.now(); save(); render(); });
-  const ta = main.querySelector('#thoughts');
-  ta.oninput = ()=>{ ps.thoughts = ta.value; ps.lastReviewedAt = Date.now(); save(); renderRail(); };
+  main.querySelectorAll('[data-notetoggle]').forEach(b => b.onclick = ()=>{
+    openCheckNotes.add(p.id + ':' + b.dataset.notetoggle); render();
+    const t = main.querySelector(`[data-cknote="${b.dataset.notetoggle}"]`) || document.querySelector(`[data-cknote="${b.dataset.notetoggle}"]`);
+    if (t) t.focus();
+  });
+  main.querySelectorAll('[data-cknote]').forEach(t => t.oninput = ()=>{ ps.checkNotes[t.dataset.cknote] = t.value; ps.lastReviewedAt = Date.now(); save(); });
+  main.querySelectorAll('[data-amend]').forEach(t => t.oninput = ()=>{ ps.amends[t.dataset.amend] = t.value; ps.lastReviewedAt = Date.now(); save(); });
+  main.querySelectorAll('[data-delamend]').forEach(b => b.onclick = ()=>{ ps.amends.splice(parseInt(b.dataset.delamend,10),1); if (!ps.amends.length) ps.amends = ['']; save(); render(); });
+  main.querySelector('#addAmend').onclick = ()=>{
+    ps.amends.push(''); save(); render();
+    const areas = document.querySelectorAll('[data-amend]');
+    if (areas.length) areas[areas.length-1].focus();
+  };
+  main.querySelectorAll('[data-shotnote]').forEach(t => t.oninput = ()=>{ ps.shots[t.dataset.shotnote].note = t.value; ps.lastReviewedAt = Date.now(); save(); });
   main.querySelector('#stGood').onclick = ()=>{ ps.status = ps.status==='good'?null:'good'; ps.lastReviewedAt = Date.now(); save(); render(); };
   main.querySelector('#stFix').onclick  = ()=>{ ps.status = ps.status==='fix' ?null:'fix';  ps.lastReviewedAt = Date.now(); save(); render(); };
   main.querySelector('#browseBtn').onclick = ()=> main.querySelector('#fileInput').click();
@@ -558,24 +630,46 @@ function closeAnnotator(){
   save(); render();
 }
 
-/* ═══ Prompt generation ══════════════════════════════════════════════ */
+/* ═══ Prompt generation ══════════════════════════════════════════════
+   Evidence stays attached to its source: checkpoint notes sit under
+   their checkpoint, screenshot notes travel with their file, amends
+   remain separate numbered items.                                     */
 function buildPrompt(p, ps, shotFiles){
-  const unchecked = p.checks.map((c,i)=>({c,i})).filter(x=>!ps.checks[x.i])
-    .map(x=>'- ' + x.c.replace(/<[^>]+>/g,''));
+  const plain = s => s.replace(/<[^>]+>/g,'');
   const checked = p.checks.filter((_,i)=>ps.checks[i]).length;
+
+  const checkLines = p.checks.map((c,i)=>{
+    const note = (ps.checkNotes[i] || '').trim();
+    return `- [${ps.checks[i] ? 'x' : ' '}] ${plain(c)}${note ? `\n      NOTE: ${note}` : ''}`;
+  }).join('\n');
+
+  const amends = ps.amends.map(a=>a.trim()).filter(Boolean);
+  const amendBlock = amends.length
+    ? amends.map((a,i)=>`AMEND ${i+1}:\n${a}`).join('\n\n')
+    : '(no written amends — rely on the screenshots and checkpoint notes)';
+
+  const shotLines = ps.shots.length
+    ? ps.shots.map((s,i)=>{
+        const f = shotFiles && shotFiles[i] ? shotFiles[i] : `screenshot ${i+1} (in review package)`;
+        const note = (s.note || '').trim();
+        return `- ${f}${s.ops && s.ops.length ? '  (founder annotations flattened in)' : ''}${note ? `\n      NOTE: ${note}` : ''}`;
+      }).join('\n')
+    : '(none)';
+
   return `# CATCH COMICS — FOUNDER REVIEW
 
 SECTION: ${p.title}
 PRODUCTION: ${p.url.startsWith('http') ? p.url : 'https://catchcomics.com'}
 FOUNDER VERDICT: ${ps.status==='good' ? 'Looks good' : ps.status==='fix' ? 'NEEDS FIXING' : 'No verdict given'}
-CHECKPOINTS: ${checked}/${p.checks.length} confirmed
-${unchecked.length ? '\nUNCONFIRMED CHECKPOINTS:\n' + unchecked.join('\n') : ''}
 
-FOUNDER THOUGHTS:
-${ps.thoughts.trim() || '(none written — rely on the screenshots and checkpoints)'}
+CHECKPOINTS (${checked}/${p.checks.length} confirmed — notes belong to the checkpoint above them):
+${checkLines}
 
-SCREENSHOTS:
-${shotFiles && shotFiles.length ? shotFiles.map(f=>'- ' + f + '  (annotations flattened in)').join('\n') : (ps.shots.length ? ps.shots.length + ' attached in the review package' : '(none)')}
+FOUNDER AMENDS (separate items — do not merge them unless they share a root cause):
+${amendBlock}
+
+SCREENSHOTS (each note describes the markup on THAT screenshot):
+${shotLines}
 
 TASK:
 1. Diagnose root causes — measure the live DOM, don't guess from the description.
@@ -654,8 +748,10 @@ async function writeFounderJson(){
 /* ═══ SEND TO CLAUDE ═════════════════════════════════════════════════ */
 async function sendToClaude(){
   const p = def(state.activePage), ps = P(p.id);
-  if (!ps.thoughts.trim() && !ps.shots.length && ps.status !== 'fix'){
-    toast('Write a thought, add a screenshot, or mark “Needs fixing” first','err'); return;
+  const hasEvidence = ps.amends.some(a=>a.trim()) || ps.shots.length
+    || Object.values(ps.checkNotes).some(n=>String(n).trim()) || ps.status === 'fix';
+  if (!hasEvidence){
+    toast('Write an amend, add a screenshot or note, or mark “Needs fixing” first','err'); return;
   }
   const stamp = new Date().toISOString().slice(0,16).replace(/[T:]/g,'-');
   const folder = `${p.id}-${stamp}`;
@@ -707,7 +803,7 @@ function importV3(){
     const pid = V3MAP[sid]; if (!pid) return;
     const ps = P(pid);
     Object.entries(sec.checks||{}).forEach(([i,v])=>{ if (v===true || v==='pass' || v==='checked'){ ps.checks[i]=true; checks++; } });
-    if (sec.notes && !ps.thoughts.includes(sec.notes)){ ps.thoughts = (ps.thoughts?ps.thoughts+'\n\n':'') + '[V3 notes] ' + sec.notes; notes++; }
+    if (sec.notes && pushAmend(ps, '[V3 notes] ' + sec.notes)) notes++;
     if (sec.status==='passed' && !ps.status) ps.status = 'good';
     if (sec.status==='failed' && !ps.status) ps.status = 'fix';
   });
@@ -717,7 +813,7 @@ function importV3(){
     if (!open) return;
     const ps = P(pid);
     const line = `[V3 ${iss.id||'issue'}] ${String(iss.desc).slice(0,400)}`;
-    if (!ps.thoughts.includes(line)){ ps.thoughts = (ps.thoughts?ps.thoughts+'\n\n':'') + line; issues++; }
+    if (pushAmend(ps, line)) issues++;
   });
   Object.values(v3.screenshots||{}).forEach(sh=>{
     const pid = V3MAP[sh.section]; if (!pid) return;
