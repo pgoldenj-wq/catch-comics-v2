@@ -49,6 +49,13 @@ const NOW         = new Date();
 let SMOKE = null;
 try { SMOKE = JSON.parse(fs.readFileSync(path.join(LAUNCH_DIR, 'smoke-verdict.json'), 'utf8')); } catch {}
 
+// ── Founder Review status (Smoke Test V4) ──────────────────────────────────────
+// Written by launch/smoke-test-v4.html on every SEND TO CLAUDE (File System
+// Access API) and updated by /founder-review after fixes. Post-launch loop:
+// review → send → Claude fixes → verify → dashboard → next review.
+let FOUNDER = null;
+try { FOUNDER = JSON.parse(fs.readFileSync(path.join(LAUNCH_DIR, 'founder-review.json'), 'utf8')); } catch {}
+
 // ── Impact weights (single source of truth for launch readiness gain %) ────────
 const IMPACT = {
   'CV Enrichment':    { impact: 'High',   gain: 12 },
@@ -837,6 +844,29 @@ a{color:inherit;text-decoration:none}
   </div>
 </div>` : '';
 
+  // Founder Review card (Smoke Test V4) — the permanent post-launch loop
+  const FOUNDER_CARD = FOUNDER ? (() => {
+    const rows = Object.entries(FOUNDER.pages || {});
+    const good = rows.filter(([,p]) => p.status === 'good').length;
+    const fix  = rows.filter(([,p]) => p.status === 'fix').length;
+    const unrev = rows.length - good - fix;
+    const chip = (p) => p.status === 'good' ? '<span style="color:#22C55E">✓ good</span>'
+      : p.status === 'fix' ? '<span style="color:#F59E0B">✎ needs fixing</span>'
+      : '<span style="color:var(--muted2)">— unreviewed</span>';
+    return `
+<div class="card gap">
+  <h2>Founder Review — Smoke Test V4 · updated ${esc((FOUNDER.updated || '').slice(0, 10))}</h2>
+  <div class="health-grid">
+    <div class="hstat"><div class="hstat-num" style="color:#22C55E">${good}</div><div class="hstat-label">Looks good</div></div>
+    <div class="hstat"><div class="hstat-num" style="color:#F59E0B">${fix}</div><div class="hstat-label">Needs fixing</div></div>
+    <div class="hstat"><div class="hstat-num">${unrev}</div><div class="hstat-label">Unreviewed</div></div>
+  </div>
+  <div style="font-size:11px;color:var(--muted2);margin-top:10px;line-height:1.9">
+    ${rows.map(([id, p]) => `<span style="white-space:nowrap;margin-right:14px"><strong style="color:var(--text)">${esc(p.title || id)}</strong> ${chip(p)}${p.lastSentAt ? ' · sent ' + esc(String(p.lastSentAt).slice(0, 10)) : ''}${p.fixSummary ? ' · ' + esc(p.fixSummary) : ''}</span>`).join(' ')}
+  </div>
+</div>`;
+  })() : '';
+
   // Workstream completion (infra/setup) — not the product-QA gate
   const LR_TABLE = `
 <div class="card gap">
@@ -973,6 +1003,7 @@ ${MONO_ACTIONS}
 
 <!-- Smoke Test V3 verdict (product-QA launch gate) -->
 ${SMOKE_CARD}
+${FOUNDER_CARD}
 
 <!-- Workstream completion -->
 ${LR_TABLE}

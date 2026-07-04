@@ -138,3 +138,6 @@ next-env.d.ts
 # Claude agent config — local only
 /.agents/
 /.claude/
+
+# Founder Review packages (transient handoff artifacts - screenshots can be large)
+launch/reviews/

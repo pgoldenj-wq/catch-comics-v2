@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Catch Comics — Founder Review (Smoke Test V4)</title>
+<style>
+/* ═══ Founder Review System — Smoke Test V4 ═══════════════════════════
+   Philosophy: Notion/Linear, not Jira. One thoughts box. Two statuses.
+   Claude decides severity, grouping and priority. Joe decides feelings.
+   ══════════════════════════════════════════════════════════════════ */
+:root {
+  --bg:#F8F8F6; --panel:#FFFFFF; --ink:#111111; --ink2:#4B5563; --ink3:#9CA3AF;
+  --line:#E5E7EB; --accent:#C41F22; --accent-ink:#FFFFFF;
+  --good:#15803D; --good-bg:#DCFCE7; --fix:#B45309; --fix-bg:#FEF3C7;
+  --focus:#2563EB;
+}
+* { box-sizing:border-box; }
+html,body { margin:0; padding:0; background:var(--bg); color:var(--ink);
+  font:15px/1.55 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+button { font:inherit; cursor:pointer; }
+:focus-visible { outline:3px solid var(--focus); outline-offset:2px; border-radius:6px; }
+
+/* ── Layout ── */
+.app { display:grid; grid-template-columns:280px 1fr; min-height:100vh; }
+@media (max-width:860px){ .app { grid-template-columns:1fr; } .rail { position:static; height:auto; border-right:none; border-bottom:1px solid var(--line);} }
+
+/* ── Header ── */
+header { grid-column:1/-1; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  padding:14px 22px; background:var(--panel); border-bottom:1px solid var(--line); }
+header h1 { font-size:17px; margin:0; letter-spacing:-0.01em; }
+header .sub { color:var(--ink2); font-size:13px; }
+header .spacer { flex:1; }
+.btn { border:1px solid var(--line); background:var(--panel); color:var(--ink);
+  border-radius:10px; padding:10px 16px; font-weight:600; font-size:14px; min-height:44px; }
+.btn:hover { background:#F3F4F6; }
+.btn.primary { background:var(--accent); border-color:var(--accent); color:var(--accent-ink); }
+.btn.primary:hover { background:#a51a1d; }
+.btn.big { font-size:16px; padding:16px 26px; border-radius:14px; width:100%; }
+.btn[disabled]{ opacity:.5; cursor:not-allowed; }
+
+/* ── Rail ── */
+.rail { background:var(--panel); border-right:1px solid var(--line); padding:14px 10px;
+  position:sticky; top:0; height:calc(100vh); overflow:auto; }
+.rail .railtitle { font-size:11px; font-weight:700; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--ink3); padding:6px 12px; }
+.pagebtn { display:flex; align-items:center; gap:10px; width:100%; text-align:left;
+  border:none; background:none; border-radius:10px; padding:12px; margin:2px 0; min-height:48px; }
+.pagebtn:hover { background:#F3F4F6; }
+.pagebtn.active { background:#111827; color:#fff; }
+.pagebtn.active .pmeta { color:#D1D5DB; }
+.pagebtn .dot { width:12px; height:12px; border-radius:50%; flex-shrink:0;
+  background:#D1D5DB; border:2px solid #fff; box-shadow:0 0 0 1px var(--line); }
+.pagebtn .dot.good { background:var(--good); }
+.pagebtn .dot.fix  { background:#F59E0B; }
+.pagebtn .pname { font-weight:600; font-size:14px; flex:1; min-width:0; }
+.pagebtn .pmeta { font-size:11px; color:var(--ink3); }
+
+/* ── Main ── */
+main { padding:26px; max-width:880px; }
+.card { background:var(--panel); border:1px solid var(--line); border-radius:16px;
+  padding:22px; margin-bottom:18px; }
+.pagehead h2 { margin:0 0 4px; font-size:24px; letter-spacing:-0.02em; }
+.pagehead .why { color:var(--ink2); margin:0 0 10px; max-width:640px; }
+.pagehead a.urlchip { display:inline-block; font-size:13px; color:var(--accent);
+  text-decoration:none; border:1px solid var(--line); border-radius:999px; padding:6px 14px; }
+.pagehead a.urlchip:hover { background:#FEF2F2; }
+
+/* progress blocks */
+.progress { display:flex; gap:4px; margin:16px 0 4px; }
+.progress span { width:22px; height:10px; border-radius:3px; background:#E5E7EB; }
+.progress span.on { background:var(--good); }
+.progresslabel { font-size:12px; color:var(--ink3); }
+
+/* checkpoints */
+.check { display:flex; gap:12px; align-items:flex-start; padding:10px 8px; border-radius:10px; }
+.check:hover { background:#F9FAFB; }
+.check input[type=checkbox]{ width:22px; height:22px; margin-top:1px; accent-color:var(--good); cursor:pointer; flex-shrink:0; }
+.check label { cursor:pointer; }
+.check code { background:#F3F4F6; border-radius:4px; padding:1px 5px; font-size:13px; }
+
+/* thoughts */
+.thoughts textarea { width:100%; min-height:170px; resize:vertical; border:1px solid var(--line);
+  border-radius:12px; padding:14px; font:inherit; color:var(--ink); background:#FDFDFC; }
+.thoughts textarea:focus { border-color:var(--focus); }
+.sectionlabel { font-size:12px; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--ink3); margin:0 0 10px; }
+
+/* screenshots */
+.dropzone { border:2px dashed var(--line); border-radius:12px; padding:22px; text-align:center;
+  color:var(--ink2); font-size:14px; transition:border-color .15s, background .15s; }
+.dropzone.drag { border-color:var(--accent); background:#FEF2F2; }
+.dropzone button { border:none; background:none; color:var(--accent); font-weight:700; text-decoration:underline; padding:4px; }
+.shots { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; margin-top:14px; }
+.shot { position:relative; border:1px solid var(--line); border-radius:10px; overflow:hidden; background:#111827; }
+.shot img { width:100%; height:110px; object-fit:cover; display:block; cursor:pointer; }
+.shot .shotbar { display:flex; }
+.shot .shotbar button { flex:1; border:none; background:#F9FAFB; border-top:1px solid var(--line);
+  font-size:12px; font-weight:600; padding:8px 4px; min-height:36px; }
+.shot .shotbar button:hover { background:#EEF2F7; }
+.shot .shotbar button.del { color:var(--accent); }
+
+/* status — two big choices */
+.statusrow { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.statusbtn { border:2px solid var(--line); background:var(--panel); border-radius:14px;
+  padding:18px; font-size:16px; font-weight:700; min-height:64px; }
+.statusbtn .hint { display:block; font-size:12px; font-weight:500; color:var(--ink3); margin-top:2px; }
+.statusbtn.good.on { border-color:var(--good); background:var(--good-bg); color:var(--good); }
+.statusbtn.fix.on  { border-color:#F59E0B; background:var(--fix-bg); color:var(--fix); }
+
+/* send panel */
+.sendcard { border:2px solid #111827; }
+.sendmeta { font-size:13px; color:var(--ink2); margin-top:10px; }
+.sendmeta code { background:#F3F4F6; padding:2px 6px; border-radius:6px; }
+
+/* toast */
+#toast { position:fixed; bottom:22px; left:50%; transform:translateX(-50%);
+  background:#111827; color:#fff; border-radius:12px; padding:14px 22px; font-size:14px;
+  box-shadow:0 8px 30px rgba(0,0,0,.35); opacity:0; pointer-events:none; transition:opacity .2s; z-index:60; max-width:90vw; }
+#toast.show { opacity:1; }
+#toast.err { background:#991B1B; }
+
+/* annotator modal */
+.modal { position:fixed; inset:0; background:rgba(15,18,25,.88); z-index:50;
+  display:none; align-items:center; justify-content:center; flex-direction:column; gap:12px; padding:18px; }
+.modal.open { display:flex; }
+.toolrow { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
+.tool { border:1px solid #374151; background:#1F2937; color:#E5E7EB; border-radius:10px;
+  padding:10px 14px; font-size:14px; font-weight:600; min-height:44px; }
+.tool.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+.swatch { width:34px; height:34px; border-radius:50%; border:3px solid transparent; padding:0; }
+.swatch.on { border-color:#fff; }
+#annoWrap { max-width:96vw; max-height:70vh; overflow:auto; border-radius:8px; box-shadow:0 10px 50px rgba(0,0,0,.5); }
+#annoCanvas { display:block; cursor:crosshair; touch-action:none; }
+
+.help { font-size:13px; color:var(--ink2); }
+kbd { background:#F3F4F6; border:1px solid var(--line); border-bottom-width:2px; border-radius:5px; padding:1px 6px; font-size:12px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div>
+      <h1>Catch Comics — Founder Review</h1>
+      <div class="sub">Look at the page. Say how it feels. Paste screenshots. Send it to Claude. <span id="storageState"></span></div>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn" id="connectBtn" title="Pick the repo's launch/ folder once — reviews are then written straight into the repo">🔌 Connect repo</button>
+    <button class="btn" id="importV3Btn" title="Pull checkpoints, notes and screenshots from Smoke Test V3">Import V3</button>
+    <button class="btn" id="exportBtn" title="Download the whole session as JSON">Export</button>
+  </header>
+
+  <nav class="rail" aria-label="Pages">
+    <div class="railtitle">Pages</div>
+    <div id="raillist"></div>
+    <p class="help" style="padding:10px 12px">
+      <kbd>Ctrl</kbd>+<kbd>V</kbd> pastes a screenshot onto the current page.<br>
+      <kbd>Alt</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd> switches pages.
+    </p>
+  </nav>
+
+  <main id="main"></main>
+</div>
+
+<div class="modal" id="annoModal" role="dialog" aria-modal="true" aria-label="Annotate screenshot">
+  <div class="toolrow" id="toolRow">
+    <button class="tool" data-tool="pen">✏️ Pen</button>
+    <button class="tool" data-tool="arrow">➜ Arrow</button>
+    <button class="tool" data-tool="rect">▭ Box</button>
+    <button class="tool" data-tool="ellipse">◯ Circle</button>
+    <button class="tool" data-tool="hilite">🖍 Highlight</button>
+    <button class="tool" data-tool="text">T Text</button>
+    <button class="swatch" data-color="#DC2626" style="background:#DC2626" aria-label="Red"></button>
+    <button class="swatch" data-color="#2563EB" style="background:#2563EB" aria-label="Blue"></button>
+    <button class="swatch" data-color="#16A34A" style="background:#16A34A" aria-label="Green"></button>
+    <button class="swatch" data-color="#F59E0B" style="background:#F59E0B" aria-label="Amber"></button>
+    <button class="tool" id="undoBtn">↩ Undo</button>
+    <button class="tool" id="clearBtn">🗑 Clear</button>
+    <button class="tool" id="doneBtn" style="background:#16A34A;border-color:#16A34A;color:#fff">✓ Done</button>
+  </div>
+  <div id="annoWrap"><canvas id="annoCanvas"></canvas></div>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ═══ Pages — V3's sections + checkpoints, severity stripped ═════════ */
+const PAGES = [
+ { id:'homepage', ico:'🏠', title:'Homepage', url:'https://catchcomics.com',
+   why:'First impression and the gateway to discovery.',
+   checks:['Page loads — no error screen, no blank white page',
+     'Hero section visible — headline and <strong>search bar</strong> at the top',
+     '“Explore Series” shows <strong>6 series cards</strong>',
+     'At least 4 of the 6 series covers load',
+     'Navbar has logo, search, and a visible <strong>“Series”</strong> link',
+     'Clicking <strong>“Series”</strong> navigates to <code>/series</code>',
+     '“Browse all series →” link present and clickable',
+     'Footer shows <strong>hello@catchcomics.com</strong>',
+     'Footer has all four links: About · Affiliate Disclosure · Privacy · Terms',
+     'Cookie notice bar appears at the bottom'] },
+ { id:'search', ico:'🔍', title:'Search', url:'https://catchcomics.com',
+   why:'Primary way users find a specific comic.',
+   checks:['Type <strong>“Saga”</strong> — results appear',
+     '“Saga Vol …” or similar relevant titles appear',
+     'Click a result — the correct product page loads',
+     'Search <strong>“Invincible”</strong> — relevant results appear',
+     'Gibberish (<code>xzqjkwp</code>) — clean “no results”, no crash'] },
+ { id:'series-index', ico:'📚', title:'Series Index', url:'https://catchcomics.com/series',
+   why:'The curated catalogue front door.',
+   checks:['<code>/series</code> loads without error',
+     '<strong>17 series cards</strong> visible in the grid',
+     'Covers load on at least 12 of 17 cards',
+     'Each card links to <code>/series/[name]</code>',
+     'Grid is multi-column on desktop'] },
+ { id:'series-pages', ico:'📖', title:'Series Pages', url:'https://catchcomics.com/series/saga',
+   why:'The reading-order journey — the core product thesis.',
+   checks:['<strong>Saga</strong> — loads, Vol 1 shows ≥2 UK £ prices',
+     'Saga — volumes in correct order, no gaps',
+     'Saga — Vol 1 has “Start Here” badge; synopsis present',
+     '<strong>Invincible</strong> — loads, Vol 1 priced',
+     'Invincible — volumes in order, Start Here on Vol 1',
+     '<strong>Fullmetal Alchemist</strong> — loads, Vol 1 priced',
+     'FMA — volumes in order, Start Here on Vol 1',
+     'FMA — Vol 1 cover loads from <code>images.catchcomics.com</code>'] },
+ { id:'product', ico:'🛒', title:'Product Pages', url:'https://catchcomics.com (Saga → Vol 1)',
+   why:'Where the buying decision happens.',
+   checks:['Product page loads — no error / blank page',
+     'Cover image loads (no placeholder, no broken icon)',
+     'Pricing panel shows <strong>≥2 retailers with £ prices</strong>',
+     '“Buy at [Retailer]” buttons visible and clickable',
+     'Creator credits visible (writer / artist)',
+     'Synopsis text visible and readable',
+     'eBay section appears within ~5s',
+     'Amazon search link visible'] },
+ { id:'offerstable', ico:'💷', title:'Offers Table', url:'On any product page',
+   why:'The price-comparison table is the trust core.',
+   checks:['Table renders — one row per retailer, £ price each',
+     'Rows sorted cheapest-first',
+     '“Best Price” badge only on the cheapest <strong>in-stock</strong> row',
+     'Stock labels correct (In stock / Out of stock / Pre-order)',
+     '“Checked N days ago” freshness label present',
+     'Each row’s Buy/Go button works',
+     'Out-of-stock / pre-order rows visually distinct',
+     'No duplicate retailer rows'] },
+ { id:'affiliate', ico:'💰', title:'Affiliate Flows', url:'Buy button → /go/… → awin1.com',
+   why:'Revenue-critical. Verify the full redirect chain.',
+   checks:['Find a Bookshop.org / Waterstones / LBB “Buy” button',
+     'Copy Link Address → starts with <code>/go/</code> + a long ID',
+     'Click → URL becomes <code>awin1.com/cread.php?…</code>',
+     'URL contains <code>awinmid=</code> + retailer number',
+     'URL contains <code>awinaffid=</code> + your publisher ID',
+     'URL contains <code>clickref=cc-</code> + 8 chars',
+     'URL contains <code>ued=</code> + an encoded retailer URL',
+     '<code>ued=</code> NOT double-wrapped with another awin1.com',
+     'You land on the correct retailer product page',
+     'eBay links wrap EPN id; Amazon /go/ applies associate tag'] },
+ { id:'mobile', ico:'📱', title:'Mobile', url:'catchcomics.com on a phone (375px)',
+   why:'A large share of launch traffic is mobile.',
+   checks:['Homepage readable — no horizontal scroll',
+     'Search bar tappable, keyboard comes up',
+     '<code>/series</code> grid stacks readably',
+     'Product pricing panel usable — nothing cut off',
+     '“Buy” buttons large enough to tap',
+     'OffersTable scrolls/stacks without clipping',
+     'Footer links readable and tappable'] },
+ { id:'loading', ico:'⏳', title:'Loading States', url:'DevTools → throttle Slow 3G',
+   why:'Perceived speed — skeletons, never blank flashes.',
+   checks:['Homepage shows skeleton/placeholder before content',
+     'Series index shows card skeletons while covers load',
+     'Product eBay section shows a spinner, then results',
+     'Search shows a loading indicator',
+     'No large layout shift when content arrives',
+     'Slow-3G still resolves gracefully'] },
+ { id:'route', ico:'🧭', title:'Route Transitions', url:'Navigate between pages',
+   why:'Navigation should feel instant and never lose the URL.',
+   checks:['Home → <code>/series</code> — no white flash or crash',
+     '<code>/series</code> → series page — smooth',
+     'Series page → product page — smooth',
+     'Browser <strong>Back</strong> returns correctly',
+     'Browser <strong>Forward</strong> works',
+     'No red console errors during navigation',
+     'URL updates on every navigation'] },
+ { id:'errors', ico:'🚧', title:'Error States', url:'catchcomics.com/series/this-does-not-exist',
+   why:'Bad URLs must degrade to a friendly 404, never a crash.',
+   checks:['<code>/series/this-does-not-exist</code> → branded 404',
+     'The 404 links back to home or <code>/series</code>',
+     '<code>/product/this-does-not-exist</code> → 404 page',
+     'Broken covers fall back gracefully',
+     'A failed search/API call shows a message, not a crash'] },
+ { id:'covers', ico:'🖼️', title:'Cover Quality', url:'/series, series & product pages',
+   why:'Covers carry the visual catalogue.',
+   checks:['Series index covers sharp, not pixelated',
+     'No Google Books “no preview” placeholders',
+     'No blank / 1×1 Open Library images',
+     'No grey or broken covers on key launch series',
+     'R2 covers load quickly',
+     'Product hero cover is high-resolution',
+     'Aspect ratios consistent'] },
+ { id:'recommendation', ico:'🎯', title:'Recommendations', url:'On a product page',
+   why:'Issue grids must show the right comics — no cross-series bleed.',
+   checks:['Issues grid shows the correct series',
+     'No wrong-series contamination',
+     'Issue thumbnails load covers',
+     'Issue numbers in order',
+     'Clicking a recommendation loads the right product',
+     'Recommendations relevant to the comic viewed'] },
+ { id:'launch-readiness', ico:'✅', title:'Launch Readiness', url:'Final gate — review all',
+   why:'Cross-checks the critical paths and feeds the launch verdict.',
+   checks:['All critical pages above reviewed',
+     'Nothing above is marked Needs fixing',
+     '<code>/privacy</code> and <code>/affiliate-disclosure</code> load',
+     '<strong>hello@catchcomics.com</strong> is live and monitored',
+     'Affiliate chain verified end-to-end',
+     'Analytics + error monitoring live',
+     '17 series live with correct reading orders',
+     'Mobile confirmed usable'] },
+];
+
+/* ═══ State ══════════════════════════════════════════════════════════ */
+const KEY = 'cc-smoke-test-v4';
+function blank(){ return { version:4, activePage:PAGES[0].id, pages:{} }; }
+function load(){ try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.version===4) return s; } catch(e){} return blank(); }
+let state = load();
+let saveT = null;
+function save(){ clearTimeout(saveT); saveT = setTimeout(()=>{ try { localStorage.setItem(KEY, JSON.stringify(state)); setStorageState(); } catch(e){ toast('Storage full — export, then delete old screenshots','err'); } }, 250); }
+function P(id){ if(!state.pages[id]) state.pages[id] = { status:null, thoughts:'', checks:{}, shots:[], lastSentAt:null, lastReviewedAt:null }; return state.pages[id]; }
+function def(id){ return PAGES.find(p=>p.id===id); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function setStorageState(){ try { const kb = Math.round((localStorage.getItem(KEY)||'').length/1024); document.getElementById('storageState').textContent = kb > 0 ? `· autosaved (${kb} KB)` : ''; } catch(e){} }
+
+/* ═══ Toast ══════════════════════════════════════════════════════════ */
+let toastT = null;
+function toast(msg, cls){ const t = document.getElementById('toast'); t.textContent = msg; t.className = 'show' + (cls==='err'?' err':''); clearTimeout(toastT); toastT = setTimeout(()=>{ t.className=''; }, 4200); }
+
+/* ═══ Rail ═══════════════════════════════════════════════════════════ */
+function renderRail(){
+  const el = document.getElementById('raillist');
+  el.innerHTML = PAGES.map(p=>{
+    const ps = P(p.id);
+    const done = Object.values(ps.checks).filter(Boolean).length;
+    const dot = ps.status==='good' ? 'good' : ps.status==='fix' ? 'fix' : '';
+    return `<button class="pagebtn ${state.activePage===p.id?'active':''}" data-page="${p.id}" aria-current="${state.activePage===p.id}">
+      <span class="dot ${dot}" aria-hidden="true"></span>
+      <span class="pname">${p.ico} ${esc(p.title)}</span>
+      <span class="pmeta">${done}/${p.checks.length}</span>
+    </button>`;
+  }).join('');
+  el.querySelectorAll('.pagebtn').forEach(b=> b.onclick = ()=>{ state.activePage = b.dataset.page; save(); render(); });
+}
+
+/* ═══ Page view ══════════════════════════════════════════════════════ */
+function render(){
+  renderRail();
+  const p = def(state.activePage), ps = P(p.id);
+  const done = p.checks.map((_,i)=>!!ps.checks[i]);
+  const main = document.getElementById('main');
+  main.innerHTML = `
+  <div class="card pagehead">
+    <h2>${p.ico} ${esc(p.title)}</h2>
+    <p class="why">${esc(p.why)}</p>
+    <a class="urlchip" href="${p.url.startsWith('http')?p.url:'https://catchcomics.com'}" target="_blank" rel="noopener">↗ ${esc(p.url)}</a>
+    <div class="progress" aria-label="Checkpoint progress">${done.map(d=>`<span class="${d?'on':''}"></span>`).join('')}</div>
+    <div class="progresslabel">${done.filter(Boolean).length} of ${p.checks.length} checkpoints</div>
+  </div>
+
+  <div class="card">
+    <p class="sectionlabel">Smoke test points</p>
+    ${p.checks.map((c,i)=>`
+      <div class="check">
+        <input type="checkbox" id="ck${i}" data-ck="${i}" ${done[i]?'checked':''}>
+        <label for="ck${i}">${c}</label>
+      </div>`).join('')}
+  </div>
+
+  <div class="card thoughts">
+    <p class="sectionlabel">Thoughts — what do you think?</p>
+    <textarea id="thoughts" aria-label="Your thoughts about this page" placeholder="Anything feel wrong?
+
+Layout issues. Design inconsistencies. Trust problems. Accessibility concerns.
+Things that simply don't feel right. Suggestions. Ideas. Improvements.
+
+Claude decides severity, grouping and priority — just write.">${esc(ps.thoughts)}</textarea>
+  </div>
+
+  <div class="card">
+    <p class="sectionlabel">Screenshots</p>
+    <div class="dropzone" id="dropzone">
+      📸 Paste (<kbd>Ctrl</kbd>+<kbd>V</kbd>), drag &amp; drop, or
+      <button id="browseBtn" type="button">browse</button> —
+      then click a screenshot to draw on it.
+      <input type="file" id="fileInput" accept="image/*" multiple hidden>
+    </div>
+    <div class="shots" id="shots">${ps.shots.map((s,i)=>`
+      <figure class="shot" style="margin:0">
+        <img src="${s.flat || s.src}" alt="Screenshot ${i+1} for ${esc(p.title)}" data-anno="${i}" title="Click to annotate">
+        <div class="shotbar">
+          <button data-anno="${i}">✏️ Draw</button>
+          <button class="del" data-del="${i}">Delete</button>
+        </div>
+      </figure>`).join('')}
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="sectionlabel">How does this page feel?</p>
+    <div class="statusrow" role="radiogroup" aria-label="Page status">
+      <button class="statusbtn good ${ps.status==='good'?'on':''}" id="stGood" role="radio" aria-checked="${ps.status==='good'}">
+        ✓ Looks good<span class="hint">Ship it as-is</span>
+      </button>
+      <button class="statusbtn fix ${ps.status==='fix'?'on':''}" id="stFix" role="radio" aria-checked="${ps.status==='fix'}">
+        ✎ Needs fixing<span class="hint">Claude decides what and how</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="card sendcard">
+    <button class="btn primary big" id="sendBtn">🚀 SEND ${esc(p.title.toUpperCase())} TO CLAUDE</button>
+    <div class="sendmeta" id="sendMeta">
+      ${dirHandle ? 'Writes the review package into the repo, then copies the kick-off command — paste it into Claude Code.'
+                  : 'Tip: press <strong>Connect repo</strong> (top right) once, and this button writes reviews straight into the repo. Without it, you get a download + the prompt on your clipboard.'}
+      ${ps.lastSentAt ? `<br>Last sent: ${new Date(ps.lastSentAt).toLocaleString()}` : ''}
+    </div>
+    <div class="sendmeta"><button class="btn" id="copyBtn" style="margin-top:10px">Copy prompt only</button></div>
+  </div>`;
+
+  // wire
+  main.querySelectorAll('[data-ck]').forEach(cb => cb.onchange = ()=>{ ps.checks[cb.dataset.ck] = cb.checked; ps.lastReviewedAt = Date.now(); save(); render(); });
+  const ta = main.querySelector('#thoughts');
+  ta.oninput = ()=>{ ps.thoughts = ta.value; ps.lastReviewedAt = Date.now(); save(); renderRail(); };
+  main.querySelector('#stGood').onclick = ()=>{ ps.status = ps.status==='good'?null:'good'; ps.lastReviewedAt = Date.now(); save(); render(); };
+  main.querySelector('#stFix').onclick  = ()=>{ ps.status = ps.status==='fix' ?null:'fix';  ps.lastReviewedAt = Date.now(); save(); render(); };
+  main.querySelector('#browseBtn').onclick = ()=> main.querySelector('#fileInput').click();
+  main.querySelector('#fileInput').onchange = e => { [...e.target.files].forEach(addShotFile); };
+  const dz = main.querySelector('#dropzone');
+  dz.ondragover = e=>{ e.preventDefault(); dz.classList.add('drag'); };
+  dz.ondragleave = ()=> dz.classList.remove('drag');
+  dz.ondrop = e=>{ e.preventDefault(); dz.classList.remove('drag'); [...e.dataTransfer.files].filter(f=>f.type.startsWith('image/')).forEach(addShotFile); };
+  main.querySelectorAll('[data-anno]').forEach(el=> el.onclick = ()=> openAnnotator(parseInt(el.dataset.anno,10)));
+  main.querySelectorAll('[data-del]').forEach(el=> el.onclick = ()=>{ ps.shots.splice(parseInt(el.dataset.del,10),1); save(); render(); });
+  main.querySelector('#sendBtn').onclick = sendToClaude;
+  main.querySelector('#copyBtn').onclick = async ()=>{ await navigator.clipboard.writeText(buildPrompt(p, ps)); toast('Prompt copied — paste into Claude Code'); };
+}
+
+/* ═══ Screenshots ════════════════════════════════════════════════════ */
+function addShotFile(file){
+  const r = new FileReader();
+  r.onload = ()=> addShotSrc(r.result);
+  r.readAsDataURL(file);
+}
+function addShotSrc(src){
+  const ps = P(state.activePage);
+  ps.shots.push({ src, flat:null, ops:[], ts:Date.now() });
+  ps.lastReviewedAt = Date.now();
+  save(); render();
+  toast('Screenshot added — click it to draw');
+}
+document.addEventListener('paste', e=>{
+  const items = [...(e.clipboardData?.items||[])].filter(i=>i.type.startsWith('image/'));
+  if (!items.length) return;
+  if (e.target && e.target.id === 'thoughts' ) { /* allow pasting text into thoughts; images still captured */ }
+  items.forEach(i=>{ const f = i.getAsFile(); if (f) addShotFile(f); });
+});
+
+/* ═══ Annotator ══════════════════════════════════════════════════════
+   Vector ops per shot: {tool,color,points|x0..|text}. Flattened PNG kept
+   alongside for thumbnails, prompts and exports.                       */
+let anno = null; // { shotIdx, img, ops, tool, color, drawing, start, cur }
+const cv = document.getElementById('annoCanvas');
+const cx = cv.getContext('2d');
+
+function openAnnotator(i){
+  const ps = P(state.activePage), shot = ps.shots[i];
+  const img = new Image();
+  img.onload = ()=>{
+    anno = { shotIdx:i, img, ops:[...(shot.ops||[])], tool:'pen', color:'#DC2626', drawing:false };
+    cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+    document.getElementById('annoModal').classList.add('open');
+    syncTools(); redraw();
+  };
+  img.src = shot.src;
+}
+function syncTools(){
+  document.querySelectorAll('#toolRow .tool[data-tool]').forEach(b=> b.classList.toggle('on', anno && b.dataset.tool===anno.tool));
+  document.querySelectorAll('#toolRow .swatch').forEach(b=> b.classList.toggle('on', anno && b.dataset.color===anno.color));
+}
+document.querySelectorAll('#toolRow .tool[data-tool]').forEach(b=> b.onclick = ()=>{ anno.tool = b.dataset.tool; syncTools(); });
+document.querySelectorAll('#toolRow .swatch').forEach(b=> b.onclick = ()=>{ anno.color = b.dataset.color; syncTools(); });
+document.getElementById('undoBtn').onclick = ()=>{ anno.ops.pop(); redraw(); };
+document.getElementById('clearBtn').onclick = ()=>{ anno.ops = []; redraw(); };
+document.getElementById('doneBtn').onclick = closeAnnotator;
+document.addEventListener('keydown', e=>{ if (e.key==='Escape' && anno) closeAnnotator(); });
+
+function lw(){ return Math.max(3, Math.round(cv.width/300)); }
+function drawOp(o){
+  cx.strokeStyle = o.color; cx.fillStyle = o.color; cx.lineWidth = lw(); cx.lineCap='round'; cx.lineJoin='round';
+  if (o.tool==='pen'){ cx.beginPath(); o.points.forEach((pt,i)=> i?cx.lineTo(pt[0],pt[1]):cx.moveTo(pt[0],pt[1])); cx.stroke(); }
+  if (o.tool==='rect'){ cx.strokeRect(o.x0,o.y0,o.x1-o.x0,o.y1-o.y0); }
+  if (o.tool==='ellipse'){ cx.beginPath(); cx.ellipse((o.x0+o.x1)/2,(o.y0+o.y1)/2,Math.abs(o.x1-o.x0)/2,Math.abs(o.y1-o.y0)/2,0,0,7); cx.stroke(); }
+  if (o.tool==='hilite'){ cx.save(); cx.globalAlpha=.32; cx.fillRect(o.x0,o.y0,o.x1-o.x0,o.y1-o.y0); cx.restore(); }
+  if (o.tool==='arrow'){
+    cx.beginPath(); cx.moveTo(o.x0,o.y0); cx.lineTo(o.x1,o.y1); cx.stroke();
+    const a = Math.atan2(o.y1-o.y0,o.x1-o.x0), h = lw()*4;
+    cx.beginPath(); cx.moveTo(o.x1,o.y1);
+    cx.lineTo(o.x1-h*Math.cos(a-0.5), o.y1-h*Math.sin(a-0.5));
+    cx.lineTo(o.x1-h*Math.cos(a+0.5), o.y1-h*Math.sin(a+0.5));
+    cx.closePath(); cx.fill();
+  }
+  if (o.tool==='text'){ cx.font = `bold ${lw()*7}px sans-serif`; cx.fillText(o.text, o.x0, o.y0); }
+}
+function redraw(preview){
+  cx.clearRect(0,0,cv.width,cv.height);
+  cx.drawImage(anno.img,0,0);
+  anno.ops.forEach(drawOp);
+  if (preview) drawOp(preview);
+}
+function evPos(e){
+  const r = cv.getBoundingClientRect();
+  const sx = cv.width/r.width, sy = cv.height/r.height;
+  const px = (e.touches? e.touches[0].clientX : e.clientX) - r.left;
+  const py = (e.touches? e.touches[0].clientY : e.clientY) - r.top;
+  return [px*sx, py*sy];
+}
+cv.addEventListener('pointerdown', e=>{
+  if (!anno) return;
+  const [x,y] = evPos(e);
+  if (anno.tool==='text'){
+    const text = prompt('Label text:');
+    if (text) { anno.ops.push({tool:'text', color:anno.color, x0:x, y0:y, text}); redraw(); }
+    return;
+  }
+  anno.drawing = true; anno.start = [x,y];
+  if (anno.tool==='pen') anno.ops.push({tool:'pen', color:anno.color, points:[[x,y]]});
+  cv.setPointerCapture(e.pointerId);
+});
+cv.addEventListener('pointermove', e=>{
+  if (!anno || !anno.drawing) return;
+  const [x,y] = evPos(e);
+  if (anno.tool==='pen'){ anno.ops[anno.ops.length-1].points.push([x,y]); redraw(); }
+  else redraw({tool:anno.tool, color:anno.color, x0:anno.start[0], y0:anno.start[1], x1:x, y1:y});
+});
+cv.addEventListener('pointerup', e=>{
+  if (!anno || !anno.drawing) return;
+  anno.drawing = false;
+  const [x,y] = evPos(e);
+  if (anno.tool!=='pen'){
+    const dx = Math.abs(x-anno.start[0]), dy = Math.abs(y-anno.start[1]);
+    if (dx>4 || dy>4) anno.ops.push({tool:anno.tool, color:anno.color, x0:anno.start[0], y0:anno.start[1], x1:x, y1:y});
+  }
+  redraw();
+});
+function closeAnnotator(){
+  redraw();
+  const ps = P(state.activePage), shot = ps.shots[anno.shotIdx];
+  shot.ops = anno.ops;
+  shot.flat = anno.ops.length ? cv.toDataURL('image/png') : null;
+  document.getElementById('annoModal').classList.remove('open');
+  anno = null;
+  save(); render();
+}
+
+/* ═══ Prompt generation ══════════════════════════════════════════════ */
+function buildPrompt(p, ps, shotFiles){
+  const unchecked = p.checks.map((c,i)=>({c,i})).filter(x=>!ps.checks[x.i])
+    .map(x=>'- ' + x.c.replace(/<[^>]+>/g,''));
+  const checked = p.checks.filter((_,i)=>ps.checks[i]).length;
+  return `# CATCH COMICS — FOUNDER REVIEW
+
+SECTION: ${p.title}
+PRODUCTION: ${p.url.startsWith('http') ? p.url : 'https://catchcomics.com'}
+FOUNDER VERDICT: ${ps.status==='good' ? 'Looks good' : ps.status==='fix' ? 'NEEDS FIXING' : 'No verdict given'}
+CHECKPOINTS: ${checked}/${p.checks.length} confirmed
+${unchecked.length ? '\nUNCONFIRMED CHECKPOINTS:\n' + unchecked.join('\n') : ''}
+
+FOUNDER THOUGHTS:
+${ps.thoughts.trim() || '(none written — rely on the screenshots and checkpoints)'}
+
+SCREENSHOTS:
+${shotFiles && shotFiles.length ? shotFiles.map(f=>'- ' + f + '  (annotations flattened in)').join('\n') : (ps.shots.length ? ps.shots.length + ' attached in the review package' : '(none)')}
+
+TASK:
+1. Diagnose root causes — measure the live DOM, don't guess from the description.
+2. Ignore nitpicks; group related issues.
+3. Determine actual severity yourself — the founder deliberately does not triage.
+4. Implement safe, contained fixes directly. Plan anything risky before building.
+5. Production-verify every change.
+6. Update the founder-review status and dashboard afterwards.
+
+ACT AS: Product Director · UX Lead · Frontend Engineer · Collector Advocate.
+Trust, accessibility and conversion matter more than visual experimentation.
+Wrong data is worse than missing data.
+Keep design language consistent across the entire site.`;
+}
+
+/* ═══ Repo connection (File System Access API) ═══════════════════════ */
+let dirHandle = null;   // handle to the repo's launch/ folder
+
+const idb = {
+  db: null,
+  open(){ return new Promise((res,rej)=>{ const q = indexedDB.open('cc-frv4',1);
+    q.onupgradeneeded = ()=> q.result.createObjectStore('kv');
+    q.onsuccess = ()=>{ idb.db = q.result; res(); }; q.onerror = rej; }); },
+  get(k){ return new Promise((res)=>{ const t = idb.db.transaction('kv').objectStore('kv').get(k); t.onsuccess=()=>res(t.result); t.onerror=()=>res(null); }); },
+  set(k,v){ return new Promise((res)=>{ const t = idb.db.transaction('kv','readwrite').objectStore('kv').put(v,k); t.onsuccess=()=>res(); t.onerror=()=>res(); }); },
+};
+
+async function connectRepo(){
+  if (!window.showDirectoryPicker){ toast('This browser lacks the File System Access API — Send will download files instead','err'); return; }
+  try {
+    dirHandle = await window.showDirectoryPicker({ id:'cc-launch', mode:'readwrite' });
+    await idb.set('dir', dirHandle);
+    toast(`Connected: ${dirHandle.name}/ — reviews will be written into the repo`);
+    render();
+  } catch(e){ /* user cancelled */ }
+}
+async function restoreRepo(){
+  try {
+    await idb.open();
+    const h = await idb.get('dir');
+    if (!h) return;
+    const perm = await h.queryPermission({ mode:'readwrite' });
+    if (perm === 'granted'){ dirHandle = h; render(); }
+    else {
+      // one-click re-grant button in header
+      const btn = document.getElementById('connectBtn');
+      btn.textContent = '🔌 Re-connect repo';
+      btn.onclick = async ()=>{ if ((await h.requestPermission({mode:'readwrite'})) === 'granted'){ dirHandle = h; btn.textContent='🔌 Connected'; toast('Repo re-connected'); render(); } };
+    }
+  } catch(e){}
+}
+
+function dataUrlToBytes(u){ const b = atob(u.split(',')[1]); const a = new Uint8Array(b.length); for (let i=0;i<b.length;i++) a[i]=b.charCodeAt(i); return a; }
+
+async function writeFile(dir, name, content){
+  const fh = await dir.getFileHandle(name, { create:true });
+  const w = await fh.createWritable();
+  await w.write(content);
+  await w.close();
+}
+
+async function writeFounderJson(){
+  if (!dirHandle) return;
+  const pages = {};
+  PAGES.forEach(p=>{ const ps = P(p.id); pages[p.id] = {
+    title: p.title,
+    status: ps.status,
+    checkpoints: `${Object.values(ps.checks).filter(Boolean).length}/${p.checks.length}`,
+    shots: ps.shots.length,
+    lastReviewedAt: ps.lastReviewedAt ? new Date(ps.lastReviewedAt).toISOString() : null,
+    lastSentAt: ps.lastSentAt ? new Date(ps.lastSentAt).toISOString() : null,
+  }; });
+  await writeFile(dirHandle, 'founder-review.json', JSON.stringify({ updated:new Date().toISOString(), tool:'smoke-test-v4', pages }, null, 2));
+}
+
+/* ═══ SEND TO CLAUDE ═════════════════════════════════════════════════ */
+async function sendToClaude(){
+  const p = def(state.activePage), ps = P(p.id);
+  if (!ps.thoughts.trim() && !ps.shots.length && ps.status !== 'fix'){
+    toast('Write a thought, add a screenshot, or mark “Needs fixing” first','err'); return;
+  }
+  const stamp = new Date().toISOString().slice(0,16).replace(/[T:]/g,'-');
+  const folder = `${p.id}-${stamp}`;
+  const shotFiles = ps.shots.map((_,i)=>`shot-${i+1}.png`);
+  const prompt = buildPrompt(p, ps, shotFiles);
+
+  if (dirHandle){
+    try {
+      const reviews = await dirHandle.getDirectoryHandle('reviews', { create:true });
+      const dir = await reviews.getDirectoryHandle(folder, { create:true });
+      await writeFile(dir, 'review.md', prompt);
+      for (let i=0;i<ps.shots.length;i++){
+        const s = ps.shots[i];
+        await writeFile(dir, `shot-${i+1}.png`, dataUrlToBytes(s.flat || s.src));
+      }
+      await writeFounderJson();
+      ps.lastSentAt = Date.now(); save();
+      const kickoff = `/founder-review ${p.id}`;
+      await navigator.clipboard.writeText(kickoff);
+      toast(`✓ Review package written to launch/reviews/${folder}/ — “${kickoff}” copied. Paste it into Claude Code.`);
+      render();
+      return;
+    } catch(e){ console.error(e); toast('Repo write failed — falling back to download','err'); }
+  }
+
+  // Fallback: download package + copy full prompt
+  const blob = new Blob([prompt], {type:'text/markdown'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = `${folder}-review.md`; a.click();
+  ps.shots.forEach((s,i)=>{
+    const b = document.createElement('a');
+    b.href = s.flat || s.src; b.download = `${folder}-shot-${i+1}.png`; b.click();
+  });
+  await navigator.clipboard.writeText(prompt);
+  ps.lastSentAt = Date.now(); save(); render();
+  toast('Package downloaded + prompt copied. Paste into Claude Code and attach the shots.');
+}
+
+/* ═══ Import from V3 ═════════════════════════════════════════════════ */
+function importV3(){
+  let v3 = null;
+  try { v3 = JSON.parse(localStorage.getItem('cc-smoke-test-v3')); } catch(e){}
+  if (!v3){ toast('No V3 session found in this browser profile','err'); return; }
+  let checks = 0, notes = 0, shots = 0, issues = 0;
+  const V3MAP = { 'homepage':'homepage','search':'search','series-index':'series-index','series-pages':'series-pages',
+    'product':'product','offerstable':'offerstable','affiliate':'affiliate','mobile':'mobile','loading':'loading',
+    'route':'route','errors':'errors','covers':'covers','recommendation':'recommendation','launch-readiness':'launch-readiness' };
+  Object.entries(v3.sections||{}).forEach(([sid, sec])=>{
+    const pid = V3MAP[sid]; if (!pid) return;
+    const ps = P(pid);
+    Object.entries(sec.checks||{}).forEach(([i,v])=>{ if (v===true || v==='pass' || v==='checked'){ ps.checks[i]=true; checks++; } });
+    if (sec.notes && !ps.thoughts.includes(sec.notes)){ ps.thoughts = (ps.thoughts?ps.thoughts+'\n\n':'') + '[V3 notes] ' + sec.notes; notes++; }
+    if (sec.status==='passed' && !ps.status) ps.status = 'good';
+    if (sec.status==='failed' && !ps.status) ps.status = 'fix';
+  });
+  Object.values(v3.issues||{}).forEach(iss=>{
+    const pid = V3MAP[iss.section]; if (!pid || !iss.desc) return;
+    const open = !['verified','closed'].includes(iss.stat);
+    if (!open) return;
+    const ps = P(pid);
+    const line = `[V3 ${iss.id||'issue'}] ${String(iss.desc).slice(0,400)}`;
+    if (!ps.thoughts.includes(line)){ ps.thoughts = (ps.thoughts?ps.thoughts+'\n\n':'') + line; issues++; }
+  });
+  Object.values(v3.screenshots||{}).forEach(sh=>{
+    const pid = V3MAP[sh.section]; if (!pid) return;
+    const src = sh.annotatedDataUrl || sh.dataUrl || sh.img || sh.src;
+    if (typeof src === 'string' && src.startsWith('data:image')){
+      P(pid).shots.push({ src, flat:null, ops:[], ts:Date.now() }); shots++;
+    }
+  });
+  save(); render();
+  toast(`Imported from V3 — ${checks} checkpoints, ${notes} notes, ${issues} open issues → thoughts, ${shots} screenshots`);
+}
+
+/* ═══ Export session ═════════════════════════════════════════════════ */
+function exportJson(){
+  const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `founder-review-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+}
+
+/* ═══ Keyboard ═══════════════════════════════════════════════════════ */
+document.addEventListener('keydown', e=>{
+  if (!e.altKey || anno) return;
+  const idx = PAGES.findIndex(p=>p.id===state.activePage);
+  if (e.key==='ArrowDown' && idx < PAGES.length-1){ state.activePage = PAGES[idx+1].id; save(); render(); e.preventDefault(); }
+  if (e.key==='ArrowUp'   && idx > 0){ state.activePage = PAGES[idx-1].id; save(); render(); e.preventDefault(); }
+});
+
+/* ═══ Boot ═══════════════════════════════════════════════════════════ */
+document.getElementById('connectBtn').onclick = connectRepo;
+document.getElementById('importV3Btn').onclick = importV3;
+document.getElementById('exportBtn').onclick = exportJson;
+restoreRepo();
+render();
+setStorageState();
+</script>
+</body>
+</html>

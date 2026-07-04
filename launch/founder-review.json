@@ -1,0 +1,118 @@
+﻿{
+    "pages":  {
+                  "series-index":  {
+                                       "shots":  0,
+                                       "checkpoints":  "0/0",
+                                       "lastSentAt":  null,
+                                       "lastReviewedAt":  null,
+                                       "title":  "series-index",
+                                       "status":  null
+                                   },
+                  "affiliate":  {
+                                    "shots":  0,
+                                    "checkpoints":  "0/0",
+                                    "lastSentAt":  null,
+                                    "lastReviewedAt":  null,
+                                    "title":  "affiliate",
+                                    "status":  null
+                                },
+                  "loading":  {
+                                  "shots":  0,
+                                  "checkpoints":  "0/0",
+                                  "lastSentAt":  null,
+                                  "lastReviewedAt":  null,
+                                  "title":  "loading",
+                                  "status":  null
+                              },
+                  "route":  {
+                                "shots":  0,
+                                "checkpoints":  "0/0",
+                                "lastSentAt":  null,
+                                "lastReviewedAt":  null,
+                                "title":  "route",
+                                "status":  null
+                            },
+                  "launch-readiness":  {
+                                           "shots":  0,
+                                           "checkpoints":  "0/0",
+                                           "lastSentAt":  null,
+                                           "lastReviewedAt":  null,
+                                           "title":  "launch-readiness",
+                                           "status":  null
+                                       },
+                  "offerstable":  {
+                                      "shots":  0,
+                                      "checkpoints":  "0/0",
+                                      "lastSentAt":  null,
+                                      "lastReviewedAt":  null,
+                                      "title":  "offerstable",
+                                      "status":  null
+                                  },
+                  "errors":  {
+                                 "shots":  0,
+                                 "checkpoints":  "0/0",
+                                 "lastSentAt":  null,
+                                 "lastReviewedAt":  null,
+                                 "title":  "errors",
+                                 "status":  null
+                             },
+                  "product":  {
+                                  "shots":  0,
+                                  "checkpoints":  "0/0",
+                                  "lastSentAt":  null,
+                                  "lastReviewedAt":  null,
+                                  "title":  "product",
+                                  "status":  null
+                              },
+                  "series-pages":  {
+                                       "shots":  0,
+                                       "checkpoints":  "0/0",
+                                       "lastSentAt":  null,
+                                       "lastReviewedAt":  null,
+                                       "title":  "series-pages",
+                                       "status":  null
+                                   },
+                  "mobile":  {
+                                 "shots":  0,
+                                 "checkpoints":  "0/0",
+                                 "lastSentAt":  null,
+                                 "lastReviewedAt":  null,
+                                 "title":  "mobile",
+                                 "status":  null
+                             },
+                  "homepage":  {
+                                   "shots":  0,
+                                   "checkpoints":  "0/0",
+                                   "lastSentAt":  null,
+                                   "lastReviewedAt":  null,
+                                   "title":  "homepage",
+                                   "status":  null
+                               },
+                  "recommendation":  {
+                                         "shots":  0,
+                                         "checkpoints":  "0/0",
+                                         "lastSentAt":  null,
+                                         "lastReviewedAt":  null,
+                                         "title":  "recommendation",
+                                         "status":  null
+                                     },
+                  "covers":  {
+                                 "shots":  0,
+                                 "checkpoints":  "0/0",
+                                 "lastSentAt":  null,
+                                 "lastReviewedAt":  null,
+                                 "title":  "covers",
+                                 "status":  null
+                             },
+                  "search":  {
+                                 "shots":  0,
+                                 "checkpoints":  "0/0",
+                                 "lastSentAt":  null,
+                                 "lastReviewedAt":  null,
+                                 "title":  "search",
+                                 "status":  null
+                             }
+              },
+    "tool":  "smoke-test-v4",
+    "updated":  "2026-07-03T22:53:08.0174562+01:00"
+}
