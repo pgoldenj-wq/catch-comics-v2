@@ -345,7 +345,10 @@ function blank(){ return { version:4, activePage:PAGES[0].id, pages:{} }; }
 function load(){ try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.version===4) return s; } catch(e){} return blank(); }
 let state = load();
 let saveT = null;
-function save(){ clearTimeout(saveT); saveT = setTimeout(()=>{ try { localStorage.setItem(KEY, JSON.stringify(state)); setStorageState(); } catch(e){ toast('Storage full — export, then delete old screenshots','err'); } }, 250); }
+// localStorage now holds only lightweight metadata (checklist, notes, amends,
+// shot ids) — screenshot bytes live in IndexedDB (see image storage below), so
+// this basically never fills. If it ever does, notes are still on screen.
+function save(){ clearTimeout(saveT); saveT = setTimeout(()=>{ try { localStorage.setItem(KEY, JSON.stringify(state)); setStorageState(); } catch(e){ toast('Could not autosave metadata — your notes are still on screen. Export as a backup.','err'); } }, 250); }
 function P(id){
   if(!state.pages[id]) state.pages[id] = { status:null, amends:[''], checks:{}, checkNotes:{}, shots:[], lastSentAt:null, lastReviewedAt:null };
   const ps = state.pages[id];
@@ -371,7 +374,53 @@ function pushAmend(ps, text){
 const openCheckNotes = new Set();
 function def(id){ return PAGES.find(p=>p.id===id); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function setStorageState(){ try { const kb = Math.round((localStorage.getItem(KEY)||'').length/1024); document.getElementById('storageState').textContent = kb > 0 ? `· autosaved (${kb} KB)` : ''; } catch(e){} }
+async function setStorageState(){
+  const el = document.getElementById('storageState'); if (!el) return;
+  let shots = 0; for (const pid in state.pages) shots += (state.pages[pid].shots||[]).length;
+  let pct = '';
+  if (navigator.storage && navigator.storage.estimate){
+    try { const { usage, quota } = await navigator.storage.estimate(); if (quota) pct = ` · storage ${Math.round(usage/quota*100)}% used`; } catch(e){}
+  }
+  el.textContent = `· ${shots} screenshot${shots===1?'':'s'} stored${pct}`;
+}
+
+/* ═══ Screenshot image storage — IndexedDB, not localStorage ══════════
+   Root cause of "storage full": full-size base64 screenshots were kept in
+   localStorage (~5MB cap), so a few annotated shots filled it. Image bytes
+   now live in IndexedDB (hundreds of MB); localStorage keeps only the
+   lightweight shot metadata {id, note, ops, ts}. Text always saves even if
+   image storage is full — they're separate stores.                       */
+const imgCache = new Map();  // shot.id -> { src, flat }  (session mirror of IDB)
+
+// Resize to a sane max width + JPEG encode. Keeps screenshots and annotations
+// legible for Claude/debugging while cutting stored bytes ~10-20x vs full PNG.
+function compressImage(dataUrl, maxW = 1600, quality = 0.82){
+  return new Promise((resolve)=>{
+    const img = new Image();
+    img.onload = ()=>{
+      let w = img.naturalWidth, h = img.naturalHeight;
+      if (w > maxW){ h = Math.round(h * maxW / w); w = maxW; }
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      try { c.getContext('2d').drawImage(img, 0, 0, w, h); resolve(c.toDataURL('image/jpeg', quality)); }
+      catch(e){ resolve(dataUrl); }
+    };
+    img.onerror = ()=> resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+// Resolve a shot's display / handoff image: session cache first, then IDB.
+async function shotImage(shot){
+  let rec = imgCache.get(shot.id);
+  if (!rec){ rec = await idb.getImg(shot.id); if (rec) imgCache.set(shot.id, rec); }
+  return rec ? (rec.flat || rec.src) : null;
+}
+// Early friendly warning, well before anything actually fails.
+async function storagePressure(){
+  if (!navigator.storage || !navigator.storage.estimate) return;
+  try { const { usage, quota } = await navigator.storage.estimate();
+    if (quota && usage/quota > 0.8) toast(`Storage ${Math.round(usage/quota*100)}% full — Export soon, then delete old screenshots. Your notes stay safe.`, 'err');
+  } catch(e){}
+}
 
 /* ═══ Toast ══════════════════════════════════════════════════════════ */
 let toastT = null;
@@ -449,7 +498,7 @@ Claude decides severity, grouping and priority — just write.">${esc(a)}</texta
     </div>
     <div class="shots" id="shots">${ps.shots.map((s,i)=>`
       <figure class="shot" style="margin:0">
-        <img src="${s.flat || s.src}" alt="Screenshot ${i+1} for ${esc(p.title)}" data-anno="${i}" title="Click to annotate">
+        <img data-shotid="${s.id}" alt="Screenshot ${i+1} for ${esc(p.title)}" data-anno="${i}" title="Click to annotate" style="background:#111827">
         <div class="shotbar">
           <button data-anno="${i}">✏️ Draw</button>
           <button class="del" data-del="${i}">Delete</button>
@@ -508,7 +557,16 @@ Claude decides severity, grouping and priority — just write.">${esc(a)}</texta
   dz.ondragleave = ()=> dz.classList.remove('drag');
   dz.ondrop = e=>{ e.preventDefault(); dz.classList.remove('drag'); [...e.dataTransfer.files].filter(f=>f.type.startsWith('image/')).forEach(addShotFile); };
   main.querySelectorAll('[data-anno]').forEach(el=> el.onclick = ()=> openAnnotator(parseInt(el.dataset.anno,10)));
-  main.querySelectorAll('[data-del]').forEach(el=> el.onclick = ()=>{ ps.shots.splice(parseInt(el.dataset.del,10),1); save(); render(); });
+  main.querySelectorAll('[data-del]').forEach(el=> el.onclick = async ()=>{
+    const idx = parseInt(el.dataset.del,10), shot = ps.shots[idx];
+    if (shot){ imgCache.delete(shot.id); await idb.delImg(shot.id); }
+    ps.shots.splice(idx,1); save(); render();   // deletes ONLY the image; notes/amends/verdict untouched
+  });
+  // Hydrate screenshot thumbnails from IndexedDB (image bytes aren't in state)
+  main.querySelectorAll('img[data-shotid]').forEach(async imgEl=>{
+    const src = await shotImage({ id: imgEl.dataset.shotid });
+    if (src) imgEl.src = src;
+  });
   main.querySelector('#sendBtn').onclick = sendToClaude;
   main.querySelector('#copyBtn').onclick = async ()=>{ await navigator.clipboard.writeText(buildPrompt(p, ps)); toast('Prompt copied — paste into Claude Code'); };
 }
@@ -519,12 +577,17 @@ function addShotFile(file){
   r.onload = ()=> addShotSrc(r.result);
   r.readAsDataURL(file);
 }
-function addShotSrc(src){
+async function addShotSrc(raw){
   const ps = P(state.activePage);
-  ps.shots.push({ src, flat:null, ops:[], ts:Date.now() });
+  const src = await compressImage(raw);
+  const id = 's' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+  imgCache.set(id, { src, flat:null });
+  ps.shots.push({ id, note:'', ops:[], ts:Date.now() });   // metadata only — no bytes in state
   ps.lastReviewedAt = Date.now();
-  save(); render();
-  toast('Screenshot added — click it to draw');
+  save(); render();   // instant: thumbnail hydrates from the session cache
+  try { await idb.setImg(id, { src, flat:null }); toast('Screenshot added — click it to draw'); }
+  catch(e){ toast('Screenshot saved for this session, but disk storage is full — Export & delete old screenshots to keep it.','err'); }
+  storagePressure();
 }
 document.addEventListener('paste', e=>{
   const items = [...(e.clipboardData?.items||[])].filter(i=>i.type.startsWith('image/'));
@@ -540,8 +603,10 @@ let anno = null; // { shotIdx, img, ops, tool, color, drawing, start, cur }
 const cv = document.getElementById('annoCanvas');
 const cx = cv.getContext('2d');
 
-function openAnnotator(i){
+async function openAnnotator(i){
   const ps = P(state.activePage), shot = ps.shots[i];
+  const rec = imgCache.get(shot.id) || await idb.getImg(shot.id);
+  if (!rec || !rec.src){ toast('Could not load that screenshot','err'); return; }
   const img = new Image();
   img.onload = ()=>{
     anno = { shotIdx:i, img, ops:[...(shot.ops||[])], tool:'pen', color:'#DC2626', drawing:false };
@@ -549,7 +614,7 @@ function openAnnotator(i){
     document.getElementById('annoModal').classList.add('open');
     syncTools(); redraw();
   };
-  img.src = shot.src;
+  img.src = rec.src;   // annotate over the ORIGINAL, replaying stored vector ops
 }
 function syncTools(){
   document.querySelectorAll('#toolRow .tool[data-tool]').forEach(b=> b.classList.toggle('on', anno && b.dataset.tool===anno.tool));
@@ -620,14 +685,19 @@ cv.addEventListener('pointerup', e=>{
   }
   redraw();
 });
-function closeAnnotator(){
+async function closeAnnotator(){
   redraw();
   const ps = P(state.activePage), shot = ps.shots[anno.shotIdx];
-  shot.ops = anno.ops;
-  shot.flat = anno.ops.length ? cv.toDataURL('image/png') : null;
+  shot.ops = anno.ops;   // vector ops stay in state (tiny, keeps annotations re-editable)
+  const flat = anno.ops.length ? cv.toDataURL('image/jpeg', 0.85) : null;
+  const rec = imgCache.get(shot.id) || await idb.getImg(shot.id) || {};
+  rec.flat = flat;
+  imgCache.set(shot.id, rec);
   document.getElementById('annoModal').classList.remove('open');
   anno = null;
   save(); render();
+  try { await idb.setImg(shot.id, rec); }
+  catch(e){ toast('Annotation saved for this session, but disk storage is full — Export & delete old screenshots.','err'); }
 }
 
 /* ═══ Prompt generation ══════════════════════════════════════════════
@@ -690,11 +760,18 @@ let dirHandle = null;   // handle to the repo's launch/ folder
 
 const idb = {
   db: null,
-  open(){ return new Promise((res,rej)=>{ const q = indexedDB.open('cc-frv4',1);
-    q.onupgradeneeded = ()=> q.result.createObjectStore('kv');
+  open(){ if (idb.db) return Promise.resolve(); return new Promise((res,rej)=>{ const q = indexedDB.open('cc-frv4',2);
+    q.onupgradeneeded = ()=>{ const db = q.result;
+      if (!db.objectStoreNames.contains('kv'))   db.createObjectStore('kv');
+      if (!db.objectStoreNames.contains('imgs')) db.createObjectStore('imgs'); };
     q.onsuccess = ()=>{ idb.db = q.result; res(); }; q.onerror = rej; }); },
   get(k){ return new Promise((res)=>{ const t = idb.db.transaction('kv').objectStore('kv').get(k); t.onsuccess=()=>res(t.result); t.onerror=()=>res(null); }); },
   set(k,v){ return new Promise((res)=>{ const t = idb.db.transaction('kv','readwrite').objectStore('kv').put(v,k); t.onsuccess=()=>res(); t.onerror=()=>res(); }); },
+  // Screenshot image bytes ({src, flat} per shot id) — kept out of localStorage.
+  // setImg REJECTS on quota error so callers can warn; get/del swallow errors.
+  getImg(id){ return new Promise((res)=>{ try { const t = idb.db.transaction('imgs').objectStore('imgs').get(id); t.onsuccess=()=>res(t.result||null); t.onerror=()=>res(null); } catch(e){ res(null); } }); },
+  setImg(id,v){ return new Promise((res,rej)=>{ try { const t = idb.db.transaction('imgs','readwrite').objectStore('imgs').put(v,id); t.onsuccess=()=>res(); t.onerror=()=>rej(t.error); } catch(e){ rej(e); } }); },
+  delImg(id){ return new Promise((res)=>{ try { const t = idb.db.transaction('imgs','readwrite').objectStore('imgs').delete(id); t.onsuccess=()=>res(); t.onerror=()=>res(); } catch(e){ res(); } }); },
 };
 
 async function connectRepo(){
@@ -755,7 +832,7 @@ async function sendToClaude(){
   }
   const stamp = new Date().toISOString().slice(0,16).replace(/[T:]/g,'-');
   const folder = `${p.id}-${stamp}`;
-  const shotFiles = ps.shots.map((_,i)=>`shot-${i+1}.png`);
+  const shotFiles = ps.shots.map((_,i)=>`shot-${i+1}.jpg`);
   const prompt = buildPrompt(p, ps, shotFiles);
 
   if (dirHandle){
@@ -764,8 +841,8 @@ async function sendToClaude(){
       const dir = await reviews.getDirectoryHandle(folder, { create:true });
       await writeFile(dir, 'review.md', prompt);
       for (let i=0;i<ps.shots.length;i++){
-        const s = ps.shots[i];
-        await writeFile(dir, `shot-${i+1}.png`, dataUrlToBytes(s.flat || s.src));
+        const src = await shotImage(ps.shots[i]);
+        if (src) await writeFile(dir, `shot-${i+1}.jpg`, dataUrlToBytes(src));
       }
       await writeFounderJson();
       ps.lastSentAt = Date.now(); save();
@@ -781,17 +858,19 @@ async function sendToClaude(){
   const blob = new Blob([prompt], {type:'text/markdown'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = `${folder}-review.md`; a.click();
-  ps.shots.forEach((s,i)=>{
+  for (let i=0;i<ps.shots.length;i++){
+    const src = await shotImage(ps.shots[i]);
+    if (!src) continue;
     const b = document.createElement('a');
-    b.href = s.flat || s.src; b.download = `${folder}-shot-${i+1}.png`; b.click();
-  });
+    b.href = src; b.download = `${folder}-shot-${i+1}.jpg`; b.click();
+  }
   await navigator.clipboard.writeText(prompt);
   ps.lastSentAt = Date.now(); save(); render();
   toast('Package downloaded + prompt copied. Paste into Claude Code and attach the shots.');
 }
 
 /* ═══ Import from V3 ═════════════════════════════════════════════════ */
-function importV3(){
+async function importV3(){
   let v3 = null;
   try { v3 = JSON.parse(localStorage.getItem('cc-smoke-test-v3')); } catch(e){}
   if (!v3){ toast('No V3 session found in this browser profile','err'); return; }
@@ -815,20 +894,32 @@ function importV3(){
     const line = `[V3 ${iss.id||'issue'}] ${String(iss.desc).slice(0,400)}`;
     if (pushAmend(ps, line)) issues++;
   });
-  Object.values(v3.screenshots||{}).forEach(sh=>{
-    const pid = V3MAP[sh.section]; if (!pid) return;
-    const src = sh.annotatedDataUrl || sh.dataUrl || sh.img || sh.src;
-    if (typeof src === 'string' && src.startsWith('data:image')){
-      P(pid).shots.push({ src, flat:null, ops:[], ts:Date.now() }); shots++;
-    }
-  });
+  for (const sh of Object.values(v3.screenshots||{})){
+    const pid = V3MAP[sh.section]; if (!pid) continue;
+    const raw = sh.annotatedDataUrl || sh.dataUrl || sh.img || sh.src;
+    if (typeof raw !== 'string' || !raw.startsWith('data:image')) continue;
+    const src = await compressImage(raw);
+    const id = 's' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+    imgCache.set(id, { src, flat:null });
+    P(pid).shots.push({ id, note:'', ops:[], ts:Date.now() });
+    try { await idb.setImg(id, { src, flat:null }); } catch(e){}
+    shots++;
+  }
   save(); render();
   toast(`Imported from V3 — ${checks} checkpoints, ${notes} notes, ${issues} open issues → thoughts, ${shots} screenshots`);
 }
 
 /* ═══ Export session ═════════════════════════════════════════════════ */
-function exportJson(){
-  const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
+async function exportJson(){
+  // Rehydrate image bytes back inline so the exported JSON is fully self-contained.
+  const out = JSON.parse(JSON.stringify(state));
+  for (const pid in out.pages){
+    for (const s of (out.pages[pid].shots || [])){
+      const rec = imgCache.get(s.id) || await idb.getImg(s.id);
+      if (rec){ s.src = rec.src; s.flat = rec.flat || null; }
+    }
+  }
+  const blob = new Blob([JSON.stringify(out,null,2)], {type:'application/json'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = `founder-review-${new Date().toISOString().slice(0,10)}.json`;
@@ -847,13 +938,42 @@ document.addEventListener('keydown', e=>{
 document.getElementById('connectBtn').onclick = connectRepo;
 document.getElementById('importV3Btn').onclick = importV3;
 document.getElementById('exportBtn').onclick = exportJson;
-// Deep link from Mission Control: smoke-test-v4.html#mobile opens that page
-if (location.hash && PAGES.some(p => p.id === location.hash.slice(1))) {
-  state.activePage = location.hash.slice(1);
+
+// One-time migration: evacuate any inline base64 screenshots (v4.0 shape) from
+// localStorage into IndexedDB. This also REPAIRS an already-bloated localStorage
+// — the state is rewritten without image bytes — so existing sessions that hit
+// "storage full" recover automatically on first load. Runs before first render.
+async function migrateInlineShots(){
+  let moved = 0;
+  for (const pid in state.pages){
+    for (const s of (state.pages[pid].shots || [])){
+      if (!s.id) s.id = 's' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+      let rec = null;
+      if (typeof s.src === 'string' && s.src.startsWith('data:')) rec = { src:s.src, flat:(s.flat && s.flat.startsWith('data:')) ? s.flat : null };
+      else if (typeof s.flat === 'string' && s.flat.startsWith('data:')){ rec = imgCache.get(s.id) || {}; rec.flat = s.flat; }
+      if (rec){
+        imgCache.set(s.id, rec);
+        try { await idb.setImg(s.id, rec); } catch(e){}
+        delete s.src; delete s.flat;
+        moved++;
+      }
+    }
+  }
+  if (moved){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e){} }  // immediate, bypass debounce
+  return moved;
 }
-restoreRepo();
-render();
-setStorageState();
+
+async function boot(){
+  try { await idb.open(); } catch(e){}
+  await migrateInlineShots();
+  // Deep link from Mission Control: smoke-test-v4.html#mobile opens that page
+  if (location.hash && PAGES.some(p => p.id === location.hash.slice(1))) state.activePage = location.hash.slice(1);
+  await restoreRepo();
+  render();
+  setStorageState();
+  if (navigator.storage && navigator.storage.persist) { try { navigator.storage.persist(); } catch(e){} }
+}
+boot();
 </script>
 </body>
 </html>

@@ -14,8 +14,9 @@ package regardless of page.)
 
 1. **Find the package.** List `launch/reviews/` and take the NEWEST directory
    matching `$ARGUMENTS-*` (names are `<page>-<yyyy-mm-dd-hh-mm>`). Read
-   `review.md` and every `shot-N.png` in it (the Read tool renders images —
-   look at them properly; annotations mark what the founder means).
+   `review.md` and every screenshot in it (`shot-N.jpg`, or `shot-N.png` in
+   older packages) — the Read tool renders images, so look at them properly;
+   annotations mark what the founder means.
 
 2. **Diagnose before fixing.** The founder deliberately does not triage:
    no severities, no issue splitting. You decide what is real, what groups
