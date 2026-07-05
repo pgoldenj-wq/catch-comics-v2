@@ -11,6 +11,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { enforceRateLimit } from '@/lib/security/rateLimit'
 
 interface ErrorPayload {
   message: string
@@ -20,6 +21,10 @@ interface ErrorPayload {
 }
 
 export async function POST(req: NextRequest) {
+  // Unauthenticated log writer — cap it so it cannot be used to flood logs.
+  const limited = await enforceRateLimit(req, 'log-error', 60)
+  if (limited) return limited
+
   try {
     const body = await req.json() as ErrorPayload
 

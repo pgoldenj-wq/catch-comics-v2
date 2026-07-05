@@ -37,6 +37,7 @@ import IssueListGrid                     from '@/components/IssueListGrid'
 import IssueCountLine                    from '@/components/IssueCountLine'
 import { isBadCoverUrl, canUseNextImage } from '@/lib/images/url-filters'
 import { seriesNameToSlug, getSeriesEntry } from '@/lib/series/registry'
+import { jsonLdScriptString }               from '@/lib/security/jsonLd'
 
 // ISR: cache each product page for 1 hour, then regenerate in the background.
 // Switched from force-dynamic (which hit the DB on every request) now that the
@@ -536,7 +537,7 @@ export default async function ProductPage(
       {/* JSON-LD */}
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdScriptString(jsonLd) }}
       />
 
       <main className="min-h-screen bg-white text-[#0A0A0A]" style={{ scrollBehavior: 'smooth' }}>

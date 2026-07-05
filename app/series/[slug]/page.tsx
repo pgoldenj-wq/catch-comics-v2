@@ -7,6 +7,7 @@ import { getSeriesData }    from '@/lib/series/getSeriesData'
 import SeriesHero           from './_components/SeriesHero'
 import VolumeGrid           from './_components/VolumeGrid'
 import EditionComparison    from './_components/EditionComparison'
+import { jsonLdScriptString } from '@/lib/security/jsonLd'
 
 // ISR: same cadence as product pages
 export const revalidate = 3600
@@ -107,11 +108,11 @@ export default async function SeriesPage(
       {/* JSON-LD */}
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(bookSeriesLd) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdScriptString(bookSeriesLd) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListLd) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdScriptString(itemListLd) }}
       />
 
       <main className="min-h-screen bg-white text-[#0A0A0A]">

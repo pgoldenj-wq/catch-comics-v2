@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { autocompleteCache }         from '@/lib/cache'
 import { cvFetch }                   from '@/lib/comicvine'
 import { prisma }                    from '@/lib/prisma'
+import { enforceRateLimit }          from '@/lib/security/rateLimit'
 
 // ── Curated dictionary ────────────────────────────────────────────────────────
 
@@ -199,6 +200,11 @@ async function volumeSuggestions(q: string): Promise<Suggestion[]> {
 }
 
 export async function GET(req: NextRequest) {
+  // Fires per keystroke and can reach Comic Vine — generous cap blocks only
+  // scripted floods, never a human typing.
+  const limited = await enforceRateLimit(req, 'autocomplete', 200)
+  if (limited) return limited
+
   const q    = req.nextUrl.searchParams.get('q') || ''
   const mode = req.nextUrl.searchParams.get('mode') || 'suggest'
 
