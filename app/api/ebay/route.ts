@@ -26,6 +26,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { searchListings, EbayListing } from '@/lib/ebay'
 import { TTLCache } from '@/lib/cache'
+import { enforceRateLimit } from '@/lib/security/rateLimit'
 
 // Module-level 1-hour cache — shared across warm serverless instances
 const ebayProductCache = new TTLCache<EbayListing[]>(60 * 60 * 1000)
@@ -58,6 +59,10 @@ function filterListings(listings: EbayListing[]): EbayListing[] {
 export const runtime = 'nodejs' // Buffer required for OAuth Basic auth in lib/ebay.ts
 
 export async function GET(req: NextRequest) {
+  // eBay Browse is a live external API — throttle to stop scripted cost abuse.
+  const limited = await enforceRateLimit(req, 'ebay', 40)
+  if (limited) return limited
+
   const { searchParams } = new URL(req.url)
   const isbn  = (searchParams.get('isbn')  || '').trim()
   const title = (searchParams.get('title') || '').trim()
@@ -118,8 +123,10 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ listings, source: 'live' })
   } catch (err) {
-    // Graceful degradation — product page must never fail because eBay is down
+    // Graceful degradation — product page must never fail because eBay is down.
+    // Log the detail server-side; return a generic marker to the client so no
+    // internal error text leaks into the public response.
     console.error('[/api/ebay] eBay API error:', err)
-    return NextResponse.json({ listings: [], source: 'error', error: String(err) })
+    return NextResponse.json({ listings: [], source: 'error' })
   }
 }

@@ -4,6 +4,8 @@ import { cvFetch, cvGet, cvSet }    from '@/lib/comicvine'
 import { parseComicQuery, titleMatchScore } from '@/lib/parseComicQuery'
 import { isAmbiguousComicTitle } from '@/lib/comicDisambiguation'
 import { unifiedSearch } from '@/lib/search'
+import { enforceRateLimit } from '@/lib/security/rateLimit'
+import { clampInt } from '@/lib/security/http'
 
 // ── Image helpers ─────────────────────────────────────────────────────────────
 
@@ -271,6 +273,10 @@ async function enrichIssuePublishers(
 // ── Main handler ──────────────────────────────────────────────────────────────
 
 export async function GET(request: NextRequest) {
+  // Guardrail: search can fan out to the DB and (on fallback) Comic Vine.
+  const limited = await enforceRateLimit(request, 'search', 120)
+  if (limited) return limited
+
   const searchParams = request.nextUrl.searchParams
   const query        = searchParams.get('q')
   const region       = (searchParams.get('region') ?? 'uk') as 'uk' | 'us'
@@ -293,8 +299,10 @@ export async function GET(request: NextRequest) {
         priceMax:    searchParams.get('priceMax')    ? parseFloat(searchParams.get('priceMax')!) : undefined,
         condition:   searchParams.get('condition')   ?? undefined,
         retailerIds: searchParams.get('retailerIds') ? searchParams.get('retailerIds')!.split(',') : undefined,
-        page:     parseInt(searchParams.get('page')     ?? '1',  10),
-        pageSize: parseInt(searchParams.get('pageSize') ?? '20', 10),
+        // Clamp pagination so a request like ?pageSize=1000000 cannot amplify
+        // the query / response. Normal UI uses page>=1, pageSize=20.
+        page:     clampInt(searchParams.get('page'),     1, 10_000, 1),
+        pageSize: clampInt(searchParams.get('pageSize'), 1, 50,     20),
       })
       // Structured search analytics log — one line per request, parseable by log aggregators.
       const d = result.debug

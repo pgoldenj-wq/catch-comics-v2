@@ -4,6 +4,7 @@ import Navbar               from '@/components/Navbar'
 import { SERIES_REGISTRY }  from '@/lib/series/registry'
 import { getSeriesData }    from '@/lib/series/getSeriesData'
 import SeriesIndexCard      from './_components/SeriesIndexCard'
+import { jsonLdScriptString } from '@/lib/security/jsonLd'
 
 export const revalidate = 3600
 
@@ -78,7 +79,7 @@ export default async function SeriesIndexPage() {
       {/* JSON-LD */}
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(itemListLd) }}
+        dangerouslySetInnerHTML={{ __html: jsonLdScriptString(itemListLd) }}
       />
 
       <main className="min-h-screen bg-white text-[#0A0A0A]">
