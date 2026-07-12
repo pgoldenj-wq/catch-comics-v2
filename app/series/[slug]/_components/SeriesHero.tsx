@@ -140,6 +140,12 @@ export default function SeriesHero({ entry, seriesData }: Props) {
                     {expanded ? 'Show less' : 'Read more'}
                   </button>
                 )}
+                {/* W2-2: ComicVine attribution (API ToS + honesty about source) */}
+                {seriesData.descriptionIsCv && (
+                  <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', margin: '8px 0 0' }}>
+                    Series information via ComicVine
+                  </p>
+                )}
               </div>
             )}
 

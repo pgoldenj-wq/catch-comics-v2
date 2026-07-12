@@ -10,6 +10,28 @@ interface CvMetaShape {
   [key: string]: unknown
 }
 
+/**
+ * W2-2: presentation cleanup for series descriptions. CV synopses are wiki
+ * articles — pull quotes, "Awards"/"Hiatus" sections, non-English edition
+ * lists — which read as a raw dump on a retail page. Take only the first
+ * paragraph (block-level HTML breaks preserved before stripping), capped at a
+ * sentence boundary. Source data is never modified.
+ */
+function firstParagraph(html: string, maxLen = 480): string {
+  const withBreaks = html
+    .replace(/<\/(p|div|h[1-6]|li|blockquote)>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+  const first = withBreaks
+    .split('\n')
+    .map(chunk => stripHtml(chunk))
+    .find(chunk => chunk.length > 50) ?? stripHtml(withBreaks)
+  if (first.length <= maxLen) return first
+  // Cut at the last sentence end before the cap; fall back to a hard cap.
+  const cut = first.slice(0, maxLen)
+  const lastStop = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('.” '), cut.lastIndexOf('! '), cut.lastIndexOf('? '))
+  return lastStop > 120 ? cut.slice(0, lastStop + 1) : `${cut.trimEnd()}…`
+}
+
 const IN_STOCK = new Set(['IN_STOCK', 'LOW_STOCK', 'PREORDER'])
 
 /**
@@ -56,15 +78,24 @@ export async function getSeriesData(entry: SeriesEntry): Promise<SeriesPageData>
     return a.title.localeCompare(b.title)
   })
 
-  // ── Description: first meaningful CV synopsis across sorted products ──────
+  // ── Description: first meaningful CV synopsis across sorted products.
+  //    W2-2: first paragraph only (see firstParagraph) — never the raw wiki
+  //    dump — and the ComicVine origin is flagged so the UI can attribute it.
   let description: string | null = null
+  let descriptionIsCv = false
   for (const p of products) {
     const cvMeta   = (p as { cvMetadata?: CvMetaShape | null }).cvMetadata ?? null
-    const cvText   = cvMeta?.synopsis ? stripHtml(cvMeta.synopsis).trim() : ''
-    const dbText   = p.description     ? stripHtml(p.description).trim()  : ''
-    const candidate = cvText.length > dbText.length + 40 ? cvText : dbText
+    const cvText   = cvMeta?.synopsis ? firstParagraph(cvMeta.synopsis) : ''
+    const dbText   = p.description     ? firstParagraph(p.description)  : ''
+    const useCv    = cvText.length > dbText.length + 40
+    const candidate = useCv ? cvText : dbText
     if (candidate.length > 50) {
-      description = candidate
+      description     = candidate
+      // Attribute ComicVine whenever the shown text matches the CV synopsis —
+      // enrichment sometimes copies CV text into the description column, so
+      // source-column alone under-attributes (observed on Saga).
+      descriptionIsCv = useCv
+        || (cvText.length > 50 && candidate.slice(0, 80) === cvText.slice(0, 80))
       break
     }
   }
@@ -138,6 +169,7 @@ export async function getSeriesData(entry: SeriesEntry): Promise<SeriesPageData>
     displayName:   entry.displayName,
     publisher:     entry.publisher,
     description,
+    descriptionIsCv,
     heroCoverUrl,
     volumes,
     editionGroups,

@@ -33,6 +33,8 @@ export interface SeriesPageData {
   displayName:  string
   publisher:    string | null
   description:  string | null
+  /** True when description came from a ComicVine synopsis — UI attributes it. */
+  descriptionIsCv: boolean
   heroCoverUrl: string | null
   volumes:      VolumeCardData[]
   editionGroups: EditionGroup[]

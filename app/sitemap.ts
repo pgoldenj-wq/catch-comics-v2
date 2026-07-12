@@ -24,12 +24,8 @@ const STATIC_ROUTES: MetadataRoute.Sitemap = [
     changeFrequency:  'daily',
     priority:         1.0,
   },
-  {
-    url:              `${BASE_URL}/search`,
-    lastModified:     new Date(),
-    changeFrequency:  'weekly',
-    priority:         0.8,
-  },
+  // /search removed (LB-5, 2026-07-12): with no query the page is a search
+  // start state, not indexable content — no crawl value.
   {
     url:              `${BASE_URL}/series`,
     lastModified:     new Date(),

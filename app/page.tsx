@@ -72,13 +72,6 @@ const isPlaceholderCoverUrl = (url: string) => isBadCoverUrl(url)
 
 // adjustImgSrc lives in lib/images/url-filters (imported above).
 
-function discountPercent(deal: DealItem, region: 'uk' | 'us'): number {
-  const price = region === 'uk' ? deal.priceUK : deal.priceUS;
-  const rrp   = region === 'uk' ? deal.rrpUK   : deal.rrpUS;
-  if (rrp <= price) return 0;
-  return Math.round((1 - price / rrp) * 100);
-}
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function Home() {
@@ -326,13 +319,13 @@ export default function Home() {
 
           <div style={{ position: 'relative', zIndex: 1 }}>
             <p style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#E8272A', marginBottom: '16px' }}>
-              The world's only comic price comparison
+              Comic price comparison, without the tab chaos
             </p>
             <h1 style={{ fontSize: 'clamp(1.75rem, 7vw, 2.25rem)', fontWeight: 600, lineHeight: 1.1, letterSpacing: '-0.03em', color: '#fff', marginBottom: '12px' }}>
               Search, compare,<br />save on comics
             </h1>
             <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, marginBottom: '24px' }}>
-              Every comic, graphic novel and manga — compared across the web in seconds.
+              Find comics, graphic novels and manga across retailers — with prices, covers and availability shown honestly.
             </p>
 
             <SearchBar region={region} variant="hero" />
@@ -358,7 +351,7 @@ export default function Home() {
       {/* ── Mobile: top deals 2-column grid ─────────────────────────────────── */}
       <div className="md:hidden" style={{ padding: '16px 16px 0' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '14px' }}>
-          <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#111', margin: 0 }}>Top deals today</h2>
+          <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#111', margin: 0 }}>Price finds today</h2>
           <span style={{ fontSize: '11px', color: '#6B7280' }}>
             {liveDeals ? 'Live prices from retailers' : 'Sample prices'}
           </span>
@@ -411,11 +404,8 @@ export default function Home() {
                       {region === 'uk' ? '£' : '$'}{price!.toFixed(2)}
                     </div>
                   )}
-                  {!isLive && staticDeal && discountPercent(staticDeal, region) > 0 && (
-                    <div style={{ position: 'absolute', top: '8px', left: '8px', background: '#C41F22', color: '#fff', fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '5px' }}>
-                      -{discountPercent(staticDeal, region)}%
-                    </div>
-                  )}
+                  {/* Static fallback shows no discount badge — sample prices carry
+                      no verified reference price, so a "-N%" would be fabricated. */}
                 </div>
                 <div className="mobile-deal-title" style={{ fontSize: '12px', fontWeight: 500, color: '#111', marginBottom: '2px' }}>{title}</div>
                 <div style={{ fontSize: '10px', color: '#6B7280', marginTop: '2px' }}>{publisher}</div>
@@ -424,11 +414,6 @@ export default function Home() {
                     <span style={{ fontSize: '14px', fontWeight: 700, color: '#C41F22' }}>
                       {currency}{price.toFixed(2)}
                     </span>
-                    {!isLive && staticDeal && discountPercent(staticDeal, region) > 0 && (
-                      <span style={{ fontSize: '10px', color: '#6B7280', textDecoration: 'line-through' }}>
-                        {currency}{(region === 'uk' ? staticDeal.rrpUK : staticDeal.rrpUS).toFixed(2)}
-                      </span>
-                    )}
                   </div>
                 )}
               </button>
@@ -472,13 +457,13 @@ export default function Home() {
           {/* LEFT — copy + search + category hints */}
           <div className="hero-left" style={{ position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '48px', width: '50%', flexShrink: 0 }}>
             <p style={{ color: '#E8272A', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '20px' }}>
-              The world's only comic price comparison
+              Comic price comparison, without the tab chaos
             </p>
             <h1 style={{ color: '#fff', fontSize: 'clamp(2rem,3.5vw,3rem)', fontWeight: 600, letterSpacing: '-0.03em', lineHeight: 1.1, marginBottom: '14px' }}>
               Search, compare,<br />save on comics
             </h1>
             <p style={{ color: '#fff', fontSize: '14px', lineHeight: 1.6, marginBottom: '28px', maxWidth: '320px' }}>
-              Every comic, graphic novel and manga — compared across the web in seconds.
+              Find comics, graphic novels and manga across retailers — with prices, covers and availability shown honestly.
             </p>
 
             {/* Search bar */}
@@ -589,7 +574,7 @@ export default function Home() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', gap: '16px', flexWrap: 'wrap' }}>
           {/* Left — section title */}
           <div style={{ flexShrink: 0 }}>
-            <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#111', margin: 0 }}>Top deals today</h2>
+            <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#111', margin: 0 }}>Price finds today</h2>
             <p style={{ fontSize: '11px', color: '#6B7280', margin: '2px 0 0' }}>
               {liveDeals ? 'Live prices from retailers' : 'Sample prices'}
             </p>
@@ -754,14 +739,8 @@ export default function Home() {
                       <span style={{ fontSize: '14px', fontWeight: 700, color: '#C41F22' }}>
                         {currency}{price.toFixed(2)}
                       </span>
-                      {!isLive && (() => {
-                        const pct = discountPercent(staticDeal!, region)
-                        return pct > 0 ? (
-                          <span style={{ fontSize: '10px', color: '#6B7280', textDecoration: 'line-through' }}>
-                            {currency}{(region === 'uk' ? staticDeal!.rrpUK : staticDeal!.rrpUS).toFixed(2)}
-                          </span>
-                        ) : null
-                      })()}
+                      {/* No strikethrough RRP on sample data — fabricated discounts
+                          were removed for launch honesty (LB-7). */}
                     </div>
                   )}
                 </button>

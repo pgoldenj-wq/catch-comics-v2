@@ -89,6 +89,19 @@ async function getProduct(slug: string) {
           // the /go/[id] affiliate redirect still works, but they should not
           // appear in the price-comparison table.
           priceAmount: { gt: 0 },
+          // LB-8 (2026-07-12): Amazon listings have no automated refresh path
+          // while the Rainforest key is off in prod, so past the 30-day
+          // freshness threshold they are hidden rather than shown greyed-out —
+          // a wall of "(stale)" Amazon rows misleads more than it informs.
+          // Other retailers keep the existing stale-label treatment: their
+          // feeds refresh daily, so stale rows there are rare and honest.
+          // /go redirects for existing Amazon listing ids still work.
+          NOT: {
+            AND: [
+              { retailer:   { name: { contains: 'amazon', mode: 'insensitive' } } },
+              { lastSeenAt: { lt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } },
+            ],
+          },
         },
         include: {
           retailer: {
@@ -777,10 +790,12 @@ export default async function ProductPage(
                     Price Comparison
                     {/* Only show count when SSR-tracked retailer listings exist.
                         When offers.length === 0, eBay marketplace rows may still
-                        load client-side — hiding (0) avoids a confusing mismatch. */}
+                        load client-side — hiding (0) avoids a confusing mismatch.
+                        W2-6: "tracked retailer" wording — the bare "(1 listing)"
+                        contradicted tab counts once eBay rows loaded ("All (9)"). */}
                     {offers.length > 0 && (
                       <span className="ml-2 text-sm font-normal text-gray-400">
-                        ({offers.length} listing{offers.length !== 1 ? 's' : ''})
+                        ({offers.length} tracked retailer{offers.length !== 1 ? 's' : ''})
                       </span>
                     )}
                   </h2>
@@ -823,16 +838,22 @@ export default async function ProductPage(
                   </div>
                 )}
 
-                <div className="mt-10">
-                  <h3 className="text-[11px] font-bold uppercase tracking-[0.14em] text-gray-400 mb-3">
-                    Price History
-                  </h3>
-                  <div className="bg-white rounded-xl p-4 border border-gray-200">
-                    <Suspense fallback={<div className="h-40 animate-pulse bg-gray-100 rounded" />}>
-                      <PriceSparkline points={sparkPoints} currency={primaryCurrency} />
-                    </Suspense>
+                {/* W2-1: only rendered once real history exists (2+ daily
+                    points). An always-empty "not enough data" module on ~every
+                    page reads as a broken product; the component is preserved
+                    and reappears automatically as history accumulates. */}
+                {sparkPoints.length >= 2 && (
+                  <div className="mt-10">
+                    <h3 className="text-[11px] font-bold uppercase tracking-[0.14em] text-gray-400 mb-3">
+                      Price History
+                    </h3>
+                    <div className="bg-white rounded-xl p-4 border border-gray-200">
+                      <Suspense fallback={<div className="h-40 animate-pulse bg-gray-100 rounded" />}>
+                        <PriceSparkline points={sparkPoints} currency={primaryCurrency} />
+                      </Suspense>
+                    </div>
                   </div>
-                </div>
+                )}
 
               </div>
 
@@ -1149,7 +1170,8 @@ function CollectedInModule({ editions }: {
                     {priceText}
                   </p>
                 ) : (
-                  <p className="text-[12px] text-gray-400">Check</p>
+                  /* W2-4: honest missing-price state */
+                  <p className="text-[12px] text-gray-400">No price yet</p>
                 )}
                 <span className="text-gray-300 group-hover:text-[#E8272A] text-xs transition-colors" aria-hidden="true">→</span>
               </div>

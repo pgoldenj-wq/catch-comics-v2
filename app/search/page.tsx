@@ -9,26 +9,29 @@ import Navbar       from '@/components/Navbar'
 import { isBadCoverUrl, adjustImgSrc } from '@/lib/images/url-filters'
 
 // ─── PriceTag — live "From £X.XX" badge per result card ──────────────────────
-// Fetches /api/price-hint for one comic at a time, staggered by index so we
-// don't fire 20 simultaneous eBay requests. Shows a shimmer while loading,
-// the live price on success, or "Find prices →" as a graceful fallback.
+// LB-3: hints are ISBN-keyed only. Title-string eBay searches produced
+// wrong-product anchors (e.g. "Absolute Batman Vol. 3" hardcover showing
+// "From £5.95" — a single issue's price). A wrong low price is worse than no
+// hint, so results without an ISBN show "Find prices →" and fetch nothing.
+// Fetches are staggered by index so we don't fire 20 simultaneous requests.
 
 const CURRENCY_SYMBOLS: Record<string, string> = { GBP: '£', USD: '$', EUR: '€' }
 
 function PriceTag({
-  query, region, index, format = 'all',
+  isbn, priceKey, region, index,
   onPriceLoaded,
 }: {
-  query: string
+  /** ISBN-13/10 — the only accepted price-hint key. null = no hint shown. */
+  isbn: string | null
+  /** Stable key for the parent's price map (used by "Lowest price" sort). */
+  priceKey: string
   region: 'uk' | 'us'
   index: number
-  /** Active format filter — price is the cheapest listing matching this format */
-  format?: string
-  onPriceLoaded?: (query: string, price: number | null) => void
+  onPriceLoaded?: (key: string, price: number | null) => void
 }) {
   // undefined = first fetch not yet complete (show shimmer)
-  // null      = fetched but no listing found ("Find prices →")
-  // number    = lowest price found for the active format
+  // null      = no ISBN or no listing found ("Find prices →")
+  // number    = lowest ISBN-matched price
   const [priceValue, setPriceValue]       = useState<number | null | undefined>(undefined)
   const [priceCurrency, setPriceCurrency] = useState('')
 
@@ -39,35 +42,41 @@ function PriceTag({
   useEffect(() => { onPriceLoadedRef.current = onPriceLoaded }, [onPriceLoaded])
 
   useEffect(() => {
-    // Reset on every meaningful change (query, region, format).
-    // Format changes explicitly request different data — we must show a fresh price.
+    // Reset on every meaningful change (isbn, region).
     setPriceValue(undefined)
     setPriceCurrency('')
+
+    // No ISBN → no fetch, no anchor. Honest fallback state immediately.
+    if (!isbn) {
+      setPriceValue(null)
+      onPriceLoadedRef.current?.(priceKey, null)
+      return
+    }
 
     const delay = index * 80
     const controller = new AbortController()
     const t = setTimeout(() => {
-      const url = `/api/price-hint?q=${encodeURIComponent(query)}&region=${region}&format=${encodeURIComponent(format)}`
+      const url = `/api/price-hint?isbn=${encodeURIComponent(isbn)}&region=${region}`
       fetch(url, { signal: controller.signal })
         .then(r => r.json())
         .then((data: { lowestPrice: number | null; currency: string | null }) => {
           if (data.lowestPrice != null && data.currency) {
             setPriceValue(data.lowestPrice)
             setPriceCurrency(data.currency)
-            onPriceLoadedRef.current?.(query, data.lowestPrice)
+            onPriceLoadedRef.current?.(priceKey, data.lowestPrice)
           } else {
             setPriceValue(null)
-            onPriceLoadedRef.current?.(query, null)
+            onPriceLoadedRef.current?.(priceKey, null)
           }
         })
         .catch(err => {
           if (err instanceof Error && err.name === 'AbortError') return
           setPriceValue(null)
-          onPriceLoadedRef.current?.(query, null)
+          onPriceLoadedRef.current?.(priceKey, null)
         })
     }, delay)
     return () => { clearTimeout(t); controller.abort() }
-  }, [query, region, index, format]) // onPriceLoaded intentionally omitted — tracked via ref
+  }, [isbn, priceKey, region, index]) // onPriceLoaded intentionally omitted — tracked via ref
 
   const sym = CURRENCY_SYMBOLS[priceCurrency] || (priceCurrency ? `${priceCurrency} ` : '')
 
@@ -151,6 +160,10 @@ interface ComicResult {
   canonicalSlug?: string
   /** CV id when matched — enables the live CV cover fallback (CC-027) */
   comicvineId?: string | null
+  /** Raw DB format for canonical results (SINGLE_ISSUE, TPB, MANGA_VOLUME, …).
+   *  Authoritative over title heuristics — LB-2: heuristics mislabelled
+   *  Absolute Batman single issues as "Hardcover Edition". */
+  dbFormat?: string
   // Unified mode — inline offers
   offers?: Array<{
     listingId: string; retailerName: string; retailerUrl: string
@@ -180,6 +193,27 @@ const VALID_FORMATS: string[] = [
   'all', 'single-issue', 'graphic-novel', 'hardcover', 'omnibus', 'manga', 'compact', 'one-shot',
 ]
 
+// LB-2: DB format → UI format. For canonical results the database format is
+// authoritative — title heuristics mislabelled e.g. Absolute Batman single
+// issues as 'hardcover' (the word "absolute" in the title). OTHER is genuinely
+// unknown and deliberately absent from this map: those results fall back to
+// heuristics for FILTERING only, and show no format label (see the eyebrow).
+const DB_FORMAT_TO_UI: Record<string, Format> = {
+  SINGLE_ISSUE:  'single-issue',
+  TPB:           'graphic-novel',
+  HARDCOVER:     'hardcover',
+  DELUXE:        'hardcover',
+  ABSOLUTE:      'hardcover',
+  OMNIBUS:       'omnibus',
+  COMPENDIUM:    'omnibus',
+  MANGA_VOLUME:  'manga',
+}
+
+/** UI format for a result when the DB knows it; undefined when unknown. */
+function knownDbFormat(comic: ComicResult): Format | undefined {
+  return comic.dbFormat ? DB_FORMAT_TO_UI[comic.dbFormat] : undefined
+}
+
 // Tolerant matching for the four user-facing pills. Combines (a) umbrella over
 // the internal heuristic ids returned by detectFormat() with (b) lowercase
 // title-substring fallbacks. The fallbacks catch cases where detectFormat()
@@ -188,6 +222,24 @@ const VALID_FORMATS: string[] = [
 // via the substring rule, and would otherwise vanish under Graphic Novels.
 function matchesFormat(comic: ComicResult, filter: string): boolean {
   if (filter === 'all') return true
+
+  // LB-2: when the DB format is known, bucket strictly by it — no title
+  // fallbacks. A SINGLE_ISSUE named "Absolute Batman #1" must never match
+  // the Graphic Novels pill via the "absolute" substring rule.
+  const known = knownDbFormat(comic)
+  if (known) {
+    switch (filter) {
+      case 'graphic-novel':
+        return ['graphic-novel', 'hardcover', 'omnibus', 'compact', 'one-shot'].includes(known)
+      case 'single-issue':
+        return known === 'single-issue'
+      case 'manga':
+        return known === 'manga'
+      default:
+        return known === filter
+    }
+  }
+
   const detected = detectFormat(comic)
   const name     = (comic.name || '').toLowerCase()
 
@@ -220,6 +272,11 @@ const MANGA_PUBLISHERS = ['viz', 'kodansha', 'yen press', 'seven seas', 'tokyopo
 const INDIE_PUBLISHERS  = ['image', 'boom', 'dark horse', 'fantagraphics', 'oni press', 'dynamite', 'aftershock', 'vault', 'idw', 'drawn & quarterly', 'top shelf']
 
 function detectFormat(comic: ComicResult): Format {
+  // LB-2: DB format wins when known. Heuristics below only run for results
+  // whose format the database does not know (CV/OL results, format=OTHER).
+  const known = knownDbFormat(comic)
+  if (known) return known
+
   const name = (comic.name || '').toLowerCase()
   const pub  = (comic.publisher?.name || '').toLowerCase()
   // BUG FIX: manga publisher must beat the cv_issue check below — without this,
@@ -467,7 +524,9 @@ function SearchResults() {
   useEffect(() => { if (regionParam) setRegion(regionParam) }, [regionParam])
 
   const [results,    setResults]    = useState<ComicResult[]>([])
-  const [loading,    setLoading]    = useState(true)
+  // LB-5: no query → not loading, so the start state renders immediately
+  // (including in the SSR HTML) instead of skeletons that never resolve.
+  const [loading,    setLoading]    = useState(query.length > 0)
   const [error,      setError]      = useState('')
   const [didYouMean, setDidYouMean] = useState<string | null>(null)
   // Fuzzy honesty: true when the server found no strong title match for the query.
@@ -521,7 +580,9 @@ function SearchResults() {
 
   // Fetch when query or region changes
   useEffect(() => {
-    if (!query) return
+    // LB-5: no query = no fetch, and loading must resolve — otherwise the
+    // page shows skeletons forever (previously hit by direct /search visits).
+    if (!query) { setLoading(false); return }
     setLoading(true)
     setError('')
     setResults([])
@@ -562,6 +623,7 @@ function SearchResults() {
                 isbn13:         r.isbn13 ?? undefined,
                 comicvineId:    r.comicvineId,
                 canonicalSlug:  r.canonicalSlug,
+                dbFormat:       r.format,
                 offers:         r.offers,
               }
             }
@@ -697,7 +759,7 @@ function SearchResults() {
         <div style={{ flex: 1, minWidth: 0 }}>
 
           {/* ── FORMAT PILLS — mobile only; desktop pills live in the sort row below */}
-          {!loading && !error && (
+          {!loading && !error && query.length > 0 && (
             <div className="flex md:hidden" style={{ flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
               {([
                 { id: 'all',           label: 'All' },
@@ -731,7 +793,7 @@ function SearchResults() {
               display must come from the classes, not inline style — an inline
               display:flex overrides md:hidden's display:none and the toggle
               leaks onto desktop, duplicating the header selector (CC-024). */}
-          {!loading && !error && (
+          {!loading && !error && query.length > 0 && (
             <div className="flex md:hidden" style={{ alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
               <span style={{ fontSize: '11px', color: '#6B7280', flexShrink: 0 }}>Prices for:</span>
               {(['uk', 'us'] as const).map(r => (
@@ -755,7 +817,7 @@ function SearchResults() {
           )}
 
           {/* ── RESULT COUNT — own row, anchored left, predictable position */}
-          {!loading && !error && (
+          {!loading && !error && query.length > 0 && (
             <p style={{ fontSize: '13px', color: '#6B7280', margin: '0 0 12px' }}>
               <span style={{ fontWeight: 500, color: '#0A0A0A' }}>{filteredResults.length}</span>
               {results.length !== filteredResults.length && (
@@ -768,7 +830,7 @@ function SearchResults() {
           {/* ── FILTERS + SORT ROW — shared height, aligned baseline */}
           {/* Desktop: [Format pills ···] [Sort dropdown]  */}
           {/* Mobile:  [Filters button] [Sort dropdown]    */}
-          {!loading && !error && (
+          {!loading && !error && query.length > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', gap: '10px' }}>
               {/* Filters button — mobile only */}
               <button
@@ -976,16 +1038,28 @@ function SearchResults() {
                       {/* Format eyebrow — replaces the prior chip. Tracked-caps
                           treatment matching the product-page hero, with publisher
                           dot-separated. Publisher is no longer also shown in the
-                          meta line above (moved here to avoid duplication). */}
-                      <span style={{
-                        display: 'inline-block', fontSize: '10px', fontWeight: 700,
-                        color: '#9CA3AF',
-                        textTransform: 'uppercase', letterSpacing: '0.12em',
-                      }}>
-                        {isIsbnResult
+                          meta line above (moved here to avoid duplication).
+                          LB-2: canonical results whose DB format is OTHER show
+                          publisher only — an unknown format is omitted, never
+                          guessed from the title. */}
+                      {(() => {
+                        const formatUnknown = comic.source === 'canonical' && comic.dbFormat === 'OTHER'
+                        const eyebrow = isIsbnResult
                           ? 'ISBN MATCH'
-                          : `${FORMAT_LABELS[fmt]}${comic.publisher?.name ? ` · ${comic.publisher.name}` : ''}`}
-                      </span>
+                          : formatUnknown
+                            ? (comic.publisher?.name ?? '')
+                            : `${FORMAT_LABELS[fmt]}${comic.publisher?.name ? ` · ${comic.publisher.name}` : ''}`
+                        if (!eyebrow) return null
+                        return (
+                          <span style={{
+                            display: 'inline-block', fontSize: '10px', fontWeight: 700,
+                            color: '#9CA3AF',
+                            textTransform: 'uppercase', letterSpacing: '0.12em',
+                          }}>
+                            {eyebrow}
+                          </span>
+                        )
+                      })()}
 
                       {/* ISBN — subtle, grey, monospace */}
                       {isbn && (
@@ -995,14 +1069,15 @@ function SearchResults() {
                       )}
                     </div>
 
-                    {/* Live price tag — fetches eBay lowest price matching the active format */}
+                    {/* Live price tag — ISBN-keyed eBay lowest price (LB-3).
+                        Results without an ISBN show "Find prices →" instead. */}
                     <PriceTag
-                      query={comic.name}
+                      isbn={comic.isbn13 ?? comic.isbn10 ?? null}
+                      priceKey={comic.name}
                       region={region}
                       index={index}
-                      format={format}
-                      onPriceLoaded={(q, price) =>
-                        setPriceMap(prev => { const m = new Map(prev); m.set(q, price); return m })
+                      onPriceLoaded={(k, price) =>
+                        setPriceMap(prev => { const m = new Map(prev); m.set(k, price); return m })
                       }
                     />
                   </div>
@@ -1103,8 +1178,20 @@ function SearchResults() {
             </div>
           )}
 
+          {/* LB-5: start state — /search visited with no query. Never skeletons. */}
+          {!loading && !error && !query && (
+            <div style={{ textAlign: 'center', padding: '64px 0' }}>
+              <p style={{ fontWeight: 500, color: '#0A0A0A', marginBottom: '8px', fontSize: '15px' }}>
+                Search for a comic, series or ISBN
+              </p>
+              <p style={{ fontSize: '14px', color: '#6B7280' }}>
+                Try &ldquo;Saga&rdquo;, &ldquo;Absolute Batman&rdquo; or &ldquo;One Piece Vol. 1&rdquo; — use the search bar above.
+              </p>
+            </div>
+          )}
+
           {/* Zero results from API */}
-          {!loading && !error && results.length === 0 && unmatchedListings.length === 0 && looseEbayResults.length === 0 && (
+          {!loading && !error && query.length > 0 && results.length === 0 && unmatchedListings.length === 0 && looseEbayResults.length === 0 && (
             <div style={{ textAlign: 'center', padding: '64px 0' }}>
               <p style={{ fontWeight: 500, color: '#0A0A0A', marginBottom: '8px', fontSize: '15px' }}>
                 No results for &ldquo;{query}&rdquo;

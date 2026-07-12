@@ -23,7 +23,7 @@ export const metadata: Metadata = {
     template: '%s — Catch Comics',
   },
   description:
-    'Compare prices for comics, graphic novels and manga across UK retailers. Find the cheapest deal instantly.',
+    'Compare prices for comics, graphic novels and manga across UK retailers. Find the best live price in seconds.',
   metadataBase: new URL(BASE_URL),
   alternates: {
     canonical: '/',
