@@ -1,0 +1,36 @@
+{
+  "source": "product-excellence-audit",
+  "generatedAt": "2026-07-12",
+  "verdict": "NEARLY_READY",
+  "confidenceScore": 62,
+  "trustVerdict": "MOSTLY_TRUSTWORTHY_WITH_KNOWN_GAPS",
+  "launchBlockers": [
+    { "id": "LB-1", "title": "Remove 'world's only' overclaim (homepage x2, About)", "type": "trust", "effort": "XS", "status": "open" },
+    { "id": "LB-2", "title": "Search format labels ignore DB format (Absolute singles = 'Hardcover')", "type": "trust", "effort": "S", "status": "open" },
+    { "id": "LB-3", "title": "Title-keyed eBay price hints anchor wrong products", "type": "trust", "effort": "M", "status": "open" },
+    { "id": "LB-4", "title": "public/og-image.png missing — broken social share cards", "type": "brand", "effort": "XS", "status": "open" },
+    { "id": "LB-5", "title": "/search without query = infinite skeleton (and in sitemap)", "type": "ux", "effort": "XS", "status": "open" },
+    { "id": "LB-6", "title": "No rate limit on /api/price-hint and /api/comic/[id]", "type": "cost", "effort": "S", "status": "open" },
+    { "id": "LB-7", "title": "'Top deals' are uncurated lowest prices (adult-adjacent #2 card)", "type": "brand", "effort": "M", "status": "open" },
+    { "id": "LB-8", "title": "All 321 Amazon listings go stale ~launch day (founder decision)", "type": "trust", "effort": "decision", "status": "open" }
+  ],
+  "keyMetrics": {
+    "liveProducts": 81832,
+    "coverCoverageR2Pct": 30.0,
+    "cvMatchedPct": 12.1,
+    "productsWithPricedListing": 37748,
+    "productsWith2PlusRetailers": 90,
+    "pricedListings": 48805,
+    "staleListingsOver30dPct": 1.9,
+    "worldOfBooksListingSharePct": 87.5,
+    "priceHistoryPointsPerListing": 1.07,
+    "enrichmentDaysRemaining": 20.7
+  },
+  "founderDecisions": [
+    "Approve replacement hero line (LB-1)",
+    "Amazon: paid resync once vs hide rows (LB-8)",
+    "Pick 12 pinned homepage series (LB-7)",
+    "Approve rail rename: Live prices / Popular this week (LB-7)"
+  ],
+  "postLaunchTopLever": "Bring a second priced retailer live (Wordery/Bookshop adapters exist, currently 0 priced listings)"
+}

@@ -41,7 +41,9 @@ export default function EditionComparison({ groups }: Props) {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
               {group.editions.map(edition => {
                 const sym     = CURRENCY[edition.currency] ?? edition.currency
-                const price   = edition.lowestPrice !== null ? `${sym}${edition.lowestPrice.toFixed(2)}` : 'Check price'
+                // W2-4: honest missing-price state instead of a CTA that
+                // implies a price is waiting on the other side.
+                const price   = edition.lowestPrice !== null ? `${sym}${edition.lowestPrice.toFixed(2)}` : 'No live price yet'
                 const desc    = FORMAT_DESCRIPTORS[edition.format] ?? ''
                 return (
                   <Link

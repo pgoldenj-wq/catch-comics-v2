@@ -17,18 +17,18 @@ export async function generateMetadata(): Promise<Metadata> {
 
   return {
     title:       `Reading Orders — ${count} Series`,
-    description: `Complete reading orders and UK price comparison for ${count} comic and manga series. Find the right volume, compare prices across UK retailers.`,
+    description: `Complete reading orders for ${count} comic and manga series. Find the right volume and compare live UK prices where we have them.`,
     alternates:  { canonical: url },
     openGraph: {
       title:       'Comic Series Reading Orders — Catch Comics',
-      description: `Complete reading orders for ${count} series — compare prices across UK retailers on every volume.`,
+      description: `Complete reading orders for ${count} series — with live UK prices where available.`,
       url,
       type:        'website',
     },
     twitter: {
       card:        'summary',
       title:       'Comic Series Reading Orders — Catch Comics',
-      description: `Complete reading orders for ${count} series, with UK price comparison on every volume.`,
+      description: `Complete reading orders for ${count} series, with live UK prices where available.`,
     },
   }
 }
@@ -142,8 +142,9 @@ export default async function SeriesIndexPage() {
               color: 'rgba(255,255,255,0.65)',
               maxWidth: '540px', marginBottom: 0,
             }}>
-              {count} series with complete reading orders and UK price comparison on every volume.
-              Find where to start, what comes next, and the best price across UK retailers.
+              {count} series with complete reading orders and live UK prices where we have them.
+              Find where to start, what comes next, and compare prices where available —
+              some volumes may not have live prices yet.
             </p>
           </div>
         </section>

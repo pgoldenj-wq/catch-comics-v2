@@ -4,8 +4,9 @@ import { prisma } from '@/lib/prisma'
 /**
  * GET /api/homepage-deals
  *
- * Returns up to 12 canonical products that have at least one in-stock listing,
- * ordered by number of listings DESC (most-listed = most popular / best value).
+ * Returns up to 12 canonical products that have at least one in-stock listing.
+ * Founder-pinned series (PINNED_SERIES_PATTERNS) fill the rail first; remaining
+ * slots are ordered by number of listings DESC (most-listed = most popular).
  *
  * Only comic-native formats appear on the homepage:
  *   - SINGLE_ISSUE, MANGA_VOLUME — inherently comic, allowed unconditionally
@@ -35,6 +36,30 @@ import { prisma } from '@/lib/prisma'
  */
 
 export const revalidate = 900 // 15 minutes
+
+// LB-7 (2026-07-12): founder-curated launch rail. Products whose series/title
+// matches a pinned pattern fill the rail first; algorithmic fill takes the
+// remaining slots. Every card — pinned or not — passes the same quality gates
+// (R2 cover, in-stock listing, comics publisher), so a pinned series with no
+// qualifying product simply doesn't appear. Matched against LOWER(series|title).
+const PINNED_SERIES_PATTERNS = [
+  '%batman%', '%spider-man%', '%one piece%', '%watchmen%', '%naruto%',
+  '%x-men%', '%invincible%', '%demon slayer%', '%hellboy%', '%jujutsu kaisen%',
+  '%chainsaw man%',
+  // Saga (Image) needs precise shapes — a bare '%saga%' pinned "The Saga of
+  // Tanya the Evil". DB check 2026-07-12: series_name is exactly 'Saga', or
+  // null with titles like "Saga Volume 3" / "Saga: Compendium One".
+  'saga', 'saga vol%', 'saga, vol%', 'saga comp%', 'saga: comp%', 'saga #%',
+]
+
+// First-impression safety: keep explicit/adult-edge titles off the homepage
+// rail. Display-only gate — these products remain searchable and purchasable.
+// Includes editorial exclusions for known explicit series that carry no
+// flagged keyword in their titles (Painter of the Night is 18+ BL).
+const EXCLUDED_TITLE_PATTERNS = [
+  '%brothel%', '%hentai%', '%erotica%', '%ecchi%',
+  '%painter of the night%',
+]
 
 export interface HomepageDeal {
   slug:         string
@@ -81,6 +106,10 @@ export async function GET() {
             )),
             1, 40
           ) AS dedup_key,
+          -- LB-7: founder-pinned series sort ahead of algorithmic fill.
+          CASE WHEN LOWER(COALESCE(NULLIF(TRIM(cp.series_name), ''), cp.title))
+                    LIKE ANY(${PINNED_SERIES_PATTERNS})
+               THEN 0 ELSE 1 END AS pinned_rank,
           COUNT(rl.id) AS listing_count,
           MIN(CASE WHEN rl.price_currency = 'GBP' THEN rl.price_amount::numeric END) AS lowest_gbp,
           MIN(CASE WHEN rl.price_currency = 'USD' THEN rl.price_amount::numeric END) AS lowest_usd
@@ -99,6 +128,9 @@ export async function GET() {
           -- 404 or themselves be "image not available" placeholders. Guarantees
           -- the carousel never shows a broken/placeholder card.
           AND cp.cover_image_url ILIKE 'https://images.catchcomics.com/%'
+          -- LB-7: first-impression safety — no explicit/adult-edge titles on
+          -- the homepage rail (display-only; products stay searchable).
+          AND NOT (LOWER(cp.title) LIKE ANY(${EXCLUDED_TITLE_PATTERNS}))
           AND (
             -- SINGLE_ISSUE and MANGA_VOLUME are inherently comic — allow unconditionally.
             cp.format IN ('SINGLE_ISSUE','MANGA_VOLUME')
@@ -148,9 +180,12 @@ export async function GET() {
         lowest_usd
       FROM ranked
       WHERE series_rank = 1                    -- Issue 3: one row per series
-      -- Surface real-cover (R2) products first so the carousel never shows a
-      -- wall of grey placeholders; listing_count keeps the most-listed within each tier.
-      ORDER BY (cover_image_url LIKE 'https://images.catchcomics.com%') DESC, listing_count DESC
+      -- LB-7: pinned series first, then real-cover products, then most-listed.
+      -- (All rows already require an R2 cover; the cover term is kept as a
+      -- guard in case the gate is ever relaxed.)
+      ORDER BY pinned_rank ASC,
+               (cover_image_url LIKE 'https://images.catchcomics.com%') DESC,
+               listing_count DESC
       LIMIT 12
     `
 

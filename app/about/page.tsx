@@ -16,14 +16,14 @@ export default function AboutPage() {
           About Catch Comics
         </h1>
         <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: '13px', marginBottom: '48px' }}>
-          The world&apos;s only comic price-comparison service
+          Compare comic, graphic novel and manga prices across UK retailers
         </p>
 
         <Section title="What is Catch Comics?">
           <p>
             Catch Comics helps you find the cheapest price for any comic, graphic novel, or manga across
             UK and US online retailers. Instead of visiting half a dozen shops one by one, you search once
-            and we show you every available price side by side — so you can buy from whoever is cheapest.
+            and we show you the prices we track side by side — so you can buy from whoever is cheapest.
           </p>
         </Section>
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cvFetch, cvGet, cvSet } from '@/lib/comicvine'
+import { enforceRateLimit } from '@/lib/security/rateLimit'
 
 // Detect Comic Vine's "no cover" placeholder URLs.
 // Their default asset lives under user_id 0 in the uploads CDN.
@@ -14,6 +15,13 @@ export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
+  // LB-6: KV caching absorbs normal traffic, but uncached-ID enumeration
+  // would drain the shared 200/hr ComicVine budget the enrichment job also
+  // uses. Product pages legitimately fire ~25 calls (issue grid + tags), so
+  // the ceiling stays generous. Limiter fails open; RATE_LIMIT_DISABLED bypasses.
+  const limited = await enforceRateLimit(request, 'comic', 200)
+  if (limited) return limited
+
   const { id } = await context.params
 
   // Accept numeric volume IDs ("796") or issue IDs prefixed with "i" ("i892345").

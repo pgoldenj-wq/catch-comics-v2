@@ -143,8 +143,10 @@ export default function VolumeCard({ volume }: Props) {
         {/* Format */}
         <p style={{ fontSize: '10px', color: '#6B7280', fontWeight: 500 }}>
           {fmtLabel}
+          {/* W2-4: honest missing-price state — we don't have a live price,
+              say so; the card still links through to the product page. */}
           {!priceText && (
-            <span style={{ color: '#C41F22', marginLeft: '6px' }}>Check price →</span>
+            <span style={{ color: '#6B7280', marginLeft: '6px' }}>No live price yet →</span>
           )}
         </p>
       </div>
