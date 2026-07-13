@@ -1,0 +1,132 @@
+{
+  "version": 1,
+  "environment": "production",
+  "url": "https://www.catchcomics.com",
+  "checkedAt": "2026-07-13T08:43:33.943Z",
+  "verdict": "PASS",
+  "passed": 20,
+  "warned": 0,
+  "failed": 0,
+  "checks": [
+    {
+      "id": "home",
+      "label": "Homepage responds",
+      "status": "pass",
+      "detail": "HTTP 200"
+    },
+    {
+      "id": "copy-eyebrow",
+      "label": "Honest hero copy present",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "id": "copy-overclaim",
+      "label": "No \"world's only\" overclaim",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "id": "copy-rail",
+      "label": "\"Price finds today\" rail present",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "id": "copy-deals",
+      "label": "No \"Top deals\" wording",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "id": "headers",
+      "label": "Security headers present",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "id": "og",
+      "label": "OG share image resolves",
+      "status": "pass",
+      "detail": "HTTP 200, 66263 bytes"
+    },
+    {
+      "id": "search-page",
+      "label": "/search responds (start state is a V4 browser check)",
+      "status": "pass",
+      "detail": "HTTP 200"
+    },
+    {
+      "id": "search-api",
+      "label": "Search API returns valid unified shape",
+      "status": "pass",
+      "detail": "49 canonical results"
+    },
+    {
+      "id": "search-flagship",
+      "label": "Flagship query finds Absolute Batman",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "id": "product",
+      "label": "Flagship product page loads",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "id": "product-count",
+      "label": "Offer count reads \"tracked retailer\"",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "id": "product-history",
+      "label": "No always-empty Price History panel",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "id": "series",
+      "label": "Series page loads",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "id": "series-overclaim",
+      "label": "No \"every volume\" price overclaim",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "id": "series-honesty",
+      "label": "Honest price/attribution states render",
+      "status": "pass",
+      "detail": ""
+    },
+    {
+      "id": "go",
+      "label": "Affiliate redirect returns 3xx to retailer",
+      "status": "pass",
+      "detail": "HTTP 302 → https://travellingman.com/products/absolute-batman-volume-2-"
+    },
+    {
+      "id": "price-hint",
+      "label": "price-hint refuses non-ISBN keys honestly",
+      "status": "pass",
+      "detail": "HTTP 200"
+    },
+    {
+      "id": "deals-api",
+      "label": "Homepage rail API shape honest",
+      "status": "pass",
+      "detail": "12 cards, R2 covers only"
+    },
+    {
+      "id": "notfound",
+      "label": "Unknown product returns 404 (not a crash)",
+      "status": "pass",
+      "detail": "HTTP 404"
+    }
+  ]
+}

@@ -107,9 +107,13 @@ export async function GET() {
             1, 40
           ) AS dedup_key,
           -- LB-7: founder-pinned series sort ahead of algorithmic fill.
-          CASE WHEN LOWER(COALESCE(NULLIF(TRIM(cp.series_name), ''), cp.title))
-                    LIKE ANY(${PINNED_SERIES_PATTERNS})
-               THEN 0 ELSE 1 END AS pinned_rank,
+          -- Wave 3E: capture WHICH pattern matched (ordinal index) so the
+          -- final select can cap each pinned franchise at 2 cards — three
+          -- Spider-Man series were filling half the visible mobile rail.
+          (SELECT MIN(u.idx) FROM unnest(${PINNED_SERIES_PATTERNS}::text[])
+             WITH ORDINALITY AS u(pat, idx)
+           WHERE LOWER(COALESCE(NULLIF(TRIM(cp.series_name), ''), cp.title)) LIKE u.pat
+          ) AS pinned_idx,
           COUNT(rl.id) AS listing_count,
           MIN(CASE WHEN rl.price_currency = 'GBP' THEN rl.price_amount::numeric END) AS lowest_gbp,
           MIN(CASE WHEN rl.price_currency = 'USD' THEN rl.price_amount::numeric END) AS lowest_usd
@@ -168,6 +172,17 @@ export async function GET() {
                      listing_count DESC, release_date DESC NULLS LAST
           ) AS series_rank
         FROM per_product
+      ),
+      capped AS (
+        SELECT *,
+          -- Wave 3E: at most 2 cards per pinned franchise (e.g. Spider-Man
+          -- matches 3+ distinct series). Unpinned rows are uncapped here —
+          -- they were already deduped to one card per series above.
+          CASE WHEN pinned_idx IS NOT NULL
+               THEN ROW_NUMBER() OVER (PARTITION BY pinned_idx ORDER BY listing_count DESC)
+               ELSE 1 END AS franchise_rank
+        FROM ranked
+        WHERE series_rank = 1                  -- Issue 3: one row per series
       )
       SELECT
         canonical_slug   AS slug,
@@ -178,12 +193,12 @@ export async function GET() {
         listing_count,
         lowest_gbp,
         lowest_usd
-      FROM ranked
-      WHERE series_rank = 1                    -- Issue 3: one row per series
+      FROM capped
+      WHERE franchise_rank <= 2
       -- LB-7: pinned series first, then real-cover products, then most-listed.
       -- (All rows already require an R2 cover; the cover term is kept as a
       -- guard in case the gate is ever relaxed.)
-      ORDER BY pinned_rank ASC,
+      ORDER BY (pinned_idx IS NULL) ASC,
                (cover_image_url LIKE 'https://images.catchcomics.com%') DESC,
                listing_count DESC
       LIMIT 12
