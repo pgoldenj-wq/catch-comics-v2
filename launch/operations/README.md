@@ -2,6 +2,8 @@
 
 Everything Joe needs to run Catch Comics at launch, in one place. Built Wave 3 (2026-07-13).
 
+**One-click version:** the desktop shortcut **"Catch Comics Command Centre"** runs both commands below, starts the Mission Control server and opens it — see [COMMAND-CENTRE-LAUNCHER.md](COMMAND-CENTRE-LAUNCHER.md) (install: `create-desktop-shortcut.ps1`).
+
 ## The two commands
 
 ```bash
