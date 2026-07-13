@@ -137,6 +137,11 @@ footer button { color:var(--ink3); background:none; border:none; text-decoration
     <div class="card"><h2>🚀 Launch ops</h2><div id="opsList"></div></div>
   </div>
 
+  <div class="card">
+    <h2>🔭 Operations &amp; health</h2>
+    <div id="opsHealth"></div>
+  </div>
+
   <div class="card" id="blockersCard">
     <h2>⛔ Open blockers — things that genuinely stop launch</h2>
     <div id="blockerList"></div>
@@ -151,6 +156,14 @@ footer button { color:var(--ink3); background:none; border:none; text-decoration
     <h2>Go deeper</h2>
     <div class="links">
       <a class="ghostbtn" href="smoke-test-v4.html">Open Smoke Test V4</a>
+      <a class="ghostbtn" href="https://www.catchcomics.com" target="_blank" rel="noopener">Production site</a>
+      <a class="ghostbtn" href="https://vercel.com/pgoldenj-wqs-projects/catch-comics-v2" target="_blank" rel="noopener">Vercel</a>
+      <a class="ghostbtn" href="https://github.com/pgoldenj-wq/catch-comics-v2" target="_blank" rel="noopener">GitHub</a>
+      <a class="ghostbtn" href="operations/launch-runbook.md">Launch runbook</a>
+      <a class="ghostbtn" href="operations/incident-response.md">Incident response</a>
+      <a class="ghostbtn" href="operations/rollback-guide.md">Rollback guide</a>
+      <a class="ghostbtn" href="operations/launch-health-latest.md">Latest health report</a>
+      <a class="ghostbtn" href="product-excellence/product-excellence-audit.md">Product-excellence audit</a>
       <a class="ghostbtn" href="dashboard.html">Full dashboard (deep dive)</a>
       <a class="ghostbtn" href="war-room-2026-07-03.md">War-room report</a>
     </div>
@@ -172,6 +185,11 @@ const OPS_ITEMS = [
   { id:'terms',     label:'Terms live and reviewed',          href:'https://catchcomics.com/terms' },
   { id:'analytics', label:'Analytics + error monitoring confirmed in production' },
   { id:'mailbox',   label:'hello@catchcomics.com live and monitored' },
+  // Wave 3 founder-only checks — these cannot be automated honestly.
+  { id:'phone-grid',    label:'Confirm issue-grid covers and tap behaviour on a physical phone (browser emulation is NOT this check)' },
+  { id:'amazon-decision', label:'Amazon staleness decision made (see Operations & health below — deadline shown there)' },
+  { id:'gh-security',   label:'GitHub: enable secret scanning + push protection + Dependabot (Settings → Advanced Security)', href:'https://github.com/pgoldenj-wq/catch-comics-v2/settings/security_analysis' },
+  { id:'vercel-spend',  label:'Vercel: enable Spend Management notifications (Team Settings → Billing → Spend Management)', href:'https://vercel.com/pgoldenj-wqs-projects/~/settings/billing' },
   { id:'finalgo',   label:'Final GO / NO-GO review completed' },
 ];
 // V4 testing pages, in founder-priority order for "what next"
@@ -190,13 +208,17 @@ let mc = (()=>{ try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && 
 function saveMc(){ localStorage.setItem(KEY, JSON.stringify(mc)); writeMcToRepo(); }
 
 /* ═══ Live data ══════════════════════════════════════════════════════ */
-let FOUNDER = null, SMOKE = null;
+let FOUNDER = null, SMOKE = null, OPS_SMOKE = null, OPS_HEALTH = null;
 async function loadData(){
   // 1) http(s): plain fetch. 2) file://: FS-handle if connected.
+  // Wave 3: also load the generated operations snapshots. A missing file is
+  // shown as "unavailable" — never rendered as a passing check.
   try {
     if (location.protocol.startsWith('http')){
       FOUNDER = await (await fetch('founder-review.json?'+Date.now())).json();
       SMOKE   = await (await fetch('smoke-verdict.json?'+Date.now())).json();
+      try { OPS_SMOKE  = await (await fetch('operations/launch-smoke-latest.json?'+Date.now())).json(); } catch(e){ OPS_SMOKE = null; }
+      try { OPS_HEALTH = await (await fetch('operations/launch-health-latest.json?'+Date.now())).json(); } catch(e){ OPS_HEALTH = null; }
       return;
     }
   } catch(e){}
@@ -204,6 +226,11 @@ async function loadData(){
     try {
       FOUNDER = JSON.parse(await (await (await dirHandle.getFileHandle('founder-review.json')).getFile()).text());
       SMOKE   = JSON.parse(await (await (await dirHandle.getFileHandle('smoke-verdict.json')).getFile()).text());
+    } catch(e){}
+    try {
+      const ops = await dirHandle.getDirectoryHandle('operations');
+      try { OPS_SMOKE  = JSON.parse(await (await (await ops.getFileHandle('launch-smoke-latest.json')).getFile()).text()); } catch(e){}
+      try { OPS_HEALTH = JSON.parse(await (await (await ops.getFileHandle('launch-health-latest.json')).getFile()).text()); } catch(e){}
     } catch(e){}
   }
 }
@@ -372,6 +399,33 @@ function render(){
       ${o.href?`<a class="ghostbtn go" href="${o.href}" target="_blank" rel="noopener">Check</a>`:''}
     </div>`).join('');
   document.querySelectorAll('[data-ops]').forEach(cb => cb.onchange = ()=>{ mc.ops[cb.dataset.ops] = cb.checked; saveMc(); render(); });
+
+  // Operations & health (Wave 3) — real generated data or an honest
+  // "unavailable". Timestamps always shown; snapshots older than 48h are
+  // flagged stale rather than presented as current.
+  const age = iso => { const h = (Date.now() - new Date(iso).getTime()) / 3.6e6;
+    return h < 1 ? `${Math.round(h*60)}m ago` : h < 48 ? `${Math.round(h)}h ago` : `⚠ ${Math.round(h/24)}d ago — STALE, re-run`; };
+  let oh = '';
+  if (OPS_SMOKE){
+    const s = OPS_SMOKE;
+    const col = s.failed > 0 ? 'var(--red)' : s.warned > 0 ? 'var(--amber)' : 'var(--green)';
+    const fails = (s.checks||[]).filter(c => c.status !== 'pass').map(c =>
+      `<div class="win" style="color:${c.status==='fail'?'var(--red)':'var(--amber)'}">${c.status==='fail'?'✗':'⚠'} ${esc(c.label)}${c.detail?` — ${esc(c.detail)}`:''}</div>`).join('');
+    oh += `<div style="margin-bottom:14px"><strong style="color:${col}">Production smoke: ${esc(s.verdict)}</strong>
+      <span class="src"> · ${s.passed}✓ ${s.warned}⚠ ${s.failed}✗ · ${esc(s.environment)} · ${age(s.checkedAt)} (npm run launch:smoke)</span>${fails}</div>`;
+  } else oh += `<div style="margin-bottom:14px"><strong style="color:var(--ink3)">Production smoke: unavailable</strong>
+      <span class="src"> · run <code>npm run launch:smoke</code> then reload</span></div>`;
+  if (OPS_HEALTH){
+    const g = OPS_HEALTH; const c = g.catalogue, p = g.pricing, a = g.amazon;
+    oh += `<div><strong>Data health</strong><span class="src"> · ${esc(g.source)} · ${age(g.generatedAt)} (npm run launch:health)</span>
+      <div class="win" style="color:var(--ink2)">📦 ${c.liveProducts.toLocaleString()} products · covers ${c.coverR2Pct}% R2 · suspect-flagged ${c.suspectFlagged}</div>
+      <div class="win" style="color:var(--ink2)">💷 ${p.pricedListings.toLocaleString()} priced listings · ${p.stale30dPlus.toLocaleString()} stale (${p.stalePct}%) · ${p.comparisonDepth.twoPlusRetailers} products with 2+ retailers</div>
+      <div class="win" style="color:${a.decisionRequiredBeforeLaunch?'var(--amber)':'var(--ink2)'}">🛒 Amazon: ${a.visibleOnSite} visible / ${a.suppressedAsStale} suppressed · all hidden by <strong>${esc(a.allVisibleRowsGoStaleBy||'n/a')}</strong>${a.decisionRequiredBeforeLaunch?' — <strong>DECISION REQUIRED</strong> (see checklist)':''}</div>
+      ${g.deltas ? `<div class="win" style="color:var(--ink3)">Δ since ${esc(String(g.previousSnapshotAt).slice(0,10))}: products ${g.deltas.liveProducts>=0?'+':''}${g.deltas.liveProducts} · priced ${g.deltas.pricedListings>=0?'+':''}${g.deltas.pricedListings} · stale ${g.deltas.stale30dPlus>=0?'+':''}${g.deltas.stale30dPlus}</div>` : `<div class="win" style="color:var(--ink3)">No prior snapshot for deltas yet.</div>`}
+    </div>`;
+  } else oh += `<div><strong style="color:var(--ink3)">Data health: unavailable</strong>
+      <span class="src"> · run <code>npm run launch:health</code> then reload</span></div>`;
+  document.getElementById('opsHealth').innerHTML = oh;
 
   // Blockers
   document.getElementById('blockersCard').style.display = d.blockers.length ? '' : 'none';

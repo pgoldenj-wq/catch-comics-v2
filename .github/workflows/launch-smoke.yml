@@ -1,0 +1,25 @@
+# Daily production smoke — 20 public read-only checks (~15 requests).
+# No secrets, no DB, no paid APIs, no npm install (plain Node script).
+# A material failure fails the workflow → GitHub emails the founder.
+# Manual runs: Actions tab → "Launch smoke (production)" → Run workflow.
+name: Launch smoke (production)
+
+on:
+  schedule:
+    - cron: '0 8 * * *'   # 08:00 UTC daily
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run production smoke
+        run: node scripts/launch-smoke.mjs

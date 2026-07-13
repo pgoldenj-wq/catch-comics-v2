@@ -220,14 +220,22 @@ const PAGES = [
      '“Browse all series →” link present and clickable',
      'Footer shows <strong>hello@catchcomics.com</strong>',
      'Footer has all four links: About · Affiliate Disclosure · Privacy · Terms',
-     'Cookie notice bar appears at the bottom'] },
+     'Cookie notice bar appears at the bottom',
+     /* Wave 3 launch checks — appended only (check state is index-keyed) */
+     'Hero eyebrow reads <strong>“Comic price comparison, without the tab chaos”</strong> — no “world’s only” anywhere',
+     '<strong>“Price finds today”</strong> rail: recognisable series, real covers, honest prices — no “deals” wording, no adult-edge titles',
+     'Paste <code>catchcomics.com</code> into Discord/WhatsApp — <strong>og-image share card</strong> renders'] },
  { id:'search', ico:'🔍', title:'Search', url:'https://catchcomics.com',
    why:'Primary way users find a specific comic.',
    checks:['Type <strong>“Saga”</strong> — results appear',
      '“Saga Vol …” or similar relevant titles appear',
      'Click a result — the correct product page loads',
      'Search <strong>“Invincible”</strong> — relevant results appear',
-     'Gibberish (<code>xzqjkwp</code>) — clean “no results”, no crash'] },
+     'Gibberish (<code>xzqjkwp</code>) — clean “no results”, no crash',
+     /* Wave 3 launch checks */
+     '<strong>“Absolute Batman”</strong> — issues #1–#20 labelled <strong>SINGLE ISSUE</strong>, not Hardcover Edition',
+     '“From £…” tags only on results with an ISBN — others say <strong>“Find prices →”</strong> (no wrong-product anchors)',
+     '<code>/search</code> with no query — start state appears, <strong>no endless skeletons</strong>'] },
  { id:'series-index', ico:'📚', title:'Series Index', url:'https://catchcomics.com/series',
    why:'The curated catalogue front door.',
    checks:['<code>/series</code> loads without error',
@@ -244,7 +252,10 @@ const PAGES = [
      'Invincible — volumes in order, Start Here on Vol 1',
      '<strong>Fullmetal Alchemist</strong> — loads, Vol 1 priced',
      'FMA — volumes in order, Start Here on Vol 1',
-     'FMA — Vol 1 cover loads from <code>images.catchcomics.com</code>'] },
+     'FMA — Vol 1 cover loads from <code>images.catchcomics.com</code>',
+     /* Wave 3 launch checks */
+     'Description is a clean first paragraph with <strong>“Series information via ComicVine”</strong> attribution — no raw wiki dump',
+     'Unpriced volumes say <strong>“No live price yet”</strong> — never “£0” or a fake price'] },
  { id:'product', ico:'🛒', title:'Product Pages', url:'https://catchcomics.com (Saga → Vol 1)',
    why:'Where the buying decision happens.',
    checks:['Product page loads — no error / blank page',
@@ -254,7 +265,11 @@ const PAGES = [
      'Creator credits visible (writer / artist)',
      'Synopsis text visible and readable',
      'eBay section appears within ~5s',
-     'Amazon search link visible'] },
+     'Amazon search link visible',
+     /* Wave 3 launch checks */
+     'No always-empty <strong>Price History</strong> panel — section only exists when a real chart renders',
+     'Listing count reads <strong>“(N tracked retailers)”</strong> and doesn’t contradict the All/New/Used tab counts',
+     'No greyed-out <strong>stale Amazon</strong> rows (30-day-stale Amazon offers are hidden, not shown)'] },
  { id:'offerstable', ico:'💷', title:'Offers Table', url:'On any product page',
    why:'The price-comparison table is the trust core.',
    checks:['Table renders — one row per retailer, £ price each',
@@ -285,7 +300,9 @@ const PAGES = [
      'Product pricing panel usable — nothing cut off',
      '“Buy” buttons large enough to tap',
      'OffersTable scrolls/stacks without clipping',
-     'Footer links readable and tappable'] },
+     'Footer links readable and tappable',
+     /* Wave 3 launch checks */
+     '<strong>PHYSICAL PHONE</strong>: product-page issue grid — covers load or show honest #N tiles, taps comfortable, no horizontal overflow'] },
  { id:'loading', ico:'⏳', title:'Loading States', url:'DevTools → throttle Slow 3G',
    why:'Perceived speed — skeletons, never blank flashes.',
    checks:['Homepage shows skeleton/placeholder before content',
@@ -336,7 +353,10 @@ const PAGES = [
      'Affiliate chain verified end-to-end',
      'Analytics + error monitoring live',
      '17 series live with correct reading orders',
-     'Mobile confirmed usable'] },
+     'Mobile confirmed usable',
+     /* Wave 3 launch checks */
+     '<code>npm run launch:smoke</code> passes against production (security headers included)',
+     '<code>npm run launch:health</code> run within 48h — <strong>Amazon staleness decision made</strong>'] },
 ];
 
 /* ═══ State ══════════════════════════════════════════════════════════ */

@@ -77,7 +77,9 @@
     "audit:covers": "dotenv -e .env.local -- tsx scripts/audit-covers.ts",
     "verify:covers": "dotenv -e .env.local -- tsx scripts/cover-r2-fullscan.ts",
     "test:url-filters": "tsx scripts/test-url-filters.ts",
-    "test:search-ranking": "tsx scripts/test-search-ranking.ts"
+    "test:search-ranking": "tsx scripts/test-search-ranking.ts",
+    "launch:smoke": "node scripts/launch-smoke.mjs",
+    "launch:health": "dotenv -e .env.local -- tsx scripts/launch-health.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1055.0",
