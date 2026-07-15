@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Smoke Test V3 — CC-020 Re-diagnosis Patch · 13 Jul 2026</title>
+<style>
+  :root{--bg:#F8F7F4;--card:#fff;--text:#111827;--muted:#6B7280;--border:#E5E7EB;--red:#DC2626;--green:#16A34A;--amber:#D97706;--navy:#111827}
+  body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);margin:0;padding:32px 20px;line-height:1.5}
+  .wrap{max-width:860px;margin:0 auto}
+  h1{font-size:22px;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:24px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:20px 22px;margin-bottom:16px}
+  .ok{border-left:4px solid var(--green)}
+  .warn{border-left:4px solid var(--amber)}
+  .err{border-left:4px solid var(--red)}
+  .metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin:12px 0}
+  .metric{background:var(--bg);border-radius:8px;padding:10px 12px;text-align:center}
+  .metric .n{font-size:24px;font-weight:800}
+  .metric .l{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  .rec{display:inline-block;padding:4px 14px;border-radius:999px;font-weight:800;font-size:14px}
+  .rec-nogo{background:#FEE2E2;color:var(--red)}
+  .rec-conditions{background:#FEF3C7;color:var(--amber)}
+  .rec-go{background:#DCFCE7;color:var(--green)}
+  ul.log{font-size:13px;padding-left:18px;margin:8px 0}
+  ul.log li{margin-bottom:3px}
+  button,a.btn{display:inline-block;background:var(--navy);color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;margin-right:10px}
+  button.secondary,a.btn.secondary{background:#fff;color:var(--text);border:1px solid var(--border)}
+  code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:12px}
+  figure.ev{margin:14px 0;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:#fff}
+  figure.ev img{display:block;width:100%;height:auto}
+  figure.ev figcaption{padding:8px 12px;font-size:12px;color:var(--muted);border-top:1px solid var(--border)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>CC-020 Re-diagnosis Patch — 13 Jul 2026</h1>
+  <div class="sub">Resolves the last open P0. The 02 Jul triage left CC-020 open because its description was a fragment ("to say comic") and evidence IMG-15 was believed missing from the master-report export. <strong>Both premises were re-checked on 13 Jul: IMG-15 was never missing.</strong> It is in <code>Downloads/catch-comics-smoke-test-master-report.html</code> (section 07) and is archived to <code>launch/evidence/cc-020-img-15.jpg</code>. A backup of the current session is stored under <code>cc-smoke-test-v3-backup-20260713-cc020</code> before anything changes. Idempotent — safe to open more than once.</div>
+
+  <div class="card">
+    <strong>The recovered evidence — review before applying</strong>
+    <figure class="ev">
+      <img src="evidence/cc-020-img-15.jpg" alt="IMG-15: homepage hero with callout circling the Graphic Novels chip">
+      <figcaption><b>IMG-15</b> · logged 27/06/2026 12:16 while section 07 (Affiliate Systems) was active · Callout #1 circles the <b>“Graphic Novels”</b> quick-filter chip under the homepage hero search bar</figcaption>
+    </figure>
+    <div style="font-size:13px">
+      <p><strong>What this changes:</strong> CC-020 is not an affiliate defect. The screenshot shows the <em>homepage hero</em>; the callout targets the “Graphic Novels” chip; the fragment “to say comic” is a copy note about that chip's label (most plausible reading: it should say “Comics”). It was filed under Affiliate Systems only because that section was active in the tester when it was captured. The affiliate system itself passed its full checklist 10/10 in the same session (<code>/go/</code> → <code>awin1.com</code> chain, mid/affid/clickref/ued all verified).</p>
+      <p><strong>Severity:</strong> P0 → P2. A chip-label wording nit is the same class as CC-006 / CC-011 / CC-017 (visual polish, not collector-trust-critical). It inherited P0 from the revenue-critical section it was logged under, not from its content.</p>
+      <p><strong>Deliberately NOT done:</strong> no copy change has shipped. “To say comic” is still a fragment — the exact wording is yours to confirm (the chips live in <code>app/page.tsx</code>, both hero variants). Wrong data is worse than missing data; guessing your intent and shipping it would be wrong data.</p>
+    </div>
+  </div>
+
+  <div class="card warn" style="font-size:13px"><strong>Before applying:</strong> close any open Smoke Test V3 tabs (its autosave could overwrite this patch). Reopen V3 after.</div>
+  <div id="app"></div>
+</div>
+<script>
+const KEY = 'cc-smoke-test-v3';
+const BACKUP = 'cc-smoke-test-v3-backup-20260713-cc020';
+const STAMP = '[Re-diagnosis 13 Jul 2026]';
+const OPEN_STATES = ['open','diagnosed','in-progress','fixed','ready'];
+const SECTION_IDS = ['homepage','search','series-index','series-pages','product','offerstable','affiliate','mobile','loading','route','errors','covers','recommendation','launch-readiness'];
+
+function note(cur, txt){
+  if ((cur||'').includes(STAMP)) return cur;
+  return (cur ? cur + '\n\n' : '') + STAMP + ' ' + txt;
+}
+
+/* ── the re-diagnosis, as data ───────────────────────────────── */
+const UPDATES = [
+  {id:'CC-020', set:{sev:'p2', color:'yellow'},
+   desc:"RE-DIAGNOSED from recovered evidence. IMG-15 was never missing — it is in the 27 Jun master-report export (Downloads/catch-comics-smoke-test-master-report.html, section 07) and is archived to launch/evidence/cc-020-img-15.jpg. The screenshot shows the HOMEPAGE hero; callout #1 circles the 'Graphic Novels' quick-filter chip under the search bar. The fragment 'to say comic' is a copy note about that chip's label (most plausible reading: rename to 'Comics'). It was captured while the Affiliate Systems section was active in the tester, which is why it was filed — and severity-inherited — as an affiliate P0.",
+   verify:"Downgraded P0 → P2: homepage copy polish, not revenue- or trust-critical (same class as the CC-006/CC-011/CC-017 downgrades). Not an affiliate defect — the affiliate checklist passed 10/10 in the same 27 Jun session and the full /go/ → awin1.com chain is production-verified. Remaining action: founder confirms the intended chip wording (chips are decorative spans in app/page.tsx, mobile + desktop heroes); no copy change ships until then — wrong data is worse than missing data."},
+];
+
+/* ── metrics (same formula as Smoke Test V3) ─────────────────── */
+function metrics(s){
+  const issues = Object.values(s.issues||{});
+  const real = issues.filter(i=>i.sev!=='positive');
+  const m = {total:issues.length, open:0, verified:0, closed:0, p0:0,p1:0,p2:0,p3:0, p0open:0,p1open:0,p2open:0,p3open:0};
+  issues.forEach(i=>{
+    if (OPEN_STATES.includes(i.stat)) m.open++;
+    if (i.stat==='verified') m.verified++;
+    if (i.stat==='closed') m.closed++;
+  });
+  real.forEach(i=>{ m[i.sev]++; if (OPEN_STATES.includes(i.stat)) m[i.sev+'open']++; });
+  const passed = SECTION_IDS.filter(id=>s.sections && s.sections[id] && s.sections[id].status==='passed').length;
+  m.sectionsPassed = passed;
+  m.coverage = Math.round(passed/SECTION_IDS.length*100);
+  const penalty = Math.min(100, m.p0open*40 + m.p1open*15 + m.p2open*5 + m.p3open*2);
+  m.issueHealth = 100 - penalty;
+  m.readiness = Math.max(0, Math.round(0.6*m.coverage + 0.4*m.issueHealth));
+  m.rec = m.p0open>0 ? 'nogo' : (m.p1open>0 || passed<SECTION_IDS.length) ? 'conditions' : 'go';
+  return m;
+}
+const REC = {nogo:['⛔ NO-GO','rec-nogo'], conditions:['⚠️ GO WITH CONDITIONS','rec-conditions'], go:['✅ GO','rec-go']};
+
+/* ── apply ───────────────────────────────────────────────────── */
+function apply(s){
+  const log = [];
+  UPDATES.forEach(u=>{
+    const i = s.issues[u.id];
+    if (!i){ log.push(u.id+' — not found in session, skipped'); return; }
+    const already = (i.verify||'').includes(STAMP) || (i.desc||'').includes(STAMP);
+    if (u.set) Object.assign(i, u.set);
+    if (u.verify) i.verify = note(i.verify, u.verify);
+    if (u.desc) i.desc = note(i.desc, u.desc);
+    log.push(u.id+' — '+(already?'already patched (no-op)':'updated'+(u.set&&u.set.sev?' → '+u.set.sev.toUpperCase():'')));
+  });
+  return log;
+}
+
+/* ── UI flow ─────────────────────────────────────────────────── */
+const app = document.getElementById('app');
+function metricCard(title, m, cls){
+  return '<div class="card '+(cls||'')+'"><strong>'+title+'</strong>'
+    + '<div class="metric-grid">'
+    + '<div class="metric"><div class="n">'+m.p0open+'</div><div class="l">P0 open</div></div>'
+    + '<div class="metric"><div class="n">'+m.p1open+'</div><div class="l">P1 open</div></div>'
+    + '<div class="metric"><div class="n">'+m.p2open+'</div><div class="l">P2 open</div></div>'
+    + '<div class="metric"><div class="n">'+m.verified+'</div><div class="l">Verified</div></div>'
+    + '<div class="metric"><div class="n">'+m.closed+'</div><div class="l">Closed</div></div>'
+    + '<div class="metric"><div class="n">'+m.readiness+'%</div><div class="l">Readiness</div></div>'
+    + '</div>'
+    + '<span class="rec '+REC[m.rec][1]+'">'+REC[m.rec][0]+'</span>'
+    + '</div>';
+}
+function run(){
+  const raw = localStorage.getItem(KEY);
+  if (!raw){
+    app.innerHTML = '<div class="card err"><strong>No Smoke Test V3 session found in this browser.</strong><br>Open this file in the browser (and profile) where you normally run <code>smoke-test-v3.html</code> from <code>file://</code>.</div>';
+    return;
+  }
+  let s;
+  try { s = JSON.parse(raw); } catch(e){ app.innerHTML = '<div class="card err">Session data is corrupt — nothing was changed.</div>'; return; }
+  if (s.version !== 2){ app.innerHTML = '<div class="card err">Unexpected session version ('+s.version+') — nothing was changed.</div>'; return; }
+
+  const before = metrics(s);
+  // backup FIRST — never overwrite an existing backup (preserves the pre-patch original across re-runs)
+  let backedUp = !!localStorage.getItem(BACKUP);
+  if (!backedUp){
+    try { localStorage.setItem(BACKUP, raw); backedUp = true; }
+    catch(e){ backedUp = false; }
+  }
+  if (!backedUp){
+    const blob = new Blob([raw], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    app.innerHTML = '<div class="card warn"><strong>Storage is too full to keep an automatic backup.</strong><br>Download a manual backup first, then apply.</div>'
+      + '<a class="btn secondary" href="'+url+'" download="cc-smoke-test-v3-backup-20260713.json">Download backup</a>'
+      + '<button id="force">I saved the backup — apply the patch</button>';
+    document.getElementById('force').onclick = ()=>{ doApply(s, before); };
+    return;
+  }
+  doApply(s, before);
+}
+function doApply(s, before){
+  const log = apply(s);
+  try { localStorage.setItem(KEY, JSON.stringify(s)); }
+  catch(e){ app.innerHTML = '<div class="card err">Could not save — storage quota. Nothing was changed (your session is intact).</div>'; return; }
+  const after = metrics(s);
+  app.innerHTML =
+    '<div class="card ok"><strong>✔ Patch applied.</strong> Backup preserved under <code>'+BACKUP+'</code>.</div>'
+    + metricCard('Before', before)
+    + metricCard('After — honest state', after, 'ok')
+    + '<div class="card"><strong>Change log</strong><ul class="log">'+log.map(l=>'<li>'+l+'</li>').join('')+'</ul></div>'
+    + '<a class="btn" href="smoke-test-v3.html">Open Smoke Test V3</a>'
+    + '<button class="secondary" id="revert">Revert to backup</button>';
+  document.getElementById('revert').onclick = ()=>{
+    if (!confirm('Restore the pre-patch session from backup? Any V3 edits made after applying will be lost.')) return;
+    localStorage.setItem(KEY, localStorage.getItem(BACKUP));
+    location.reload();
+  };
+}
+run();
+</script>
+</body>
+</html>
