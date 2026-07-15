@@ -37,6 +37,7 @@ import IssueCountLine                    from '@/components/IssueCountLine'
 import { isBadCoverUrl, canUseNextImage } from '@/lib/images/url-filters'
 import { seriesNameToSlug, getSeriesEntry } from '@/lib/series/registry'
 import { jsonLdScriptString }               from '@/lib/security/jsonLd'
+import { displayPublisher }                 from '@/lib/identity/publisher'
 
 // ISR: cache each product page for 1 hour, then regenerate in the background.
 // Switched from force-dynamic (which hit the DB on every request) — there is no
@@ -281,7 +282,7 @@ export async function generateMetadata(
 
   const title       = product.title
   const description = product.description
-    ?? `Compare prices for ${title}${product.publisher ? ` from ${product.publisher}` : ''}.`
+    ?? `Compare prices for ${title}${displayPublisher(product.publisher) ? ` from ${displayPublisher(product.publisher)}` : ''}.`
   const BASE_URL    = (process.env.NEXT_PUBLIC_SITE_URL || 'https://catchcomics.com').replace(/\/$/, '')
   const url         = `${BASE_URL}/product/${slug}`
   const image       = product.coverImageUrl
@@ -459,8 +460,8 @@ export default async function ProductPage(
     ...(product.description  ? { description: product.description }  : {}),
     ...(product.coverImageUrl ? { image: product.coverImageUrl }     : {}),
     ...(product.isbn13        ? { isbn: product.isbn13 }             : {}),
-    ...(product.publisher
-      ? { publisher: { '@type': 'Organization', name: product.publisher } }
+    ...(displayPublisher(product.publisher)
+      ? { publisher: { '@type': 'Organization', name: displayPublisher(product.publisher) } }
       : {}),
     // Individual Offer per retailer — lets Google surface each source's price.
     // Falls back to AggregateOffer summary when no in-stock offers exist.
@@ -639,10 +640,13 @@ export default async function ProductPage(
                   )}
                   <LabeledRow label="Format" value={FORMAT_LABELS[product.format] ?? product.format} />
                   {/* T1-B: Publisher hidden on mobile — Format + Status are the
-                      decision-critical signals; Publisher is supplementary. */}
-                  {product.publisher && (
+                      decision-critical signals; Publisher is supplementary.
+                      W4 Phase 6: displayPublisher omits distributor/retailer
+                      names (e.g. "Penguin Random House NZ") — honest-missing
+                      beats presenting a distributor as the creative publisher. */}
+                  {displayPublisher(product.publisher) && (
                     <div className="hidden sm:block">
-                      <LabeledRow label="Publisher" value={product.publisher} />
+                      <LabeledRow label="Publisher" value={displayPublisher(product.publisher)} />
                     </div>
                   )}
                   {product.releaseDate && (
@@ -850,7 +854,7 @@ export default async function ProductPage(
                     <h2 className="text-xl font-semibold text-[#0A0A0A] mb-3">
                       {isCollectedEdition
                         ? 'You might also like'
-                        : (product.publisher ? `More from ${product.publisher}` : 'You might also like')}
+                        : (displayPublisher(product.publisher) ? `More from ${displayPublisher(product.publisher)}` : 'You might also like')}
                     </h2>
                     <div className="grid grid-cols-2 md:grid-cols-1 gap-3">
                       {related.slice(0, 4).map(r => (
@@ -986,7 +990,7 @@ function RelatedCard({ r }: {
         </p>
         <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-[0.1em] font-medium">
           {fmt}
-          {r.publisher && <span> · {r.publisher}</span>}
+          {displayPublisher(r.publisher) && <span> · {displayPublisher(r.publisher)}</span>}
         </p>
       </div>
     </Link>

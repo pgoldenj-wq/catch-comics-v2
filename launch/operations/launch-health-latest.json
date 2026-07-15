@@ -1,50 +1,57 @@
 {
   "version": 1,
-  "generatedAt": "2026-07-13T21:59:27.915Z",
+  "generatedAt": "2026-07-15T14:52:34.738Z",
   "source": "read-only Postgres queries (scripts/launch-health.ts)",
   "catalogue": {
-    "liveProducts": 82306,
-    "coverR2": 24597,
-    "coverNone": 52825,
-    "coverR2Pct": 29.9,
-    "formatKnownPct": 14.1,
-    "cvMatched": 9899,
-    "cvMatchedPct": 12,
-    "described": 26673,
-    "withCreators": 9025,
+    "liveProducts": 84499,
+    "coverR2": 24680,
+    "coverNone": 54695,
+    "coverR2Pct": 29.2,
+    "formatKnownPct": 13.8,
+    "cvMatched": 9913,
+    "cvMatchedPct": 11.7,
+    "described": 27208,
+    "withCreators": 9037,
     "suspectFlagged": 4
   },
   "pricing": {
-    "pricedListings": 47780,
-    "fresh7d": 8355,
-    "aged7to30d": 39021,
-    "stale30dPlus": 404,
-    "stalePct": 0.85,
-    "inStock": 40410,
-    "outOfStock": 7370,
-    "productsPriced": 36881,
+    "pricedListings": 46002,
+    "fresh7d": 9838,
+    "aged7to30d": 35055,
+    "stale30dPlus": 1109,
+    "stalePct": 2.41,
+    "inStock": 37929,
+    "outOfStock": 8073,
+    "productsPriced": 35088,
     "comparisonDepth": {
-      "oneRetailer": 36796,
-      "twoPlusRetailers": 86
+      "oneRetailer": 34891,
+      "twoPlusRetailers": 198
     },
+    "comparisonOverlapPct": 0.56,
     "retailers": [
       {
         "name": "World of Books",
-        "listings": 41701,
-        "fresh30d": 41297,
-        "lastSeen": "2026-07-13"
+        "listings": 39306,
+        "fresh30d": 38197,
+        "lastSeen": "2026-07-15"
       },
       {
         "name": "Lets Buy Books",
-        "listings": 3476,
-        "fresh30d": 3476,
-        "lastSeen": "2026-07-13"
+        "listings": 3513,
+        "fresh30d": 3513,
+        "lastSeen": "2026-07-15"
       },
       {
         "name": "Travelling Man",
-        "listings": 2282,
-        "fresh30d": 2282,
-        "lastSeen": "2026-07-13"
+        "listings": 2311,
+        "fresh30d": 2311,
+        "lastSeen": "2026-07-15"
+      },
+      {
+        "name": "Bookshop.org (UK)",
+        "listings": 551,
+        "fresh30d": 551,
+        "lastSeen": "2026-07-15"
       },
       {
         "name": "Amazon UK",
@@ -53,6 +60,24 @@
         "lastSeen": "2026-06-26"
       }
     ]
+  },
+  "wave4": {
+    "priceHistory": {
+      "totalObservations": 476250,
+      "oldest": "2026-05-11",
+      "newest": "2026-07-15",
+      "productsEligibleForChart": 2351
+    },
+    "metadata": {
+      "distributorAsPublisher": 175,
+      "cvMatchedNoCreators": 876,
+      "note": "distributorAsPublisher rows are omitted at display via lib/identity/publisher.displayPublisher — DB unchanged. Full breakdown: npm run audit:metadata"
+    },
+    "issueCovers": {
+      "storedToR2Sampled": 22,
+      "volumesIngested": 1,
+      "note": "Validated issue covers on R2 (issue-covers/cv-{id}.webp). Bounded sample only — no full migration. Run: npm run ingest:issue-covers -- --volume <cvVolumeId> --write"
+    }
   },
   "amazon": {
     "mode": "AFFILIATE_ONLY_STORED_OFFERS",
@@ -66,13 +91,13 @@
     "allVisibleRowsGoStaleBy": "2026-07-26",
     "note": "No action required. Amazon data coverage will decline as stored listings expire. This is intentional and honest until a compliant replacement (Amazon Creators API when eligible) is approved. See launch/operations/amazon-post-rainforest-plan.md."
   },
-  "previousSnapshotAt": "2026-07-13T19:55:26.653Z",
+  "previousSnapshotAt": "2026-07-15T10:42:00.846Z",
   "deltas": {
-    "liveProducts": 0,
-    "coverR2": 0,
-    "cvMatched": 0,
-    "pricedListings": 0,
-    "stale30dPlus": 13,
-    "productsPriced": 0
+    "liveProducts": 178,
+    "coverR2": 4,
+    "cvMatched": 2,
+    "pricedListings": 772,
+    "stale30dPlus": 19,
+    "productsPriced": 593
   }
 }

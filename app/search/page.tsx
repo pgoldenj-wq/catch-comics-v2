@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import MobileHeader from '@/components/MobileHeader'
 import Navbar       from '@/components/Navbar'
 import { isBadCoverUrl, adjustImgSrc } from '@/lib/images/url-filters'
+import { displayPublisher } from '@/lib/identity/publisher'
 
 // ─── PriceTag — live "From £X.XX" badge per result card ──────────────────────
 // LB-3: hints are ISBN-keyed only. Title-string eBay searches produced
@@ -1044,11 +1045,14 @@ function SearchResults() {
                           guessed from the title. */}
                       {(() => {
                         const formatUnknown = comic.source === 'canonical' && comic.dbFormat === 'OTHER'
+                        // W4 Phase 6: omit distributor/retailer names from the
+                        // publisher slot — don't present a distributor as publisher.
+                        const pub = displayPublisher(comic.publisher?.name)
                         const eyebrow = isIsbnResult
                           ? 'ISBN MATCH'
                           : formatUnknown
-                            ? (comic.publisher?.name ?? '')
-                            : `${FORMAT_LABELS[fmt]}${comic.publisher?.name ? ` · ${comic.publisher.name}` : ''}`
+                            ? (pub ?? '')
+                            : `${FORMAT_LABELS[fmt]}${pub ? ` · ${pub}` : ''}`
                         if (!eyebrow) return null
                         return (
                           <span style={{

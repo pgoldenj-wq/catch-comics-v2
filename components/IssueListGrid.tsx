@@ -108,7 +108,14 @@ export default function IssueListGrid({
         {issues.map(issue => {
           const isCurrent = currentIssueId != null && String(issue.id) === String(currentIssueId)
           const rawCover  = issue.image?.medium_url || issue.image?.small_url || ''
-          const cover     = rawCover && !isBadCoverUrl(rawCover) ? rawCover : ''
+          const cvCover   = rawCover && !isBadCoverUrl(rawCover) ? rawCover : ''
+          // Wave 4: prefer the validated R2 copy (issue-covers/cv-{id}.webp,
+          // ingested by scripts/ingest-issue-covers.ts). The key is derived
+          // from the SAME CV issue id this card renders, so identity is
+          // structural. Not yet ingested → onError falls back to the CV
+          // hotlink; that failing too → the honest #N tile shows through.
+          const r2Cover   = `https://images.catchcomics.com/issue-covers/cv-${issue.id}.webp`
+          const cover     = cvCover ? r2Cover : ''
           const number    = issue.issue_number || '?'
           const cardLabel = `Issue #${number}`
           return (
@@ -141,7 +148,13 @@ export default function IssueListGrid({
                         const img = e.currentTarget
                         if (img.naturalWidth <= 1 || img.naturalHeight <= 1) img.style.display = 'none'
                       }}
-                      onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+                      onError={e => {
+                        const img = e.currentTarget as HTMLImageElement
+                        // R2 copy missing (not yet ingested) → try the CV
+                        // hotlink once; if that also fails, hide → #N tile.
+                        if (cvCover && img.src !== cvCover) { img.src = cvCover; return }
+                        img.style.display = 'none'
+                      }}
                     />
                   )}
               </div>

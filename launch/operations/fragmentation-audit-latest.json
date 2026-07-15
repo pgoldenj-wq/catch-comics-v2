@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "generatedAt": "2026-07-15T10:53:34.220Z",
+  "source": "read-only Postgres queries (scripts/audit-edition-fragmentation.ts)",
+  "sameRetailerDuplicates": {
+    "groups": 19,
+    "sample": [
+      {
+        "canonical_product_id": null,
+        "retailer": "World of Books",
+        "rows": 10555
+      },
+      {
+        "canonical_product_id": null,
+        "retailer": "Travelling Man",
+        "rows": 97
+      },
+      {
+        "canonical_product_id": null,
+        "retailer": "Lets Buy Books",
+        "rows": 6
+      },
+      {
+        "canonical_product_id": "e003e50f-b1be-4bff-875b-d737fcd2f9df",
+        "retailer": "Travelling Man",
+        "rows": 2
+      },
+      {
+        "canonical_product_id": "ceafeea3-6c97-4799-84a2-9fe352342712",
+        "retailer": "Lets Buy Books",
+        "rows": 2
+      },
+      {
+        "canonical_product_id": "39926eb2-ef89-4671-b4d6-e29dc2438a9b",
+        "retailer": "Lets Buy Books",
+        "rows": 2
+      },
+      {
+        "canonical_product_id": "4b04242a-cb84-48bb-9aa6-2a8fd2769d9c",
+        "retailer": "Lets Buy Books",
+        "rows": 2
+      },
+      {
+        "canonical_product_id": "4a81b007-138d-44f8-a0c0-d3406382bd91",
+        "retailer": "Lets Buy Books",
+        "rows": 2
+      },
+      {
+        "canonical_product_id": "394d44d3-bd7d-4c6c-beda-0275c72b91d1",
+        "retailer": "Lets Buy Books",
+        "rows": 2
+      },
+      {
+        "canonical_product_id": "9365d842-7636-4f70-b7b0-eb4e0f6abe9f",
+        "retailer": "Lets Buy Books",
+        "rows": 2
+      }
+    ],
+    "note": "one product + one retailer with >1 active priced row — inflates apparent coverage"
+  },
+  "editionFamilies": {
+    "families": 2806,
+    "memberIsbns": 6962,
+    "note": "same normalised title, 2+ ISBNs — REAL editions; presentation-grouping opportunity, never auto-merge"
+  },
+  "mergeCandidates": {
+    "count": 0,
+    "sample": [],
+    "note": "ISBN-less canonical matching an ISBN-bearing one on title+format. Report-only; any merge needs human review + editionMatchVerdict"
+  },
+  "weakIdentityPricedListings": {
+    "listings": 0,
+    "products": 0,
+    "note": "priced listings on products with no ISBN — cannot participate in ISBN-keyed comparison"
+  }
+}
