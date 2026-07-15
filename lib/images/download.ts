@@ -207,6 +207,77 @@ export async function downloadAndStoreCover(
   }
 }
 
+// ── Issue covers (Wave 4 Phase 5) ────────────────────────────────────────────
+//
+// Issue-grid artwork was hotlinked from comicvine.gamespot.com — fragile in
+// several environments. Validated copies now live on R2 under a DETERMINISTIC
+// key derived from the ComicVine issue id, so identity is structural: the UI
+// derives the same key from the same issue id it renders, and no DB column is
+// needed. Validation mirrors the product-cover path (content-type, size,
+// dimensions, placeholder-hash guard); kept as its own lean function rather
+// than refactoring the battle-tested product path during launch week.
+
+/** R2 object key for a ComicVine issue's cover. Deterministic from identity. */
+export function issueCoverR2Key(cvIssueId: string | number): string {
+  return `issue-covers/cv-${cvIssueId}.webp`
+}
+
+export type IssueCoverResult =
+  | { stored: string }          // R2 public URL
+  | { rejected: string }        // human-readable reason — nothing written
+
+/**
+ * Download, validate and store one issue cover at issue-covers/cv-{id}.webp.
+ * Never throws; never writes to the database; never overwrites silently
+ * (caller decides whether an existing object should be skipped).
+ */
+export async function downloadAndStoreIssueCover(
+  cvIssueId: string | number,
+  sourceUrl: string,
+): Promise<IssueCoverResult> {
+  try {
+    const fetchUrl = upgradeComicVineUrl(sourceUrl)
+    const res = await fetch(fetchUrl, {
+      signal:  AbortSignal.timeout(TIMEOUT_MS),
+      headers: { ...BROWSER_HEADERS, 'Referer': refererFor(fetchUrl) },
+    })
+    if (!res.ok) return { rejected: `http-${res.status}` }
+
+    const contentType = res.headers.get('content-type') ?? ''
+    if (!contentType.startsWith('image/') && contentType !== 'application/octet-stream')
+      return { rejected: `non-image-content-type: ${contentType || 'none'}` }
+
+    const buffer = Buffer.from(await res.arrayBuffer())
+    if (buffer.byteLength > MAX_BYTES) return { rejected: 'too-large' }
+    // HTML error pages sometimes arrive as octet-stream — sharp rejects them,
+    // but catch the obvious case cheaply first.
+    if (buffer.subarray(0, 200).toString('utf8').toLowerCase().includes('<html'))
+      return { rejected: 'html-error-page' }
+
+    let meta
+    try { meta = await sharp(buffer).metadata() } catch { return { rejected: 'not-decodable' } }
+    const { width = 0, height = 0 } = meta
+    if (width < 100 || height < 100) return { rejected: `too-small: ${width}x${height}` }
+    if (height / width < 0.9) return { rejected: `not-portrait: ${width}x${height}` }
+
+    const processed = await sharp(buffer)
+      .resize(600, undefined, { fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: WEBP_Q })
+      .toBuffer()
+
+    const sig = crypto.createHash('sha256').update(processed).digest('hex').slice(0, 16)
+    if (PLACEHOLDER_HASHES.has(sig)) return { rejected: `known-placeholder: ${sig}` }
+
+    const key = issueCoverR2Key(cvIssueId)
+    await r2Client.send(new PutObjectCommand({
+      Bucket: R2_BUCKET, Key: key, Body: processed, ContentType: 'image/webp',
+    }))
+    return { stored: `${R2_PUBLIC_URL}/${key}` }
+  } catch (err) {
+    return { rejected: `error: ${err instanceof Error ? err.message : String(err)}` }
+  }
+}
+
 // ── Fallback chain ────────────────────────────────────────────────────────────
 //
 // downloadAndStoreCoverWithFallback() tries multiple sources in priority order.

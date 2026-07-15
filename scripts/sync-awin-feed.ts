@@ -33,6 +33,11 @@ import { StockStatus, MatchMethod, ListingCondition } from '@prisma/client'
 const argv     = process.argv.slice(2)
 const WRITE    = argv.includes('--write')
 const DRY      = !WRITE
+// Wave 4: match-only mode. Prices attach ONLY to canonicals that already
+// exist (ISBN-13 exact) — no stub-product creation from a general bookstore
+// feed. This is the trust-first default for first runs of a new merchant:
+// pure comparison-depth gain, zero catalogue-pollution risk.
+const NO_CREATE = argv.includes('--no-create')
 const limIdx   = argv.indexOf('--limit')
 const LIMIT    = limIdx !== -1 ? parseInt(argv[limIdx + 1] ?? '999999', 10) : 999_999
 const mIdx     = argv.indexOf('--merchant')
@@ -258,6 +263,7 @@ async function main() {
     // Match canonical — create new if missing and comics-relevant (write mode only)
     let canonicalId = await getCanonicalId(isbn13)
     if (!canonicalId) {
+      if (NO_CREATE) { stats.skippedNoMatch++; continue }
       const title = row['product_name'] ?? ''
       if (!isComicsRelated(title)) { stats.skippedNotComics++; continue }
       if (DRY) {
@@ -293,9 +299,14 @@ async function main() {
       // AWIN-wrapped (pclick.php) and would create a double-wrap if stored.
       const merchantUrl = row['merchant_deep_link'] || row['product_url'] || `https://${domain}/book/${isbn13}`
 
+      // Look up by the UNIQUE key (retailer_id, retailer_sku) — NOT filtered by
+      // deletedAt. A soft-deleted row still occupies the unique slot, so a
+      // create() would collide; the update branch below revives it (deletedAt:
+      // null + fresh price). Filtering deletedAt:null here missed those rows and
+      // caused 527/551 create() collisions on the first Bookshop run (Wave 4).
       const existing = await prisma.retailerListing.findFirst({
-        where: { retailerId: retailerId!, isbn13, deletedAt: null },
-        select: { id: true, priceAmount: true },
+        where: { retailerId: retailerId!, retailerSku: isbn13 },
+        select: { id: true, priceAmount: true, deletedAt: true },
       })
 
       if (existing) {

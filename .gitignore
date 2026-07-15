@@ -99,6 +99,7 @@ next-env.d.ts
 /scripts/verify-trim-prod.ts
 
 # CV enrichment checkpoints — local machine state, not source code
+/scripts/.issue-covers-checkpoint.json
 /scripts/.enrich-catalogue-checkpoint.json
 /scripts/.enrich-catalogue-checkpoint-w2.json
 /scripts/.backfill-covers-checkpoint.json

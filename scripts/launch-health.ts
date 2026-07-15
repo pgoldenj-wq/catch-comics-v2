@@ -94,7 +94,39 @@ async function main() {
     FROM retailer_listings l JOIN retailers r ON r.id = l.retailer_id
     WHERE r.name ILIKE '%amazon%' AND l.deleted_at IS NULL AND l.price_amount > 0`
 
+  // ── Wave 4: price-history depth + suspicious metadata ──────────────────────
+  const [ph] = await prisma.$queryRaw<Row[]>`
+    SELECT COUNT(*) AS total_obs,
+      MIN(recorded_at)::date::text AS oldest,
+      MAX(recorded_at)::date::text AS newest
+    FROM price_history`
+  const [phElig] = await prisma.$queryRaw<Row[]>`
+    SELECT COUNT(*) AS products FROM (
+      SELECT l.canonical_product_id
+      FROM price_history ph JOIN retailer_listings l ON l.id = ph.retailer_listing_id
+      WHERE l.deleted_at IS NULL
+      GROUP BY l.canonical_product_id
+      HAVING COUNT(DISTINCT ph.recorded_at::date) >= 2) t`
+  const [meta] = await prisma.$queryRaw<Row[]>`
+    SELECT
+      COUNT(*) FILTER (WHERE LOWER(publisher) LIKE ANY(ARRAY[
+        '%penguin random house nz%','%melia publishing%','%ingram%','%gardners%',
+        '%bertrams%','%turnaround%','%baker & taylor%','%nbn international%'])) AS distributor_as_publisher,
+      COUNT(*) FILTER (WHERE comicvine_id IS NOT NULL
+        AND (cv_metadata IS NULL OR NOT (cv_metadata ? 'creators')
+             OR jsonb_array_length(cv_metadata->'creators') = 0)) AS cv_no_creators
+    FROM canonical_products WHERE deleted_at IS NULL`
+
   await prisma.$disconnect()
+
+  // Issue-cover R2 sample from the ingest manifest (Wave 4 Phase 5).
+  let issueCoversStored = 0, issueCoverVolumes = 0
+  try {
+    const manifest = JSON.parse(readFileSync(join(OUT_DIR, 'issue-covers-manifest.json'), 'utf8'))
+    const vols = Object.values(manifest.volumes ?? {}) as Array<{ accepted?: number }>
+    issueCoverVolumes = vols.length
+    issueCoversStored = vols.reduce((s, v) => s + (v.accepted ?? 0), 0)
+  } catch { /* no manifest yet */ }
 
   const allStaleBy = amz.newest_seen
     ? new Date(new Date(String(amz.newest_seen)).getTime() + AMAZON_STALE_DAYS * 864e5).toISOString().slice(0, 10)
@@ -129,9 +161,30 @@ async function main() {
       outOfStock: n(price.out_of_stock),
       productsPriced: n(price.products_priced),
       comparisonDepth: { oneRetailer: one, twoPlusRetailers: twoPlus },
+      // Overlap % = share of priced products with a genuine 2+ retailer comparison.
+      comparisonOverlapPct: +(100 * twoPlus / Math.max(1, n(price.products_priced))).toFixed(2),
       retailers: retailers.map(r => ({
         name: String(r.name), listings: n(r.listings), fresh30d: n(r.fresh_30d), lastSeen: r.last_seen ?? null,
       })),
+    },
+    // ── Wave 4: catalogue-trust depth ────────────────────────────────────────
+    wave4: {
+      priceHistory: {
+        totalObservations: n(ph.total_obs),
+        oldest: ph.oldest ?? null,
+        newest: ph.newest ?? null,
+        productsEligibleForChart: n(phElig.products),  // 2+ distinct-day observations
+      },
+      metadata: {
+        distributorAsPublisher: n(meta.distributor_as_publisher),
+        cvMatchedNoCreators: n(meta.cv_no_creators),
+        note: 'distributorAsPublisher rows are omitted at display via lib/identity/publisher.displayPublisher — DB unchanged. Full breakdown: npm run audit:metadata',
+      },
+      issueCovers: {
+        storedToR2Sampled: issueCoversStored,
+        volumesIngested: issueCoverVolumes,
+        note: 'Validated issue covers on R2 (issue-covers/cv-{id}.webp). Bounded sample only — no full migration. Run: npm run ingest:issue-covers -- --volume <cvVolumeId> --write',
+      },
     },
     amazon: {
       // Rainforest retired 2026-07-13 (account closed). No live refresh source.
@@ -178,8 +231,13 @@ Source: ${d.source}. ${d.deltas ? `Deltas vs ${String(d.previousSnapshotAt).slic
 ## Pricing
 - Priced listings: **${d.pricing.pricedListings.toLocaleString()}**${delta('pricedListings')} · products priced: ${d.pricing.productsPriced.toLocaleString()}${delta('productsPriced')}
 - Freshness: ${d.pricing.fresh7d.toLocaleString()} <7d · ${d.pricing.aged7to30d.toLocaleString()} 7–30d · **${d.pricing.stale30dPlus.toLocaleString()} stale (${d.pricing.stalePct}%)**${delta('stale30dPlus')}
-- Comparison depth: ${d.pricing.comparisonDepth.oneRetailer.toLocaleString()} products @ 1 retailer · **${d.pricing.comparisonDepth.twoPlusRetailers} @ 2+**
+- Comparison depth: ${d.pricing.comparisonDepth.oneRetailer.toLocaleString()} products @ 1 retailer · **${d.pricing.comparisonDepth.twoPlusRetailers} @ 2+** (overlap ${d.pricing.comparisonOverlapPct}%)
 ${d.pricing.retailers.map(r => `- ${r.name}: ${r.listings.toLocaleString()} listings, ${r.fresh30d.toLocaleString()} fresh, last seen ${r.lastSeen}`).join('\n')}
+
+## Wave 4 — catalogue trust
+- Price history: **${d.wave4.priceHistory.totalObservations.toLocaleString()}** observations (${d.wave4.priceHistory.oldest} → ${d.wave4.priceHistory.newest}) · **${d.wave4.priceHistory.productsEligibleForChart.toLocaleString()} products eligible** for the Price History chart (2+ distinct-day observations)
+- Suspect metadata: **${d.wave4.metadata.distributorAsPublisher}** distributor-as-publisher (omitted at display) · ${d.wave4.metadata.cvMatchedNoCreators.toLocaleString()} CV-matched w/o creators
+- Issue covers on R2 (sampled): **${d.wave4.issueCovers.storedToR2Sampled}** across ${d.wave4.issueCovers.volumesIngested} volume(s)
 
 ## Amazon — AFFILIATE-ONLY / STORED OFFERS (informational, not a failure)
 - No live Amazon price refresh is active · no paid third-party Amazon API is configured (Rainforest retired 2026-07-13)
