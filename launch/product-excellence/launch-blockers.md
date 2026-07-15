@@ -48,11 +48,11 @@
 - **Fix (launch-sized):** rename to "Live prices" / "Popular this week"; drop the fabricated "-N%" strikethroughs from the static fallback; add a pinned-slugs curation list (12 crowd-pleaser series with R2 covers + live prices) that fills first, algorithmic fill after.
 - **Accept:** section title doesn't say "deals" unless a real reference price exists; founder approves the 12 pinned cards.
 
-## LB-8 · Amazon UK rows go stale on launch day
-- **Where:** data (321 listings, last sync 26 Jun; Rainforest key off in prod)
-- **Wrong:** all Amazon rows cross the 30-day stale threshold ~26 Jul and grey out simultaneously — on launch day.
-- **Fix:** founder decision, 5 minutes: (a) one approved Rainforest resync of the 321 (paid, ~$ small), or (b) soft-hide Amazon listings until an automated refresh exists. Either is honest; doing nothing looks broken.
-- **Accept:** on 26 Jul, no page shows a wall of greyed Amazon rows.
+## LB-8 · Amazon UK rows go stale on launch day — ✅ CLOSED 2026-07-13
+- **Decision:** Rainforest retired entirely (founder; account closed). Option (b) chosen and hardened: stale Amazon rows are *hidden* (not greyed) by the product-page filter and soft-deleted by the daily cleanup — no wall of grey rows is possible.
+- **Now:** Amazon is AFFILIATE-ONLY / STORED OFFERS. Coverage declines honestly as rows expire (all by 26 Jul). Launch health + Mission Control show this as an informational state.
+- **Future:** Amazon Creators API when eligible (10 qualifying sales/30d) — see `launch/operations/amazon-post-rainforest-plan.md`.
+- **Accept (met):** on 26 Jul, no page shows a wall of greyed Amazon rows.
 
 ---
 

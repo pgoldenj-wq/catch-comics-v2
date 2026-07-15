@@ -187,7 +187,6 @@ const OPS_ITEMS = [
   { id:'mailbox',   label:'hello@catchcomics.com live and monitored' },
   // Wave 3 founder-only checks — these cannot be automated honestly.
   { id:'phone-grid',    label:'Confirm issue-grid covers and tap behaviour on a physical phone (browser emulation is NOT this check)' },
-  { id:'amazon-decision', label:'Amazon staleness decision made (see Operations & health below — deadline shown there)' },
   { id:'gh-security',   label:'GitHub: enable secret scanning + push protection + Dependabot (Settings → Advanced Security)', href:'https://github.com/pgoldenj-wq/catch-comics-v2/settings/security_analysis' },
   { id:'vercel-spend',  label:'Vercel: enable Spend Management notifications (Team Settings → Billing → Spend Management)', href:'https://vercel.com/pgoldenj-wqs-projects/~/settings/billing' },
   { id:'finalgo',   label:'Final GO / NO-GO review completed' },
@@ -420,7 +419,8 @@ function render(){
     oh += `<div><strong>Data health</strong><span class="src"> · ${esc(g.source)} · ${age(g.generatedAt)} (npm run launch:health)</span>
       <div class="win" style="color:var(--ink2)">📦 ${c.liveProducts.toLocaleString()} products · covers ${c.coverR2Pct}% R2 · suspect-flagged ${c.suspectFlagged}</div>
       <div class="win" style="color:var(--ink2)">💷 ${p.pricedListings.toLocaleString()} priced listings · ${p.stale30dPlus.toLocaleString()} stale (${p.stalePct}%) · ${p.comparisonDepth.twoPlusRetailers} products with 2+ retailers</div>
-      <div class="win" style="color:${a.decisionRequiredBeforeLaunch?'var(--amber)':'var(--ink2)'}">🛒 Amazon: ${a.visibleOnSite} visible / ${a.suppressedAsStale} suppressed · all hidden by <strong>${esc(a.allVisibleRowsGoStaleBy||'n/a')}</strong>${a.decisionRequiredBeforeLaunch?' — <strong>DECISION REQUIRED</strong> (see checklist)':''}</div>
+      <div class="win" style="color:var(--ink2)">🛒 Amazon: <strong>AFFILIATE-ONLY / STORED OFFERS</strong> · ${a.visibleOnSite} visible / ${a.suppressedAsStale} suppressed · remaining rows hidden by <strong>${esc(a.allVisibleRowsGoStaleBy||'n/a')}</strong> · no live refresh, no paid Amazon API (Rainforest retired 13 Jul)</div>
+      <div class="win" style="color:var(--ink3)">🛒 No action required now. Amazon data coverage will decline as stored listings expire. This is intentional and honest until a compliant replacement (Amazon Creators API when eligible) is approved.</div>
       ${g.deltas ? `<div class="win" style="color:var(--ink3)">Δ since ${esc(String(g.previousSnapshotAt).slice(0,10))}: products ${g.deltas.liveProducts>=0?'+':''}${g.deltas.liveProducts} · priced ${g.deltas.pricedListings>=0?'+':''}${g.deltas.pricedListings} · stale ${g.deltas.stale30dPlus>=0?'+':''}${g.deltas.stale30dPlus}</div>` : `<div class="win" style="color:var(--ink3)">No prior snapshot for deltas yet.</div>`}
     </div>`;
   } else oh += `<div><strong style="color:var(--ink3)">Data health: unavailable</strong>

@@ -65,20 +65,15 @@ Last updated: 2026-05-20
   ```
 
 ### Amazon UK (amazon.co.uk)
-- **DB listings**: ~93 priced (barely started)
-- **Commission**: ✅ LIVE — Associates tag `catchcomics-21`
-- **Feed**: Via Rainforest API (~$0.001/call, GTIN lookup)
-- **Action**: 🔧 Run enrichment:
-  ```
-  npm run enrich:amazon -- --write --limit 2000
-  ```
-  (~3.5h, ~$2, ~940 expected hits from TM-linked ISBNs)
-- **Notes**: Full run = ~9,100 ISBNs, ~$9, ~16h. TTL=6h auto-refreshes stale.
+- **DB listings**: 321 priced (stored; last observed 20–26 Jun 2026; age out honestly under the 30-day rule)
+- **Commission**: ✅ LIVE — Associates tag `catchcomics-21` (applied at /go click time)
+- **Feed**: ❌ NONE — Rainforest RETIRED 2026-07-13 (account closed). `npm run enrich:amazon` now refuses with an explanation. Do not restore Rainforest or add any paid Amazon API without founder approval.
+- **Status**: AFFILIATE-ONLY / STORED OFFERS — check with `npm run amazon:status`.
+- **Future**: Amazon Creators API when eligible (10 qualifying sales in trailing 30 days) — see `launch/operations/amazon-post-rainforest-plan.md`. Also investigate the Awin "Amazon Sellers Programme UK" feed (JOINED).
 
 ### Amazon US (amazon.com)
 - **DB listings**: None
-- **Commission**: ❌ BUG — NEXT_PUBLIC_AMAZON_US_ASSOCIATE_TAG is set to `catchcomics-21` (UK tag)
-- **Action**: 🔧 Blank out in Vercel env vars until real US Associates tag obtained
+- **Commission**: ❌ BUG — NEXT_PUBLIC_AMAZON_US_ASSOCIATE_TAG was set to `catchcomics-21` (UK tag). Blanked locally 2026-07-13; **founder: blank it in Vercel too**. Do not invent a US tag — untagged US links are correct until a real US Associates tag exists.
 
 ### eBay (ebay.co.uk)
 - **DB listings**: Dynamic (API)
@@ -114,9 +109,9 @@ Last updated: 2026-05-20
 2. **Re-apply World of Books AWIN** — 1 click in Rejected tab (43,677 listings at stake)
 3. **Run Bookshop feed** — `npm run sync:awin -- --merchant bookshop --write`
 4. **Run Lets Buy Books feed** — `npm run sync:awin -- --merchant letsbuybooks --write`
-5. **Run Amazon enrichment** — `npm run enrich:amazon -- --write --limit 2000`
+5. ~~**Run Amazon enrichment**~~ — RETIRED 2026-07-13 (Rainforest gone; Amazon is affiliate-only until Creators API eligibility)
 6. **Chase MusicMagpie AWIN** — email AWIN account manager
-7. **Fix Amazon US tag bug** — blank out in Vercel env vars
+7. **Fix Amazon US tag bug** — blanked in .env.local 2026-07-13; still to blank in Vercel env vars
 8. **Email Travelling Man** — direct affiliate arrangement
 9. **Add rel="sponsored"** to eBay links
 10. **Investigate Amazon Sellers Programme UK feed** — AWIN JOINED + product feed YES
@@ -129,9 +124,9 @@ Last updated: 2026-05-20
 |---|---|---|
 | `AWIN_DATAFEED_KEY` | sync-awin-feed.ts | ⚠️ May be wrong — getting 400 |
 | `AWIN_PUBLISHER_ID` | lib/affiliate.ts | Set: 2888331 |
-| `RAINFOREST_API_KEY` | amazon-rainforest.ts | Set |
+| ~~`RAINFOREST_API_KEY`~~ | (no references — code removed) | RETIRED 2026-07-13; never re-add |
 | `NEXT_PUBLIC_AMAZON_UK_ASSOCIATE_TAG` | lib/amazon.ts callers | Set: catchcomics-21 |
-| `NEXT_PUBLIC_AMAZON_US_ASSOCIATE_TAG` | lib/amazon.ts callers | ❌ BUG: set to UK tag |
+| `NEXT_PUBLIC_AMAZON_US_ASSOCIATE_TAG` | lib/amazon.ts callers | Blank locally (was UK tag by mistake); blank in Vercel too |
 | `EBAY_CAMPAIGN_ID` | lib/ebay.ts | Set: 5339151767 |
 | `NEXT_PUBLIC_FORBIDDEN_PLANET_AFFILIATE_CODE` | PricingPanel.tsx | Set — unverified |
 | `DATABASE_URL` | lib/prisma.ts | Set |

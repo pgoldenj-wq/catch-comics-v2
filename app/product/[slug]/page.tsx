@@ -29,7 +29,6 @@ import { Suspense }             from 'react'
 import { prisma }               from '@/lib/prisma'
 import OffersTable, { type OfferRow }    from '@/components/OffersTable'
 import PriceSparkline, { type SparkPoint } from '@/components/PriceSparkline'
-import { lookupByIsbn as lookupAmazon }  from '@/lib/adapters/amazon-rainforest'
 import Navbar                            from '@/components/Navbar'
 import CVCharacterTags                   from '@/components/CVCharacterTags'
 import CVCoverImage                      from '@/components/CVCoverImage'
@@ -40,10 +39,10 @@ import { seriesNameToSlug, getSeriesEntry } from '@/lib/series/registry'
 import { jsonLdScriptString }               from '@/lib/security/jsonLd'
 
 // ISR: cache each product page for 1 hour, then regenerate in the background.
-// Switched from force-dynamic (which hit the DB on every request) now that the
-// on-demand Rainforest lookup is effectively disabled (key not set). Price data
-// updates via AWIN feed syncs and the Wordery enrichment script, which run
-// externally — 1h staleness is acceptable and dramatically reduces DB load.
+// Switched from force-dynamic (which hit the DB on every request) — there is no
+// per-request external lookup on this page (Rainforest retired 2026-07-13).
+// Price data updates via AWIN feed syncs and the Wordery enrichment script,
+// which run externally — 1h staleness is acceptable and reduces DB load.
 export const revalidate = 3600
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -89,13 +88,12 @@ async function getProduct(slug: string) {
           // the /go/[id] affiliate redirect still works, but they should not
           // appear in the price-comparison table.
           priceAmount: { gt: 0 },
-          // LB-8 (2026-07-12): Amazon listings have no automated refresh path
-          // while the Rainforest key is off in prod, so past the 30-day
-          // freshness threshold they are hidden rather than shown greyed-out —
-          // a wall of "(stale)" Amazon rows misleads more than it informs.
-          // Other retailers keep the existing stale-label treatment: their
-          // feeds refresh daily, so stale rows there are rare and honest.
-          // /go redirects for existing Amazon listing ids still work.
+          // LB-8 (closed 2026-07-13): Amazon has NO live refresh source — the
+          // Rainforest integration was retired and the account closed. Past the
+          // 30-day freshness threshold Amazon rows are hidden rather than shown
+          // greyed-out — a wall of "(stale)" Amazon rows misleads more than it
+          // informs. Other retailers keep the existing stale-label treatment:
+          // their feeds refresh daily, so stale rows there are rare and honest.
           NOT: {
             AND: [
               { retailer:   { name: { contains: 'amazon', mode: 'insensitive' } } },
@@ -394,25 +392,10 @@ export default async function ProductPage(
       : Promise.resolve(null),
   ])
 
-  // ── Amazon on-demand lookup (non-blocking, 800 ms budget) ────────────────
-  // Only attempted for canonical products with an ISBN-13.
-  // Promise.race: if Rainforest resolves within 800ms include the offer in the
-  // initial SSR render; otherwise the page renders without it (graceful skip).
-  // The TTL check inside lookupByIsbn means a DB-cached result (~1ms) almost
-  // always wins the race; a live API call may not.
-  let amazonOffer: Awaited<ReturnType<typeof lookupAmazon>> = null
-  if (product.isbn13) {
-    try {
-      amazonOffer = await Promise.race([
-        lookupAmazon(product.isbn13, product.id, 'amazon.co.uk'),
-        new Promise<null>(resolve => setTimeout(() => resolve(null), 800)),
-      ])
-    } catch (err) {
-      // RainforestQuotaError (402) or other transient failures — skip gracefully.
-      // The page renders without an Amazon offer rather than crashing.
-      console.warn('[product] Amazon lookup failed for ISBN', product.isbn13, err instanceof Error ? err.message : err)
-    }
-  }
+  // Amazon offers render from stored listings only (via getProduct above).
+  // There is NO live Amazon price lookup: the Rainforest integration was
+  // retired on 2026-07-13 (account closed). Stored Amazon rows age out under
+  // the 30-day freshness rules. See launch/operations/amazon-post-rainforest-plan.md.
 
   // ── Offer processing ─────────────────────────────────────────────────────
   const IN_STOCK_STATUSES = new Set(['IN_STOCK', 'LOW_STOCK', 'PREORDER'])
@@ -420,30 +403,6 @@ export default async function ProductPage(
 
   // Best offer = cheapest in-stock listing across all conditions
   const bestListing = allListings.find(l => IN_STOCK_STATUSES.has(l.stockStatus))
-
-  // Merge Amazon offer into listings if it's not already present (fromCache=true
-  // means it was already in allListings via the DB fetch above).
-  if (amazonOffer && !amazonOffer.fromCache) {
-    const alreadyPresent = allListings.some(l => l.id === amazonOffer!.listingId)
-    if (!alreadyPresent) {
-      // Re-query to get the freshly upserted listing in the same shape.
-      // Guard deletedAt: a listing soft-deleted between upsert and here should
-      // not be surfaced to the user.
-      const freshAmazon = await prisma.retailerListing.findFirst({
-        where  : { id: amazonOffer.listingId, deletedAt: null },
-        include: {
-          retailer    : { select: { name: true, trustScore: true, affiliateNetwork: true, affiliateId: true } },
-          priceHistory: { orderBy: { recordedAt: 'asc' }, take: 90, select: { priceAmount: true, priceCurrency: true, recordedAt: true } },
-        },
-      })
-      if (freshAmazon) {
-        // Insert sorted by price (allListings is already price-sorted)
-        const insertAt = allListings.findIndex(l => Number(l.priceAmount) > Number(freshAmazon.priceAmount))
-        if (insertAt === -1) allListings.push(freshAmazon as typeof allListings[0])
-        else                 allListings.splice(insertAt, 0, freshAmazon as typeof allListings[0])
-      }
-    }
-  }
 
   // All offers for the table (in-stock first, then OOS)
   const offers: OfferRow[] = allListings.map(l => ({
