@@ -1,11 +1,11 @@
 {
   "version": 1,
-  "generatedAt": "2026-07-15T14:52:34.738Z",
+  "generatedAt": "2026-07-15T15:12:25.126Z",
   "source": "read-only Postgres queries (scripts/launch-health.ts)",
   "catalogue": {
-    "liveProducts": 84499,
+    "liveProducts": 84503,
     "coverR2": 24680,
-    "coverNone": 54695,
+    "coverNone": 54699,
     "coverR2Pct": 29.2,
     "formatKnownPct": 13.8,
     "cvMatched": 9913,
@@ -15,24 +15,24 @@
     "suspectFlagged": 4
   },
   "pricing": {
-    "pricedListings": 46002,
-    "fresh7d": 9838,
-    "aged7to30d": 35055,
-    "stale30dPlus": 1109,
-    "stalePct": 2.41,
-    "inStock": 37929,
-    "outOfStock": 8073,
-    "productsPriced": 35088,
+    "pricedListings": 46006,
+    "fresh7d": 9842,
+    "aged7to30d": 35052,
+    "stale30dPlus": 1112,
+    "stalePct": 2.42,
+    "inStock": 37619,
+    "outOfStock": 8387,
+    "productsPriced": 35092,
     "comparisonDepth": {
-      "oneRetailer": 34891,
+      "oneRetailer": 34895,
       "twoPlusRetailers": 198
     },
     "comparisonOverlapPct": 0.56,
     "retailers": [
       {
         "name": "World of Books",
-        "listings": 39306,
-        "fresh30d": 38197,
+        "listings": 39310,
+        "fresh30d": 38198,
         "lastSeen": "2026-07-15"
       },
       {
@@ -63,10 +63,10 @@
   },
   "wave4": {
     "priceHistory": {
-      "totalObservations": 476250,
+      "totalObservations": 476405,
       "oldest": "2026-05-11",
       "newest": "2026-07-15",
-      "productsEligibleForChart": 2351
+      "productsEligibleForChart": 2
     },
     "metadata": {
       "distributorAsPublisher": 175,
@@ -91,13 +91,13 @@
     "allVisibleRowsGoStaleBy": "2026-07-26",
     "note": "No action required. Amazon data coverage will decline as stored listings expire. This is intentional and honest until a compliant replacement (Amazon Creators API when eligible) is approved. See launch/operations/amazon-post-rainforest-plan.md."
   },
-  "previousSnapshotAt": "2026-07-15T10:42:00.846Z",
+  "previousSnapshotAt": "2026-07-15T15:11:17.198Z",
   "deltas": {
-    "liveProducts": 178,
-    "coverR2": 4,
-    "cvMatched": 2,
-    "pricedListings": 772,
-    "stale30dPlus": 19,
-    "productsPriced": 593
+    "liveProducts": 0,
+    "coverR2": 0,
+    "cvMatched": 0,
+    "pricedListings": 0,
+    "stale30dPlus": 1,
+    "productsPriced": 0
   }
 }

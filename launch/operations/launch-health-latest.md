@@ -1,25 +1,25 @@
-# Launch Health — 2026-07-15 14:52 UTC
+# Launch Health — 2026-07-15 15:12 UTC
 
 Source: read-only Postgres queries (scripts/launch-health.ts). Deltas vs 2026-07-15.
 
 ## Catalogue
-- Live products: **84,499** (+178 since 2026-07-15)
-- R2 covers: **24,680 (29.2%)** (+4 since 2026-07-15) · no cover: 54,695
-- Format known: 13.8% · CV-matched: 9,913 (11.7%) (+2 since 2026-07-15)
+- Live products: **84,503** (+0 since 2026-07-15)
+- R2 covers: **24,680 (29.2%)** (+0 since 2026-07-15) · no cover: 54,699
+- Format known: 13.8% · CV-matched: 9,913 (11.7%) (+0 since 2026-07-15)
 - Descriptions: 27,208 · creators: 9,037 · **suspect-flagged: 4**
 
 ## Pricing
-- Priced listings: **46,002** (+772 since 2026-07-15) · products priced: 35,088 (+593 since 2026-07-15)
-- Freshness: 9,838 <7d · 35,055 7–30d · **1,109 stale (2.41%)** (+19 since 2026-07-15)
-- Comparison depth: 34,891 products @ 1 retailer · **198 @ 2+** (overlap 0.56%)
-- World of Books: 39,306 listings, 38,197 fresh, last seen 2026-07-15
+- Priced listings: **46,006** (+0 since 2026-07-15) · products priced: 35,092 (+0 since 2026-07-15)
+- Freshness: 9,842 <7d · 35,052 7–30d · **1,112 stale (2.42%)** (+1 since 2026-07-15)
+- Comparison depth: 34,895 products @ 1 retailer · **198 @ 2+** (overlap 0.56%)
+- World of Books: 39,310 listings, 38,198 fresh, last seen 2026-07-15
 - Lets Buy Books: 3,513 listings, 3,513 fresh, last seen 2026-07-15
 - Travelling Man: 2,311 listings, 2,311 fresh, last seen 2026-07-15
 - Bookshop.org (UK): 551 listings, 551 fresh, last seen 2026-07-15
 - Amazon UK: 321 listings, 321 fresh, last seen 2026-06-26
 
 ## Wave 4 — catalogue trust
-- Price history: **476,250** observations (2026-05-11 → 2026-07-15) · **2,351 products eligible** for the Price History chart (2+ distinct-day observations)
+- Price history: **476,405** observations (2026-05-11 → 2026-07-15) · **2 products eligible** for the Price History chart (7+ distinct-day observations — matches the UI MIN_POINTS gate)
 - Suspect metadata: **175** distributor-as-publisher (omitted at display) · 876 CV-matched w/o creators
 - Issue covers on R2 (sampled): **22** across 1 volume(s)
 

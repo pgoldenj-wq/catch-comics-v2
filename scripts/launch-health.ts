@@ -100,13 +100,16 @@ async function main() {
       MIN(recorded_at)::date::text AS oldest,
       MAX(recorded_at)::date::text AS newest
     FROM price_history`
+  // Chart eligibility must match the UI: PriceSparkline draws only at 7+ daily
+  // points (components/PriceSparkline MIN_POINTS), and sparkPoints are daily-min
+  // buckets — so eligibility = 7+ distinct observation days.
   const [phElig] = await prisma.$queryRaw<Row[]>`
     SELECT COUNT(*) AS products FROM (
       SELECT l.canonical_product_id
       FROM price_history ph JOIN retailer_listings l ON l.id = ph.retailer_listing_id
       WHERE l.deleted_at IS NULL
       GROUP BY l.canonical_product_id
-      HAVING COUNT(DISTINCT ph.recorded_at::date) >= 2) t`
+      HAVING COUNT(DISTINCT ph.recorded_at::date) >= 7) t`
   const [meta] = await prisma.$queryRaw<Row[]>`
     SELECT
       COUNT(*) FILTER (WHERE LOWER(publisher) LIKE ANY(ARRAY[
@@ -235,7 +238,7 @@ Source: ${d.source}. ${d.deltas ? `Deltas vs ${String(d.previousSnapshotAt).slic
 ${d.pricing.retailers.map(r => `- ${r.name}: ${r.listings.toLocaleString()} listings, ${r.fresh30d.toLocaleString()} fresh, last seen ${r.lastSeen}`).join('\n')}
 
 ## Wave 4 — catalogue trust
-- Price history: **${d.wave4.priceHistory.totalObservations.toLocaleString()}** observations (${d.wave4.priceHistory.oldest} → ${d.wave4.priceHistory.newest}) · **${d.wave4.priceHistory.productsEligibleForChart.toLocaleString()} products eligible** for the Price History chart (2+ distinct-day observations)
+- Price history: **${d.wave4.priceHistory.totalObservations.toLocaleString()}** observations (${d.wave4.priceHistory.oldest} → ${d.wave4.priceHistory.newest}) · **${d.wave4.priceHistory.productsEligibleForChart.toLocaleString()} products eligible** for the Price History chart (7+ distinct-day observations — matches the UI MIN_POINTS gate)
 - Suspect metadata: **${d.wave4.metadata.distributorAsPublisher}** distributor-as-publisher (omitted at display) · ${d.wave4.metadata.cvMatchedNoCreators.toLocaleString()} CV-matched w/o creators
 - Issue covers on R2 (sampled): **${d.wave4.issueCovers.storedToR2Sampled}** across ${d.wave4.issueCovers.volumesIngested} volume(s)
 

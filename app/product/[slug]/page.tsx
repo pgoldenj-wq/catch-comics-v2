@@ -801,11 +801,13 @@ export default async function ProductPage(
                   </div>
                 )}
 
-                {/* W2-1: only rendered once real history exists (2+ daily
-                    points). An always-empty "not enough data" module on ~every
-                    page reads as a broken product; the component is preserved
-                    and reappears automatically as history accumulates. */}
-                {sparkPoints.length >= 2 && (
+                {/* W2-1 / W4: only render once PriceSparkline will actually draw
+                    a chart. Its internal threshold is MIN_POINTS = 7, so the gate
+                    must match — a >=2 gate let products with 2-6 points render the
+                    module and re-show "Not enough price history (N/7)", the exact
+                    always-empty panel W2-1 removed (regression surfaced in Wave 4
+                    once syncs pushed products into the 2-6 range). */}
+                {sparkPoints.length >= 7 && (
                   <div className="mt-10">
                     <h3 className="text-[11px] font-bold uppercase tracking-[0.14em] text-gray-400 mb-3">
                       Price History
