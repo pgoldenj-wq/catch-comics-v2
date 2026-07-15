@@ -5,7 +5,7 @@ Things only you can decide or do. Everything else is in `claude-fix-prompts.md` 
 ## Decisions needed (15 minutes total)
 
 1. **Approve the new hero line.** "The world's only comic price comparison" has to go (it's falsifiable and your own brand doc flags it). Pick the replacement — suggestion: **"Compare comic, graphic novel & manga prices across UK retailers."** The homepage is design-frozen, so this is your sign-off, not Claude's.
-2. **Amazon rows: refresh or hide?** All 321 Amazon UK prices were last checked 26 June and will all turn grey "(stale)" right around launch day. Either approve one paid Rainforest resync (~small cost, 321 calls) or tell Claude to hide Amazon rows until refresh is automated. Doing nothing looks broken on launch day.
+2. ~~**Amazon rows: refresh or hide?**~~ **DECIDED & DONE (13 July):** Rainforest retired, account closed. Amazon is affiliate-only; stored offers age out honestly under the 30-day rule (all hidden by 26 July — automatic, intentional, no wall of grey rows). No action required. Revisit Amazon Creators API eligibility after launch (needs 10 qualifying sales/30 days).
 3. **Pick the 12 pinned homepage cards.** The carousel currently ranks by what World of Books stocks deepest — which is how *"Asumi-chan is Interested in Lesbian Brothels!"* became your #2 storefront card. Give Claude 12 crowd-pleaser series (Saga, One Piece, AB, Invincible, Walking Dead, JJK, Naruto, Hellboy…) — it fills the rest algorithmically.
 4. **"Top deals" rename.** They're prices, not deals. Approve "Live prices" or "Popular this week".
 

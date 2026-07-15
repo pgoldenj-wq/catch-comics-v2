@@ -5,7 +5,7 @@ Rollback tag if everything burns: `PRE-MONSTER-MODE-LAUNCH-STABLE-2026-07-03` ·
 ## T-minus 3 days (Thu 23 July)
 
 - [ ] `git log origin/main -1` matches the deployed commit (`npx vercel ls catch-comics-v2` → latest Production Ready)
-- [ ] `npm run launch:health` — read the Amazon block. **Deadline: all 321 Amazon offers auto-hide by 26 July.** Decision made? (resync = ~321 paid Rainforest calls via `scripts/enrich-amazon-bulk.ts` + key; or accept they disappear)
+- [ ] `npm run launch:health` — Amazon block should read **AFFILIATE-ONLY / STORED OFFERS** (informational, not a failure). Stored Amazon offers auto-hide as they cross 30 days — intentional and honest; Rainforest retired 2026-07-13. No decision pending.
 - [ ] `npm run launch:smoke` — PASS
 - [ ] Mission Control: no red, ops checklist honest, countdown correct
 - [ ] Smoke Test V4: Homepage, Search, Product, Affiliate, Mobile pages green (includes the new Wave-3 checks)

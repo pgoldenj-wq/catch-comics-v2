@@ -99,8 +99,6 @@ async function main() {
   const allStaleBy = amz.newest_seen
     ? new Date(new Date(String(amz.newest_seen)).getTime() + AMAZON_STALE_DAYS * 864e5).toISOString().slice(0, 10)
     : null
-  const amazonDecisionRequired = n(amz.visible) > 0 && allStaleBy !== null
-    && new Date(allStaleBy) <= new Date('2026-08-02') // within launch week + buffer
 
   const one = n(depth.find(d => n(d.retailers) === 1)?.products)
   const twoPlus = depth.filter(d => n(d.retailers) >= 2).reduce((s, d) => s + n(d.products), 0)
@@ -136,6 +134,11 @@ async function main() {
       })),
     },
     amazon: {
+      // Rainforest retired 2026-07-13 (account closed). No live refresh source.
+      // Stored offers display while fresh and age out under the 30-day rule —
+      // intentional and honest. Informational state, never a system failure.
+      mode: 'AFFILIATE_ONLY_STORED_OFFERS',
+      liveRefreshSource: null,
       staleThresholdDays: AMAZON_STALE_DAYS,
       total: n(amz.total),
       visibleOnSite: n(amz.visible),
@@ -143,12 +146,7 @@ async function main() {
       oldestSeen: amz.oldest_seen ?? null,
       newestSeen: amz.newest_seen ?? null,
       allVisibleRowsGoStaleBy: allStaleBy,
-      decisionRequiredBeforeLaunch: amazonDecisionRequired,
-      recommendation: amazonDecisionRequired
-        ? `All ${n(amz.visible)} visible Amazon offers cross the ${AMAZON_STALE_DAYS}-day threshold by ${allStaleBy} and will be hidden automatically. Decide before launch: (a) one approved Rainforest resync of ~${n(amz.total)} ISBNs (paid, ~${n(amz.total)} calls via scripts/enrich-amazon-bulk.ts — requires RAINFOREST_API_KEY and explicit founder approval), or (b) accept that Amazon rows disappear (honest, zero cost).`
-        : n(amz.total) === 0
-          ? 'No priced Amazon listings — nothing to decide.'
-          : 'No imminent staleness deadline.',
+      note: 'No action required. Amazon data coverage will decline as stored listings expire. This is intentional and honest until a compliant replacement (Amazon Creators API when eligible) is approved. See launch/operations/amazon-post-rainforest-plan.md.',
     },
     previousSnapshotAt: previous?.generatedAt ?? null,
     deltas: previous ? {
@@ -183,11 +181,11 @@ Source: ${d.source}. ${d.deltas ? `Deltas vs ${String(d.previousSnapshotAt).slic
 - Comparison depth: ${d.pricing.comparisonDepth.oneRetailer.toLocaleString()} products @ 1 retailer · **${d.pricing.comparisonDepth.twoPlusRetailers} @ 2+**
 ${d.pricing.retailers.map(r => `- ${r.name}: ${r.listings.toLocaleString()} listings, ${r.fresh30d.toLocaleString()} fresh, last seen ${r.lastSeen}`).join('\n')}
 
-## Amazon staleness (30-day suppression live since Wave 1)
-- Listings: ${d.amazon.total} total · **${d.amazon.visibleOnSite} visible · ${d.amazon.suppressedAsStale} suppressed**
-- Last synced: ${d.amazon.oldestSeen} → ${d.amazon.newestSeen} · all visible rows hidden by: **${d.amazon.allVisibleRowsGoStaleBy ?? 'n/a'}**
-- Decision required before launch: **${d.amazon.decisionRequiredBeforeLaunch ? 'YES' : 'no'}**
-- ${d.amazon.recommendation}
+## Amazon — AFFILIATE-ONLY / STORED OFFERS (informational, not a failure)
+- No live Amazon price refresh is active · no paid third-party Amazon API is configured (Rainforest retired 2026-07-13)
+- Stored listings: ${d.amazon.total} total · **${d.amazon.visibleOnSite} visible · ${d.amazon.suppressedAsStale} suppressed as stale**
+- Observations: ${d.amazon.oldestSeen ?? 'n/a'} → ${d.amazon.newestSeen ?? 'n/a'} · remaining visible rows hidden by: **${d.amazon.allVisibleRowsGoStaleBy ?? 'n/a'}**
+- ${d.amazon.note}
 `
   writeFileSync(MD_PATH, md)
   console.log(md)

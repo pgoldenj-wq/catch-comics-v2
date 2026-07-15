@@ -304,12 +304,13 @@ model JobRun {
 }
 
 // ── api_usage_log ─────────────────────────────────────────────────────────────
-// Append-only log of every call to a paid third-party API (Rainforest, Bookshop).
+// Append-only log of every call to a paid third-party API (Bookshop; historically
+// Rainforest — retired 2026-07-13, its rows remain as an audit trail only).
 // Used for budget tracking and rate-limit auditing. Never update or delete rows.
 
 model ApiUsageLog {
   id           String   @id @default(uuid()) @db.Uuid
-  /// "rainforest" | "bookshop_us" | "bookshop_uk"
+  /// "bookshop_us" | "bookshop_uk" | "rainforest" (historical — provider retired)
   provider     String   @db.VarChar(50)
   /// Full URL called (sanitised — no API keys)
   endpoint     String   @db.Text

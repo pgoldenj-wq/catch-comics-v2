@@ -31,9 +31,11 @@ conventions, prompts, or "obvious" assumptions.
 4. **Protect token usage.** Don't read large files in full when a
    range will do. Don't re-read files already in conversation context.
    Avoid spawning subagents to do work the parent can finish.
-5. **Protect API spend.** ComicVine has a 200/hr cap. Rainforest is
-   pay-per-call. Don't write scripts that hit paid APIs in loops
-   without confirming rate limits and approval.
+5. **Protect API spend.** ComicVine has a 200/hr cap. Don't write
+   scripts that hit paid APIs in loops without confirming rate limits
+   and approval. Rainforest (Amazon prices) was RETIRED 2026-07-13,
+   account closed — never restore it or add any paid Amazon API
+   without explicit founder approval.
 6. **Local-first.** Test on `localhost:3000` before pushing. The user
    demos and ships from production; visible breakage there matters.
 7. **Priority order when trading off:** revenue → SEO → data quality
@@ -98,7 +100,7 @@ If you must inspect a checkpoint, READ it. Do not write.
 | Database | Neon Postgres (serverless; expect occasional connection drops) |
 | Hosting | Vercel — single project `catch-comics-v2` |
 | Object storage | Cloudflare R2, custom domain `images.catchcomics.com` |
-| External APIs | ComicVine (200/hr), Open Library (free), Google Books (free), Rainforest/Amazon (paid, key NOT set in prod), eBay (Browse API), AWIN (affiliate) |
+| External APIs | ComicVine (200/hr), Open Library (free), Google Books (free), eBay (Browse API), AWIN (affiliate). Amazon: affiliate-only — NO price API (Rainforest retired 2026-07-13) |
 
 Modern Next.js details: read `node_modules/next/dist/docs/` (AGENTS.md
 already directs to this; many APIs differ from training data).
@@ -210,7 +212,7 @@ Anything else: ask first.
 | ComicVine | Free, 200/hr cap | Scripts default to 25s/call (~144/hr) + 60s backoff on HTTP 420 |
 | Open Library | Free, no docs cap | Be polite: 1s delay between calls |
 | Google Books | Free, soft cap | Currently used only via enrichment fallback chain |
-| Amazon Rainforest | PAID per call | `RAINFOREST_API_KEY` not set in prod. Don't enable casually. |
+| Amazon | RETIRED | Rainforest retired 2026-07-13 (account closed). Stored offers age out honestly; affiliate links only. Future: Amazon Creators API when eligible — founder approval required. |
 | eBay Browse | Free with key | Used in queryC for live results |
 | AWIN | Free | Affiliate URL wrapping only |
 

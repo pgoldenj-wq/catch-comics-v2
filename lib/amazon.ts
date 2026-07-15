@@ -8,27 +8,17 @@
  * Amazon associate tags are NOT secrets — they appear in every affiliate URL
  * visible to users. NEXT_PUBLIC_ is therefore safe and correct for client use.
  *
- * UK first. US is wired and ready; just set NEXT_PUBLIC_AMAZON_US_ASSOCIATE_TAG.
+ * UK first. US has no valid tag yet — leave NEXT_PUBLIC_AMAZON_US_ASSOCIATE_TAG
+ * blank (never reuse the UK tag); untagged US links are the correct behaviour.
  *
- * ── PA API future architecture ────────────────────────────────────────────────
- * When 10 qualifying sales unlock the Product Advertising API 5.0:
- *
- * New env vars needed (server-side only — these ARE secrets):
- *   AMAZON_PA_ACCESS_KEY=
- *   AMAZON_PA_SECRET_KEY=
- *   AMAZON_PA_UK_ASSOCIATE_TAG=
- *   AMAZON_PA_US_ASSOCIATE_TAG=
- *
- * New file: app/api/amazon-prices/route.ts
- *   → calls PA API SearchItems with Keywords param
- *   → returns { listings: AmazonListing[] } with real prices, ASINs, images
- *   → cached in pricesCache under key  amazon:{region}:{query}
- *
- * PricingPanel change: merge AmazonListing[] into the priced listings section
- * (above the "Also search on" divider), sorted by price alongside eBay results.
- * The affiliate fallback links below stay as-is — they become supplementary.
- *
- * Nothing in the current affiliate layer needs to change when PA API arrives.
+ * ── Future integration note ───────────────────────────────────────────────────
+ * There is NO live Amazon price source (Rainforest retired 2026-07-13, account
+ * closed — do not restore it). PA-API 5.0 was retired by Amazon in May 2026.
+ * The compliant future route is the Amazon Creators API, which unlocks at
+ * 10 qualifying sales in the trailing 30 days and requires explicit founder
+ * approval before integration. See launch/operations/amazon-post-rainforest-plan.md.
+ * Nothing in this affiliate layer needs to change when that arrives — these
+ * search-fallback builders stay as-is and become supplementary.
  */
 
 export type AmazonRegion = 'uk' | 'us'
