@@ -122,6 +122,10 @@ export async function GET() {
           ON rl.canonical_product_id = cp.id
           AND rl.stock_status = 'IN_STOCK'
           AND rl.deleted_at IS NULL
+          -- W4: exclude £0 stub listings — a DYNAMIC_LINK / zero-price row that
+          -- is IN_STOCK would make MIN(price) = 0 and surface a fake "£0" deal
+          -- (caught by launch:smoke deals-api honesty check). Prices only.
+          AND rl.price_amount > 0
         WHERE cp.deleted_at IS NULL
           -- Issue 4: visual carousel demands images. Also exclude known placeholder
           -- URLs (mirrors lib/images/url-filters.isBadCoverUrl) so a homepage slot is
