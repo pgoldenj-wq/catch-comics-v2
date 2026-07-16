@@ -35,11 +35,55 @@ export const DEFAULT_REFRESH_HOURS: Record<string, number> = {
 }
 
 /**
+ * Per-retailer opt-out from the scheduled/adapter sync path.
+ *
+ * Set `syncConfig.scheduled_sync_disabled: true` on a retailer whose feed must
+ * only be refreshed through a gated CLI sync. The adapter path has no
+ * comics-only gate: it refreshes (and revives, via `deletedAt: null`) every
+ * feed row and creates stub canonicals for unknown ISBNs — for a general
+ * bookstore feed like Lets Buy Books that means re-importing non-comic
+ * catalogue pollution every run. The gated path is:
+ *   npm run sync:awin -- --merchant <name> --no-create --comics-only --write
+ */
+export function isScheduledSyncDisabled(syncConfig: unknown): boolean {
+  return (
+    typeof syncConfig === 'object' &&
+    syncConfig !== null &&
+    (syncConfig as Record<string, unknown>).scheduled_sync_disabled === true
+  )
+}
+
+/**
+ * Should the scheduled cron enqueue a sync for this retailer right now?
+ * Pure — the cron passes each active retailer plus the current time.
+ */
+export function isDueForScheduledSync(
+  r: { platform: string; lastSyncedAt: Date | null; syncConfig: unknown },
+  now: number,
+): boolean {
+  if (SKIP_PLATFORMS.has(r.platform)) return false
+  if (isScheduledSyncDisabled(r.syncConfig)) return false
+  const intervalMs = refreshIntervalHours(r.syncConfig, r.platform) * 60 * 60 * 1000
+  const lastSynced = r.lastSyncedAt?.getTime() ?? 0
+  return now - lastSynced >= intervalMs
+}
+
+/**
  * Run a full sync for a retailer and return the result.
  * Throws on unrecognised platform — let the caller handle it.
  */
 export async function dispatchSync(retailerId: string): Promise<SyncResult> {
   const retailer = await prisma.retailer.findUniqueOrThrow({ where: { id: retailerId } })
+
+  // Defence in depth: events already queued (or retried) before the scheduler
+  // filter excluded this retailer must not reach the ungated adapter either.
+  if (isScheduledSyncDisabled(retailer.syncConfig)) {
+    throw new Error(
+      `Adapter sync is disabled for ${retailer.domain} (syncConfig.scheduled_sync_disabled). ` +
+      `Refresh it with the gated CLI sync instead: ` +
+      `npm run sync:awin -- --merchant <name> --no-create --comics-only --write`,
+    )
+  }
 
   switch (retailer.platform) {
     case 'SHOPIFY': {

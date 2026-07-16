@@ -38,6 +38,7 @@ import { isBadCoverUrl, canUseNextImage } from '@/lib/images/url-filters'
 import { seriesNameToSlug, getSeriesEntry } from '@/lib/series/registry'
 import { jsonLdScriptString }               from '@/lib/security/jsonLd'
 import { displayPublisher }                 from '@/lib/identity/publisher'
+import { suppressDuplicateRetailerListings } from '@/lib/listings/dedupeListings'
 
 // ISR: cache each product page for 1 hour, then regenerate in the background.
 // Switched from force-dynamic (which hit the DB on every request) — there is no
@@ -106,6 +107,7 @@ async function getProduct(slug: string) {
           retailer: {
             select: {
               name:             true,
+              domain:           true,
               trustScore:       true,
               affiliateNetwork: true,
               affiliateId:      true,
@@ -400,7 +402,9 @@ export default async function ProductPage(
 
   // ── Offer processing ─────────────────────────────────────────────────────
   const IN_STOCK_STATUSES = new Set(['IN_STOCK', 'LOW_STOCK', 'PREORDER'])
-  const allListings       = product.listings
+  // One trusted offer per retailer where a retailer double-ingested the same
+  // product under two SKU schemes (Lets Buy Books ISBN vs merchant id rows).
+  const allListings       = suppressDuplicateRetailerListings(product.listings)
 
   // Best offer = cheapest in-stock listing across all conditions
   const bestListing = allListings.find(l => IN_STOCK_STATUSES.has(l.stockStatus))
