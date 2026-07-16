@@ -28,6 +28,7 @@ import { gunzipSync }    from 'zlib'
 import { parse }         from 'csv-parse'
 import { prisma }   from '../lib/prisma'
 import { StockStatus, MatchMethod, ListingCondition } from '@prisma/client'
+import { classifyCanonicalComicShape, type CanonicalComicVerdict } from '../lib/identity/comicShape'
 
 // ── CLI args ──────────────────────────────────────────────────────────────────
 const argv     = process.argv.slice(2)
@@ -38,6 +39,14 @@ const DRY      = !WRITE
 // feed. This is the trust-first default for first runs of a new merchant:
 // pure comparison-depth gain, zero catalogue-pollution risk.
 const NO_CREATE = argv.includes('--no-create')
+// Comics-only refresh gate (2026-07-16): general bookstore feeds exact-ISBN
+// match some pre-existing NON-comic canonicals (health books etc. from old
+// book-feed imports). With this flag, a matched row is refreshed ONLY when
+// the canonical itself is comic-shaped (lib/identity/comicShape — format
+// enum, CV link, or high-precision publisher/title signal). 'uncertain' and
+// 'non-comic' rows are REJECTED before any write: price, stock and
+// last_seen_at stay untouched, so pollution freshness is never extended.
+const COMICS_ONLY = argv.includes('--comics-only')
 const limIdx   = argv.indexOf('--limit')
 const LIMIT    = limIdx !== -1 ? parseInt(argv[limIdx + 1] ?? '999999', 10) : 999_999
 const mIdx     = argv.indexOf('--merchant')
@@ -75,17 +84,22 @@ function mapStock(inStock: string, qty: string): StockStatus {
 }
 
 // ── Canonical match + create cache ───────────────────────────────────────────
-const canonCache = new Map<string, string>()  // isbn13 → canonical_product_id
+interface CanonMatch { id: string; verdict: CanonicalComicVerdict }
+const canonCache = new Map<string, CanonMatch | null>()  // isbn13 → match (null = no canonical)
 
-async function getCanonicalId(isbn13: string): Promise<string | null> {
+async function getCanonical(isbn13: string): Promise<CanonMatch | null> {
   if (canonCache.has(isbn13)) return canonCache.get(isbn13) ?? null
   const cp = await prisma.canonicalProduct.findFirst({
     where: { isbn13, deletedAt: null },
-    select: { id: true },
+    // format/comicvineId/publisher/title feed the comics-only gate — the
+    // verdict comes from the CANONICAL's own metadata, never the feed row.
+    select: { id: true, format: true, comicvineId: true, publisher: true, title: true },
   })
-  const id = cp?.id ?? null
-  canonCache.set(isbn13, id ?? '')
-  return id
+  const match: CanonMatch | null = cp
+    ? { id: cp.id, verdict: classifyCanonicalComicShape(cp) }
+    : null
+  canonCache.set(isbn13, match)
+  return match
 }
 
 // ── Comics relevance filter ───────────────────────────────────────────────────
@@ -132,13 +146,15 @@ async function createCanonical(isbn13: string, row: Record<string, string>): Pro
         coverImageUrl : null,
       },
     })
-    canonCache.set(isbn13, cp.id)
+    // Created via the comics-relevance path (isComicsRelated gate above the
+    // call site) — treat as comic for this run's cache.
+    canonCache.set(isbn13, { id: cp.id, verdict: 'comic' })
     return cp.id
   } catch (err: unknown) {
     // P2002 = unique constraint — ISBN already exists as a soft-deleted canonical.
     // Skip rather than crash; the listing is omitted for this ISBN.
     if (err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === 'P2002') {
-      canonCache.set(isbn13, '')  // prevent retrying this ISBN
+      canonCache.set(isbn13, null)  // prevent retrying this ISBN
       return null
     }
     throw err
@@ -228,7 +244,11 @@ async function main() {
   const stats = {
     rows: 0, matched: 0, created: 0, upserted: 0, priced: 0,
     skippedNoIsbn: 0, skippedNotComics: 0, skippedNoMatch: 0, wouldCreate: 0, skippedNoPrice: 0, errors: 0,
+    // Comics-only gate buckets: every exact-ISBN match is classified from the
+    // CANONICAL's metadata. With --comics-only, only matchedComic proceeds.
+    matchedComic: 0, rejectedUncertain: 0, rejectedNonComic: 0,
   }
+  const rejectSamples: string[] = []
 
   const parser = parse(body, {
     columns         : true,
@@ -261,7 +281,9 @@ async function main() {
     if (price <= 0) { stats.skippedNoPrice++; continue }
 
     // Match canonical — create new if missing and comics-relevant (write mode only)
-    let canonicalId = await getCanonicalId(isbn13)
+    const canonical = await getCanonical(isbn13)
+    let canonicalId = canonical?.id ?? null
+    let verdict: CanonicalComicVerdict = canonical?.verdict ?? 'uncertain'
     if (!canonicalId) {
       if (NO_CREATE) { stats.skippedNoMatch++; continue }
       const title = row['product_name'] ?? ''
@@ -276,9 +298,24 @@ async function main() {
       canonicalId = await createCanonical(isbn13, row)
       if (!canonicalId) { stats.skippedNoMatch++; continue }
       stats.created++
+      verdict = 'comic'  // created via the comics-relevance path above
     }
 
     stats.matched++
+
+    // Classification buckets (always counted; enforced when --comics-only).
+    if (verdict === 'comic') stats.matchedComic++
+    else if (verdict === 'non-comic') stats.rejectedNonComic++
+    else stats.rejectedUncertain++
+
+    if (COMICS_ONLY && verdict !== 'comic') {
+      // REJECT before any write path: price, stock and last_seen_at on any
+      // existing listing stay untouched — pollution freshness never extended.
+      if (rejectSamples.length < 8) {
+        rejectSamples.push(`[${verdict}] ${isbn13} "${(row['product_name'] ?? '').slice(0, 48)}"`)
+      }
+      continue
+    }
 
     if (DRY) {
       if (stats.matched <= 10) {
@@ -355,9 +392,17 @@ async function main() {
   console.log('\n── Summary ──────────────────────────────────────────────')
   console.log(`  Total rows     : ${stats.rows.toLocaleString()}`)
   console.log(`  Matched (ISBN) : ${stats.matched.toLocaleString()}`)
+  console.log(`    · comic-safe        : ${stats.matchedComic.toLocaleString()}`)
+  console.log(`    · uncertain ${COMICS_ONLY ? '(REJECTED)' : '(would reject)'} : ${stats.rejectedUncertain.toLocaleString()}`)
+  console.log(`    · non-comic ${COMICS_ONLY ? '(REJECTED)' : '(would reject)'} : ${stats.rejectedNonComic.toLocaleString()}`)
+  if (rejectSamples.length > 0) {
+    console.log(`  Reject samples :`)
+    rejectSamples.forEach(s => console.log(`    ${s}`))
+  }
   console.log(`  Upserted       : ${stats.upserted.toLocaleString()}`)
   console.log(`  Priced         : ${stats.priced.toLocaleString()}`)
   console.log(`  No ISBN        : ${stats.skippedNoIsbn.toLocaleString()}`)
+  console.log(`  No canonical   : ${stats.skippedNoMatch.toLocaleString()}`)
   console.log(`  Not comics     : ${stats.skippedNotComics.toLocaleString()}`)
   if (DRY) {
     console.log(`  Would create   : ${stats.wouldCreate.toLocaleString()}`)

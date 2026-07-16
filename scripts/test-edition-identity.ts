@@ -10,6 +10,7 @@ import {
   detectEditionSignals, editionMatchVerdict,
 } from '../lib/identity/edition'
 import { displayPublisher, isNonCreativePublisher } from '../lib/identity/publisher'
+import { classifyCanonicalComicShape, isRefreshableComicCanonical } from '../lib/identity/comicShape'
 
 let failures = 0
 function check(label: string, ok: boolean, detail = '') {
@@ -88,6 +89,40 @@ check('real publisher kept: Image Comics', displayPublisher('Image Comics') === 
 check('blank → null', displayPublisher('   ') === null)
 check('isNonCreativePublisher flags distributor', isNonCreativePublisher('Ingram Book Company') === true)
 check('isNonCreativePublisher passes real publisher', isNonCreativePublisher('Viz Media') === false)
+
+// ── Comics-only refresh gate (Bookshop full-sync trust gate) ─────────────────
+// The gate classifies the CANONICAL, never the feed row. 'uncertain' and
+// 'non-comic' must both be rejected — pollution freshness is never extended.
+// The format ENUM is NOT evidence (proven contaminated on first run).
+check('gate: ComicVine id → comic',
+  classifyCanonicalComicShape({ format: 'OTHER', comicvineId: '12345', title: 'Obscure Title' }) === 'comic')
+check('gate: exact comics publisher (Viz Media) → comic',
+  classifyCanonicalComicShape({ format: 'OTHER', publisher: 'Viz Media', title: 'Some Series 3' }) === 'comic')
+check('gate: word-bounded "graphic novel" in title → comic',
+  classifyCanonicalComicShape({ format: 'OTHER', publisher: 'Unknown Press', title: 'Persepolis: A Graphic Novel' }) === 'comic')
+check('gate: word-bounded "manga" in title → comic',
+  classifyCanonicalComicShape({ format: 'OTHER', publisher: null, title: 'Spy x Family Manga Box Set' }) === 'comic')
+check('gate: health book (self-help flag) → non-comic REJECTED',
+  classifyCanonicalComicShape({ format: 'OTHER', publisher: 'Hay House', title: 'The Self-Help Guide to Healing' }) === 'non-comic')
+check('gate: cookbook → non-comic REJECTED',
+  classifyCanonicalComicShape({ format: 'OTHER', publisher: null, title: 'The Mediterranean Cookbook' }) === 'non-comic')
+check('gate: generic novel, no signals → uncertain REJECTED (never guessed)',
+  classifyCanonicalComicShape({ format: 'OTHER', publisher: 'Faber & Faber', title: 'The Quiet House' }) === 'uncertain')
+// Real-world regressions from the first full-sync run — format enum lied:
+check('gate REGRESSION: cookbook mislabelled HARDCOVER → non-comic (format is not evidence)',
+  classifyCanonicalComicShape({ format: 'HARDCOVER', publisher: 'Bloomsbury', title: "Poppy Cooks: The Food You Need Poppy O'Toole Cookbook" }) === 'non-comic')
+check('gate REGRESSION: music book mislabelled DELUXE → uncertain REJECTED',
+  classifyCanonicalComicShape({ format: 'DELUXE', publisher: null, title: 'Iron Maiden: Piece Of Mind - Deluxe Edition' }) === 'uncertain')
+check('gate REGRESSION: "Mangal" cookbook mislabelled MANGA_VOLUME → uncertain REJECTED (\\b beats substring)',
+  classifyCanonicalComicShape({ format: 'MANGA_VOLUME', publisher: 'Quadrille', title: 'Mangal II: Stories and Recipes' }) === 'uncertain')
+check('gate: comic format enum ALONE is not enough → uncertain',
+  classifyCanonicalComicShape({ format: 'TPB', publisher: 'Somewhere Press', title: 'Anything At All' }) === 'uncertain')
+check('gate predicate: comic → refreshable',
+  isRefreshableComicCanonical({ format: 'OTHER', comicvineId: '9', title: 'X' }) === true)
+check('gate predicate: uncertain → NOT refreshable',
+  isRefreshableComicCanonical({ format: 'OTHER', publisher: 'Faber & Faber', title: 'The Quiet House' }) === false)
+check('gate predicate: non-comic → NOT refreshable',
+  isRefreshableComicCanonical({ format: 'OTHER', title: 'GCSE Maths Study Guide' }) === false)
 
 console.log(failures === 0 ? '\nEDITION IDENTITY: PASS' : `\nEDITION IDENTITY: FAIL — ${failures} failure(s)`)
 process.exit(failures === 0 ? 0 : 1)
