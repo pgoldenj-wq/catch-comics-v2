@@ -10,11 +10,13 @@
  * This cron can safely enqueue as many as needed.
  *
  * Platforms skipped: EBAY (live search API), MANUAL (human entry only).
+ * Retailers with syncConfig.scheduled_sync_disabled are never enqueued —
+ * they are refreshed only via the gated CLI sync (see lib/sync/dispatch.ts).
  */
 
 import { inngest }               from '@/lib/inngest/client'
 import { prisma }                from '@/lib/prisma'
-import { SKIP_PLATFORMS, refreshIntervalHours } from '@/lib/sync/dispatch'
+import { isDueForScheduledSync } from '@/lib/sync/dispatch'
 
 export const syncScheduled = inngest.createFunction(
   {
@@ -39,12 +41,7 @@ export const syncScheduled = inngest.createFunction(
       const now = Date.now()
 
       return retailers
-        .filter(r => {
-          if (SKIP_PLATFORMS.has(r.platform)) return false
-          const intervalMs = refreshIntervalHours(r.syncConfig, r.platform) * 60 * 60 * 1000
-          const lastSynced = r.lastSyncedAt?.getTime() ?? 0
-          return now - lastSynced >= intervalMs
-        })
+        .filter(r => isDueForScheduledSync(r, now))
         .map(r => ({ id: r.id, domain: r.domain }))
     })
 

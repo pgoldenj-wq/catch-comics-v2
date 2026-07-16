@@ -83,6 +83,7 @@
     "launch:health": "dotenv -e .env.local -- tsx scripts/launch-health.ts",
     "test:secrets": "tsx scripts/test-secret-hygiene.ts",
     "test:identity": "tsx scripts/test-edition-identity.ts",
+    "test:containment": "tsx scripts/test-lbb-containment.ts",
     "audit:fragmentation": "dotenv -e .env.local -- tsx scripts/audit-edition-fragmentation.ts",
     "audit:metadata": "dotenv -e .env.local -- tsx scripts/audit-suspicious-metadata.ts",
     "ingest:issue-covers": "dotenv -e .env.local -- tsx scripts/ingest-issue-covers.ts"
