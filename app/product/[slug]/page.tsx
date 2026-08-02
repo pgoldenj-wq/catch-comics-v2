@@ -25,7 +25,7 @@ import type { Metadata }        from 'next'
 import { notFound }             from 'next/navigation'
 import Image                    from 'next/image'
 import Link                     from 'next/link'
-import { Suspense }             from 'react'
+import { cache, Suspense }      from 'react'
 import { prisma }               from '@/lib/prisma'
 import OffersTable, { type OfferRow }    from '@/components/OffersTable'
 import PriceSparkline, { type SparkPoint } from '@/components/PriceSparkline'
@@ -76,10 +76,30 @@ function fmtDate(d: Date | string | null) {
 
 // ── Data layer ────────────────────────────────────────────────────────────────
 
-async function getProduct(slug: string) {
+// cache(): generateMetadata and the page body both call getProduct — React's
+// request cache collapses that into ONE query per render instead of two.
+// Explicit select (not include): a bare include shipped every column of the
+// product and each listing — including listings.raw_data, a ~1 KB/row JSONB
+// blob never rendered here. With ~86k crawlable ISR product pages, that row
+// weight dominated Neon public-network egress. cvMetadata IS rendered
+// (synopsis / creators / cv_volume_id), so it stays selected.
+const getProduct = cache(async (slug: string) => {
   return prisma.canonicalProduct.findUnique({
     where: { canonicalSlug: slug },
-    include: {
+    select: {
+      id:            true,
+      title:         true,
+      description:   true,
+      publisher:     true,
+      format:        true,
+      seriesName:    true,
+      volumeNumber:  true,
+      issueNumber:   true,
+      releaseDate:   true,
+      coverImageUrl: true,
+      isbn13:        true,
+      comicvineId:   true,
+      cvMetadata:    true,
       listings: {
         where: {
           retailer   : { isActive: true },
@@ -103,7 +123,18 @@ async function getProduct(slug: string) {
             ],
           },
         },
-        include: {
+        select: {
+          id:              true,
+          retailerUrl:     true,
+          // retailerSku feeds suppressDuplicateRetailerListings (ISBN-13 check)
+          retailerSku:     true,
+          condition:       true,
+          conditionDetail: true,
+          priceAmount:     true,
+          priceCurrency:   true,
+          shippingAmount:  true,
+          stockStatus:     true,
+          lastSeenAt:      true,
           retailer: {
             select: {
               name:             true,
@@ -123,7 +154,7 @@ async function getProduct(slug: string) {
       },
     },
   })
-}
+})
 
 /** Returns price=0 active listings (DYNAMIC_LINK retailers like Forbidden Planet). */
 async function getDynamicLinks(canonicalProductId: string) {
