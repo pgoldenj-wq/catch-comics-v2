@@ -17,6 +17,7 @@
 import { inngest }               from '@/lib/inngest/client'
 import { prisma }                from '@/lib/prisma'
 import { isDueForScheduledSync } from '@/lib/sync/dispatch'
+import { inngestCostGate }       from '@/lib/costguard/inngest'
 
 export const syncScheduled = inngest.createFunction(
   {
@@ -25,6 +26,22 @@ export const syncScheduled = inngest.createFunction(
     triggers: [{ cron: '0 * * * *' }],   // every hour, on the hour
   },
   async ({ step }) => {
+    // Cost Guard: skip cleanly (no retries) when the spend state blocks
+    // nonessential work. Blocking THIS cron stops the whole hourly pipeline.
+    const costGate = await step.run('costguard-gate', () =>
+      inngestCostGate({
+        operation:    'inngest:sync-retailer-scheduled',
+        jobClass:     'nonessential',
+        estRows:      500,
+        estRequests:  50,
+        maxRuntimeMs: 5 * 60_000,
+        write:        false,
+      }))
+    if (!costGate.allowed) {
+      console.warn(`[costguard] sync-scheduled skipped: ${costGate.reason}`)
+      return { enqueued: 0, skipped: 'costguard', reason: costGate.reason }
+    }
+
     // ── Step 1: find retailers due for sync ──────────────────────────────────
     const due = await step.run('find-due-retailers', async () => {
       const retailers = await prisma.retailer.findMany({

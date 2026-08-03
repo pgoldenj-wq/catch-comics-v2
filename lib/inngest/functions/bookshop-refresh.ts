@@ -14,6 +14,7 @@
 import { inngest }                        from '@/lib/inngest/client'
 import { prisma }                         from '@/lib/prisma'
 import { refreshStaleBookshopListings }   from '@/lib/adapters/bookshop'
+import { inngestCostGate }                from '@/lib/costguard/inngest'
 
 export const bookshopRefresh = inngest.createFunction(
   {
@@ -23,6 +24,21 @@ export const bookshopRefresh = inngest.createFunction(
     triggers: [{ cron: '0 4 * * *' }],
   },
   async ({ step }) => {
+    // Cost Guard: bulk listing refresh — refuse cleanly when state blocks it.
+    const costGate = await step.run('costguard-gate', () =>
+      inngestCostGate({
+        operation:    'inngest:bookshop-refresh',
+        jobClass:     'nonessential',
+        estRows:      5_000,
+        estRequests:  1_000,
+        maxRuntimeMs: 20 * 60_000,
+        write:        true,
+      }))
+    if (!costGate.allowed) {
+      console.warn(`[costguard] bookshop-refresh skipped: ${costGate.reason}`)
+      return { skipped: 'costguard', reason: costGate.reason }
+    }
+
     // ── Step 1: log job start ─────────────────────────────────────────────────
     const jobRun = await step.run('create-job-run', () =>
       prisma.jobRun.create({

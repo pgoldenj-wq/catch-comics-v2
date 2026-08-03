@@ -64,7 +64,21 @@ function sourceLabel(url: string): string {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
+import { assertJobAllowed } from '../lib/costguard/gate'
+
 async function main() {
+  // Cost Guard: historical cover migration — unbounded R2 write risk.
+  await assertJobAllowed({
+    operation:    'script:migrate-covers',
+    jobClass:     'high-risk',
+    provider:     'cloudflare',
+    estRows:      50_000,
+    estRequests:  100_000,
+    maxRuntimeMs: 6 * 60 * 60_000,
+    write:        process.argv.includes('--write'),
+    dryRun:       !process.argv.includes('--write'),
+    checkpointId: 'cover-migration-checkpoint',
+  })
   console.log('')
   console.log('══════════════════════════════════════════════════════════')
   console.log(' Catch Comics — Cover Migration to R2')

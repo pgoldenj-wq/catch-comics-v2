@@ -21,6 +21,7 @@
 
 import { inngest }  from '@/lib/inngest/client'
 import { prisma }   from '@/lib/prisma'
+import { inngestCostGate } from '@/lib/costguard/inngest'
 
 const STALE_OOS_DAYS   = 30
 const SOFT_DELETE_DAYS = 30
@@ -37,6 +38,22 @@ export const cleanupStale = inngest.createFunction(
     triggers: [{ cron: '0 3 * * *' }],   // 03:00 UTC daily
   },
   async ({ step }) => {
+    // Cost Guard: soft-delete sweep — deferrable (data hygiene), blocked only
+    // in LOCKDOWN.
+    const costGate = await step.run('costguard-gate', () =>
+      inngestCostGate({
+        operation:    'inngest:cleanup-stale',
+        jobClass:     'deferrable',
+        estRows:      50_000,
+        estRequests:  10,
+        maxRuntimeMs: 10 * 60_000,
+        write:        true,
+      }))
+    if (!costGate.allowed) {
+      console.warn(`[costguard] cleanup-stale skipped: ${costGate.reason}`)
+      return { skipped: 'costguard', reason: costGate.reason }
+    }
+
     // ── Step 1: create job run ───────────────────────────────────────────────
     const jobRun = await step.run('create-job-run', () =>
       prisma.jobRun.create({

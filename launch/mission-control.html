@@ -142,6 +142,11 @@ footer button { color:var(--ink3); background:none; border:none; text-decoration
     <div id="opsHealth"></div>
   </div>
 
+  <div class="card">
+    <h2>💰 Cost Guard</h2>
+    <div id="costGuard"></div>
+  </div>
+
   <div class="card" id="blockersCard">
     <h2>⛔ Open blockers — things that genuinely stop launch</h2>
     <div id="blockerList"></div>
@@ -207,7 +212,7 @@ let mc = (()=>{ try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && 
 function saveMc(){ localStorage.setItem(KEY, JSON.stringify(mc)); writeMcToRepo(); }
 
 /* ═══ Live data ══════════════════════════════════════════════════════ */
-let FOUNDER = null, SMOKE = null, OPS_SMOKE = null, OPS_HEALTH = null;
+let FOUNDER = null, SMOKE = null, OPS_SMOKE = null, OPS_HEALTH = null, OPS_COSTGUARD = null;
 async function loadData(){
   // 1) http(s): plain fetch. 2) file://: FS-handle if connected.
   // Wave 3: also load the generated operations snapshots. A missing file is
@@ -218,6 +223,7 @@ async function loadData(){
       SMOKE   = await (await fetch('smoke-verdict.json?'+Date.now())).json();
       try { OPS_SMOKE  = await (await fetch('operations/launch-smoke-latest.json?'+Date.now())).json(); } catch(e){ OPS_SMOKE = null; }
       try { OPS_HEALTH = await (await fetch('operations/launch-health-latest.json?'+Date.now())).json(); } catch(e){ OPS_HEALTH = null; }
+      try { OPS_COSTGUARD = await (await fetch('operations/costguard-latest.json?'+Date.now())).json(); } catch(e){ OPS_COSTGUARD = null; }
       return;
     }
   } catch(e){}
@@ -230,6 +236,7 @@ async function loadData(){
       const ops = await dirHandle.getDirectoryHandle('operations');
       try { OPS_SMOKE  = JSON.parse(await (await (await ops.getFileHandle('launch-smoke-latest.json')).getFile()).text()); } catch(e){}
       try { OPS_HEALTH = JSON.parse(await (await (await ops.getFileHandle('launch-health-latest.json')).getFile()).text()); } catch(e){}
+      try { OPS_COSTGUARD = JSON.parse(await (await (await ops.getFileHandle('costguard-latest.json')).getFile()).text()); } catch(e){}
     } catch(e){}
   }
 }
@@ -427,6 +434,43 @@ function render(){
   } else oh += `<div><strong style="color:var(--ink3)">Data health: unavailable</strong>
       <span class="src"> · run <code>npm run launch:health</code> then reload</span></div>`;
   document.getElementById('opsHealth').innerHTML = oh;
+
+  // Cost Guard panel — data from operations/costguard-latest.json
+  // (written by `npm run costguard:status`; live state collected hourly by
+  // the cost-guard GitHub Action). Honest freshness: age is always shown,
+  // and a missing file is "unavailable", never a green.
+  let cg = '';
+  if (OPS_COSTGUARD){
+    const g = OPS_COSTGUARD;
+    const stCol = g.state==='GREEN' ? 'var(--green)' : g.state==='AMBER' ? 'var(--amber)' : 'var(--red)';
+    const t = g.totals;
+    cg += `<div style="margin-bottom:10px"><strong style="color:${stCol};font-size:18px">${esc(g.state)}${g.lockdownLatched?' (latched)':''}</strong>
+      <span class="src"> · since ${g.since ? age(g.since) : 'n/a'} · data ${g.dataAgeHours===null?'never collected':`${g.dataAgeHours}h old`} · store ${esc(g.storeMode)}</span></div>`;
+    for (const r of (g.reasons||[]).slice(0,4)) cg += `<div class="win" style="color:var(--ink2)">· ${esc(r)}</div>`;
+    if (t){
+      cg += `<div class="win" style="color:var(--ink2)">💵 Variable MTD <strong>$${t.variableMtdUsd}</strong> · projected month-end <strong>$${t.projectedMonthUsd}</strong> · fixed fees $${t.fixedMonthlyUsd}</div>
+      <div class="win" style="color:var(--ink2)">🔥 Burn $${t.burnUsdPerDay}/day vs baseline ${t.baselineUsdPerDay===null?'n/a':`$${t.baselineUsdPerDay}/day`}</div>`;
+    }
+    for (const p of (g.perProvider||[])){
+      const pc = !p.configured ? 'var(--ink3)' : !p.fresh ? 'var(--amber)' : 'var(--ink2)';
+      cg += `<div class="win" style="color:${pc}">${esc(p.provider)}: ${!p.configured?'not configured':`$${p.variableMtdUsd} MTD · proj $${p.projectedMonthUsd} · ${p.budgetUsedPct}% of $${p.budgetMaxUsd} max${p.fresh?'':' · STALE'}`}${p.note?` — ${esc(p.note)}`:''}</div>`;
+    }
+    if ((g.activeRestrictions||[]).length){
+      cg += `<div class="win" style="color:var(--red)"><strong>Blocked jobs:</strong> ${g.activeRestrictions.map(r=>`${esc(r.operation)} (×${r.count})`).join(' · ')}</div>`;
+    }
+    for (const e of (g.recentEvents||[]).slice(0,5)){
+      cg += `<div class="win" style="color:var(--ink3)">${age(e.at)} · ${esc(e.message)}</div>`;
+    }
+    // What Joe must do, if anything — derived, explicit, one line.
+    let action = '';
+    if (g.lockdownLatched) action = 'LOCKDOWN latched — review reasons above, then run: npm run costguard:clear -- --confirm CLEAR';
+    else if (g.state==='RED') action = 'RED — stop discretionary bulk jobs; review the reasons above and the provider dashboards.';
+    else if ((g.unconfiguredProviders||[]).length) action = `Add provider credentials for: ${g.unconfiguredProviders.join(', ')} (see launch/operations/COST-GUARD.md → Manual actions).`;
+    else if (g.dataAgeHours!==null && g.dataAgeHours>26) action = 'Collection is stale — check the cost-guard GitHub Action and COSTGUARD_CRON_SECRET.';
+    cg += `<div class="win" style="color:${action?'var(--amber)':'var(--green)'}"><strong>${action ? 'Action: '+esc(action) : 'No founder action required.'}</strong></div>`;
+  } else cg += `<div><strong style="color:var(--ink3)">Cost Guard: unavailable</strong>
+      <span class="src"> · run <code>npm run costguard:status</code> then reload</span></div>`;
+  document.getElementById('costGuard').innerHTML = cg;
 
   // Blockers
   document.getElementById('blockersCard').style.display = d.blockers.length ? '' : 'none';

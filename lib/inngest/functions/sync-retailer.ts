@@ -18,6 +18,7 @@
 import { inngest }      from '@/lib/inngest/client'
 import { prisma }       from '@/lib/prisma'
 import { dispatchSync } from '@/lib/sync/dispatch'
+import { inngestCostGate } from '@/lib/costguard/inngest'
 
 export const syncRetailer = inngest.createFunction(
   {
@@ -29,6 +30,22 @@ export const syncRetailer = inngest.createFunction(
   },
   async ({ event, step }) => {
     const { retailerId } = event.data as { retailerId: string }
+
+    // Cost Guard: one full retailer feed ingest is the classic runaway-cost
+    // shape (July 2026 LBB incident) — refuse cleanly when state blocks it.
+    const costGate = await step.run('costguard-gate', () =>
+      inngestCostGate({
+        operation:    'inngest:sync-retailer',
+        jobClass:     'nonessential',
+        estRows:      50_000,
+        estRequests:  2_000,
+        maxRuntimeMs: 30 * 60_000,
+        write:        true,
+      }))
+    if (!costGate.allowed) {
+      console.warn(`[costguard] sync-retailer(${retailerId}) skipped: ${costGate.reason}`)
+      return { skipped: 'costguard', reason: costGate.reason }
+    }
 
     // ── Step 1: load retailer ────────────────────────────────────────────────
     const retailer = await step.run('load-retailer', async () => {

@@ -51,7 +51,20 @@ async function r2ObjectExists(key: string): Promise<boolean> {
   catch { return false }
 }
 
+import { assertJobAllowed } from '../lib/costguard/gate'
+
 async function main() {
+  // Cost Guard: per-volume cover ingest — CV image fetches + R2 uploads.
+  await assertJobAllowed({
+    operation:    'script:ingest-issue-covers',
+    jobClass:     'high-risk',
+    provider:     'cloudflare',
+    estRows:      1_000,
+    estRequests:  2_000,
+    maxRuntimeMs: 2 * 60 * 60_000,
+    write:        process.argv.includes('--write'),
+    dryRun:       !process.argv.includes('--write'),
+  })
   const apiKey = process.env.COMIC_VINE_API_KEY
   if (!apiKey) { console.error('COMIC_VINE_API_KEY not set'); process.exit(1) }
 
