@@ -131,6 +131,26 @@ export async function getEvents(): Promise<GuardEvent[]> {
   return (await readDoc<GuardEvent[]>(KEY_EVENTS)) ?? []
 }
 
+// ── Webhook delivery idempotency ─────────────────────────────────────────────
+// Vercel (like most providers) may redeliver the same event. Enforcement must
+// be applied at most once per delivery, so the webhook route checks this
+// bounded ledger BEFORE mutating any state.
+
+const KEY_DELIVERIES = 'costguard:webhook-deliveries'
+const MAX_DELIVERY_IDS = 200
+
+export async function wasDeliveryProcessed(deliveryId: string): Promise<boolean> {
+  const ids = (await readDoc<string[]>(KEY_DELIVERIES)) ?? []
+  return ids.includes(deliveryId)
+}
+
+export async function markDeliveryProcessed(deliveryId: string): Promise<void> {
+  const ids = (await readDoc<string[]>(KEY_DELIVERIES)) ?? []
+  if (ids.includes(deliveryId)) return
+  ids.push(deliveryId)
+  await writeDoc(KEY_DELIVERIES, ids.slice(-MAX_DELIVERY_IDS))
+}
+
 /**
  * Append an event with dedupe: an event whose dedupeKey matches one recorded
  * inside `dedupeWindowMs` is dropped (returns false). Recovery/state-change

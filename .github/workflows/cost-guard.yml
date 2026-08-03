@@ -32,18 +32,37 @@ jobs:
         env:
           SECRET: ${{ secrets.COSTGUARD_CRON_SECRET }}
         run: |
+          # Not yet configured is a KNOWN state, not a failure: skip visibly
+          # with an annotation instead of emailing a red run every hour.
           if [ -z "$SECRET" ]; then
-            echo "::warning::COSTGUARD_CRON_SECRET not set — Cost Guard collection cannot run yet (see COST-GUARD.md manual actions)."
+            echo "::warning::Cost Guard SKIPPED — COSTGUARD_CRON_SECRET is not set as a repo Actions secret. Collection cannot run until the founder completes launch/operations/COST-GUARD.md → Secrets. This is expected before setup, not a fault."
+            echo "### Cost Guard skipped :warning:" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`COSTGUARD_CRON_SECRET\` is not configured, so no usage was collected." >> "$GITHUB_STEP_SUMMARY"
+            echo "See \`launch/operations/COST-GUARD.md\` → Secrets." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           for attempt in 1 2 3; do
-            RESPONSE=$(curl -sS -m 55 -X POST \
+            HTTP=$(curl -sS -m 55 -X POST \
               -H "Authorization: Bearer $SECRET" \
+              -o /tmp/cg-response.json -w '%{http_code}' \
               https://www.catchcomics.com/api/costguard/collect) && break
             echo "attempt $attempt failed; retrying in 20s"; sleep 20
           done
-          if [ -z "$RESPONSE" ]; then
+          RESPONSE=$(cat /tmp/cg-response.json 2>/dev/null || echo '')
+          if [ -z "$HTTP" ]; then
             echo "::error::Cost Guard collect endpoint unreachable after 3 attempts."
+            exit 1
+          fi
+          # 503 = server-side secret not configured yet. Same known-state skip
+          # as above: annotate, do not fail hourly.
+          if [ "$HTTP" = "503" ]; then
+            echo "::warning::Cost Guard SKIPPED — the deployment reports COSTGUARD_CRON_SECRET is not set in Vercel env. Add it and redeploy (launch/operations/COST-GUARD.md → Secrets)."
+            echo "### Cost Guard skipped :warning:" >> "$GITHUB_STEP_SUMMARY"
+            echo "Production returned 503: server-side secret not configured." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [ "$HTTP" = "401" ]; then
+            echo "::error::Cost Guard collect rejected the Actions secret (401) — COSTGUARD_CRON_SECRET differs between GitHub and Vercel."
             exit 1
           fi
           echo "$RESPONSE"

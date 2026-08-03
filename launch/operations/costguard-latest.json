@@ -1,15 +1,15 @@
 {
-  "generatedAt": "2026-08-03T12:15:30.966Z",
+  "generatedAt": "2026-08-03T13:46:14.997Z",
   "storeMode": "file",
   "configured": true,
   "state": "AMBER",
-  "since": "2026-08-03T12:15:27.345Z",
+  "since": "2026-08-03T13:45:48.653Z",
   "lockdownLatched": false,
   "reasons": [
     "No provider has fresh data — GREEN is not possible without telemetry.",
     "Not yet configured (no credentials): neon, vercel, github, cloudflare."
   ],
-  "lastCollectionAt": "2026-08-03T12:15:27.345Z",
+  "lastCollectionAt": "2026-08-03T13:45:48.653Z",
   "dataAgeHours": 0,
   "staleProviders": [],
   "unconfiguredProviders": [
@@ -113,7 +113,19 @@
   },
   "recentEvents": [
     {
-      "at": "2026-08-03T12:15:27.345Z",
+      "at": "2026-08-03T13:45:52.654Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:script:backfill-covers:AMBER",
+      "message": "script:backfill-covers allowed in AMBER (class=high-risk)."
+    },
+    {
+      "at": "2026-08-03T13:45:52.643Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:price-check:AMBER",
+      "message": "inngest:price-check allowed in AMBER (class=deferrable)."
+    },
+    {
+      "at": "2026-08-03T13:45:48.653Z",
       "kind": "state-change",
       "provider": "global",
       "dedupeKey": "finding:State changed (none) → AMBER#",

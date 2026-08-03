@@ -22,7 +22,7 @@ configure deliberately, below) can do that.
 | State/snapshots/events store | Vercel KV (`costguard:*` keys); local fallback `.costguard-state/` |
 | Collection endpoint | `POST /api/costguard/collect` (bearer `COSTGUARD_CRON_SECRET`) |
 | State endpoint | `GET /api/costguard/state` (bearer or admin cookie) |
-| Vercel spend webhook | `POST /api/costguard/vercel-webhook?token=<COSTGUARD_WEBHOOK_SECRET>` |
+| Vercel spend webhook | `POST /api/costguard/vercel-webhook` (no secret in the URL; HMAC-SHA1 `x-vercel-signature` required) |
 | Hourly check + PR scan | `.github/workflows/cost-guard.yml` |
 | Mission Control panel | `launch/mission-control.html` ← `launch/operations/costguard-latest.json` |
 | CLI | `npm run costguard:collect` / `costguard:status` / `costguard:clear` |
@@ -82,6 +82,27 @@ scripts (warning). Suppress a deliberate exception with
 `// costguard-allow: <reason>` on the line above.
 
 ---
+
+## Secrets — two DIFFERENT values, never in a URL
+
+| Variable | Where it comes from | Used for |
+|---|---|---|
+| `COSTGUARD_CRON_SECRET` | **you generate it** (`openssl rand -hex 32`) | bearer auth on `POST /api/costguard/collect`; must be identical in Vercel env AND the GitHub Actions repo secret |
+| `COSTGUARD_WEBHOOK_SECRET` | **Vercel generates it** and shows it once when you save the Spend Management webhook | verifying the `x-vercel-signature` HMAC on each delivery |
+| `VERCEL_TEAM_ID` | Vercel → Team Settings → General (not a secret) | rejecting deliveries from another team (403) |
+
+Rules:
+- **The webhook URL contains no secret**: `https://www.catchcomics.com/api/costguard/vercel-webhook`.
+- **Never reuse the webhook signing secret as the cron secret** (different trust domains, different rotation).
+- Neither secret may be shared, logged, committed, or pasted into a URL/query string.
+- If `COSTGUARD_WEBHOOK_SECRET` is absent the endpoint returns 503 and processes nothing — it fails **closed**. An unsigned event is never valid.
+
+### Webhook setup order (matters)
+
+1. Generate `COSTGUARD_CRON_SECRET` yourself; put it in Vercel env + the GitHub Actions secret.
+2. In Vercel → Team Settings → Billing → Spend Management, add the webhook with the bare URL above.
+3. Vercel shows a **signing secret** on save — copy it.
+4. Put that copied value in Vercel env as `COSTGUARD_WEBHOOK_SECRET`, add `VERCEL_TEAM_ID`, then redeploy.
 
 ## Manual actions (founder) — provider credentials and native hard caps
 

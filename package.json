@@ -86,6 +86,7 @@
     "costguard:status": "dotenv -e .env.local -- tsx scripts/costguard-status.ts",
     "costguard:clear": "dotenv -e .env.local -- tsx scripts/costguard-clear-lockdown.ts",
     "test:costguard": "tsx scripts/test-costguard.ts",
+    "test:costguard:webhook": "tsx scripts/test-costguard-webhook.ts",
     "check:cost-hazards": "node scripts/check-cost-hazards.mjs",
     "launch:health": "dotenv -e .env.local -- tsx scripts/launch-health.ts",
     "test:secrets": "tsx scripts/test-secret-hygiene.ts",
