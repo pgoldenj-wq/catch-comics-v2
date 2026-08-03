@@ -30,8 +30,16 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files — every real environment file stays ignored.
+# .env, .env.local, .env.development.local, .env.production.local, .env.*.local
 .env*
+
+# …with one deliberate exception: the blank template. It contains only variable
+# names, comments, and non-secret public values (marketplace host, associate
+# tag). Every credential line in it is empty. This negation MUST stay below the
+# .env* rule above, and .env.example MUST never be filled in with real values —
+# copy it to .env.local instead. npm run test:secrets scans it once tracked.
+!.env.example
 
 # vercel
 .vercel

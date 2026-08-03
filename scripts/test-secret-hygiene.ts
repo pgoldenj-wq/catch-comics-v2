@@ -6,8 +6,9 @@
  *   1. No literal key inside an AWIN productdata URL (apikey/<value> must be
  *      an interpolation, never a literal).
  *   2. No assignment of a real-looking value to known secret env names.
- *   3. No AWIN_* / COMIC_VINE / EBAY_CLIENT / DATABASE_URL reference inside
- *      client-bundled code (app/**, components/**) except NEXT_PUBLIC_ vars.
+ *   3. No AWIN_* / COMIC_VINE / EBAY_CLIENT / AMAZON_CREATORS_ / DATABASE_URL
+ *      reference inside client-bundled code (app/**, components/**) except
+ *      NEXT_PUBLIC_ vars.
  *   4. No long hex/base64 literals adjacent to KEY/SECRET/TOKEN identifiers.
  *   5. No Rainforest API key patterns anywhere (provider retired).
  *
@@ -55,7 +56,7 @@ const show = (h: Hit) => `${h.file}:${h.line} — ${h.text}`
 
 // ── 2. Secret env names assigned real-looking values ────────────────────────
 {
-  const re = /(AWIN_DATAFEED_KEY|AWIN_API_KEY|COMIC_VINE_API_KEY|EBAY_CLIENT_SECRET|DATABASE_URL)\s*[=:]\s*['"]?[A-Za-z0-9+/_-]{12,}/
+  const re = /(AWIN_DATAFEED_KEY|AWIN_API_KEY|COMIC_VINE_API_KEY|EBAY_CLIENT_SECRET|AMAZON_CREATORS_CLIENT_SECRET|AMAZON_CREATORS_CLIENT_ID|DATABASE_URL)\s*[=:]\s*['"]?[A-Za-z0-9+/_-]{12,}/
   const hits = scan(re, tracked)
   hits.length ? fail('Secret env var assigned a literal value in tracked source', hits.map(show))
               : pass('No secret env vars assigned literal values')
@@ -69,7 +70,7 @@ const show = (h: Hit) => `${h.file}:${h.line} — ${h.text}`
   const clientFiles = tracked.filter(f =>
     (f.startsWith('app/') || f.startsWith('components/')) && /\.(ts|tsx)$/.test(f)
       && (() => { try { return /^\s*['"]use client['"]/.test(readFileSync(f, 'utf8')) } catch { return false } })())
-  const re = /process\.env\.(?!NEXT_PUBLIC_)(AWIN_|COMIC_VINE|EBAY_CLIENT|DATABASE_URL|KV_REST)/
+  const re = /process\.env\.(?!NEXT_PUBLIC_)(AWIN_|COMIC_VINE|EBAY_CLIENT|AMAZON_CREATORS_|DATABASE_URL|KV_REST)/
   const hits = scan(re, clientFiles)
   hits.length ? fail("Server secret referenced in a 'use client' file (would be undefined or leak intent)", hits.map(show))
               : pass(`No server secrets referenced in ${clientFiles.length} client components`)
