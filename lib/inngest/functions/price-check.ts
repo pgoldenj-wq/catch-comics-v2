@@ -14,6 +14,7 @@
 
 import { inngest }  from '@/lib/inngest/client'
 import { prisma }   from '@/lib/prisma'
+import { inngestCostGate } from '@/lib/costguard/inngest'
 
 const LOOKBACK_HOURS = 24
 const MAX_RETAILERS  = 10
@@ -26,6 +27,22 @@ export const priceCheck = inngest.createFunction(
     triggers: [{ cron: '0 */4 * * *' }],   // every 4 hours
   },
   async ({ step }) => {
+    // Cost Guard: price freshness matters to shoppers — deferrable, so it
+    // keeps running in RED and stops only in LOCKDOWN.
+    const costGate = await step.run('costguard-gate', () =>
+      inngestCostGate({
+        operation:    'inngest:price-check',
+        jobClass:     'deferrable',
+        estRows:      5_000,
+        estRequests:  500,
+        maxRuntimeMs: 15 * 60_000,
+        write:        true,
+      }))
+    if (!costGate.allowed) {
+      console.warn(`[costguard] price-check skipped: ${costGate.reason}`)
+      return { skipped: 'costguard', reason: costGate.reason }
+    }
+
     // ── Step 1: create job run ───────────────────────────────────────────────
     const jobRun = await step.run('create-job-run', () =>
       prisma.jobRun.create({

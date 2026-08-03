@@ -150,3 +150,6 @@ next-env.d.ts
 
 # Founder Review packages (transient handoff artifacts - screenshots can be large)
 launch/reviews/
+
+# Cost Guard local file-fallback state (KV is the real store)
+.costguard-state/

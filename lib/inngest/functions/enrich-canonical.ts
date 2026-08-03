@@ -15,6 +15,7 @@
 import { inngest }               from '@/lib/inngest/client'
 import { prisma }                from '@/lib/prisma'
 import { enrichPendingProducts } from '@/lib/enrichment/isbn'
+import { inngestCostGate }       from '@/lib/costguard/inngest'
 
 export const enrichCanonical = inngest.createFunction(
   {
@@ -24,6 +25,21 @@ export const enrichCanonical = inngest.createFunction(
     triggers: [{ cron: '0 2 * * *' }],   // 02:00 UTC daily
   },
   async ({ step }) => {
+    // Cost Guard: catalogue enrichment is bulk external-API + DB write work.
+    const costGate = await step.run('costguard-gate', () =>
+      inngestCostGate({
+        operation:    'inngest:enrich-canonical',
+        jobClass:     'nonessential',
+        estRows:      10_000,
+        estRequests:  500,
+        maxRuntimeMs: 20 * 60_000,
+        write:        true,
+      }))
+    if (!costGate.allowed) {
+      console.warn(`[costguard] enrich-canonical skipped: ${costGate.reason}`)
+      return { skipped: 'costguard', reason: costGate.reason }
+    }
+
     // ── Step 1: create job run ───────────────────────────────────────────────
     const jobRun = await step.run('create-job-run', () =>
       prisma.jobRun.create({

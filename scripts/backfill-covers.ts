@@ -175,10 +175,23 @@ async function realRun(args: Args) {
   await prisma.$disconnect()
 }
 
+import { assertJobAllowed } from '../lib/costguard/gate'
+
 async function main() {
   const args = parseArgs()
   if (args.report)  { await reportProgress(); return }
   if (args.dryRun)  { await dryRunReport();   return }
+  // Cost Guard: Open Library fetch + R2 upload + DB write per row.
+  await assertJobAllowed({
+    operation:    'script:backfill-covers',
+    jobClass:     'high-risk',
+    provider:     'cloudflare',
+    estRows:      args.limit,
+    estRequests:  args.limit * 2,
+    maxRuntimeMs: 4 * 60 * 60_000,
+    write:        true,
+    checkpointId: 'backfill-covers-checkpoint',
+  })
   await realRun(args)
 }
 main().catch(async e => { console.error(e); await prisma.$disconnect(); process.exit(1) })

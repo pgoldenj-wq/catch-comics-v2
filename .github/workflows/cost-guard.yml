@@ -1,0 +1,92 @@
+# Catch Cost Guard — scheduled spend check + PR cost-hazard scan.
+#
+# Hourly job: triggers a collection cycle on production and FAILS THE
+# WORKFLOW when Cost Guard reports RED or LOCKDOWN → GitHub emails the
+# founder (same visible-failure convention as launch-smoke.yml). Alert
+# dedup happens server-side in the event store; the workflow failing every
+# hour during an incident is intentional pressure, not noise — GitHub
+# only emails on the first failure of a streak.
+#
+# PR job: runs the zero-dependency cost-hazard scan on changed code.
+#
+# Secrets required (repo → Settings → Secrets and variables → Actions):
+#   COSTGUARD_CRON_SECRET — must match the Vercel env var of the same name.
+name: Cost Guard
+
+on:
+  schedule:
+    - cron: '20 * * * *'   # hourly at :20
+  pull_request:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  spend-check:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger collection and evaluate state
+        env:
+          SECRET: ${{ secrets.COSTGUARD_CRON_SECRET }}
+        run: |
+          # Not yet configured is a KNOWN state, not a failure: skip visibly
+          # with an annotation instead of emailing a red run every hour.
+          if [ -z "$SECRET" ]; then
+            echo "::warning::Cost Guard SKIPPED — COSTGUARD_CRON_SECRET is not set as a repo Actions secret. Collection cannot run until the founder completes launch/operations/COST-GUARD.md → Secrets. This is expected before setup, not a fault."
+            echo "### Cost Guard skipped :warning:" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`COSTGUARD_CRON_SECRET\` is not configured, so no usage was collected." >> "$GITHUB_STEP_SUMMARY"
+            echo "See \`launch/operations/COST-GUARD.md\` → Secrets." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          for attempt in 1 2 3; do
+            HTTP=$(curl -sS -m 55 -X POST \
+              -H "Authorization: Bearer $SECRET" \
+              -o /tmp/cg-response.json -w '%{http_code}' \
+              https://www.catchcomics.com/api/costguard/collect) && break
+            echo "attempt $attempt failed; retrying in 20s"; sleep 20
+          done
+          RESPONSE=$(cat /tmp/cg-response.json 2>/dev/null || echo '')
+          if [ -z "$HTTP" ]; then
+            echo "::error::Cost Guard collect endpoint unreachable after 3 attempts."
+            exit 1
+          fi
+          # 503 = server-side secret not configured yet. Same known-state skip
+          # as above: annotate, do not fail hourly.
+          if [ "$HTTP" = "503" ]; then
+            echo "::warning::Cost Guard SKIPPED — the deployment reports COSTGUARD_CRON_SECRET is not set in Vercel env. Add it and redeploy (launch/operations/COST-GUARD.md → Secrets)."
+            echo "### Cost Guard skipped :warning:" >> "$GITHUB_STEP_SUMMARY"
+            echo "Production returned 503: server-side secret not configured." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [ "$HTTP" = "401" ]; then
+            echo "::error::Cost Guard collect rejected the Actions secret (401) — COSTGUARD_CRON_SECRET differs between GitHub and Vercel."
+            exit 1
+          fi
+          echo "$RESPONSE"
+          STATE=$(echo "$RESPONSE" | jq -r '.state // "UNKNOWN"')
+          echo "Cost Guard state: $STATE"
+          if [ "$STATE" = "RED" ] || [ "$STATE" = "LOCKDOWN" ]; then
+            echo "::error::Cost Guard is $STATE — check Mission Control / launch/operations/COST-GUARD.md"
+            echo "$RESPONSE" | jq -r '.reasons[]?' | while read -r r; do echo "::error::$r"; done
+            exit 1
+          fi
+          if [ "$STATE" = "UNKNOWN" ]; then
+            echo "::error::Cost Guard returned no state — endpoint misconfigured."
+            exit 1
+          fi
+
+  cost-hazard-scan:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Scan for concrete cost hazards
+        run: node scripts/check-cost-hazards.mjs

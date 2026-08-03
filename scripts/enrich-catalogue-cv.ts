@@ -389,8 +389,25 @@ async function reportProgress() {
   await prisma.$disconnect()
 }
 
+import { assertJobAllowed } from '../lib/costguard/gate'
+
 async function main() {
   const args = parseArgs()
+
+  // Cost Guard: multi-day ComicVine enrichment (checkpoint/resume). Declared
+  // limits make it runnable in AMBER; RED/LOCKDOWN refuse the next launch —
+  // an already-running process is never interrupted mid-flight.
+  await assertJobAllowed({
+    operation:    'script:enrich-catalogue-cv',
+    jobClass:     'high-risk',
+    provider:     'external-api',
+    estRows:      args.limit,
+    estRequests:  args.limit,
+    maxRuntimeMs: 7 * 24 * 60 * 60_000,
+    write:        !args.dryRun && !args.report,
+    dryRun:       args.dryRun || args.report,
+    checkpointId: 'enrich-catalogue-checkpoint',
+  })
 
   // ── Worker resolution ────────────────────────────────────────────────────────
   // Worker 1 (default, no --worker-id): existing behaviour, existing checkpoint path.

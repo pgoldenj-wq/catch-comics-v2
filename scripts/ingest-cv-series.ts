@@ -141,7 +141,20 @@ function isoDate(d: string | null): Date | null {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
+import { assertJobAllowed } from '../lib/costguard/gate'
+
 async function main() {
+  // Cost Guard: CV volume ingest — external API loop + canonical writes.
+  await assertJobAllowed({
+    operation:    'script:ingest-cv-series',
+    jobClass:     'high-risk',
+    provider:     'external-api',
+    estRows:      2_000,
+    estRequests:  2_000,
+    maxRuntimeMs: 4 * 60 * 60_000,
+    write:        !process.argv.includes('--dry-run'),
+    dryRun:       process.argv.includes('--dry-run'),
+  })
   if (!CV_KEY) {
     console.error('COMIC_VINE_API_KEY not set')
     process.exit(1)

@@ -173,7 +173,20 @@ async function getRetailerId(domain: string): Promise<string | null> {
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
+import { assertJobAllowed } from '../lib/costguard/gate'
+
 async function main() {
+  // Cost Guard: full AWIN datafeed ingest — the highest-volume retailer sync.
+  await assertJobAllowed({
+    operation:    'script:sync-awin-feed',
+    jobClass:     'high-risk',
+    provider:     'neon',
+    estRows:      250_000,
+    estRequests:  100,
+    maxRuntimeMs: 2 * 60 * 60_000,
+    write:        process.argv.includes('--write'),
+    dryRun:       !process.argv.includes('--write'),
+  })
   // AWIN uses two separate keys:
   //   AWIN_API_KEY      — Publisher API (transactions, reports) — NOT for feed downloads
   //   AWIN_DATAFEED_KEY — product feed downloads from productdata.awin.com (this one)

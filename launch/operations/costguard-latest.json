@@ -1,0 +1,141 @@
+{
+  "generatedAt": "2026-08-03T13:46:14.997Z",
+  "storeMode": "file",
+  "configured": true,
+  "state": "AMBER",
+  "since": "2026-08-03T13:45:48.653Z",
+  "lockdownLatched": false,
+  "reasons": [
+    "No provider has fresh data — GREEN is not possible without telemetry.",
+    "Not yet configured (no credentials): neon, vercel, github, cloudflare."
+  ],
+  "lastCollectionAt": "2026-08-03T13:45:48.653Z",
+  "dataAgeHours": 0,
+  "staleProviders": [],
+  "unconfiguredProviders": [
+    "neon",
+    "vercel",
+    "github",
+    "cloudflare"
+  ],
+  "totals": {
+    "variableMtdUsd": 0,
+    "fixedMonthlyUsd": 20,
+    "projectedMonthUsd": 0,
+    "burnUsdPerDay": 0,
+    "baselineUsdPerDay": null
+  },
+  "perProvider": [
+    {
+      "provider": "neon",
+      "configured": false,
+      "fresh": false,
+      "variableMtdUsd": 0,
+      "projectedMonthUsd": 0,
+      "budgetSoftUsd": 60,
+      "budgetMaxUsd": 90,
+      "budgetUsedPct": 0,
+      "note": "NEON_API_KEY not set — see COST-GUARD.md manual actions."
+    },
+    {
+      "provider": "vercel",
+      "configured": false,
+      "fresh": false,
+      "variableMtdUsd": 0,
+      "projectedMonthUsd": 0,
+      "budgetSoftUsd": 15,
+      "budgetMaxUsd": 40,
+      "budgetUsedPct": 0,
+      "note": "COSTGUARD_WEBHOOK_SECRET not set — Spend Management webhook inactive. See COST-GUARD.md."
+    },
+    {
+      "provider": "github",
+      "configured": false,
+      "fresh": false,
+      "variableMtdUsd": 0,
+      "projectedMonthUsd": 0,
+      "budgetSoftUsd": 5,
+      "budgetMaxUsd": 10,
+      "budgetUsedPct": 0,
+      "note": "GITHUB_BILLING_TOKEN not set — see COST-GUARD.md manual actions."
+    },
+    {
+      "provider": "cloudflare",
+      "configured": false,
+      "fresh": false,
+      "variableMtdUsd": 0,
+      "projectedMonthUsd": 0,
+      "budgetSoftUsd": 5,
+      "budgetMaxUsd": 15,
+      "budgetUsedPct": 0,
+      "note": "CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID not set — see COST-GUARD.md."
+    }
+  ],
+  "activeRestrictions": [],
+  "budgets": {
+    "global": {
+      "fixedMonthlyUsd": 20,
+      "expectedMonthlyUsd": 45,
+      "softBudgetUsd": 90,
+      "maxApprovedUsd": 150,
+      "catastrophicUsd": 250
+    },
+    "providers": {
+      "neon": {
+        "fixedMonthlyUsd": 0,
+        "expectedMonthlyUsd": 45,
+        "softBudgetUsd": 60,
+        "maxApprovedUsd": 90,
+        "catastrophicUsd": 150
+      },
+      "vercel": {
+        "fixedMonthlyUsd": 20,
+        "expectedMonthlyUsd": 5,
+        "softBudgetUsd": 15,
+        "maxApprovedUsd": 40,
+        "catastrophicUsd": 100
+      },
+      "github": {
+        "fixedMonthlyUsd": 0,
+        "expectedMonthlyUsd": 0,
+        "softBudgetUsd": 5,
+        "maxApprovedUsd": 10,
+        "catastrophicUsd": 25
+      },
+      "cloudflare": {
+        "fixedMonthlyUsd": 0,
+        "expectedMonthlyUsd": 2,
+        "softBudgetUsd": 5,
+        "maxApprovedUsd": 15,
+        "catastrophicUsd": 30
+      }
+    }
+  },
+  "recentEvents": [
+    {
+      "at": "2026-08-03T13:45:52.654Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:script:backfill-covers:AMBER",
+      "message": "script:backfill-covers allowed in AMBER (class=high-risk)."
+    },
+    {
+      "at": "2026-08-03T13:45:52.643Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:price-check:AMBER",
+      "message": "inngest:price-check allowed in AMBER (class=deferrable)."
+    },
+    {
+      "at": "2026-08-03T13:45:48.653Z",
+      "kind": "state-change",
+      "provider": "global",
+      "dedupeKey": "finding:State changed (none) → AMBER#",
+      "message": "State changed (none) → AMBER.",
+      "detail": {
+        "variableMtdUsd": 0,
+        "projectedMonthUsd": 0,
+        "burnUsdPerDay": 0,
+        "state": "AMBER"
+      }
+    }
+  ]
+}
