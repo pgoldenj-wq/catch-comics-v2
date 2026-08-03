@@ -1,3 +1,4 @@
+import { cache }         from 'react'
 import { prisma }        from '@/lib/prisma'
 import { isBadCoverUrl } from '@/lib/images/url-filters'
 import { stripHtml }     from '@/lib/utils/text'
@@ -40,15 +41,34 @@ const IN_STOCK = new Set(['IN_STOCK', 'LOW_STOCK', 'PREORDER'])
  *
  * Sorted: volumeNumber ASC NULLS LAST → releaseDate ASC NULLS LAST → title ASC
  * Price:  cheapest in-stock or pre-order listing per product (LEFT JOIN).
+ *
+ * cache(): generateMetadata + the page body on /series/[slug] both call this —
+ * React's request cache collapses that into one query per render. Keying is by
+ * object identity, which works because getSeriesEntry returns stable references
+ * from the static SERIES_REGISTRY; a freshly-built SeriesEntry just misses the
+ * cache (uncached, still correct).
  */
-export async function getSeriesData(entry: SeriesEntry): Promise<SeriesPageData> {
+export const getSeriesData = cache(async (entry: SeriesEntry): Promise<SeriesPageData> => {
   const products = await prisma.canonicalProduct.findMany({
     where: {
       comicvineId: entry.cvVolumeId,
       format:      { not: ProductFormat.SINGLE_ISSUE },
       deletedAt:   null,
     },
-    include: {
+    // Explicit select — `include` pulled every canonical_products column per
+    // volume. cvMetadata stays (synopsis feeds the series description below);
+    // the win is dropping the columns this page never touches, keeping the
+    // per-render Neon egress bounded to rendered data.
+    select: {
+      title:         true,
+      description:   true,
+      canonicalSlug: true,
+      format:        true,
+      volumeNumber:  true,
+      releaseDate:   true,
+      coverImageUrl: true,
+      isbn13:        true,
+      cvMetadata:    true,
       listings: {
         where: {
           deletedAt:   null,
@@ -174,4 +194,4 @@ export async function getSeriesData(entry: SeriesEntry): Promise<SeriesPageData>
     volumes,
     editionGroups,
   }
-}
+})
