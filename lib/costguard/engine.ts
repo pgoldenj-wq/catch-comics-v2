@@ -197,11 +197,17 @@ export function evaluate(
     raise('AMBER', `Neon compute ${neonCompute.toFixed(1)} CU-hr/day exceeds AMBER threshold ${CFG.rates.neonComputeCuPerDay.amber}.`)
   }
 
-  const ghMinutes = metricPerDay(snapshots, 'github', 'actions_minutes', 24 * 3_600_000, now)
-  if (ghMinutes > CFG.rates.githubMinutesPerDay.red) {
-    raise('RED', `GitHub Actions ${ghMinutes.toFixed(0)} min/day exceeds RED threshold ${CFG.rates.githubMinutesPerDay.red}.`)
-  } else if (ghMinutes > CFG.rates.githubMinutesPerDay.amber) {
-    raise('AMBER', `GitHub Actions ${ghMinutes.toFixed(0)} min/day exceeds AMBER threshold ${CFG.rates.githubMinutesPerDay.amber}.`)
+  // BILLABLE minutes only. catch-comics-v2 is a public repository, where
+  // GitHub-hosted standard runners are free and unlimited — a busy CI day costs
+  // nothing, so measuring total minutes here produced a RED that blocked
+  // nonessential and high-risk jobs while $0 was at risk (observed 2026-08-06,
+  // "96 min/day"). Runaway PAID minutes still trip the same thresholds, and the
+  // github dollar budgets remain the backstop either way.
+  const ghPaidMinutes = metricPerDay(snapshots, 'github', 'actions_paid_minutes', 24 * 3_600_000, now)
+  if (ghPaidMinutes > CFG.rates.githubMinutesPerDay.red) {
+    raise('RED', `GitHub Actions ${ghPaidMinutes.toFixed(0)} billable min/day exceeds RED threshold ${CFG.rates.githubMinutesPerDay.red}.`)
+  } else if (ghPaidMinutes > CFG.rates.githubMinutesPerDay.amber) {
+    raise('AMBER', `GitHub Actions ${ghPaidMinutes.toFixed(0)} billable min/day exceeds AMBER threshold ${CFG.rates.githubMinutesPerDay.amber}.`)
   }
 
   const r2ClassA = metricPerDay(snapshots, 'cloudflare', 'r2_class_a_ops', 24 * 3_600_000, now)

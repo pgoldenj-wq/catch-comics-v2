@@ -89,7 +89,10 @@ export const COSTGUARD_CONFIG = {
   rates: {
     neonTransferGbPerDay:  { amber: 10, red: 25 },   // baseline ~3; July disaster ~61
     neonComputeCuPerDay:   { amber: 30, red: 60 },   // baseline ~12
-    githubMinutesPerDay:   { amber: 45, red: 90 },   // 2000 free/mo ≈ 66/day even
+    // BILLABLE minutes/day (metric 'actions_paid_minutes'), not total minutes:
+    // on a public repo standard runners are free and unlimited, so total
+    // minutes are not a spend signal at all. 2000 free/mo ≈ 66/day even.
+    githubMinutesPerDay:   { amber: 45, red: 90 },
     r2ClassAOpsPerDay:     { amber: 50_000, red: 250_000 },
   },
 

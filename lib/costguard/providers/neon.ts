@@ -32,6 +32,26 @@ const TRANSFER_USD_PER_GB     = 0.10
 
 const API = 'https://console.neon.tech/api/v2'
 
+/**
+ * The v2 consumption endpoints reject any request that does not name the
+ * metrics it wants ('query parameter "metrics" not set'). These are the names
+ * parseNeonConsumption understands.
+ */
+const V2_METRICS = [
+  'compute_unit_seconds',
+  'public_network_transfer_bytes',
+  'private_network_transfer_bytes',
+  'root_branch_bytes_month',
+  'child_branch_bytes_month',
+  'instant_restore_bytes_month',
+  'snapshot_storage_bytes_month',
+] as const
+
+/** Repeated form: metrics=a&metrics=b — the usual OpenAPI array encoding. */
+const V2_METRICS_REPEATED = V2_METRICS.map(m => `metrics=${m}`).join('&')
+/** Comma form, in case Neon expects a single joined value. */
+const V2_METRICS_CSV = `metrics=${V2_METRICS.join(',')}`
+
 /** Totals accumulated from whichever response shape Neon returned. */
 export interface NeonTotals {
   computeSeconds: number
@@ -214,19 +234,24 @@ export async function collectNeon(now: Date = new Date()): Promise<ProviderUsage
   // Ordered by how well we can parse the answer, and by which endpoints Neon
   // actually exposes on non-Scale plans (org-scoped consumption is Scale-only,
   // so the per-project forms carrying explicit project_ids come first).
+  // Ordered by what Neon actually accepts here. Measured against the live API
+  // on 2026-08-06, which answered:
+  //   projects?org_id+project_ids → 403 "included with Scale plans and above"
+  //   v2/projects?…               → 400 'query parameter "metrics" not set'
+  //   account?org_id              → 404 "this route does not exist"
+  // so the v2 project endpoint carrying org_id AND metrics is the live path;
+  // the rest stay as fallbacks for other plans and future API changes.
   const candidates: Array<{ label: string; url: string }> = []
-  if (pids) {
-    candidates.push({ label: 'projects?project_ids', url: `${API}/consumption_history/projects?${pids}&${range}` })
-    if (orgId) {
-      candidates.push({ label: 'projects?org_id+project_ids', url: `${API}/consumption_history/projects?${org}${pids}&${range}` })
-      candidates.push({ label: 'v2/projects?org_id+project_ids', url: `${API}/consumption_history/v2/projects?${org}${pids}&${range}` })
-    }
-    candidates.push({ label: 'v2/projects?project_ids', url: `${API}/consumption_history/v2/projects?${pids}&${range}` })
-  }
   if (orgId) {
+    candidates.push({ label: 'v2/projects?org_id+metrics', url: `${API}/consumption_history/v2/projects?${org}${V2_METRICS_REPEATED}&${range}` })
+    candidates.push({ label: 'v2/projects?org_id+metrics(csv)', url: `${API}/consumption_history/v2/projects?${org}${V2_METRICS_CSV}&${range}` })
+    if (pids) {
+      candidates.push({ label: 'v2/projects?org_id+project_ids+metrics', url: `${API}/consumption_history/v2/projects?${org}${pids}&${V2_METRICS_REPEATED}&${range}` })
+      candidates.push({ label: 'projects?org_id+project_ids', url: `${API}/consumption_history/projects?${org}${pids}&${range}` })
+    }
     candidates.push({ label: 'account?org_id', url: `${API}/consumption_history/account?${org}${range}` })
-    candidates.push({ label: 'v2/projects?org_id', url: `${API}/consumption_history/v2/projects?${org}${range}` })
   }
+  if (pids) candidates.push({ label: 'projects?project_ids', url: `${API}/consumption_history/projects?${pids}&${range}` })
   candidates.push({ label: 'account (unscoped)', url: `${API}/consumption_history/account?${range}` })
 
   const attempts: string[] = []

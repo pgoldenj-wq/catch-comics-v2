@@ -48,12 +48,16 @@ export async function collectGithub(now: Date = new Date()): Promise<ProviderUsa
       }
       if (Array.isArray(json.usageItems)) {
         let actionsMinutes = 0
+        let actionsPaidMinutes = 0
         let paidUsd = 0
         for (const item of json.usageItems) {
-          paidUsd += Number(item.netAmount ?? 0)
+          const net = Number(item.netAmount ?? 0)
+          paidUsd += net
           if ((item.product ?? '').toLowerCase() === 'actions' &&
               (item.unitType ?? '').toLowerCase().includes('minute')) {
-            actionsMinutes += Number(item.quantity ?? 0)
+            const qty = Number(item.quantity ?? 0)
+            actionsMinutes += qty
+            if (net > 0) actionsPaidMinutes += qty
           }
         }
         const metrics: UsageMetric[] = [
@@ -61,6 +65,14 @@ export async function collectGithub(now: Date = new Date()): Promise<ProviderUsa
             name: 'actions_minutes', mtd: Number(actionsMinutes.toFixed(0)), unit: 'min',
             estCostUsd: 0, // paid amount comes from netAmount below
             allowanceUsedPct: Number(((actionsMinutes / INCLUDED_MINUTES) * 100).toFixed(1)),
+          },
+          {
+            // Minutes actually charged for. The engine's rate breaker keys on
+            // THIS, not on total minutes: on a public repository standard
+            // runners are free and unlimited, so busy CI is not spend and must
+            // never trip RED. See collectGithub's header note.
+            name: 'actions_paid_minutes', mtd: Number(actionsPaidMinutes.toFixed(0)), unit: 'min',
+            estCostUsd: 0,
           },
           {
             name: 'metered_paid_usd', mtd: Number(paidUsd.toFixed(2)), unit: 'USD',
@@ -93,6 +105,7 @@ export async function collectGithub(now: Date = new Date()): Promise<ProviderUsa
         name: 'actions_minutes', mtd: mins, unit: 'min', estCostUsd: 0,
         allowanceUsedPct: Number(((mins / INCLUDED_MINUTES) * 100).toFixed(1)),
       },
+      { name: 'actions_paid_minutes', mtd: paidMins, unit: 'min', estCostUsd: 0 },
       { name: 'metered_paid_usd', mtd: Number(paidUsd.toFixed(2)), unit: 'USD', estCostUsd: Number(paidUsd.toFixed(2)) },
     ]
     return { ...base, ok: true, metrics, variableMtdUsd: Number(paidUsd.toFixed(2)) }
