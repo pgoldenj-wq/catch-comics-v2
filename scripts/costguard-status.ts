@@ -28,14 +28,29 @@ const REMOTE = process.env.COSTGUARD_STATE_URL
  * store otherwise — recording which one was used, so a stale local file can
  * never masquerade as live production data on the Mission Control panel.
  */
+/**
+ * Vercel stores the Cost Guard secrets as sensitive (write-only) values, so a
+ * founder machine frequently cannot hold COSTGUARD_CRON_SECRET at all — `vercel
+ * env pull` returns it empty. The state route also accepts the same cc_admin
+ * cookie the admin area uses, so try that before falling back to the local
+ * store, which is blind to production.
+ */
+function authHeaders(): Record<string, string> | null {
+  const secret = process.env.COSTGUARD_CRON_SECRET
+  if (secret) return { authorization: `Bearer ${secret}` }
+  const admin = process.env.ADMIN_PASSWORD
+  if (admin) return { cookie: `cc_admin=${Buffer.from(admin, 'utf8').toString('base64')}` }
+  return null
+}
+
 async function readProduction(): Promise<
   { state: CostGuardState | null; events: GuardEvent[] } | null
 > {
-  const secret = process.env.COSTGUARD_CRON_SECRET
-  if (!secret) return null
+  const headers = authHeaders()
+  if (!headers) return null
   try {
     const res = await fetch(REMOTE, {
-      headers: { authorization: `Bearer ${secret}` },
+      headers,
       signal: AbortSignal.timeout(20_000),
     })
     if (!res.ok) {
