@@ -21,6 +21,7 @@ process.chdir(workDir)
 import { COSTGUARD_CONFIG as CFG } from '../lib/costguard/config'
 import { evaluate } from '../lib/costguard/engine'
 import { assertJobAllowed, JobBudget, withCappedRetries } from '../lib/costguard/gate'
+import { parseNeonConsumption } from '../lib/costguard/providers/neon'
 import { appendEvent, getEvents, setState } from '../lib/costguard/store'
 import type {
   CostGuardState, ProviderUsage, Snapshot,
@@ -315,6 +316,56 @@ async function main() {
     const first = await appendEvent(ev, CFG.alertDedupeWindowMs)
     const second = await appendEvent({ ...ev, at: new Date().toISOString() }, CFG.alertDedupeWindowMs)
     ok('duplicate alerts inside the window are suppressed', first === true && second === false)
+  }
+
+  // ── Neon response parsing: both shapes, and no fabricated zeros ───────────
+  console.log('\nNeon consumption parsing\n────────────────────────')
+  {
+    const legacy = {
+      periods: [{
+        consumption: [
+          { compute_time_seconds: 3600, public_data_transfer_bytes: 1024 ** 3, private_data_transfer_bytes: 0, synthetic_storage_size_bytes: 2 * 1024 ** 3 },
+          { compute_time_seconds: 1800, public_data_transfer_bytes: 1024 ** 3, private_data_transfer_bytes: 0, synthetic_storage_size_bytes: 3 * 1024 ** 3 },
+        ],
+      }],
+    }
+    const t = parseNeonConsumption(legacy)
+    ok('legacy shape detected', t.shape === 'legacy', String(t.shape))
+    ok('legacy compute summed', t.computeSeconds === 5400, `${t.computeSeconds}s`)
+    ok('legacy transfer summed', t.publicTransferBytes === 2 * 1024 ** 3, `${t.publicTransferBytes}B`)
+    ok('legacy storage takes the peak, not the sum', t.storageBytes === 3 * 1024 ** 3, `${t.storageBytes}B`)
+  }
+  {
+    const v2 = {
+      projects: [{
+        periods: [{
+          consumption: [
+            { metrics: [
+              { metric_name: 'compute_unit_seconds', value: 7200 },
+              { metric_name: 'public_network_transfer_bytes', value: 5 * 1024 ** 3 },
+              { metric_name: 'private_network_transfer_bytes', value: 1024 ** 3 },
+              { metric_name: 'root_branch_bytes_month', value: 4 * 1024 ** 3 },
+            ] },
+          ],
+        }],
+      }],
+    }
+    const t = parseNeonConsumption(v2)
+    ok('v2 metrics-array shape detected', t.shape === 'v2', String(t.shape))
+    ok('v2 compute read from compute_unit_seconds', t.computeSeconds === 7200, `${t.computeSeconds}s`)
+    ok('v2 public transfer read', t.publicTransferBytes === 5 * 1024 ** 3)
+    ok('v2 storage accumulates byte-months', t.storageByteMonths === 4 * 1024 ** 3)
+  }
+  {
+    // A 200 whose body we cannot interpret must NOT look like zero usage —
+    // shape null makes collectNeon report a failure instead of a false all-clear.
+    const alien = { periods: [{ consumption: [{ something_new_entirely: 42 }] }] }
+    ok('unrecognised shape yields no shape', parseNeonConsumption(alien).shape === null)
+    ok('unrecognised shape reports zero rows', parseNeonConsumption(alien).rows === 0)
+    ok('empty body yields no shape', parseNeonConsumption({}).shape === null)
+    ok('null body yields no shape', parseNeonConsumption(null).shape === null)
+    ok('metrics array with only unknown names yields no shape',
+      parseNeonConsumption({ periods: [{ consumption: [{ metrics: [{ metric_name: 'mystery', value: 9 }] }] }] }).shape === null)
   }
 
   // ── Secret hygiene: no client-side imports of costguard modules ────────────
