@@ -127,17 +127,49 @@ export function parseNeonConsumption(json: unknown): NeonTotals {
   return out
 }
 
-async function getJson(url: string, key: string): Promise<{ status: number; json: unknown }> {
+/**
+ * Neon error bodies carry {message, code} and no credential material, so a
+ * short snippet is safe to surface — and it is the difference between "HTTP
+ * 400" and knowing which parameter Neon rejected.
+ */
+async function getJson(
+  url: string, key: string,
+): Promise<{ status: number; json: unknown; why: string }> {
   const res = await fetch(url, {
     headers: { authorization: `Bearer ${key}`, accept: 'application/json' },
     signal: AbortSignal.timeout(20_000),
   })
-  if (!res.ok) return { status: res.status, json: null }
-  try {
-    return { status: res.status, json: await res.json() }
-  } catch {
-    return { status: res.status, json: null }
+  const text = await res.text()
+  if (!res.ok) {
+    let why = text.slice(0, 140).replace(/\s+/g, ' ').trim()
+    try {
+      const j = JSON.parse(text) as { message?: string; code?: string }
+      if (j.message) why = `${j.message}${j.code ? ` (${j.code})` : ''}`.slice(0, 140)
+    } catch { /* keep the raw snippet */ }
+    return { status: res.status, json: null, why }
   }
+  try {
+    return { status: res.status, json: JSON.parse(text), why: '' }
+  } catch {
+    return { status: res.status, json: null, why: 'non-JSON body' }
+  }
+}
+
+/** Project ids are required by the per-project consumption endpoints. */
+async function resolveProjectIds(key: string, orgId: string | null): Promise<string[]> {
+  for (const url of [
+    orgId ? `${API}/projects?org_id=${encodeURIComponent(orgId)}` : null,
+    `${API}/projects`,
+  ]) {
+    if (!url) continue
+    try {
+      const { json } = await getJson(url, key)
+      const ids = (json as { projects?: Array<{ id?: string }> })?.projects
+        ?.map(p => p.id).filter((id): id is string => Boolean(id)) ?? []
+      if (ids.length) return ids
+    } catch { /* try the next form */ }
+  }
+  return []
 }
 
 /** Resolve the organization the personal key belongs to (first membership). */
@@ -176,10 +208,23 @@ export async function collectNeon(now: Date = new Date()): Promise<ProviderUsage
   } catch { /* fall through — the un-scoped attempts may still work */ }
 
   const org = orgId ? `org_id=${encodeURIComponent(orgId)}&` : ''
+  const projectIds = await resolveProjectIds(apiKey, orgId)
+  const pids = projectIds.map(id => `project_ids=${encodeURIComponent(id)}`).join('&')
+
+  // Ordered by how well we can parse the answer, and by which endpoints Neon
+  // actually exposes on non-Scale plans (org-scoped consumption is Scale-only,
+  // so the per-project forms carrying explicit project_ids come first).
   const candidates: Array<{ label: string; url: string }> = []
+  if (pids) {
+    candidates.push({ label: 'projects?project_ids', url: `${API}/consumption_history/projects?${pids}&${range}` })
+    if (orgId) {
+      candidates.push({ label: 'projects?org_id+project_ids', url: `${API}/consumption_history/projects?${org}${pids}&${range}` })
+      candidates.push({ label: 'v2/projects?org_id+project_ids', url: `${API}/consumption_history/v2/projects?${org}${pids}&${range}` })
+    }
+    candidates.push({ label: 'v2/projects?project_ids', url: `${API}/consumption_history/v2/projects?${pids}&${range}` })
+  }
   if (orgId) {
-    candidates.push({ label: `account?org_id (${orgId.slice(0, 4)}…)`, url: `${API}/consumption_history/account?${org}${range}` })
-    candidates.push({ label: 'projects?org_id', url: `${API}/consumption_history/projects?${org}${range}` })
+    candidates.push({ label: 'account?org_id', url: `${API}/consumption_history/account?${org}${range}` })
     candidates.push({ label: 'v2/projects?org_id', url: `${API}/consumption_history/v2/projects?${org}${range}` })
   }
   candidates.push({ label: 'account (unscoped)', url: `${API}/consumption_history/account?${range}` })
@@ -188,28 +233,25 @@ export async function collectNeon(now: Date = new Date()): Promise<ProviderUsage
   let totals: NeonTotals | null = null
   let usedLabel = ''
   for (const c of candidates) {
-    let status = 0
     try {
       const r = await getJson(c.url, apiKey)
-      status = r.status
       if (r.status === 200) {
         const parsed = parseNeonConsumption(r.json)
         if (parsed.shape) { totals = parsed; usedLabel = `${c.label} [${parsed.shape}]`; break }
         attempts.push(`${c.label}→200 but unrecognised shape`)
         continue
       }
+      attempts.push(`${c.label}→${r.status}${r.why ? ` ${r.why}` : ''}`)
     } catch (err) {
       attempts.push(`${c.label}→${(err as Error).message}`)
-      continue
     }
-    attempts.push(`${c.label}→HTTP ${status}`)
   }
 
   if (!totals) {
     return {
       ...base,
-      note: `Neon consumption unavailable. Tried: ${attempts.join('; ')}.` +
-        (orgId ? '' : ' No organization resolved — set NEON_ORG_ID if the key is personal.'),
+      note: `Neon consumption unavailable (org ${orgId ? 'resolved' : 'NOT resolved'}, ` +
+        `${projectIds.length} project(s)). Tried: ${attempts.join('; ')}.`,
     }
   }
 
