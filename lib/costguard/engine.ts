@@ -58,8 +58,24 @@ function burnUsdPerDay(snaps: Snapshot[], windowMs: number, now: Date): number {
   const first = inWindow[0]
   const last  = inWindow[inWindow.length - 1]
   const spanMs = Math.max(Date.parse(last.at) - Date.parse(first.at), 60 * 60 * 1000)
-  let delta = last.totalVariableMtdUsd - first.totalVariableMtdUsd
-  if (delta < 0) delta = last.totalVariableMtdUsd // month rollover inside window
+
+  // Compare LIKE FOR LIKE. totalVariableMtdUsd only counts providers that
+  // answered, so a provider recovering mid-window makes its entire
+  // month-to-date look like it was spent inside the window. That is newly
+  // VISIBLE spend, not new spend. Observed 2026-08-06: Neon's first successful
+  // collection turned $7.73 MTD into $65/day of burn and a $1,571 projection,
+  // tripping RED and blocking jobs while nothing had actually changed.
+  // Only providers healthy at BOTH ends of the window can contribute a delta.
+  const okIn = (s: Snapshot) => new Set(s.providers.filter(p => p.ok).map(p => p.provider))
+  const firstOk = okIn(first)
+  const common = [...okIn(last)].filter(id => firstOk.has(id))
+  if (common.length === 0) return 0
+  const sumCommon = (s: Snapshot) => s.providers
+    .filter(p => p.ok && common.includes(p.provider))
+    .reduce((t, p) => t + p.variableMtdUsd, 0)
+
+  let delta = sumCommon(last) - sumCommon(first)
+  if (delta < 0) delta = sumCommon(last) // month rollover inside window
   return (delta / spanMs) * 24 * 60 * 60 * 1000
 }
 

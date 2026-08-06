@@ -342,6 +342,30 @@ async function main() {
     ok('duplicate alerts inside the window are suppressed', first === true && second === false)
   }
 
+  // ── A recovering provider must not read as a spend spike ──────────────────
+  {
+    // Neon fails for three days, then starts answering with a real month-to-date
+    // figure. That money was already spent; it just became visible. Counting it
+    // as burn produced a false RED in production on 2026-08-06.
+    const snaps = series(96, NOW, (i, at) => {
+      const ps = normalProviders(at)
+      ps[0] = i < 90
+        ? provider('neon', { collectedAt: at.toISOString(), ok: false, metrics: [], variableMtdUsd: 0 })
+        : provider('neon', { collectedAt: at.toISOString(), variableMtdUsd: 7.73, metrics: [] })
+      return ps
+    })
+    const { state } = evaluate(snaps, greenPrior(), NOW)
+    ok('recovered provider does not manufacture burn',
+      state.totals.burnUsdPerDay < 5,
+      `burn $${state.totals.burnUsdPerDay}/day`)
+    ok('recovered provider does not blow up the projection',
+      state.totals.projectedMonthUsd < CFG.global.maxApprovedUsd,
+      `projected $${state.totals.projectedMonthUsd}`)
+    ok('recovered provider MTD is still counted in totals',
+      state.totals.variableMtdUsd >= 7.73,
+      `mtd $${state.totals.variableMtdUsd}`)
+  }
+
   // ── Neon response parsing: both shapes, and no fabricated zeros ───────────
   console.log('\nNeon consumption parsing\n────────────────────────')
   {
