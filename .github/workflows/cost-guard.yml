@@ -1,11 +1,16 @@
 # Catch Cost Guard — scheduled spend check + PR cost-hazard scan.
 #
-# Hourly job: triggers a collection cycle on production and FAILS THE
-# WORKFLOW when Cost Guard reports RED or LOCKDOWN → GitHub emails the
-# founder (same visible-failure convention as launch-smoke.yml). Alert
-# dedup happens server-side in the event store; the workflow failing every
-# hour during an incident is intentional pressure, not noise — GitHub
-# only emails on the first failure of a streak.
+# Hourly job: triggers a collection cycle on production and reports one of
+# four outcomes → PASS (green), WARNING (green + annotation), NOT CONFIGURED
+# (red) or FAILURE (red). GitHub emails the founder on red, the same
+# visible-failure convention as launch-smoke.yml. Alert dedup happens
+# server-side in the event store; the workflow failing every hour during an
+# incident is intentional pressure, not noise — GitHub only emails on the
+# first failure of a streak.
+#
+# A green tick means the check RAN AND HAD TELEMETRY. It never means the
+# check was skipped: an unconfigured Cost Guard is a red run, because a
+# spend guard with no data is indistinguishable from no spend guard at all.
 #
 # PR job: runs the zero-dependency cost-hazard scan on changed code.
 #
@@ -32,14 +37,22 @@ jobs:
         env:
           SECRET: ${{ secrets.COSTGUARD_CRON_SECRET }}
         run: |
-          # Not yet configured is a KNOWN state, not a failure: skip visibly
-          # with an annotation instead of emailing a red run every hour.
+          # Exactly four outcomes. A green tick always means the spend check RAN
+          # and had real telemetry behind it — never that it was skipped:
+          #   PASS            GREEN + fresh provider data     exit 0
+          #   WARNING         AMBER + fresh provider data     exit 0 + ::warning::
+          #   NOT CONFIGURED  no secret, or zero telemetry    exit 1 + setup steps
+          #   FAILURE         RED / LOCKDOWN / auth / down    exit 1
           if [ -z "$SECRET" ]; then
-            echo "::warning::Cost Guard SKIPPED — COSTGUARD_CRON_SECRET is not set as a repo Actions secret. Collection cannot run until the founder completes launch/operations/COST-GUARD.md → Secrets. This is expected before setup, not a fault."
-            echo "### Cost Guard skipped :warning:" >> "$GITHUB_STEP_SUMMARY"
-            echo "\`COSTGUARD_CRON_SECRET\` is not configured, so no usage was collected." >> "$GITHUB_STEP_SUMMARY"
-            echo "See \`launch/operations/COST-GUARD.md\` → Secrets." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
+            echo "::error::Cost Guard NOT CONFIGURED — COSTGUARD_CRON_SECRET is not set as a repo Actions secret, so no spend check ran and nothing is watching spend. Fix: launch/operations/COST-GUARD.md → Secrets."
+            {
+              echo "### Cost Guard: NOT CONFIGURED :x:"
+              echo ""
+              echo "\`COSTGUARD_CRON_SECRET\` is missing from **Settings → Secrets and variables → Actions**."
+              echo "No usage was collected — **spend protection is not active**."
+              echo "See \`launch/operations/COST-GUARD.md\` → Secrets."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
           fi
           for attempt in 1 2 3; do
             HTTP=$(curl -sS -m 55 -X POST \
@@ -50,33 +63,90 @@ jobs:
           done
           RESPONSE=$(cat /tmp/cg-response.json 2>/dev/null || echo '')
           if [ -z "$HTTP" ]; then
-            echo "::error::Cost Guard collect endpoint unreachable after 3 attempts."
+            echo "::error::Cost Guard collect endpoint unreachable after 3 attempts — spend is unwatched this cycle."
+            echo "### Cost Guard: FAILURE :x:" >> "$GITHUB_STEP_SUMMARY"
+            echo "Collect endpoint unreachable after 3 attempts." >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
-          # 503 = server-side secret not configured yet. Same known-state skip
-          # as above: annotate, do not fail hourly.
+          # 503 = the deployment has no server-side secret. The check did not
+          # run, so this is NOT CONFIGURED — never a pass.
           if [ "$HTTP" = "503" ]; then
-            echo "::warning::Cost Guard SKIPPED — the deployment reports COSTGUARD_CRON_SECRET is not set in Vercel env. Add it and redeploy (launch/operations/COST-GUARD.md → Secrets)."
-            echo "### Cost Guard skipped :warning:" >> "$GITHUB_STEP_SUMMARY"
-            echo "Production returned 503: server-side secret not configured." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
+            echo "::error::Cost Guard NOT CONFIGURED — production reports COSTGUARD_CRON_SECRET is missing from Vercel env, so no spend check ran. Add it to Vercel Production and redeploy (launch/operations/COST-GUARD.md → Secrets)."
+            {
+              echo "### Cost Guard: NOT CONFIGURED :x:"
+              echo ""
+              echo "Production returned **503** — server-side \`COSTGUARD_CRON_SECRET\` is not set."
+              echo "No usage was collected — **spend protection is not active**."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
           fi
           if [ "$HTTP" = "401" ]; then
             echo "::error::Cost Guard collect rejected the Actions secret (401) — COSTGUARD_CRON_SECRET differs between GitHub and Vercel."
+            echo "### Cost Guard: FAILURE :x:" >> "$GITHUB_STEP_SUMMARY"
+            echo "Collect returned **401** — the GitHub and Vercel secrets do not match." >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
           echo "$RESPONSE"
-          STATE=$(echo "$RESPONSE" | jq -r '.state // "UNKNOWN"')
-          echo "Cost Guard state: $STATE"
+          # A 200 carrying malformed JSON must land in FAILURE, not crash the
+          # step with a confusing arithmetic error — hence the defaults.
+          STATE=$(echo "$RESPONSE" | jq -r '.state // "UNKNOWN"' 2>/dev/null || true)
+          STATE=${STATE:-UNKNOWN}
+          FRESH=$(echo "$RESPONSE" | jq -r '(.freshProviders // []) | length' 2>/dev/null || true)
+          FRESH=${FRESH:-0}
+          FRESH_LIST=$(echo "$RESPONSE" | jq -r '(.freshProviders // []) | join(", ")' 2>/dev/null || true)
+          UNCONF=$(echo "$RESPONSE" | jq -r '(.unconfiguredProviders // []) | join(", ")' 2>/dev/null || true)
+          STALE=$(echo "$RESPONSE" | jq -r '(.staleProviders // []) | join(", ")' 2>/dev/null || true)
+          echo "Cost Guard state: $STATE (fresh providers: ${FRESH_LIST:-none})"
+          if [ "$STATE" = "UNKNOWN" ]; then
+            echo "::error::Cost Guard returned no state — endpoint misconfigured."
+            echo "### Cost Guard: FAILURE :x:" >> "$GITHUB_STEP_SUMMARY"
+            echo "Collect returned no state field." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          # A real breach outranks everything below, including missing telemetry.
           if [ "$STATE" = "RED" ] || [ "$STATE" = "LOCKDOWN" ]; then
             echo "::error::Cost Guard is $STATE — check Mission Control / launch/operations/COST-GUARD.md"
             echo "$RESPONSE" | jq -r '.reasons[]?' | while read -r r; do echo "::error::$r"; done
+            {
+              echo "### Cost Guard: $STATE :rotating_light:"
+              echo ""
+              echo "Variable MTD \$$(echo "$RESPONSE" | jq -r '.totals.variableMtdUsd') · projected \$$(echo "$RESPONSE" | jq -r '.totals.projectedMonthUsd')"
+              echo "$RESPONSE" | jq -r '.reasons[]? | "- " + .'
+            } >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
-          if [ "$STATE" = "UNKNOWN" ]; then
-            echo "::error::Cost Guard returned no state — endpoint misconfigured."
+          # Having checked nothing is not a pass, whatever colour the engine
+          # reports. Without telemetry the breakers have nothing to act on.
+          if [ "$FRESH" -eq 0 ]; then
+            echo "::error::Cost Guard NOT CONFIGURED — collection authenticated but no provider returned telemetry, so no spend was actually observed. Unconfigured: ${UNCONF:-none}. Stale: ${STALE:-none}. See launch/operations/COST-GUARD.md → Manual actions."
+            {
+              echo "### Cost Guard: NOT CONFIGURED :x:"
+              echo ""
+              echo "Collection ran and authenticated, but **no provider returned usable telemetry** — no spend was observed."
+              echo ""
+              echo "- Unconfigured providers: \`${UNCONF:-none}\`"
+              echo "- Stale providers: \`${STALE:-none}\`"
+              echo ""
+              echo "Add provider credentials per \`launch/operations/COST-GUARD.md\` → Manual actions."
+            } >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
+          if [ "$STATE" = "AMBER" ]; then
+            echo "::warning::Cost Guard is AMBER — degraded but inside approved budget. Fresh providers: $FRESH_LIST."
+            {
+              echo "### Cost Guard: WARNING — AMBER :warning:"
+              echo ""
+              echo "Fresh \`$FRESH_LIST\` · unconfigured \`${UNCONF:-none}\` · stale \`${STALE:-none}\`"
+              echo "$RESPONSE" | jq -r '.reasons[]? | "- " + .'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          {
+            echo "### Cost Guard: PASS — GREEN :white_check_mark:"
+            echo ""
+            echo "Fresh providers: \`$FRESH_LIST\`"
+            echo "Variable MTD \$$(echo "$RESPONSE" | jq -r '.totals.variableMtdUsd') · projected \$$(echo "$RESPONSE" | jq -r '.totals.projectedMonthUsd')"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   cost-hazard-scan:
     if: github.event_name == 'pull_request'
