@@ -179,12 +179,36 @@ async function main() {
       const mins = i > 72 ? (i - 72) * 20 : 0 // ~480 min/day
       ps[2] = provider('github', {
         collectedAt: at.toISOString(),
-        metrics: [{ name: 'actions_minutes', mtd: 300 + mins, unit: 'min', estCostUsd: 0 }],
+        metrics: [
+          { name: 'actions_minutes', mtd: 300 + mins, unit: 'min', estCostUsd: 0 },
+          { name: 'actions_paid_minutes', mtd: 300 + mins, unit: 'min', estCostUsd: 0 },
+        ],
       })
       return ps
     })
     const { state } = evaluate(snaps, greenPrior(), NOW)
-    ok('runaway GitHub Actions minutes → not GREEN', state.state !== 'GREEN', state.state)
+    ok('runaway BILLABLE GitHub Actions minutes → not GREEN', state.state !== 'GREEN', state.state)
+  }
+
+  // 7b. The same runaway on a PUBLIC repo — minutes are free and unlimited, so
+  // none of them are billable. Busy CI must not trip a spend breaker.
+  {
+    const snaps = series(96, NOW, (i, at) => {
+      const ps = normalProviders(at)
+      const mins = i > 72 ? (i - 72) * 20 : 0
+      ps[2] = provider('github', {
+        collectedAt: at.toISOString(),
+        metrics: [
+          { name: 'actions_minutes', mtd: 300 + mins, unit: 'min', estCostUsd: 0 },
+          { name: 'actions_paid_minutes', mtd: 0, unit: 'min', estCostUsd: 0 },
+        ],
+      })
+      return ps
+    })
+    const { state } = evaluate(snaps, greenPrior(), NOW)
+    ok('free (unbilled) GitHub Actions minutes never trip the breaker',
+      state.state === 'GREEN',
+      `${state.state}: ${state.reasons.join('; ')}`)
   }
 
   // 8. R2 Class A surge → escalation
