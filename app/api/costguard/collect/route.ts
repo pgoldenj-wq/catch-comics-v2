@@ -35,6 +35,13 @@ export async function POST(req: NextRequest) {
       totals: result.state.totals,
       staleProviders: result.state.staleProviders,
       unconfiguredProviders: result.state.unconfiguredProviders,
+      // Providers that returned usable, in-date telemetry this cycle. CI needs
+      // this to tell "checked and healthy" apart from "checked nothing" — an
+      // empty list means no spend was actually observed, which must never be
+      // reported as a passing check.
+      freshProviders: result.state.perProvider
+        .filter(p => p.configured && p.fresh)
+        .map(p => p.provider),
       storeMode: result.storeMode,
       emittedEvents: result.emittedEvents,
       at: result.snapshot.at,

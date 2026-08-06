@@ -445,7 +445,7 @@ function render(){
     const stCol = g.state==='GREEN' ? 'var(--green)' : g.state==='AMBER' ? 'var(--amber)' : 'var(--red)';
     const t = g.totals;
     cg += `<div style="margin-bottom:10px"><strong style="color:${stCol};font-size:18px">${esc(g.state)}${g.lockdownLatched?' (latched)':''}</strong>
-      <span class="src"> · since ${g.since ? age(g.since) : 'n/a'} · data ${g.dataAgeHours===null?'never collected':`${g.dataAgeHours}h old`} · store ${esc(g.storeMode)}</span></div>`;
+      <span class="src"> · since ${g.since ? age(g.since) : 'n/a'} · data ${g.dataAgeHours===null?'never collected':`${g.dataAgeHours}h old`} · store ${esc(g.storeMode)} · source ${esc(g.source||'local')}</span></div>`;
     for (const r of (g.reasons||[]).slice(0,4)) cg += `<div class="win" style="color:var(--ink2)">· ${esc(r)}</div>`;
     if (t){
       cg += `<div class="win" style="color:var(--ink2)">💵 Variable MTD <strong>$${t.variableMtdUsd}</strong> · projected month-end <strong>$${t.projectedMonthUsd}</strong> · fixed fees $${t.fixedMonthlyUsd}</div>

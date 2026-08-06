@@ -107,9 +107,8 @@ Rules:
 ## Manual actions (founder) — provider credentials and native hard caps
 
 Cost Guard enforces with whatever telemetry exists and treats missing
-telemetry as AMBER, never GREEN. To light up each provider, and to arm the
-provider-native backstops, see the **"Do this now"** section in the PR /
-final report. Summary of what each control truly is:
+telemetry as AMBER, never GREEN. To light up each provider, follow
+**"Do this now"** below. Summary of what each native control truly is:
 
 | Provider | Native control | Is it a true hard cap? |
 |---|---|---|
@@ -123,6 +122,69 @@ returns errors (paused deployment) until you raise/remove the limit in
 Vercel → Settings → Billing → Spend Management and redeploy. That is the
 deliberate last resort at $100 — everything before it (AMBER/RED/LOCKDOWN)
 protects spend while keeping reads alive.
+
+### Do this now — activate provider telemetry
+
+Shared authentication is **live** as of 2026-08-06: `COSTGUARD_CRON_SECRET` is
+set in the GitHub Actions repo secret, Vercel Production and `.env.local`, and
+the scheduled job performs a real authenticated collection. What is still
+missing is provider telemetry — without it Cost Guard sits at AMBER and CI
+reports **NOT CONFIGURED** (a red run), by design.
+
+Already configured — nothing to do: `COSTGUARD_CRON_SECRET`,
+`CLOUDFLARE_ACCOUNT_ID`, `VERCEL_TEAM_ID`, `KV_REST_API_URL`,
+`KV_REST_API_TOKEN`.
+
+Each step below ends with a value that is shown **once**. Paste it straight
+into Vercel; never into a commit, a URL, a screenshot or a chat window.
+
+**1. Neon — `NEON_API_KEY`** (the highest-value one: Neon is ~90% of variable spend)
+1. Neon Console → account menu (top right) → **Account settings** → **API keys**.
+2. **Create new API key**, name it `catch-costguard`, copy the value.
+3. Vercel → project `catch-comics-v2` → **Settings → Environment Variables** →
+   add `NEON_API_KEY`, scope **Production**.
+
+**2. Cloudflare — `CLOUDFLARE_API_TOKEN`**
+1. Cloudflare dashboard → **My Profile → API Tokens** → **Create Token** →
+   **Create Custom Token**.
+2. Permissions: **Account → Account Analytics → Read**. Account Resources:
+   include the account that owns the R2 bucket. (If the adapter later reports a
+   GraphQL authorization error, re-edit the token and also add
+   **Account → Workers R2 Storage → Read**.)
+3. Create, copy, then add `CLOUDFLARE_API_TOKEN` to Vercel **Production**.
+4. Confirm the existing `CLOUDFLARE_ACCOUNT_ID` equals your `R2_ACCOUNT_ID` —
+   they are the same Cloudflare account id.
+
+**3. GitHub — `GITHUB_BILLING_TOKEN`**
+1. github.com → **Settings → Developer settings → Personal access tokens →
+   Fine-grained tokens** → **Generate new token**.
+2. Resource owner `pgoldenj-wq`; under **Account permissions** set
+   **Plan → Read-only**. No repository permissions are needed.
+3. Generate, copy, add `GITHUB_BILLING_TOKEN` to Vercel **Production**.
+
+Note: `catch-comics-v2` is a **public** repo, so Actions minutes are free and
+this provider should report ~$0. It is a tripwire, not a live cost centre.
+
+**4. Vercel — `COSTGUARD_WEBHOOK_SECRET` (and the only true auto-pause)**
+1. Vercel → **Team Settings → Billing → Spend Management**.
+2. Add the webhook with the bare URL — no secret in the URL:
+   `https://www.catchcomics.com/api/costguard/vercel-webhook`
+3. Vercel shows a **signing secret once** on save — copy it.
+4. Add `COSTGUARD_WEBHOOK_SECRET` to Vercel **Production**. Optionally add
+   `VERCEL_SPEND_LIMIT_USD` mirroring the dashboard limit.
+
+**5. Redeploy, then confirm**
+Environment variables only reach the running functions on a new deployment:
+
+```
+vercel redeploy <current production url>
+npm run costguard:status
+```
+
+`costguard:status` should print a state with `source: production`, and the
+provider list in Mission Control should show the newly configured providers
+with real numbers instead of `not configured`. Once at least one provider
+returns telemetry, the scheduled Cost Guard run goes green again.
 
 ## Incident checklist
 

@@ -1,16 +1,17 @@
 {
-  "generatedAt": "2026-08-03T13:46:14.997Z",
-  "storeMode": "file",
+  "generatedAt": "2026-08-06T21:14:12.060Z",
+  "source": "production",
+  "storeMode": "kv",
   "configured": true,
   "state": "AMBER",
-  "since": "2026-08-03T13:45:48.653Z",
+  "since": "2026-08-06T21:05:11.285Z",
   "lockdownLatched": false,
   "reasons": [
     "No provider has fresh data — GREEN is not possible without telemetry.",
     "Not yet configured (no credentials): neon, vercel, github, cloudflare."
   ],
-  "lastCollectionAt": "2026-08-03T13:45:48.653Z",
-  "dataAgeHours": 0,
+  "lastCollectionAt": "2026-08-06T21:05:11.285Z",
+  "dataAgeHours": 0.2,
   "staleProviders": [],
   "unconfiguredProviders": [
     "neon",
@@ -113,19 +114,7 @@
   },
   "recentEvents": [
     {
-      "at": "2026-08-03T13:45:52.654Z",
-      "kind": "job-allowed-with-warning",
-      "dedupeKey": "allowed-warn:script:backfill-covers:AMBER",
-      "message": "script:backfill-covers allowed in AMBER (class=high-risk)."
-    },
-    {
-      "at": "2026-08-03T13:45:52.643Z",
-      "kind": "job-allowed-with-warning",
-      "dedupeKey": "allowed-warn:inngest:price-check:AMBER",
-      "message": "inngest:price-check allowed in AMBER (class=deferrable)."
-    },
-    {
-      "at": "2026-08-03T13:45:48.653Z",
+      "at": "2026-08-06T21:05:11.285Z",
       "kind": "state-change",
       "provider": "global",
       "dedupeKey": "finding:State changed (none) → AMBER#",
@@ -136,6 +125,150 @@
         "burnUsdPerDay": 0,
         "state": "AMBER"
       }
+    },
+    {
+      "at": "2026-08-06T20:00:39.834Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:sync-retailer:AMBER",
+      "message": "inngest:sync-retailer allowed in AMBER (class=nonessential)."
+    },
+    {
+      "at": "2026-08-06T20:00:32.485Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:sync-retailer-scheduled:AMBER",
+      "message": "inngest:sync-retailer-scheduled allowed in AMBER (class=nonessential)."
+    },
+    {
+      "at": "2026-08-06T16:00:25.081Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:price-check:AMBER",
+      "message": "inngest:price-check allowed in AMBER (class=deferrable)."
+    },
+    {
+      "at": "2026-08-06T14:00:38.768Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:sync-retailer:AMBER",
+      "message": "inngest:sync-retailer allowed in AMBER (class=nonessential)."
+    },
+    {
+      "at": "2026-08-06T14:00:26.247Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:sync-retailer-scheduled:AMBER",
+      "message": "inngest:sync-retailer-scheduled allowed in AMBER (class=nonessential)."
+    },
+    {
+      "at": "2026-08-06T08:01:19.743Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:price-check:AMBER",
+      "message": "inngest:price-check allowed in AMBER (class=deferrable)."
+    },
+    {
+      "at": "2026-08-06T07:01:24.253Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:sync-retailer:AMBER",
+      "message": "inngest:sync-retailer allowed in AMBER (class=nonessential)."
+    },
+    {
+      "at": "2026-08-06T07:01:01.318Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:sync-retailer-scheduled:AMBER",
+      "message": "inngest:sync-retailer-scheduled allowed in AMBER (class=nonessential)."
+    },
+    {
+      "at": "2026-08-06T04:00:45.898Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:bookshop-refresh:AMBER",
+      "message": "inngest:bookshop-refresh allowed in AMBER (class=nonessential)."
+    },
+    {
+      "at": "2026-08-06T03:00:19.357Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:cleanup-stale:AMBER",
+      "message": "inngest:cleanup-stale allowed in AMBER (class=deferrable)."
+    },
+    {
+      "at": "2026-08-06T02:00:23.791Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:enrich-canonical:AMBER",
+      "message": "inngest:enrich-canonical allowed in AMBER (class=nonessential)."
+    },
+    {
+      "at": "2026-08-06T01:01:15.827Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:sync-retailer:AMBER",
+      "message": "inngest:sync-retailer allowed in AMBER (class=nonessential)."
+    },
+    {
+      "at": "2026-08-06T01:00:19.030Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:sync-retailer-scheduled:AMBER",
+      "message": "inngest:sync-retailer-scheduled allowed in AMBER (class=nonessential)."
+    },
+    {
+      "at": "2026-08-06T00:00:28.457Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:price-check:AMBER",
+      "message": "inngest:price-check allowed in AMBER (class=deferrable)."
+    },
+    {
+      "at": "2026-08-05T18:01:38.947Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:sync-retailer:AMBER",
+      "message": "inngest:sync-retailer allowed in AMBER (class=nonessential)."
+    },
+    {
+      "at": "2026-08-05T18:00:39.770Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:sync-retailer-scheduled:AMBER",
+      "message": "inngest:sync-retailer-scheduled allowed in AMBER (class=nonessential)."
+    },
+    {
+      "at": "2026-08-05T16:00:11.133Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:price-check:AMBER",
+      "message": "inngest:price-check allowed in AMBER (class=deferrable)."
+    },
+    {
+      "at": "2026-08-05T12:01:02.747Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:sync-retailer:AMBER",
+      "message": "inngest:sync-retailer allowed in AMBER (class=nonessential)."
+    },
+    {
+      "at": "2026-08-05T12:00:22.530Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:sync-retailer-scheduled:AMBER",
+      "message": "inngest:sync-retailer-scheduled allowed in AMBER (class=nonessential)."
+    },
+    {
+      "at": "2026-08-05T08:00:28.230Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:price-check:AMBER",
+      "message": "inngest:price-check allowed in AMBER (class=deferrable)."
+    },
+    {
+      "at": "2026-08-05T06:00:11.288Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:sync-retailer:AMBER",
+      "message": "inngest:sync-retailer allowed in AMBER (class=nonessential)."
+    },
+    {
+      "at": "2026-08-05T06:00:03.043Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:sync-retailer-scheduled:AMBER",
+      "message": "inngest:sync-retailer-scheduled allowed in AMBER (class=nonessential)."
+    },
+    {
+      "at": "2026-08-05T04:00:12.356Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:bookshop-refresh:AMBER",
+      "message": "inngest:bookshop-refresh allowed in AMBER (class=nonessential)."
+    },
+    {
+      "at": "2026-08-05T03:00:02.623Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:cleanup-stale:AMBER",
+      "message": "inngest:cleanup-stale allowed in AMBER (class=deferrable)."
     }
   ]
 }
