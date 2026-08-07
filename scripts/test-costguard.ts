@@ -154,11 +154,14 @@ async function main() {
       `${state.state}: ${state.reasons.join('; ')}`)
   }
 
-  // 6. Vercel spend acceleration (webhook-reported) → projected breach → RED
+  // 6. Vercel spend acceleration (webhook-reported) → projected breach → RED.
+  // Calibrated to the $25 on-demand budget band (soft 10 / max 20 / cat 25):
+  // MTD stays under the catastrophic figure so this exercises the RED rung,
+  // not LOCKDOWN.
   {
     const snaps = series(96, NOW, (i, at) => {
       const ps = normalProviders(at)
-      const vercelSpend = i > 48 ? (i - 48) * 1.5 : 0 // $36/day acceleration
+      const vercelSpend = i > 48 ? (i - 48) * 0.3 : 0 // ends ≈ $14 MTD, ≈ $4.7/day
       ps[1] = provider('vercel', {
         collectedAt: at.toISOString(),
         fixedMonthlyUsd: 20,
@@ -168,8 +171,33 @@ async function main() {
       return ps
     })
     const { state } = evaluate(snaps, greenPrior(), NOW)
-    ok('Vercel spend acceleration → RED', state.state === 'RED',
+    ok('Vercel spend acceleration under the cap → RED', state.state === 'RED',
       `${state.state}: ${state.reasons.join('; ')}`)
+    const vercelMtd = state.perProvider.find(p => p.provider === 'vercel')?.variableMtdUsd ?? 0
+    ok('Vercel RED case stays below the catastrophic figure',
+      vercelMtd < CFG.providers.vercel.catastrophicUsd,
+      `vercel mtd $${vercelMtd} vs cat $${CFG.providers.vercel.catastrophicUsd}`)
+  }
+
+  // 6b. Vercel spend past the $25 on-demand budget → LOCKDOWN. Vercel's own
+  // Production pause is deliberately OFF, so these breakers are the only thing
+  // that stops at the budget.
+  {
+    const snaps = series(96, NOW, (i, at) => {
+      const ps = normalProviders(at)
+      const vercelSpend = i > 48 ? (i - 48) * 1.5 : 0 // ends ≈ $70 MTD, well past $25
+      ps[1] = provider('vercel', {
+        collectedAt: at.toISOString(),
+        fixedMonthlyUsd: 20,
+        variableMtdUsd: vercelSpend,
+        metrics: [{ name: 'spend_management_reported_usd', mtd: vercelSpend, unit: 'USD', estCostUsd: vercelSpend }],
+      })
+      return ps
+    })
+    const { state } = evaluate(snaps, greenPrior(), NOW)
+    ok('Vercel MTD past the $25 budget → LOCKDOWN', state.state === 'LOCKDOWN',
+      `${state.state}: ${state.reasons.join('; ')}`)
+    ok('LOCKDOWN latches on the Vercel budget breach', state.lockdownLatched)
   }
 
   // 7. Runaway GitHub Actions minutes → escalation

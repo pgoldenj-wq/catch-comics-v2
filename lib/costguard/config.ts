@@ -65,9 +65,15 @@ export const COSTGUARD_CONFIG = {
     vercel: {
       fixedMonthlyUsd: 20,
       expectedMonthlyUsd: 5,
-      softBudgetUsd: 15,
-      maxApprovedUsd: 40,
-      catastrophicUsd: 100,     // pair with Vercel Spend Management pause at $100
+      // Aligned to the real Vercel On-Demand Budget of $25 (set 2026-08-07).
+      // Production pause is deliberately OFF, so Vercel itself enforces nothing
+      // — these breakers are the enforcement, and they must therefore escalate
+      // BELOW the budget rather than above it. The previous band (15/40/100)
+      // could not reach RED until $40, i.e. $15 past the budget it was meant
+      // to protect.
+      softBudgetUsd: 10,
+      maxApprovedUsd: 20,
+      catastrophicUsd: 25,      // == the on-demand budget; LOCKDOWN at the cap
     },
     github: {
       fixedMonthlyUsd: 0,
