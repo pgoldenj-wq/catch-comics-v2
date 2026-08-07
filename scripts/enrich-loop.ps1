@@ -41,12 +41,33 @@ public class SleepBlock {
 [SleepBlock]::PreventSleep()
 Log "sleep-block active: ES_CONTINUOUS | ES_SYSTEM_REQUIRED"
 
+# Restart policy. A bare 5s restart turns a job that exits immediately into a
+# permanent hot loop: each relaunch re-runs the candidate query, and on
+# 2026-08-07 that produced 117.6 GB/day of Neon egress for zero useful work.
+#   exit 3   = nothing to process (checkpoint caught up) -> long sleep
+#   run < 60s = crashed or no-op'd fast                  -> back off
+$NothingToDoExit  = 3
+$IdleSleepSeconds = 3600
+$MinRunSeconds    = 60
+$BackoffSeconds   = 900
+
 while ($true) {
   Log "launching: npm run enrich:catalogue:full -- --rate-ms 20000"
+  $started = Get-Date
   # Append stdout+stderr to the log; the script itself also writes its own
   # progress lines so this captures both the wrapper meta and the npm output.
   & cmd /c "npm run enrich:catalogue:full -- --rate-ms 20000" *>> $LogFile
   $exit = $LASTEXITCODE
-  Log "exited with code $exit; restarting in 5s"
-  Start-Sleep -Seconds 5
+  $ran  = [int]((Get-Date) - $started).TotalSeconds
+
+  if ($exit -eq $NothingToDoExit) {
+    Log "nothing to process (exit $exit) after ${ran}s; sleeping ${IdleSleepSeconds}s"
+    Start-Sleep -Seconds $IdleSleepSeconds
+  } elseif ($ran -lt $MinRunSeconds) {
+    Log "exited with code $exit after only ${ran}s; backing off ${BackoffSeconds}s to avoid a hot restart loop"
+    Start-Sleep -Seconds $BackoffSeconds
+  } else {
+    Log "exited with code $exit after ${ran}s; restarting in 5s"
+    Start-Sleep -Seconds 5
+  }
 }

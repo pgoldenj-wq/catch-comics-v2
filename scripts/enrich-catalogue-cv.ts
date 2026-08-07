@@ -107,6 +107,14 @@ function parseArgs(): Args {
 // ── Checkpoint ────────────────────────────────────────────────────────────────
 
 // Resolved in main() based on --worker-id (default: existing single-worker path for backward compat)
+/**
+ * Distinct exit code meaning "ran fine, but there was nothing to process".
+ * The restart wrappers back off for a long interval on this instead of
+ * relaunching in 5s — a hot restart loop re-runs the candidate query every few
+ * seconds and was the mechanism behind the 2026-08-07 Neon egress incident.
+ */
+const NOTHING_TO_DO_EXIT = 3
+
 let CHECKPOINT_PATH = join(__dirname, '.enrich-catalogue-checkpoint.json')
 
 interface Checkpoint {
@@ -447,11 +455,17 @@ async function main() {
   // typically discards the majority of WoB-style pollution (German academic
   // books, Latin classics, cookbooks etc.) so we need a much larger raw pool
   // to land args.limit real comic candidates.
+  // NOTE: description and cover_image_url are deliberately NOT selected here.
+  // This query returns the whole candidate pool (119,615 rows for worker 2),
+  // but those two columns are only ever read for the handful of products that
+  // actually match Comic Vine. description alone was 63.7% of a 30.7 MB
+  // payload; re-run on a 5-second restart loop it produced 117.6 GB/day of
+  // Neon egress on 2026-08-07. They are fetched for the selected pool below.
   const candidates = await prisma.$queryRawUnsafe<Array<{
     id: string; title: string; publisher: string | null;
-    series_name: string | null; cover_image_url: string | null; description: string | null
+    series_name: string | null
   }>>(`
-    SELECT id, title, publisher, series_name, cover_image_url, description
+    SELECT id, title, publisher, series_name
     FROM canonical_products
     WHERE comicvine_id IS NULL
       AND deleted_at IS NULL
@@ -475,8 +489,34 @@ async function main() {
     classifyTextForEnrichment(`${c.title} ${c.publisher ?? ''}`) === 'comic'
 
   const filtered = candidates.filter(c => !processedSet.has(c.id) && looksLikeComic(c))
-  const pool     = filtered.slice(0, args.limit)
+  const selected = filtered.slice(0, args.limit)
+
+  // Now — and only now — fetch the two heavy columns, for the rows we will
+  // actually process rather than for the whole candidate pool.
+  const heavy = new Map<string, { description: string | null; cover_image_url: string | null }>()
+  if (selected.length) {
+    const rows = await prisma.canonicalProduct.findMany({
+      where:  { id: { in: selected.map(c => c.id) } },
+      select: { id: true, description: true, coverImageUrl: true },
+    })
+    for (const r of rows) {
+      heavy.set(r.id, { description: r.description, cover_image_url: r.coverImageUrl })
+    }
+  }
+  const pool = selected.map(c => ({
+    ...c,
+    ...(heavy.get(c.id) ?? { description: null, cover_image_url: null }),
+  }))
   console.log(`Candidate pool: ${candidates.length} raw → ${filtered.length} pass comic filter → ${pool.length} selected`)
+
+  // Nothing left to do (the checkpoint has caught up). Say so explicitly and
+  // exit with a distinct code so the restart wrapper can back off instead of
+  // re-running this query every few seconds.
+  if (pool.length === 0) {
+    console.log('Nothing to process — checkpoint is caught up for this partition.')
+    await prisma.$disconnect()
+    process.exit(NOTHING_TO_DO_EXIT)
+  }
 
   // Audit trail of successful matches (sample for spot-checking)
   const auditSamples: Array<Record<string, unknown>> = []

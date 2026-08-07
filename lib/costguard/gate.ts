@@ -108,6 +108,20 @@ export async function assertJobAllowed(spec: JobSpec): Promise<JobBudget> {
     throw new JobRefusedError(spec.operation, effective, reason)
   }
 
+  // A guard that cannot see any state is not a guard. On 2026-08-07 a founder
+  // machine with no KV credentials read the local file store, found no state,
+  // degraded to AMBER, and let a high-risk bulk job run for hours while
+  // production was RED — 117.6 GB/day of Neon egress. AMBER is a fine default
+  // for lighter classes, but high-risk work must not proceed blind.
+  if (state === null && !isDry && spec.jobClass === 'high-risk') {
+    const reason =
+      'Cost Guard has no visible state — refusing a high-risk job rather than running blind. ' +
+      'Set KV_REST_API_URL + KV_REST_API_TOKEN so this machine reads the shared state, ' +
+      'or run `npm run costguard:collect` first.'
+    await recordRefusal(spec, state, effective, reason)
+    throw new JobRefusedError(spec.operation, effective, reason)
+  }
+
   if (effective === 'RED' && !isDry &&
       (spec.jobClass === 'nonessential' || spec.jobClass === 'high-risk')) {
     const reason = `Cost Guard is RED (${state?.reasons[0] ?? 'no telemetry'}) — nonessential and high-risk jobs are blocked.`

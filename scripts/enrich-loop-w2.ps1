@@ -40,10 +40,29 @@ public class SleepBlock {
 [SleepBlock]::PreventSleep()
 Log "sleep-block active: ES_CONTINUOUS | ES_SYSTEM_REQUIRED"
 
+# Restart policy — see enrich-loop.ps1. A bare 5s restart turns a job that
+# exits immediately into a permanent hot loop; on 2026-08-07 that produced
+# 117.6 GB/day of Neon egress for zero useful work.
+$NothingToDoExit  = 3
+$IdleSleepSeconds = 3600
+$MinRunSeconds    = 60
+$BackoffSeconds   = 900
+
 while ($true) {
   Log "launching: npm run enrich:catalogue:full -- --worker-id 2 --rate-ms 20000"
+  $started = Get-Date
   & cmd /c "npm run enrich:catalogue:full -- --worker-id 2 --rate-ms 20000" *>> $LogFile
   $exit = $LASTEXITCODE
-  Log "exited with code $exit; restarting in 5s"
-  Start-Sleep -Seconds 5
+  $ran  = [int]((Get-Date) - $started).TotalSeconds
+
+  if ($exit -eq $NothingToDoExit) {
+    Log "nothing to process (exit $exit) after ${ran}s; sleeping ${IdleSleepSeconds}s"
+    Start-Sleep -Seconds $IdleSleepSeconds
+  } elseif ($ran -lt $MinRunSeconds) {
+    Log "exited with code $exit after only ${ran}s; backing off ${BackoffSeconds}s to avoid a hot restart loop"
+    Start-Sleep -Seconds $BackoffSeconds
+  } else {
+    Log "exited with code $exit after ${ran}s; restarting in 5s"
+    Start-Sleep -Seconds 5
+  }
 }
