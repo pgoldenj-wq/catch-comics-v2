@@ -291,6 +291,23 @@ async function main() {
     estRows: 5000, estRequests: 1000, maxRuntimeMs: 3_600_000, write: true,
   }
 
+  // Regression (2026-08-07): a founder machine with no KV credentials read the
+  // local file store, found no state at all, degraded to AMBER and let a
+  // high-risk bulk job run for hours while production was RED — 117.6 GB/day
+  // of Neon egress. A guard that can see nothing must not wave bulk work through.
+  {
+    rmSync(join(process.cwd(), '.costguard-state', 'costguard_state.json'), { force: true })
+    let blindRefused = false
+    try { await assertJobAllowed(baseSpec) }
+    catch (e) { blindRefused = e instanceof JobRefusedError }
+    ok('high-risk job refused when Cost Guard has no visible state', blindRefused)
+
+    let lighterOk = true
+    try { await assertJobAllowed({ operation: 'inngest:price-check', jobClass: 'deferrable', write: true }) }
+    catch { lighterOk = false }
+    ok('lighter job classes still run when state is unavailable', lighterOk)
+  }
+
   await setState(mkState('GREEN'))
   let allowed = true
   try { await assertJobAllowed(baseSpec) } catch { allowed = false }
