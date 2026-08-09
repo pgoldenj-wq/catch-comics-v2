@@ -48,7 +48,7 @@ type Classification =
   | 'missing-repo-secret' | 'missing-vercel-secret' | 'auth-mismatch'
   | 'endpoint-unreachable' | 'malformed-response' | 'no-telemetry'
   | 'provider-stale' | 'runner-never-assigned' | 'cost-hazard-scan-failed'
-  | 'healthy' | 'unclassified'
+  | 'healthy' | 'in-progress' | 'unclassified'
 
 interface RunRow {
   id: number
@@ -194,7 +194,19 @@ const RULES: Array<{
 
 function classify(run: {
   conclusion: string; annotations: string[]; failedJob: string | null; hasJobs: boolean
+  status?: string
 }): { classification: Classification; title: string; meaning: string; moneyAtRisk: boolean; costGuardBroken: boolean } {
+  // A run still in flight has no conclusion yet. Treating "not success" as
+  // "failed" invented an open incident every time a scan caught a live run --
+  // and a page that cries wolf about its own CI is no better than one that
+  // hides a real fault.
+  if (run.status && run.status !== 'completed') {
+    return {
+      classification: 'in-progress', title: 'Run still in progress',
+      meaning: 'This run had not finished when the snapshot was taken, so it has no verdict yet.',
+      moneyAtRisk: false, costGuardBroken: false,
+    }
+  }
   if (run.conclusion === 'success') {
     return {
       classification: 'healthy', title: 'Check ran and passed',
@@ -263,7 +275,8 @@ async function main() {
   const runs: RunRow[] = []
   for (const r of rawRuns) {
     const id = Number(r.databaseId)
-    const conclusion = String(r.conclusion ?? r.status ?? '')
+    const conclusion = String(r.conclusion ?? '')
+    const status = String(r.status ?? '')
     const createdAt = String(r.createdAt)
     const updatedAt = String(r.updatedAt ?? r.createdAt)
 
@@ -274,7 +287,7 @@ async function main() {
 
     // Only failures need the extra calls — a green run's detail is noise, and
     // every avoided call is headroom under the cap.
-    if (conclusion !== 'success' && conclusion !== '') {
+    if (status === 'completed' && conclusion !== 'success' && conclusion !== '') {
       try {
         const jobsDoc = gh(['api', `repos/${REPO}/actions/runs/${id}/jobs`]) as {
           jobs?: Array<{ id: number; name: string; conclusion: string; steps?: Array<{ name: string; conclusion: string }> }>
@@ -293,7 +306,7 @@ async function main() {
       } catch { hasJobs = false }
     }
 
-    const c = classify({ conclusion, annotations, failedJob, hasJobs })
+    const c = classify({ conclusion, annotations, failedJob, hasJobs, status })
     runs.push({
       id,
       url: String(r.url ?? `https://github.com/${REPO}/actions/runs/${id}`),
@@ -307,7 +320,7 @@ async function main() {
       failedStep,
       annotations,
       classification: c.classification,
-      signature: c.classification === 'healthy' ? 'healthy' : signatureOf(c.classification, annotations),
+      signature: (c.classification === 'healthy' || c.classification === 'in-progress') ? c.classification : signatureOf(c.classification, annotations),
     })
   }
 
@@ -316,7 +329,7 @@ async function main() {
   const ordered = [...runs].reverse()
   const byId = new Map<string, Incident>()
   for (const run of ordered) {
-    if (run.classification === 'healthy') continue
+    if (run.classification === 'healthy' || run.classification === 'in-progress') continue
     const meta = classify({
       conclusion: run.conclusion, annotations: run.annotations,
       failedJob: run.failedJob, hasJobs: true,
@@ -382,7 +395,7 @@ async function main() {
   doc.latest = runs[0] ?? null
   doc.counts = {
     runs: runs.length,
-    failures: runs.filter(r => r.conclusion !== 'success').length,
+    failures: runs.filter(r => r.classification !== 'healthy' && r.classification !== 'in-progress').length,
     openIncidents: incidents.filter(i => i.state === 'open').length,
     windowFrom: ordered[0]?.createdAt ?? null,
     windowTo: runs[0]?.createdAt ?? null,
