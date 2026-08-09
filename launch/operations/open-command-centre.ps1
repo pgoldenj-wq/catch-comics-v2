@@ -60,9 +60,57 @@ if (-not $SkipChecks) {
     Say '  FAILED - .env.local not found (database credentials needed for health check)' Red
     $healthStatus = 'FAILED'; $anyFailure = $true
   } else {
+    # Mark the boundary BEFORE the run: a report left over from an earlier
+    # launch must never be mistaken for this run's output.
+    $healthJson  = Join-Path $RepoRoot 'launch\operations\launch-health-latest.json'
+    $runStartedAt = (Get-Date).ToUniversalTime()
+
     & npm run launch:health
-    if ($LASTEXITCODE -eq 0) { $healthStatus = 'PASSED'; Say '  launch:health PASSED' Green }
-    else { $healthStatus = 'FAILED'; $anyFailure = $true; Say "  launch:health FAILED (exit $LASTEXITCODE) - read the output above" Red }
+    $healthExit = $LASTEXITCODE
+
+    # The exit code alone is not sufficient evidence in either direction.
+    # Observed 2026-08-09: the runner returned -1073740791 (0xC0000409,
+    # STATUS_STACK_BUFFER_OVERRUN - a native teardown crash) *after* writing a
+    # complete, valid report. The reverse is also possible: a clean exit that
+    # wrote nothing. So verdict on the artefact, not just the code.
+    $healthReport = $null
+    try { $healthReport = Get-Content $healthJson -Raw -ErrorAction Stop | ConvertFrom-Json } catch { $healthReport = $null }
+
+    $reportIsCurrent = $false
+    if ($healthReport -and $healthReport.generatedAt -and $healthReport.catalogue -and $healthReport.pricing) {
+      try {
+        $styles = [Globalization.DateTimeStyles]::AdjustToUniversal -bor [Globalization.DateTimeStyles]::AssumeUniversal
+        $gen = [datetime]::Parse($healthReport.generatedAt, [Globalization.CultureInfo]::InvariantCulture, $styles)
+        # 5s slack absorbs clock granularity between this shell and the script.
+        $reportIsCurrent = $gen -ge $runStartedAt.AddSeconds(-5)
+      } catch { $reportIsCurrent = $false }
+    }
+
+    if ($healthExit -eq 0 -and $reportIsCurrent) {
+      $healthStatus = 'PASSED'
+      Say '  launch:health PASSED' Green
+    } elseif ($reportIsCurrent) {
+      # Data is trustworthy; the runner is not. Surface the code, never hide it.
+      $healthStatus = "PASSED (report complete; runner exited $healthExit)"
+      Say "  launch:health report is COMPLETE and CURRENT, but the runner exited $healthExit" Yellow
+      Say '    Native crash after the work finished - the data above is trustworthy.' Yellow
+    } elseif ($healthExit -eq 0) {
+      $healthStatus = 'FAILED (exited 0 but wrote no current report)'
+      $anyFailure = $true
+      Say '  launch:health FAILED - exited cleanly but produced no current report' Red
+    } else {
+      $healthStatus = "FAILED (exit $healthExit)"
+      $anyFailure = $true
+      Say "  launch:health FAILED (exit $healthExit) - read the output above" Red
+    }
+
+    if (-not $reportIsCurrent) {
+      if ($healthReport -and $healthReport.generatedAt) {
+        Say "    Ignoring stale report from $($healthReport.generatedAt) - NOT this run." DarkYellow
+      } elseif ($healthReport) {
+        Say '    launch-health-latest.json is present but incomplete or unparseable.' DarkYellow
+      }
+    }
   }
 
   # -- 2. Production smoke (20 public checks) --------------------------------
@@ -83,8 +131,12 @@ if (-not $SkipChecks) {
 Say ''
 Say '-- 3/3 . Mission Control server -------------------------------------' DarkGray
 function Test-McServer {
+  # 10s timeout, not 3s: a cold first request against a freshly-started (or
+  # idle) http-server legitimately takes ~3.4s to respond. A 3s limit misreported
+  # that cold start as "port busy / not Mission Control". A genuinely-down server
+  # still fails fast (connection refused), so this only tolerates slow-but-alive.
   try {
-    $r = Invoke-WebRequest -Uri "$BaseUrl/mission-control.html" -UseBasicParsing -TimeoutSec 3
+    $r = Invoke-WebRequest -Uri "$BaseUrl/mission-control.html" -UseBasicParsing -TimeoutSec 10
     return ($r.StatusCode -eq 200 -and $r.Content -match 'Mission Control')
   } catch { return $false }
 }
