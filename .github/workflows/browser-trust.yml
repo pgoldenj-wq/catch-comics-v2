@@ -1,0 +1,135 @@
+# Browser Trust — can a real visitor use the key journeys in a real browser?
+#
+# Complements, and does not replace:
+#   launch:health  data + catalogue truth (local, needs DB credentials)
+#   launch:smoke   fast public HTTP/API truth (daily cron, launch-smoke.yml)
+#   Smoke Test V4  founder judgement on covers, editions and polish
+# See launch/operations/BROWSER-TRUST.md.
+#
+# Triggers:
+#   deployment_status  — automatically, ONLY on a SUCCESSFUL Vercel *Preview*
+#                        deployment, using that deployment's own URL.
+#   workflow_dispatch  — deliberate run against Production or a given Preview.
+#
+# Never scheduled. Never runs retailer syncs, Inngest, enrichment or any
+# write path: the suite is `--grep @prod-safe`, which is the read-only gate.
+name: Browser Trust (Playwright)
+
+on:
+  deployment_status:
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: 'HTTPS URL to test — catchcomics.com or a catch-comics-*.vercel.app Preview URL'
+        required: true
+        default: 'https://www.catchcomics.com'
+
+permissions:
+  contents: read
+
+# One run per deployed commit. Vercel can emit more than one `success`
+# deployment_status for the same deployment (build, then alias); keying on the
+# SHA with cancel-in-progress means a duplicate supersedes the earlier run
+# instead of doubling it. A genuinely new commit has a different SHA and is
+# never cancelled by another commit's run.
+concurrency:
+  group: >-
+    browser-trust-${{
+      github.event_name == 'deployment_status'
+        && github.event.deployment.sha
+        || github.run_id
+    }}
+  cancel-in-progress: true
+
+jobs:
+  browser-trust:
+    # Ignore pending/failure/error states and Production deployments. The
+    # Production suite is deliberate (workflow_dispatch), never automatic.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.deployment_status.state == 'success' &&
+       github.event.deployment_status.environment == 'Preview')
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      PLAYWRIGHT_TARGET_URL: >-
+        ${{
+          github.event_name == 'workflow_dispatch'
+            && inputs.target_url
+            || github.event.deployment_status.target_url
+        }}
+
+    steps:
+      - name: Check out the deployed commit
+        uses: actions/checkout@v6
+        with:
+          # Test the code that was actually deployed, not the branch tip.
+          ref: ${{ github.event_name == 'deployment_status' && github.event.deployment.sha || github.ref }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Fails in seconds on a hostile or mistyped workflow_dispatch URL, before
+      # a browser is downloaded. Shares tests/e2e/target.ts with the test run,
+      # so there is no second copy of the allowlist to drift.
+      - name: Validate target hostname
+        run: npx tsx scripts/validate-e2e-target.ts "$PLAYWRIGHT_TARGET_URL"
+
+      - name: Install Chromium only
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Browser Trust (read-only)
+        run: npx playwright test --grep @prod-safe --workers 1
+
+      - name: Upload HTML report and failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-trust-report-${{ github.run_id }}
+          path: |
+            launch/operations/browser-trust-report/
+            launch/operations/browser-trust-artifacts/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      # Small, always useful, and the same shape the Command Centre reads.
+      - name: Upload result JSON
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-trust-result-${{ github.run_id }}
+          path: launch/operations/browser-trust-latest.json
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "### Browser Trust" >> "$GITHUB_STEP_SUMMARY"
+          echo "Target: \`$PLAYWRIGHT_TARGET_URL\`" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f launch/operations/browser-trust-latest.json ]; then
+            node -e '
+              const r = require("./launch/operations/browser-trust-latest.json");
+              const lines = [
+                `**${r.verdict}** — ${r.passed} passed · ${r.failed} failed · ${r.skipped} skipped · ${r.flaky} flaky`,
+                "",
+                "| project | passed | failed | skipped |",
+                "|---|---|---|---|",
+                ...Object.entries(r.projects).map(([n, p]) => `| ${n} | ${p.passed} | ${p.failed} | ${p.skipped} |`),
+              ];
+              if (r.failures.length) {
+                lines.push("", "#### Failures");
+                for (const f of r.failures) lines.push(`- \`${f.project}\` ${f.test}`);
+              }
+              console.log(lines.join("\n"));
+            ' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No result JSON was written — the run did not complete." >> "$GITHUB_STEP_SUMMARY"
+          fi
