@@ -82,6 +82,10 @@
     "amazon:creators:test": "dotenv -e .env.local -- tsx scripts/amazon-creators-test.ts",
     "test:amazon": "dotenv -e .env.local -- tsx scripts/test-amazon-retirement.ts",
     "launch:smoke": "node scripts/launch-smoke.mjs",
+    "test:e2e": "node scripts/run-e2e.mjs",
+    "test:e2e:ui": "node scripts/run-e2e.mjs --ui",
+    "test:e2e:prod": "node scripts/run-e2e.mjs --prod",
+    "test:e2e:report": "playwright show-report launch/operations/browser-trust-report",
     "costguard:collect": "dotenv -e .env.local -- tsx scripts/costguard-collect.ts",
     "costguard:runs": "tsx scripts/costguard-runs.ts",
     "costguard:status": "dotenv -e .env.local -- tsx scripts/costguard-status.ts",
@@ -115,6 +119,7 @@
     "sharp": "^0.34.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

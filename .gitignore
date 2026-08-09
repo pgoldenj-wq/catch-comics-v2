@@ -153,3 +153,13 @@ launch/reviews/
 
 # Cost Guard local file-fallback state (KV is the real store)
 .costguard-state/
+
+# Browser Trust (Playwright) — regenerated on every run, never source.
+# browser-trust-latest.json IS tracked: it is the Command Centre's data file,
+# same as launch-smoke-latest.json. The report and per-test artifacts are not.
+/launch/operations/browser-trust-report/
+/launch/operations/browser-trust-artifacts/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
