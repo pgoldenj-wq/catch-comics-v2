@@ -44,21 +44,74 @@ export const syncScheduled = inngest.createFunction(
 
     // ── Step 1: find retailers due for sync ──────────────────────────────────
     const due = await step.run('find-due-retailers', async () => {
-      const retailers = await prisma.retailer.findMany({
-        where:  { isActive: true },
-        select: {
-          id:           true,
-          domain:       true,
-          platform:     true,
-          lastSyncedAt: true,
-          syncConfig:   true,
-        },
-      })
+      // Raw SQL, not findMany({ select: { syncConfig: true } }): selecting the
+      // whole `sync_config` column pulled 6 MB from worldofbooks.com alone on
+      // every hourly tick (~156 MB/day of Neon egress). Only two keys out of it
+      // are needed to decide "is this retailer due", so Postgres extracts them
+      // server-side. The lateral joins read the attempt history from sync_logs,
+      // which is what makes the failure backoff possible without a migration.
+      const rows = await prisma.$queryRaw<Array<{
+        id: string
+        domain: string
+        platform: string
+        lastSyncedAt: Date | null
+        scheduledSyncDisabled: boolean
+        refreshIntervalHours: number | null
+        lastAttemptAt: Date | null
+        lastAttemptStatus: string | null
+        consecutiveFailures: number
+      }>>`
+        SELECT r.id,
+               r.domain,
+               r.platform,
+               r.last_synced_at AS "lastSyncedAt",
+               -- Strict JSON-boolean match, mirroring isScheduledSyncDisabled:
+               -- the string "true" is not the flag, and no value can raise a
+               -- cast error that would take the whole scheduler down.
+               COALESCE((r.sync_config->'scheduled_sync_disabled') = 'true'::jsonb, false) AS "scheduledSyncDisabled",
+               CASE WHEN jsonb_typeof(r.sync_config->'refreshIntervalHours') = 'number'
+                    THEN (r.sync_config->>'refreshIntervalHours')::int END AS "refreshIntervalHours",
+               la.started_at    AS "lastAttemptAt",
+               la.status        AS "lastAttemptStatus",
+               COALESCE(cf.n, 0)::int AS "consecutiveFailures"
+        FROM retailers r
+        LEFT JOIN LATERAL (
+          SELECT s.started_at, s.status
+          FROM sync_logs s
+          WHERE s.retailer_id = r.id
+          ORDER BY s.started_at DESC
+          LIMIT 1
+        ) la ON true
+        -- Attempts since the last genuinely successful sync. Keyed off
+        -- last_synced_at (which the adapter advances on real completion), NOT
+        -- off sync_logs.status: the log row only reaches 'success' if the
+        -- Inngest run also survives its final step, which these feeds rarely do
+        -- (travellingman.com has 0 success rows despite completing on Aug 1).
+        LEFT JOIN LATERAL (
+          SELECT count(*) AS n
+          FROM sync_logs s
+          WHERE s.retailer_id = r.id
+            AND s.started_at > COALESCE(r.last_synced_at, '-infinity'::timestamptz)
+        ) cf ON true
+        WHERE r.is_active = true
+      `
 
       const now = Date.now()
 
-      return retailers
-        .filter(r => isDueForScheduledSync(r, now))
+      return rows
+        .filter(r => isDueForScheduledSync({
+          platform:            r.platform,
+          lastSyncedAt:        r.lastSyncedAt,
+          // Rebuild the minimal shape the pure predicate expects, without ever
+          // having transferred the rest of the blob.
+          syncConfig: {
+            ...(r.scheduledSyncDisabled === true ? { scheduled_sync_disabled: true } : {}),
+            ...(r.refreshIntervalHours !== null ? { refreshIntervalHours: r.refreshIntervalHours } : {}),
+          },
+          lastAttemptAt:       r.lastAttemptAt,
+          lastAttemptStatus:   r.lastAttemptStatus,
+          consecutiveFailures: r.consecutiveFailures,
+        }, now))
         .map(r => ({ id: r.id, domain: r.domain }))
     })
 

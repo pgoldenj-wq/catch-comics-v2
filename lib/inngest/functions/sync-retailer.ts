@@ -22,11 +22,18 @@ import { inngestCostGate } from '@/lib/costguard/inngest'
 
 export const syncRetailer = inngest.createFunction(
   {
-    id:          'sync-retailer',
-    name:        'Sync Retailer',
-    retries:     3,
-    concurrency: { limit: 5 },
-    triggers:    [{ event: 'sync/retailer' }],
+    id:      'sync-retailer',
+    name:    'Sync Retailer',
+    retries: 3,
+    // Two limits, deliberately: 5 globally so we never hammer every retailer at
+    // once, and 1 per retailer so a slow feed cannot have two runs writing the
+    // same listings concurrently. The scheduler's in-flight lease covers the
+    // cron path; this covers events from any source (price-check, admin, retry).
+    concurrency: [
+      { limit: 5 },
+      { limit: 1, key: 'event.data.retailerId' },
+    ],
+    triggers: [{ event: 'sync/retailer' }],
   },
   async ({ event, step }) => {
     const { retailerId } = event.data as { retailerId: string }

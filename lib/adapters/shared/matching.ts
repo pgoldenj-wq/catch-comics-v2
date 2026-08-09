@@ -14,6 +14,7 @@ import { prisma }                                     from '@/lib/prisma'
 import { inferFormat, enrichByIsbn, applyEnrichment } from '@/lib/enrichment/isbn'
 import { ListingCondition, MatchMethod, Prisma, StockStatus } from '@prisma/client'
 import { inngest }                                   from '@/lib/inngest/client'
+import { claimFanoutSlot }                           from './fanout'
 
 // ── Shared public types ───────────────────────────────────────────────────────
 
@@ -188,13 +189,18 @@ export async function matchCanonical(
 
       // ── Queue Bookshop.org lookup in the background ───────────────────────
       // Non-blocking: if Inngest is not configured this fails silently.
-      try {
-        await inngest.send({
-          name: 'bookshop/lookup',
-          data: { isbn13, canonicalProductId: created.id },
-        })
-      } catch {
-        // Inngest not reachable in this context (e.g. CLI script) — ignore.
+      // Bounded: one timed-out feed ingest must not emit tens of thousands of
+      // child events (see lib/adapters/shared/fanout.ts). Suppression is
+      // reported through SyncResult.errors, never swallowed.
+      if (claimFanoutSlot('bookshop/lookup')) {
+        try {
+          await inngest.send({
+            name: 'bookshop/lookup',
+            data: { isbn13, canonicalProductId: created.id },
+          })
+        } catch {
+          // Inngest not reachable in this context (e.g. CLI script) — ignore.
+        }
       }
 
       return { canonicalProductId: created.id, matchMethod: MatchMethod.ISBN, matchConfidence: 80 }

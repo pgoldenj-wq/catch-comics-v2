@@ -93,6 +93,7 @@
     "test:secrets": "tsx scripts/test-secret-hygiene.ts",
     "test:identity": "tsx scripts/test-edition-identity.ts",
     "test:containment": "tsx scripts/test-lbb-containment.ts",
+    "test:sync-backoff": "tsx scripts/test-sync-backoff.ts",
     "audit:fragmentation": "dotenv -e .env.local -- tsx scripts/audit-edition-fragmentation.ts",
     "audit:metadata": "dotenv -e .env.local -- tsx scripts/audit-suspicious-metadata.ts",
     "ingest:issue-covers": "dotenv -e .env.local -- tsx scripts/ingest-issue-covers.ts"

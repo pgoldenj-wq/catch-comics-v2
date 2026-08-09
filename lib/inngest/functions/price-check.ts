@@ -15,6 +15,7 @@
 import { inngest }  from '@/lib/inngest/client'
 import { prisma }   from '@/lib/prisma'
 import { inngestCostGate } from '@/lib/costguard/inngest'
+import { SKIP_PLATFORMS }  from '@/lib/sync/dispatch'
 
 const LOOKBACK_HOURS = 24
 const MAX_RETAILERS  = 10
@@ -55,6 +56,17 @@ export const priceCheck = inngest.createFunction(
     const retailerIds = await step.run('find-top-clicked-retailers', async () => {
       const since = new Date(Date.now() - LOOKBACK_HOURS * 60 * 60 * 1000)
 
+      // This is an AUTOMATIC schedule, so it must honour exactly the same
+      // eligibility rules as the hourly cron. It previously did not, and
+      // re-enqueued retailers the scheduler had already excluded: dispatchSync
+      // then threw, Inngest retried 3x, and on-failure fired — pure waste, with
+      // no sync ever happening. Observed on letsbuybooks.com, which logged 5
+      // runs in 24h while explicitly disabled.
+      //   - scheduled_sync_disabled: gated CLI only (LBB, WoB, Amazon, Scholastic)
+      //   - SKIP_PLATFORMS: no feed adapter exists, so dispatchSync always throws
+      // The gated CLI path is unaffected — it never comes through here.
+      const skipPlatforms = [...SKIP_PLATFORMS]
+
       const rows = await prisma.$queryRaw<Array<{ retailer_id: string; clicks: bigint }>>`
         SELECT
           rl.retailer_id,
@@ -66,6 +78,8 @@ export const priceCheck = inngest.createFunction(
           ce.clicked_at >= ${since}
           AND ret.is_active = true
           AND rl.deleted_at IS NULL
+          AND (ret.sync_config->'scheduled_sync_disabled') IS DISTINCT FROM 'true'::jsonb
+          AND ret.platform::text <> ALL(${skipPlatforms}::text[])
         GROUP BY rl.retailer_id
         ORDER BY clicks DESC
         LIMIT ${MAX_RETAILERS}
