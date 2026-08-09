@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "tool": "playwright",
+  "toolVersion": "1.62.1",
+  "environment": "local",
+  "url": "http://localhost:3000",
+  "host": "localhost:3000",
+  "runAt": "2026-08-09T22:17:34.658Z",
+  "durationMs": 33020,
+  "commitSha": "c7e20c2ff95c0319d91586b14d5d6e8add90d6e4",
+  "branch": "feat/playwright-browser-trust",
+  "ci": false,
+  "runUrl": null,
+  "verdict": "PASS",
+  "declared": 16,
+  "passed": 13,
+  "failed": 0,
+  "skipped": 3,
+  "flaky": 0,
+  "projects": {
+    "desktop-chromium": {
+      "passed": 7,
+      "failed": 0,
+      "skipped": 1,
+      "flaky": 0
+    },
+    "mobile-chromium": {
+      "passed": 6,
+      "failed": 0,
+      "skipped": 2,
+      "flaky": 0
+    }
+  },
+  "reportPath": "launch/operations/browser-trust-report/index.html",
+  "failures": []
+}

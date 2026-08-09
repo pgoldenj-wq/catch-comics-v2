@@ -147,6 +147,16 @@ footer button { color:var(--ink3); background:none; border:none; text-decoration
     <div id="costGuard"></div>
   </div>
 
+  <div class="card">
+    <h2>🌐 Browser Trust — real browser, real journeys</h2>
+    <div id="browserTrust"></div>
+    <div class="links" style="margin-top:14px">
+      <button class="ghostbtn" id="btRunBtn">Run Browser Trust</button>
+      <a class="ghostbtn" id="btReportBtn" href="operations/browser-trust-report/index.html" target="_blank" rel="noopener">Open latest report</a>
+      <button class="ghostbtn" id="btClaudeBtn">Diagnose with Claude</button>
+    </div>
+  </div>
+
   <div class="card" id="blockersCard">
     <h2>⛔ Open blockers — things that genuinely stop launch</h2>
     <div id="blockerList"></div>
@@ -169,6 +179,7 @@ footer button { color:var(--ink3); background:none; border:none; text-decoration
       <a class="ghostbtn" href="operations/incident-response.md">Incident response</a>
       <a class="ghostbtn" href="operations/rollback-guide.md">Rollback guide</a>
       <a class="ghostbtn" href="operations/launch-health-latest.md">Latest health report</a>
+      <a class="ghostbtn" href="operations/BROWSER-TRUST.md">Browser Trust guide</a>
       <a class="ghostbtn" href="product-excellence/product-excellence-audit.md">Product-excellence audit</a>
       <a class="ghostbtn" href="dashboard.html">Full dashboard (deep dive)</a>
       <a class="ghostbtn" href="war-room-2026-07-03.md">War-room report</a>
@@ -213,7 +224,7 @@ let mc = (()=>{ try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && 
 function saveMc(){ localStorage.setItem(KEY, JSON.stringify(mc)); writeMcToRepo(); }
 
 /* ═══ Live data ══════════════════════════════════════════════════════ */
-let FOUNDER = null, SMOKE = null, OPS_SMOKE = null, OPS_HEALTH = null, OPS_COSTGUARD = null;
+let FOUNDER = null, SMOKE = null, OPS_SMOKE = null, OPS_HEALTH = null, OPS_COSTGUARD = null, OPS_BROWSER = null;
 async function loadData(){
   // 1) http(s): plain fetch. 2) file://: FS-handle if connected.
   // Wave 3: also load the generated operations snapshots. A missing file is
@@ -225,6 +236,7 @@ async function loadData(){
       try { OPS_SMOKE  = await (await fetch('operations/launch-smoke-latest.json?'+Date.now())).json(); } catch(e){ OPS_SMOKE = null; }
       try { OPS_HEALTH = await (await fetch('operations/launch-health-latest.json?'+Date.now())).json(); } catch(e){ OPS_HEALTH = null; }
       try { OPS_COSTGUARD = await (await fetch('operations/costguard-latest.json?'+Date.now())).json(); } catch(e){ OPS_COSTGUARD = null; }
+      try { OPS_BROWSER = await (await fetch('operations/browser-trust-latest.json?'+Date.now())).json(); } catch(e){ OPS_BROWSER = null; }
       return;
     }
   } catch(e){}
@@ -238,6 +250,7 @@ async function loadData(){
       try { OPS_SMOKE  = JSON.parse(await (await (await ops.getFileHandle('launch-smoke-latest.json')).getFile()).text()); } catch(e){}
       try { OPS_HEALTH = JSON.parse(await (await (await ops.getFileHandle('launch-health-latest.json')).getFile()).text()); } catch(e){}
       try { OPS_COSTGUARD = JSON.parse(await (await (await ops.getFileHandle('costguard-latest.json')).getFile()).text()); } catch(e){}
+      try { OPS_BROWSER   = JSON.parse(await (await (await ops.getFileHandle('browser-trust-latest.json')).getFile()).text()); } catch(e){}
     } catch(e){}
   }
 }
@@ -473,6 +486,103 @@ function render(){
       <span class="src"> · run <code>npm run costguard:status</code> then reload</span></div>`;
   document.getElementById('costGuard').innerHTML = cg;
 
+  // ── Browser Trust panel — data from operations/browser-trust-latest.json,
+  // written by the Playwright reporter (npm run test:e2e / the CI workflow).
+  //
+  // Honesty rules, in precedence order:
+  //   • no file at all           → NOT RUN  (never a green)
+  //   • any failure              → FAIL     (stays FAIL however old it is)
+  //   • older than 48h           → STALE    (a passing run stops counting as
+  //                                          evidence once it is out of date)
+  //   • interrupted / nothing ran→ shown as-is, never upgraded to a pass
+  // Opening this page runs nothing; the run action below is deliberate.
+  const BT_STALE_HOURS = 48;
+  let bt = '', btPrompt = null, btReportHref = null, btReportLabel = 'Open latest report';
+  if (!OPS_BROWSER){
+    bt = `<div><strong style="color:var(--ink3)">Browser Trust: NOT RUN</strong>
+      <span class="src"> · no result recorded yet — run <code>npm run test:e2e</code>, then reload</span></div>`;
+  } else {
+    const b = OPS_BROWSER;
+    const runMs  = new Date(b.runAt).getTime();
+    const hours  = (Date.now() - runMs) / 3.6e6;
+    const stale  = !(hours < BT_STALE_HOURS);
+    const failed = (b.failed || 0) > 0 || b.verdict === 'FAIL';
+
+    let word, col;
+    if (failed)                                        { word = 'FAIL';        col = 'var(--red)'; }
+    else if (b.verdict === 'INCOMPLETE')               { word = 'INCOMPLETE';  col = 'var(--amber)'; }
+    else if (b.verdict === 'NOT RUN' || (b.passed||0) === 0) { word = 'NOT RUN'; col = 'var(--ink3)'; }
+    else if (stale)                                    { word = 'STALE';       col = 'var(--amber)'; }
+    else if (b.verdict === 'PASS-WITH-FLAKES')         { word = 'PASS (flaky)';col = 'var(--amber)'; }
+    else                                               { word = 'PASS';        col = 'var(--green)'; }
+
+    const envLabel = { local:'Local', preview:'Vercel Preview', production:'Production' }[b.environment] || esc(String(b.environment));
+    const proj = b.projects || {};
+    const projLine = p => {
+      const t = proj[p];
+      if (!t) return `${p}: not run`;
+      return `${p}: ${t.passed}✓ ${t.failed}✗ ${t.skipped}○`;
+    };
+
+    bt = `<div style="margin-bottom:10px"><strong style="color:${col};font-size:18px">${word}</strong>
+      <span class="src"> · ${envLabel} · ${esc(b.host||'unknown host')} · ${age(b.runAt)}</span></div>`;
+    // NB: age() already appends "— STALE, re-run" past 48h, which is the same
+    // threshold as BT_STALE_HOURS. Do not add a second suffix here.
+    bt += `<div class="win" style="color:var(--ink2)">🖥 ${esc(projLine('desktop-chromium'))} &nbsp;·&nbsp; 📱 ${esc(projLine('mobile-chromium'))}</div>`;
+    bt += `<div class="win" style="color:var(--ink2)">${b.passed} passed · ${b.failed} failed · ${b.skipped} skipped · ${b.flaky} flaky (of ${b.declared} declared)</div>`;
+    bt += `<div class="win" style="color:var(--ink3)">commit ${esc(String(b.commitSha||'unknown').slice(0,8))}${b.branch?` · ${esc(b.branch)}`:''} · ${esc(b.tool)} ${esc(b.toolVersion)}${b.ci?' · CI':''}</div>`;
+
+    for (const f of (b.failures||[]).slice(0,5)){
+      bt += `<div class="win" style="color:var(--red)">✗ [${esc(f.project)}] ${esc(f.test)}</div>`;
+    }
+
+    // Where the report actually lives for THIS run. A CI run's HTML report is
+    // a GitHub artifact, not a local file — linking to the local path would
+    // open a stale report or a 404.
+    if (b.ci && b.runUrl){ btReportHref = b.runUrl; btReportLabel = 'Open CI run (report attached)'; }
+    else if (!b.ci)      { btReportHref = 'operations/browser-trust-report/index.html'; }
+    bt += `<div class="win" style="color:var(--ink3)">Report: ${b.ci ? (b.runUrl ? 'GitHub Actions artifact' : 'CI run — see the Actions tab') : esc(b.reportPath || 'n/a')}</div>`;
+
+    if (failed){
+      const lines = (b.failures||[]).map(f =>
+        `- [${f.project}] ${f.test} (${f.file})${f.pageUrl?` on ${f.pageUrl}`:''}\n  error: ${String(f.error||'').split('\n')[0]}`).join('\n');
+      btPrompt =
+`Catch Comics — Browser Trust (Playwright) failed. Diagnose the root cause honestly; do not weaken the assertion to make it pass.
+
+Environment : ${envLabel} (${b.url})
+Commit      : ${b.commitSha || 'unknown'}${b.branch ? ` on ${b.branch}` : ''}
+Run at      : ${b.runAt}
+Result      : ${b.passed} passed, ${b.failed} failed, ${b.skipped} skipped, ${b.flaky} flaky
+Projects    : ${Object.entries(proj).map(([n,t])=>`${n} ${t.passed}✓/${t.failed}✗`).join(' · ')}
+
+Failing tests:
+${lines || '(none recorded)'}
+
+Artifacts:
+- HTML report      : ${b.ci ? (b.runUrl || 'GitHub Actions run artifacts') : b.reportPath}
+- Traces/screenshots: launch/operations/browser-trust-artifacts/ (screenshot on failure; trace on first retry in CI)
+
+Please: reproduce with "npm run test:e2e" (local) or "npm run test:e2e:prod" (production, read-only), identify whether this is a real product defect or a brittle assertion, and say which. Do not run retailer syncs, Inngest, or any write path.`;
+    }
+  }
+  document.getElementById('browserTrust').innerHTML = bt;
+
+  const btReport = document.getElementById('btReportBtn');
+  if (btReport){
+    btReport.textContent = btReportLabel;
+    if (btReportHref){ btReport.href = btReportHref; btReport.style.opacity = ''; btReport.style.pointerEvents = ''; }
+    else { btReport.removeAttribute('href'); btReport.style.opacity = '.45'; btReport.style.pointerEvents = 'none'; }
+  }
+  const btClaude = document.getElementById('btClaudeBtn');
+  if (btClaude){
+    btClaude.style.opacity = btPrompt ? '' : '.45';
+    btClaude.onclick = async () => {
+      if (!btPrompt){ toast('Nothing to diagnose — the last recorded run had no failures'); return; }
+      await navigator.clipboard.writeText(btPrompt);
+      toast('Diagnosis prompt copied — paste into Claude Code');
+    };
+  }
+
   // "Go deeper" label carries the live Cost Guard state, using the same
   // precedence as cost-guard.html. Never reassuring when checks are stale:
   // a partial blackout reads Degraded, and no data reads Data unavailable.
@@ -524,6 +634,14 @@ async function actFor(t){
 
 /* ═══ Boot ═══════════════════════════════════════════════════════════ */
 document.getElementById('connectBtn').onclick = connectRepo;
+
+// "Run Browser Trust" — Mission Control is a static page and cannot start a
+// process, so it hands over the exact command, the same way every other
+// action here works. Nothing runs on page load.
+document.getElementById('btRunBtn').onclick = async () => {
+  await navigator.clipboard.writeText('npm run test:e2e');
+  toast('Copied "npm run test:e2e" — run it in the repo, then reload this page');
+};
 async function boot(){ await restoreRepo(); await loadData(); render(); }
 boot();
 setInterval(()=>render(), 60_000); // countdown stays honest without reload
