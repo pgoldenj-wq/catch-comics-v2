@@ -384,6 +384,10 @@ export default function Home() {
                     <img
                       src={adjustImgSrc(coverSrc)}
                       alt={title}
+                      // Browser Trust locator. The alt text is the comic's title,
+                      // which changes with the catalogue, so there is no stable
+                      // accessible name to target. See tests/e2e/homepage.spec.ts.
+                      data-testid="deal-cover"
                       style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                       onLoad={(e) => {
                         const img = e.currentTarget
@@ -697,6 +701,8 @@ export default function Home() {
                       <img
                         src={adjustImgSrc(coverSrc)}
                         alt={title}
+                        // Browser Trust locator — see the mobile grid above.
+                        data-testid="deal-cover"
                         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
                         onLoad={(e) => {
                           const img = e.currentTarget
