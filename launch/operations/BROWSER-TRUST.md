@@ -138,6 +138,34 @@ so a bad `workflow_dispatch` input fails in seconds.
 > branch — including the branch that adds it. Pre-merge proof therefore comes
 > from `workflow_dispatch`.
 
+### ⚠ Preview deployments are currently unreachable — one founder action needed
+
+Vercel **Deployment Protection** is enabled for Preview deployments on this
+project. An anonymous request to a Preview URL gets `302 → vercel.com/sso-api`,
+so no browser can reach it and **no test can run against a Preview** until this
+is changed. The suite detects this and fails immediately with an explanation
+rather than eight confusing locator timeouts.
+
+Two ways to fix it — **A is recommended**:
+
+**A. Make Preview deployments public** *(recommended)*
+Vercel → Project → Settings → Deployment Protection → **Vercel Authentication:
+Disabled** for Preview. These are public catalogue pages with no secrets on
+them, it needs no credential anywhere, and it keeps CI traces available.
+
+**B. Protection Bypass for Automation**
+Vercel → Settings → Deployment Protection → *Protection Bypass for Automation* →
+generate a secret → add it to GitHub → Settings → Secrets → Actions as
+`VERCEL_AUTOMATION_BYPASS_SECRET`. The workflow already passes it through.
+
+> If B is used, **Playwright traces are automatically disabled**. Traces record
+> request headers verbatim, so leaving them on would write the bypass
+> credential into a CI artifact. Screenshots and the result JSON are unaffected.
+> This is why A is listed first: it costs nothing and keeps traces.
+
+Until either is done, the automatic Preview run will fail fast with the message
+above. `npm run test:e2e` and `npm run test:e2e:prod` are unaffected.
+
 ---
 
 ## Command Centre
