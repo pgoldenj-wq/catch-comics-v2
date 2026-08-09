@@ -1,24 +1,20 @@
 {
-  "generatedAt": "2026-08-06T21:14:12.060Z",
+  "generatedAt": "2026-08-09T10:33:56.135Z",
   "source": "production",
   "storeMode": "kv",
   "configured": true,
   "state": "AMBER",
-  "since": "2026-08-06T21:05:11.285Z",
+  "since": "2026-08-08T10:51:46.228Z",
   "lockdownLatched": false,
   "reasons": [
-    "No provider has fresh data — GREEN is not possible without telemetry.",
-    "Not yet configured (no credentials): neon, vercel, github, cloudflare."
+    "Stale/failed provider data: neon."
   ],
-  "lastCollectionAt": "2026-08-06T21:05:11.285Z",
-  "dataAgeHours": 0.2,
-  "staleProviders": [],
-  "unconfiguredProviders": [
-    "neon",
-    "vercel",
-    "github",
-    "cloudflare"
+  "lastCollectionAt": "2026-08-09T09:56:56.321Z",
+  "dataAgeHours": 0.6,
+  "staleProviders": [
+    "neon"
   ],
+  "unconfiguredProviders": [],
   "totals": {
     "variableMtdUsd": 0,
     "fixedMonthlyUsd": 20,
@@ -29,50 +25,72 @@
   "perProvider": [
     {
       "provider": "neon",
-      "configured": false,
+      "configured": true,
       "fresh": false,
       "variableMtdUsd": 0,
-      "projectedMonthUsd": 0,
+      "projectedMonthUsd": 28.48,
       "budgetSoftUsd": 60,
       "budgetMaxUsd": 90,
       "budgetUsedPct": 0,
-      "note": "NEON_API_KEY not set — see COST-GUARD.md manual actions."
+      "note": "Neon consumption unavailable (org resolved, 1 project(s)). Tried: v2/projects?org_id+metrics→406 specified date-time range start is outside the boundaries of the specified granularity; start:\"2026-08-01 00:00:00 +0000 UTC\"; v2/projects?org_id+metrics(csv)→406 specified date-time range start is outside the boundaries of the specified granularity; start:\"2026-08-01 00:00:00 +0000 UTC\"; v2/projects?org_id+project_ids+metrics→406 specified date-time range start is outside the boundaries of the specified granularity; start:\"2026-08-01 00:00:00 +0000 UTC\"; projects?org_id+project_ids→406 specified date-time range start is outside the boundaries of the specified granularity; start:\"2026-08-01 00:00:00 +0000 UTC\"; account?org_id→404 this route does not exist; projects?project_ids→400 org_id is required, you can find it on your organization settings page; account (unscoped)→404 this route does not exist."
     },
     {
       "provider": "vercel",
-      "configured": false,
-      "fresh": false,
+      "configured": true,
+      "fresh": true,
       "variableMtdUsd": 0,
       "projectedMonthUsd": 0,
-      "budgetSoftUsd": 15,
-      "budgetMaxUsd": 40,
+      "budgetSoftUsd": 10,
+      "budgetMaxUsd": 20,
       "budgetUsedPct": 0,
-      "note": "COSTGUARD_WEBHOOK_SECRET not set — Spend Management webhook inactive. See COST-GUARD.md."
+      "topMetric": "spend_management_reported_usd",
+      "note": "No Spend Management webhook event this month (no metered overage reported)."
     },
     {
       "provider": "github",
-      "configured": false,
-      "fresh": false,
+      "configured": true,
+      "fresh": true,
       "variableMtdUsd": 0,
       "projectedMonthUsd": 0,
       "budgetSoftUsd": 5,
       "budgetMaxUsd": 10,
       "budgetUsedPct": 0,
-      "note": "GITHUB_BILLING_TOKEN not set — see COST-GUARD.md manual actions."
+      "topMetric": "actions_minutes"
     },
     {
       "provider": "cloudflare",
-      "configured": false,
-      "fresh": false,
+      "configured": true,
+      "fresh": true,
       "variableMtdUsd": 0,
       "projectedMonthUsd": 0,
       "budgetSoftUsd": 5,
       "budgetMaxUsd": 15,
       "budgetUsedPct": 0,
-      "note": "CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID not set — see COST-GUARD.md."
+      "topMetric": "r2_class_a_ops"
     }
   ],
-  "activeRestrictions": [],
+  "activeRestrictions": [
+    {
+      "operation": "inngest:sync-retailer-scheduled",
+      "count": 30,
+      "lastAt": "2026-08-08T10:00:38.066Z"
+    },
+    {
+      "operation": "inngest:sync-retailer",
+      "count": 8,
+      "lastAt": "2026-08-08T08:00:45.683Z"
+    },
+    {
+      "operation": "inngest:enrich-canonical",
+      "count": 1,
+      "lastAt": "2026-08-08T02:00:24.013Z"
+    },
+    {
+      "operation": "inngest:bookshop-refresh",
+      "count": 1,
+      "lastAt": "2026-08-08T04:00:03.398Z"
+    }
+  ],
   "budgets": {
     "global": {
       "fixedMonthlyUsd": 20,
@@ -92,9 +110,9 @@
       "vercel": {
         "fixedMonthlyUsd": 20,
         "expectedMonthlyUsd": 5,
-        "softBudgetUsd": 15,
-        "maxApprovedUsd": 40,
-        "catastrophicUsd": 100
+        "softBudgetUsd": 10,
+        "maxApprovedUsd": 20,
+        "catastrophicUsd": 25
       },
       "github": {
         "fixedMonthlyUsd": 0,
@@ -114,11 +132,116 @@
   },
   "recentEvents": [
     {
-      "at": "2026-08-06T21:05:11.285Z",
+      "at": "2026-08-09T07:01:04.852Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:sync-retailer:AMBER",
+      "message": "inngest:sync-retailer allowed in AMBER (class=nonessential)."
+    },
+    {
+      "at": "2026-08-09T07:00:31.478Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:sync-retailer-scheduled:AMBER",
+      "message": "inngest:sync-retailer-scheduled allowed in AMBER (class=nonessential)."
+    },
+    {
+      "at": "2026-08-09T05:57:56.904Z",
+      "kind": "collection-error",
+      "provider": "neon",
+      "dedupeKey": "collect-error:neon",
+      "message": "neon collection failed: Neon consumption unavailable (org resolved, 1 project(s)). Tried: v2/projects?org_id+metrics→406 specified date-time range start is outside the boundaries of the specified granularity; start:\"2026-08-01 00:00:00 +0000 UTC\"; v2/projects?org_id+metrics(csv)→406 specified date-time range start is outside the boundaries of the specified granularity; start:\"2026-08-01 00:00:00 +0000 UTC\"; v2/projects?org_id+project_ids+metrics→406 specified date-time range start is outside the boundaries of the specified granularity; start:\"2026-08-01 00:00:00 +0000 UTC\"; projects?org_id+project_ids→406 specified date-time range start is outside the boundaries of the specified granularity; start:\"2026-08-01 00:00:00 +0000 UTC\"; account?org_id→404 this route does not exist; projects?project_ids→400 org_id is required, you can find it on your organization settings page; account (unscoped)→404 this route does not exist."
+    },
+    {
+      "at": "2026-08-09T04:00:20.458Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:bookshop-refresh:AMBER",
+      "message": "inngest:bookshop-refresh allowed in AMBER (class=nonessential)."
+    },
+    {
+      "at": "2026-08-09T04:00:10.548Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:price-check:AMBER",
+      "message": "inngest:price-check allowed in AMBER (class=deferrable)."
+    },
+    {
+      "at": "2026-08-09T03:00:16.266Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:cleanup-stale:AMBER",
+      "message": "inngest:cleanup-stale allowed in AMBER (class=deferrable)."
+    },
+    {
+      "at": "2026-08-09T02:00:18.146Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:enrich-canonical:AMBER",
+      "message": "inngest:enrich-canonical allowed in AMBER (class=nonessential)."
+    },
+    {
+      "at": "2026-08-09T00:01:42.830Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:sync-retailer:AMBER",
+      "message": "inngest:sync-retailer allowed in AMBER (class=nonessential)."
+    },
+    {
+      "at": "2026-08-09T00:00:35.592Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:sync-retailer-scheduled:AMBER",
+      "message": "inngest:sync-retailer-scheduled allowed in AMBER (class=nonessential)."
+    },
+    {
+      "at": "2026-08-08T22:47:18.443Z",
+      "kind": "collection-error",
+      "provider": "neon",
+      "dedupeKey": "collect-error:neon",
+      "message": "neon collection failed: Neon consumption unavailable (org resolved, 1 project(s)). Tried: v2/projects?org_id+metrics→406 specified date-time range start is outside the boundaries of the specified granularity; start:\"2026-08-01 00:00:00 +0000 UTC\"; v2/projects?org_id+metrics(csv)→406 specified date-time range start is outside the boundaries of the specified granularity; start:\"2026-08-01 00:00:00 +0000 UTC\"; v2/projects?org_id+project_ids+metrics→406 specified date-time range start is outside the boundaries of the specified granularity; start:\"2026-08-01 00:00:00 +0000 UTC\"; projects?org_id+project_ids→406 specified date-time range start is outside the boundaries of the specified granularity; start:\"2026-08-01 00:00:00 +0000 UTC\"; account?org_id→404 this route does not exist; projects?project_ids→400 org_id is required, you can find it on your organization settings page; account (unscoped)→404 this route does not exist."
+    },
+    {
+      "at": "2026-08-08T20:00:29.625Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:price-check:AMBER",
+      "message": "inngest:price-check allowed in AMBER (class=deferrable)."
+    },
+    {
+      "at": "2026-08-08T18:00:33.209Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:sync-retailer:AMBER",
+      "message": "inngest:sync-retailer allowed in AMBER (class=nonessential)."
+    },
+    {
+      "at": "2026-08-08T18:00:11.424Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:sync-retailer-scheduled:AMBER",
+      "message": "inngest:sync-retailer-scheduled allowed in AMBER (class=nonessential)."
+    },
+    {
+      "at": "2026-08-08T15:46:19.259Z",
+      "kind": "collection-error",
+      "provider": "neon",
+      "dedupeKey": "collect-error:neon",
+      "message": "neon collection failed: Neon consumption unavailable (org resolved, 1 project(s)). Tried: v2/projects?org_id+metrics→406 specified date-time range start is outside the boundaries of the specified granularity; start:\"2026-08-01 00:00:00 +0000 UTC\"; v2/projects?org_id+metrics(csv)→406 specified date-time range start is outside the boundaries of the specified granularity; start:\"2026-08-01 00:00:00 +0000 UTC\"; v2/projects?org_id+project_ids+metrics→406 specified date-time range start is outside the boundaries of the specified granularity; start:\"2026-08-01 00:00:00 +0000 UTC\"; projects?org_id+project_ids→406 specified date-time range start is outside the boundaries of the specified granularity; start:\"2026-08-01 00:00:00 +0000 UTC\"; account?org_id→404 this route does not exist; projects?project_ids→400 org_id is required, you can find it on your organization settings page; account (unscoped)→404 this route does not exist."
+    },
+    {
+      "at": "2026-08-08T12:00:38.453Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:price-check:AMBER",
+      "message": "inngest:price-check allowed in AMBER (class=deferrable)."
+    },
+    {
+      "at": "2026-08-08T11:01:11.331Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:sync-retailer:AMBER",
+      "message": "inngest:sync-retailer allowed in AMBER (class=nonessential)."
+    },
+    {
+      "at": "2026-08-08T11:00:14.932Z",
+      "kind": "job-allowed-with-warning",
+      "dedupeKey": "allowed-warn:inngest:sync-retailer-scheduled:AMBER",
+      "message": "inngest:sync-retailer-scheduled allowed in AMBER (class=nonessential)."
+    },
+    {
+      "at": "2026-08-08T10:51:46.228Z",
       "kind": "state-change",
       "provider": "global",
-      "dedupeKey": "finding:State changed (none) → AMBER#",
-      "message": "State changed (none) → AMBER.",
+      "dedupeKey": "finding:State changed RED → AMBER#",
+      "message": "State changed RED → AMBER.",
       "detail": {
         "variableMtdUsd": 0,
         "projectedMonthUsd": 0,
@@ -127,148 +250,93 @@
       }
     },
     {
-      "at": "2026-08-06T20:00:39.834Z",
-      "kind": "job-allowed-with-warning",
-      "dedupeKey": "allowed-warn:inngest:sync-retailer:AMBER",
-      "message": "inngest:sync-retailer allowed in AMBER (class=nonessential)."
+      "at": "2026-08-08T10:51:46.228Z",
+      "kind": "anomaly",
+      "provider": "global",
+      "dedupeKey": "finding:Recovered one level to AMBER after clean streak#",
+      "message": "Recovered one level to AMBER after clean streak.",
+      "detail": {
+        "variableMtdUsd": 0,
+        "projectedMonthUsd": 0,
+        "burnUsdPerDay": 0,
+        "state": "AMBER"
+      }
     },
     {
-      "at": "2026-08-06T20:00:32.485Z",
-      "kind": "job-allowed-with-warning",
-      "dedupeKey": "allowed-warn:inngest:sync-retailer-scheduled:AMBER",
-      "message": "inngest:sync-retailer-scheduled allowed in AMBER (class=nonessential)."
+      "at": "2026-08-08T09:00:22.661Z",
+      "kind": "collection-error",
+      "provider": "neon",
+      "dedupeKey": "collect-error:neon",
+      "message": "neon collection failed: Neon consumption unavailable (org resolved, 1 project(s)). Tried: v2/projects?org_id+metrics→406 specified date-time range start is outside the boundaries of the specified granularity; start:\"2026-08-01 00:00:00 +0000 UTC\"; v2/projects?org_id+metrics(csv)→406 specified date-time range start is outside the boundaries of the specified granularity; start:\"2026-08-01 00:00:00 +0000 UTC\"; v2/projects?org_id+project_ids+metrics→406 specified date-time range start is outside the boundaries of the specified granularity; start:\"2026-08-01 00:00:00 +0000 UTC\"; projects?org_id+project_ids→406 specified date-time range start is outside the boundaries of the specified granularity; start:\"2026-08-01 00:00:00 +0000 UTC\"; account?org_id→404 this route does not exist; projects?project_ids→400 org_id is required, you can find it on your organization settings page; account (unscoped)→404 this route does not exist."
     },
     {
-      "at": "2026-08-06T16:00:25.081Z",
-      "kind": "job-allowed-with-warning",
-      "dedupeKey": "allowed-warn:inngest:price-check:AMBER",
-      "message": "inngest:price-check allowed in AMBER (class=deferrable)."
+      "at": "2026-08-08T08:00:45.414Z",
+      "kind": "job-refused",
+      "provider": "global",
+      "dedupeKey": "refused:inngest:sync-retailer:RED",
+      "message": "Refused inngest:sync-retailer: Cost Guard is RED (Stale/failed provider data: neon.) — nonessential and high-risk jobs are blocked.",
+      "detail": {
+        "trigger": "Cost Guard is RED (Stale/failed provider data: neon.) — nonessential and high-risk jobs are blocked.",
+        "operation": "inngest:sync-retailer",
+        "jobClass": "nonessential",
+        "guardState": "RED",
+        "write": true,
+        "estRows": 50000,
+        "estRequests": 2000,
+        "projectedMonthUsd": 0,
+        "thresholdMaxApprovedUsd": 150,
+        "action": "job refused before any work ran"
+      }
     },
     {
-      "at": "2026-08-06T14:00:38.768Z",
-      "kind": "job-allowed-with-warning",
-      "dedupeKey": "allowed-warn:inngest:sync-retailer:AMBER",
-      "message": "inngest:sync-retailer allowed in AMBER (class=nonessential)."
+      "at": "2026-08-08T08:00:38.157Z",
+      "kind": "job-refused",
+      "provider": "global",
+      "dedupeKey": "refused:inngest:sync-retailer-scheduled:RED",
+      "message": "Refused inngest:sync-retailer-scheduled: Cost Guard is RED (Stale/failed provider data: neon.) — nonessential and high-risk jobs are blocked.",
+      "detail": {
+        "trigger": "Cost Guard is RED (Stale/failed provider data: neon.) — nonessential and high-risk jobs are blocked.",
+        "operation": "inngest:sync-retailer-scheduled",
+        "jobClass": "nonessential",
+        "guardState": "RED",
+        "write": false,
+        "estRows": 500,
+        "estRequests": 50,
+        "projectedMonthUsd": 0,
+        "thresholdMaxApprovedUsd": 150,
+        "action": "job refused before any work ran"
+      }
     },
     {
-      "at": "2026-08-06T14:00:26.247Z",
+      "at": "2026-08-08T08:00:37.429Z",
       "kind": "job-allowed-with-warning",
-      "dedupeKey": "allowed-warn:inngest:sync-retailer-scheduled:AMBER",
-      "message": "inngest:sync-retailer-scheduled allowed in AMBER (class=nonessential)."
+      "dedupeKey": "allowed-warn:inngest:price-check:RED",
+      "message": "inngest:price-check allowed in RED (class=deferrable)."
     },
     {
-      "at": "2026-08-06T08:01:19.743Z",
-      "kind": "job-allowed-with-warning",
-      "dedupeKey": "allowed-warn:inngest:price-check:AMBER",
-      "message": "inngest:price-check allowed in AMBER (class=deferrable)."
+      "at": "2026-08-08T04:00:03.225Z",
+      "kind": "job-refused",
+      "provider": "global",
+      "dedupeKey": "refused:inngest:bookshop-refresh:RED",
+      "message": "Refused inngest:bookshop-refresh: Cost Guard is RED (Stale/failed provider data: neon.) — nonessential and high-risk jobs are blocked.",
+      "detail": {
+        "trigger": "Cost Guard is RED (Stale/failed provider data: neon.) — nonessential and high-risk jobs are blocked.",
+        "operation": "inngest:bookshop-refresh",
+        "jobClass": "nonessential",
+        "guardState": "RED",
+        "write": true,
+        "estRows": 5000,
+        "estRequests": 1000,
+        "projectedMonthUsd": 0,
+        "thresholdMaxApprovedUsd": 150,
+        "action": "job refused before any work ran"
+      }
     },
     {
-      "at": "2026-08-06T07:01:24.253Z",
+      "at": "2026-08-08T03:00:40.072Z",
       "kind": "job-allowed-with-warning",
-      "dedupeKey": "allowed-warn:inngest:sync-retailer:AMBER",
-      "message": "inngest:sync-retailer allowed in AMBER (class=nonessential)."
-    },
-    {
-      "at": "2026-08-06T07:01:01.318Z",
-      "kind": "job-allowed-with-warning",
-      "dedupeKey": "allowed-warn:inngest:sync-retailer-scheduled:AMBER",
-      "message": "inngest:sync-retailer-scheduled allowed in AMBER (class=nonessential)."
-    },
-    {
-      "at": "2026-08-06T04:00:45.898Z",
-      "kind": "job-allowed-with-warning",
-      "dedupeKey": "allowed-warn:inngest:bookshop-refresh:AMBER",
-      "message": "inngest:bookshop-refresh allowed in AMBER (class=nonessential)."
-    },
-    {
-      "at": "2026-08-06T03:00:19.357Z",
-      "kind": "job-allowed-with-warning",
-      "dedupeKey": "allowed-warn:inngest:cleanup-stale:AMBER",
-      "message": "inngest:cleanup-stale allowed in AMBER (class=deferrable)."
-    },
-    {
-      "at": "2026-08-06T02:00:23.791Z",
-      "kind": "job-allowed-with-warning",
-      "dedupeKey": "allowed-warn:inngest:enrich-canonical:AMBER",
-      "message": "inngest:enrich-canonical allowed in AMBER (class=nonessential)."
-    },
-    {
-      "at": "2026-08-06T01:01:15.827Z",
-      "kind": "job-allowed-with-warning",
-      "dedupeKey": "allowed-warn:inngest:sync-retailer:AMBER",
-      "message": "inngest:sync-retailer allowed in AMBER (class=nonessential)."
-    },
-    {
-      "at": "2026-08-06T01:00:19.030Z",
-      "kind": "job-allowed-with-warning",
-      "dedupeKey": "allowed-warn:inngest:sync-retailer-scheduled:AMBER",
-      "message": "inngest:sync-retailer-scheduled allowed in AMBER (class=nonessential)."
-    },
-    {
-      "at": "2026-08-06T00:00:28.457Z",
-      "kind": "job-allowed-with-warning",
-      "dedupeKey": "allowed-warn:inngest:price-check:AMBER",
-      "message": "inngest:price-check allowed in AMBER (class=deferrable)."
-    },
-    {
-      "at": "2026-08-05T18:01:38.947Z",
-      "kind": "job-allowed-with-warning",
-      "dedupeKey": "allowed-warn:inngest:sync-retailer:AMBER",
-      "message": "inngest:sync-retailer allowed in AMBER (class=nonessential)."
-    },
-    {
-      "at": "2026-08-05T18:00:39.770Z",
-      "kind": "job-allowed-with-warning",
-      "dedupeKey": "allowed-warn:inngest:sync-retailer-scheduled:AMBER",
-      "message": "inngest:sync-retailer-scheduled allowed in AMBER (class=nonessential)."
-    },
-    {
-      "at": "2026-08-05T16:00:11.133Z",
-      "kind": "job-allowed-with-warning",
-      "dedupeKey": "allowed-warn:inngest:price-check:AMBER",
-      "message": "inngest:price-check allowed in AMBER (class=deferrable)."
-    },
-    {
-      "at": "2026-08-05T12:01:02.747Z",
-      "kind": "job-allowed-with-warning",
-      "dedupeKey": "allowed-warn:inngest:sync-retailer:AMBER",
-      "message": "inngest:sync-retailer allowed in AMBER (class=nonessential)."
-    },
-    {
-      "at": "2026-08-05T12:00:22.530Z",
-      "kind": "job-allowed-with-warning",
-      "dedupeKey": "allowed-warn:inngest:sync-retailer-scheduled:AMBER",
-      "message": "inngest:sync-retailer-scheduled allowed in AMBER (class=nonessential)."
-    },
-    {
-      "at": "2026-08-05T08:00:28.230Z",
-      "kind": "job-allowed-with-warning",
-      "dedupeKey": "allowed-warn:inngest:price-check:AMBER",
-      "message": "inngest:price-check allowed in AMBER (class=deferrable)."
-    },
-    {
-      "at": "2026-08-05T06:00:11.288Z",
-      "kind": "job-allowed-with-warning",
-      "dedupeKey": "allowed-warn:inngest:sync-retailer:AMBER",
-      "message": "inngest:sync-retailer allowed in AMBER (class=nonessential)."
-    },
-    {
-      "at": "2026-08-05T06:00:03.043Z",
-      "kind": "job-allowed-with-warning",
-      "dedupeKey": "allowed-warn:inngest:sync-retailer-scheduled:AMBER",
-      "message": "inngest:sync-retailer-scheduled allowed in AMBER (class=nonessential)."
-    },
-    {
-      "at": "2026-08-05T04:00:12.356Z",
-      "kind": "job-allowed-with-warning",
-      "dedupeKey": "allowed-warn:inngest:bookshop-refresh:AMBER",
-      "message": "inngest:bookshop-refresh allowed in AMBER (class=nonessential)."
-    },
-    {
-      "at": "2026-08-05T03:00:02.623Z",
-      "kind": "job-allowed-with-warning",
-      "dedupeKey": "allowed-warn:inngest:cleanup-stale:AMBER",
-      "message": "inngest:cleanup-stale allowed in AMBER (class=deferrable)."
+      "dedupeKey": "allowed-warn:inngest:cleanup-stale:RED",
+      "message": "inngest:cleanup-stale allowed in RED (class=deferrable)."
     }
   ]
 }

@@ -52,6 +52,42 @@ const V2_METRICS_REPEATED = V2_METRICS.map(m => `metrics=${m}`).join('&')
 /** Comma form, in case Neon expects a single joined value. */
 const V2_METRICS_CSV = `metrics=${V2_METRICS.join(',')}`
 
+export type NeonGranularity = 'hourly' | 'daily' | 'monthly'
+
+/**
+ * Neon caps how far back each granularity may reach, and answers 406
+ * ('specified date-time range start is outside the boundaries of the specified
+ * granularity') when the window is exceeded — NOT an auth or shape problem.
+ *
+ * This is why Neon collection died in production on 2026-08-08T02:21Z with no
+ * code change: the range always starts at the 1st of the month, so on the 8th
+ * the month-start drifted past the 7-day hourly window and every candidate
+ * endpoint began answering 406. Left alone it would break on the 8th of every
+ * month. Resolution is irrelevant to Cost Guard — only the month-to-date total
+ * is summed — so ask for the coarsest granularity that still covers the range,
+ * and keep the finer one first only while it is genuinely in range.
+ */
+const HOURLY_MAX_DAYS = 7
+const DAILY_MAX_DAYS  = 90
+/** Safety margin so a collection near the boundary does not flap into 406. */
+const WINDOW_MARGIN_DAYS = 0.5
+
+export function granularityLadder(from: Date, to: Date): NeonGranularity[] {
+  const spanDays = (to.getTime() - from.getTime()) / 86_400_000
+  const ladder: NeonGranularity[] = []
+  if (spanDays <= HOURLY_MAX_DAYS - WINDOW_MARGIN_DAYS) ladder.push('hourly')
+  if (spanDays <= DAILY_MAX_DAYS - WINDOW_MARGIN_DAYS) ladder.push('daily')
+  ladder.push('monthly')
+  return ladder
+}
+
+/**
+ * Hard cap on Neon API calls per collection. The endpoint ladder times the
+ * granularity ladder is a small cross product, but it must never grow into an
+ * unbounded retry storm against a provider we are meant to be protecting.
+ */
+const MAX_CONSUMPTION_ATTEMPTS = 12
+
 /** Totals accumulated from whichever response shape Neon returned. */
 export interface NeonTotals {
   computeSeconds: number
@@ -219,8 +255,11 @@ export async function collectNeon(now: Date = new Date()): Promise<ProviderUsage
   if (!apiKey) return { ...base, note: 'NEON_API_KEY not set — see COST-GUARD.md manual actions.' }
   base.configured = true
 
-  const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString()
-  const range = `from=${encodeURIComponent(from)}&to=${encodeURIComponent(now.toISOString())}&granularity=hourly`
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+  const from = monthStart.toISOString()
+  const rangeFor = (granularity: NeonGranularity) =>
+    `from=${encodeURIComponent(from)}&to=${encodeURIComponent(now.toISOString())}&granularity=${granularity}`
+  const granularities = granularityLadder(monthStart, now)
 
   let orgId: string | null = null
   try {
@@ -241,34 +280,47 @@ export async function collectNeon(now: Date = new Date()): Promise<ProviderUsage
   //   account?org_id              → 404 "this route does not exist"
   // so the v2 project endpoint carrying org_id AND metrics is the live path;
   // the rest stay as fallbacks for other plans and future API changes.
-  const candidates: Array<{ label: string; url: string }> = []
-  if (orgId) {
-    candidates.push({ label: 'v2/projects?org_id+metrics', url: `${API}/consumption_history/v2/projects?${org}${V2_METRICS_REPEATED}&${range}` })
-    candidates.push({ label: 'v2/projects?org_id+metrics(csv)', url: `${API}/consumption_history/v2/projects?${org}${V2_METRICS_CSV}&${range}` })
-    if (pids) {
-      candidates.push({ label: 'v2/projects?org_id+project_ids+metrics', url: `${API}/consumption_history/v2/projects?${org}${pids}&${V2_METRICS_REPEATED}&${range}` })
-      candidates.push({ label: 'projects?org_id+project_ids', url: `${API}/consumption_history/projects?${org}${pids}&${range}` })
+  const candidatesFor = (range: string): Array<{ label: string; url: string }> => {
+    const candidates: Array<{ label: string; url: string }> = []
+    if (orgId) {
+      candidates.push({ label: 'v2/projects?org_id+metrics', url: `${API}/consumption_history/v2/projects?${org}${V2_METRICS_REPEATED}&${range}` })
+      candidates.push({ label: 'v2/projects?org_id+metrics(csv)', url: `${API}/consumption_history/v2/projects?${org}${V2_METRICS_CSV}&${range}` })
+      if (pids) {
+        candidates.push({ label: 'v2/projects?org_id+project_ids+metrics', url: `${API}/consumption_history/v2/projects?${org}${pids}&${V2_METRICS_REPEATED}&${range}` })
+        candidates.push({ label: 'projects?org_id+project_ids', url: `${API}/consumption_history/projects?${org}${pids}&${range}` })
+      }
+      candidates.push({ label: 'account?org_id', url: `${API}/consumption_history/account?${org}${range}` })
     }
-    candidates.push({ label: 'account?org_id', url: `${API}/consumption_history/account?${org}${range}` })
+    if (pids) candidates.push({ label: 'projects?project_ids', url: `${API}/consumption_history/projects?${pids}&${range}` })
+    candidates.push({ label: 'account (unscoped)', url: `${API}/consumption_history/account?${range}` })
+    return candidates
   }
-  if (pids) candidates.push({ label: 'projects?project_ids', url: `${API}/consumption_history/projects?${pids}&${range}` })
-  candidates.push({ label: 'account (unscoped)', url: `${API}/consumption_history/account?${range}` })
 
   const attempts: string[] = []
   let totals: NeonTotals | null = null
   let usedLabel = ''
-  for (const c of candidates) {
-    try {
-      const r = await getJson(c.url, apiKey)
-      if (r.status === 200) {
-        const parsed = parseNeonConsumption(r.json)
-        if (parsed.shape) { totals = parsed; usedLabel = `${c.label} [${parsed.shape}]`; break }
-        attempts.push(`${c.label}→200 but unrecognised shape`)
-        continue
+  let calls = 0
+  outer:
+  for (const granularity of granularities) {
+    for (const c of candidatesFor(rangeFor(granularity))) {
+      if (calls >= MAX_CONSUMPTION_ATTEMPTS) {
+        attempts.push(`stopped at the ${MAX_CONSUMPTION_ATTEMPTS}-request cap`)
+        break outer
       }
-      attempts.push(`${c.label}→${r.status}${r.why ? ` ${r.why}` : ''}`)
-    } catch (err) {
-      attempts.push(`${c.label}→${(err as Error).message}`)
+      calls += 1
+      const label = `${c.label}@${granularity}`
+      try {
+        const r = await getJson(c.url, apiKey)
+        if (r.status === 200) {
+          const parsed = parseNeonConsumption(r.json)
+          if (parsed.shape) { totals = parsed; usedLabel = `${label} [${parsed.shape}]`; break outer }
+          attempts.push(`${label}→200 but unrecognised shape`)
+          continue
+        }
+        attempts.push(`${label}→${r.status}${r.why ? ` ${r.why}` : ''}`)
+      } catch (err) {
+        attempts.push(`${label}→${(err as Error).message}`)
+      }
     }
   }
 
