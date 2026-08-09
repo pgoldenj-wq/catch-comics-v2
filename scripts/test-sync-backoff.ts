@@ -137,7 +137,7 @@ check('price-check SQL excludes scheduled_sync_disabled retailers',
 check('price-check SQL excludes SKIP_PLATFORMS (no-adapter platforms)',
   priceCheckSrc.includes('ret.platform::text <> ALL('))
 check('price-check imports the single source of truth for SKIP_PLATFORMS',
-  priceCheckSrc.includes("import { SKIP_PLATFORMS }"))
+  /import \{[^}]*\bSKIP_PLATFORMS\b[^}]*\}\s+from\s+'@\/lib\/sync\/dispatch'/.test(priceCheckSrc))
 
 // ── 6. dispatchSync does not fetch the whole syncConfig blob ─────────────────
 const schedSrcEarly = readFileSync(join(__dirname, '..', 'lib', 'inngest', 'functions', 'sync-scheduled.ts'), 'utf8')

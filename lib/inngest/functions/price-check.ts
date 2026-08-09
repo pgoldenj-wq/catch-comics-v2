@@ -15,7 +15,7 @@
 import { inngest }  from '@/lib/inngest/client'
 import { prisma }   from '@/lib/prisma'
 import { inngestCostGate } from '@/lib/costguard/inngest'
-import { SKIP_PLATFORMS }  from '@/lib/sync/dispatch'
+import { SKIP_PLATFORMS, isBlockedByRecentAttempt } from '@/lib/sync/dispatch'
 
 const LOOKBACK_HOURS = 24
 const MAX_RETAILERS  = 10
@@ -67,25 +67,64 @@ export const priceCheck = inngest.createFunction(
       // The gated CLI path is unaffected — it never comes through here.
       const skipPlatforms = [...SKIP_PLATFORMS]
 
-      const rows = await prisma.$queryRaw<Array<{ retailer_id: string; clicks: bigint }>>`
+      const rows = await prisma.$queryRaw<Array<{
+        retailer_id: string
+        domain: string
+        clicks: bigint
+        lastAttemptAt: Date | null
+        lastAttemptStatus: string | null
+        consecutiveFailures: number
+      }>>`
         SELECT
           rl.retailer_id,
-          COUNT(ce.id) AS clicks
+          ret.domain,
+          COUNT(ce.id) AS clicks,
+          la.started_at          AS "lastAttemptAt",
+          la.status              AS "lastAttemptStatus",
+          COALESCE(cf.n, 0)::int AS "consecutiveFailures"
         FROM click_events ce
         JOIN retailer_listings rl ON rl.id = ce.listing_id
         JOIN retailers ret ON ret.id = rl.retailer_id
+        LEFT JOIN LATERAL (
+          SELECT s.started_at, s.status FROM sync_logs s
+          WHERE s.retailer_id = ret.id ORDER BY s.started_at DESC LIMIT 1
+        ) la ON true
+        LEFT JOIN LATERAL (
+          SELECT count(*) AS n FROM sync_logs s
+          WHERE s.retailer_id = ret.id
+            AND s.started_at > COALESCE(ret.last_synced_at, '-infinity'::timestamptz)
+        ) cf ON true
         WHERE
           ce.clicked_at >= ${since}
           AND ret.is_active = true
           AND rl.deleted_at IS NULL
           AND (ret.sync_config->'scheduled_sync_disabled') IS DISTINCT FROM 'true'::jsonb
           AND ret.platform::text <> ALL(${skipPlatforms}::text[])
-        GROUP BY rl.retailer_id
+        GROUP BY rl.retailer_id, ret.domain, la.started_at, la.status, cf.n
         ORDER BY clicks DESC
         LIMIT ${MAX_RETAILERS}
       `
 
-      return rows.map(r => r.retailer_id)
+      // Same in-flight lease and failure backoff the hourly cron obeys. Without
+      // this, price-check happily re-dispatched a retailer the scheduler was
+      // deliberately backing off, and every such dispatch cost 4 attempts plus
+      // an on-failure run for a sync that could not succeed.
+      const now = Date.now()
+      const eligible = rows.filter(r => !isBlockedByRecentAttempt({
+        lastAttemptAt:       r.lastAttemptAt,
+        lastAttemptStatus:   r.lastAttemptStatus,
+        consecutiveFailures: r.consecutiveFailures,
+      }, now))
+
+      const blocked = rows.length - eligible.length
+      if (blocked > 0) {
+        console.log(
+          `[price-check] ${blocked} clicked retailer(s) skipped - in-flight or in failure backoff: ` +
+          rows.filter(r => !eligible.includes(r)).map(r => r.domain).join(', '),
+        )
+      }
+
+      return eligible.map(r => r.retailer_id)
     })
 
     if (retailerIds.length === 0) {

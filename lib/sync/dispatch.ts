@@ -119,6 +119,28 @@ export interface SyncAttemptState {
 }
 
 /**
+ * Is this retailer currently protected from being dispatched by a recent
+ * attempt — either because a run holds the in-flight lease, or because the
+ * failure cooldown has not elapsed?
+ *
+ * Shared by EVERY automatic dispatcher. price-check originally had its own
+ * (weaker) rules and re-enqueued retailers the scheduler had already excluded,
+ * so the protections had to be duplicated to be bypassed. One predicate now.
+ */
+export function isBlockedByRecentAttempt(r: SyncAttemptState, now: number): boolean {
+  const lastAttempt = r.lastAttemptAt?.getTime() ?? null
+  if (lastAttempt === null) return false
+
+  // In-flight lease: never run two syncs for the same retailer at once.
+  if (r.lastAttemptStatus === 'running' && now - lastAttempt < RUN_LEASE_MS) return true
+
+  // Failure backoff. 0 failures means the last attempt produced the current
+  // lastSyncedAt — a real success — so nothing is owed.
+  const fails = r.consecutiveFailures ?? 0
+  return fails > 0 && now - lastAttempt < failureCooldownMs(fails)
+}
+
+/**
  * Should the scheduled cron enqueue a sync for this retailer right now?
  * Pure — the cron passes each active retailer plus the current time.
  */
@@ -133,18 +155,7 @@ export function isDueForScheduledSync(
   if (SKIP_PLATFORMS.has(r.platform)) return false
   if (isScheduledSyncDisabled(r.syncConfig)) return false
 
-  const lastAttempt = r.lastAttemptAt?.getTime() ?? null
-
-  if (lastAttempt !== null) {
-    // In-flight lease: never run two syncs for the same retailer at once.
-    if (r.lastAttemptStatus === 'running' && now - lastAttempt < RUN_LEASE_MS) return false
-
-    // Failure backoff. A count of 0 means the most recent attempt produced the
-    // current `lastSyncedAt` — a real success — so no cooldown applies and the
-    // normal interval rule below is the only gate.
-    const fails = r.consecutiveFailures ?? 0
-    if (fails > 0 && now - lastAttempt < failureCooldownMs(fails)) return false
-  }
+  if (isBlockedByRecentAttempt(r, now)) return false
 
   const intervalMs = refreshIntervalHours(r.syncConfig, r.platform) * 60 * 60 * 1000
   const lastSynced = r.lastSyncedAt?.getTime() ?? 0
