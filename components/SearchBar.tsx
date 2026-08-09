@@ -179,6 +179,14 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
             role="combobox"
             style={{
               flex: 1,
+              // minWidth:0 is load-bearing. A flex item defaults to
+              // min-width:auto, and an <input> carries an intrinsic width of
+              // ~177px (its default size=20). Without this the input refuses
+              // to shrink inside a narrow header, pushing the submit button
+              // past the right edge of the viewport — which made the whole
+              // /search page scroll sideways on a 412px phone.
+              // Found by Browser Trust (tests/e2e/mobile.spec.ts).
+              minWidth: 0,
               background: 'transparent',
               fontSize: '14px',
               color: '#0A0A0A',
