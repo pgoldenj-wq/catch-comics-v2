@@ -3,10 +3,16 @@
 # Hourly job: triggers a collection cycle on production and reports one of
 # four outcomes → PASS (green), WARNING (green + annotation), NOT CONFIGURED
 # (red) or FAILURE (red). GitHub emails the founder on red, the same
-# visible-failure convention as launch-smoke.yml. Alert dedup happens
-# server-side in the event store; the workflow failing every hour during an
-# incident is intentional pressure, not noise — GitHub only emails on the
-# first failure of a streak.
+# visible-failure convention as launch-smoke.yml.
+#
+# NOTIFICATION DEDUP: this file used to assume "GitHub only emails on the
+# first failure of a streak". That is false — GitHub emails on every failed
+# scheduled run, so the 2026-08-07 Neon incident sent ~30 identical founder
+# emails in 30 hours and taught the founder to ignore them. The event store
+# already dedupes findings inside alertDedupeWindowMs, so this job now defers
+# to its `emittedEvents` count: a genuinely new or changed condition fails the
+# run (and emails); an identical continuing one is annotated as a warning and
+# re-fails only when the store re-emits (6h) or the condition changes.
 #
 # A green tick means the check RAN AND HAD TELEMETRY. It never means the
 # check was skipped: an unconfigured Cost Guard is a red run, because a
@@ -96,6 +102,15 @@ jobs:
           FRESH_LIST=$(echo "$RESPONSE" | jq -r '(.freshProviders // []) | join(", ")' 2>/dev/null || true)
           UNCONF=$(echo "$RESPONSE" | jq -r '(.unconfiguredProviders // []) | join(", ")' 2>/dev/null || true)
           STALE=$(echo "$RESPONSE" | jq -r '(.staleProviders // []) | join(", ")' 2>/dev/null || true)
+          # Alert dedup is already solved server-side: the event store drops a
+          # finding whose dedupeKey repeats inside alertDedupeWindowMs (6h), so
+          # emittedEvents > 0 means "something genuinely new or changed", and 0
+          # means "the identical condition we already reported". Reusing it here
+          # is what turns an hourly incident from 24 founder emails a day into
+          # one per genuine change plus a 6-hourly reminder.
+          EMITTED=$(echo "$RESPONSE" | jq -r '.emittedEvents // 0' 2>/dev/null || true)
+          EMITTED=${EMITTED:-0}
+          case "$EMITTED" in ''|*[!0-9]*) EMITTED=0 ;; esac
           echo "Cost Guard state: $STATE (fresh providers: ${FRESH_LIST:-none})"
           if [ "$STATE" = "UNKNOWN" ]; then
             echo "::error::Cost Guard returned no state — endpoint misconfigured."
@@ -105,15 +120,32 @@ jobs:
           fi
           # A real breach outranks everything below, including missing telemetry.
           if [ "$STATE" = "RED" ] || [ "$STATE" = "LOCKDOWN" ]; then
-            echo "::error::Cost Guard is $STATE — check Mission Control / launch/operations/COST-GUARD.md"
-            echo "$RESPONSE" | jq -r '.reasons[]?' | while read -r r; do echo "::error::$r"; done
+            # An unchanged incident stays loudly visible — annotation, summary,
+            # and the Cost Guard page all still say RED — but it does not fail
+            # the run again, because a second red run only produces a duplicate
+            # email that says nothing new. It re-fails the moment anything
+            # changes, and again on the store's own 6-hourly re-emit.
+            if [ "$EMITTED" -gt 0 ]; then
+              LEVEL=error; VERB="Cost Guard is $STATE"
+            else
+              LEVEL=warning; VERB="Cost Guard is still $STATE (unchanged since the alert already sent)"
+            fi
+            echo "::${LEVEL}::${VERB} — check the Cost Guard page / launch/operations/COST-GUARD.md"
+            echo "$RESPONSE" | jq -r '.reasons[]?' | while read -r r; do echo "::${LEVEL}::$r"; done
             {
               echo "### Cost Guard: $STATE :rotating_light:"
               echo ""
               echo "Variable MTD \$$(echo "$RESPONSE" | jq -r '.totals.variableMtdUsd') · projected \$$(echo "$RESPONSE" | jq -r '.totals.projectedMonthUsd')"
               echo "$RESPONSE" | jq -r '.reasons[]? | "- " + .'
+              echo ""
+              if [ "$EMITTED" -gt 0 ]; then
+                echo "**New or changed** — this run fails so the founder is emailed."
+              else
+                echo "_Unchanged since the alert already sent — annotated, not re-failed. It will fail again on any change, or on the store's 6-hourly re-emit._"
+              fi
             } >> "$GITHUB_STEP_SUMMARY"
-            exit 1
+            if [ "$EMITTED" -gt 0 ]; then exit 1; fi
+            exit 0
           fi
           # Having checked nothing is not a pass, whatever colour the engine
           # reports. Without telemetry the breakers have nothing to act on.
@@ -148,6 +180,10 @@ jobs:
             echo "Variable MTD \$$(echo "$RESPONSE" | jq -r '.totals.variableMtdUsd') · projected \$$(echo "$RESPONSE" | jq -r '.totals.projectedMonthUsd')"
           } >> "$GITHUB_STEP_SUMMARY"
 
+  # PR-only by design. On the hourly schedule this job reports "Skipped", which
+  # is correct and not a symptom — there is no changed code to scan. It is NOT
+  # skipped as a consequence of spend-check failing; the two jobs are
+  # independent and gated purely on the triggering event.
   cost-hazard-scan:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest

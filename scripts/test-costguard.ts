@@ -21,7 +21,7 @@ process.chdir(workDir)
 import { COSTGUARD_CONFIG as CFG } from '../lib/costguard/config'
 import { evaluate } from '../lib/costguard/engine'
 import { assertJobAllowed, JobBudget, withCappedRetries } from '../lib/costguard/gate'
-import { parseNeonConsumption } from '../lib/costguard/providers/neon'
+import { granularityLadder, parseNeonConsumption } from '../lib/costguard/providers/neon'
 import { appendEvent, getEvents, setState } from '../lib/costguard/store'
 import type {
   CostGuardState, ProviderUsage, Snapshot,
@@ -459,6 +459,26 @@ async function main() {
     ok('null body yields no shape', parseNeonConsumption(null).shape === null)
     ok('metrics array with only unknown names yields no shape',
       parseNeonConsumption({ periods: [{ consumption: [{ metrics: [{ metric_name: 'mystery', value: 9 }] }] }] }).shape === null)
+  }
+
+  // ── Neon granularity window ────────────────────────────────────────────────
+  // Regression for the 2026-08-08 blackout: the consumption range always starts
+  // at the 1st of the month, so from the 8th onward an hourly request is
+  // outside Neon's 7-day hourly window and every endpoint answers 406. Cost
+  // Guard lost Neon with no code change and would have done so every month.
+  {
+    const monthStart = new Date('2026-08-01T00:00:00Z')
+    const day3  = granularityLadder(monthStart, new Date('2026-08-03T12:00:00Z'))
+    const day8  = granularityLadder(monthStart, new Date('2026-08-08T02:21:00Z'))
+    const day28 = granularityLadder(monthStart, new Date('2026-08-28T09:00:00Z'))
+
+    ok('early in the month still prefers hourly', day3[0] === 'hourly')
+    ok('day 8 drops hourly (the live 406 boundary)', !day8.includes('hourly'), day8.join(','))
+    ok('day 8 falls back to daily first', day8[0] === 'daily', day8.join(','))
+    ok('late in the month still covers the range', day28[0] === 'daily', day28.join(','))
+    ok('every ladder ends with a granularity that always spans a month',
+      [day3, day8, day28].every(l => l[l.length - 1] === 'monthly'))
+    ok('no ladder is ever empty', [day3, day8, day28].every(l => l.length > 0))
   }
 
   // ── Secret hygiene: no client-side imports of costguard modules ────────────
