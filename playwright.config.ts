@@ -23,6 +23,19 @@ import { LOCAL_BASE_URL, resolveTarget } from './tests/e2e/target'
 const target = resolveTarget()
 const isCI = !!process.env.CI
 
+/**
+ * Optional. Only needed while Vercel Deployment Protection is enabled for
+ * Preview deployments — without it a Preview redirects any anonymous browser
+ * to Vercel SSO and nothing can be tested. See tests/e2e/global-setup.ts.
+ *
+ * The value is a credential, and Playwright traces record request headers
+ * verbatim, so traces are turned OFF whenever it is in use. That keeps the
+ * rule "no secrets in reports, traces, screenshots or generated JSON" true
+ * rather than merely intended. Making Preview deployments public removes the
+ * secret and brings traces back.
+ */
+const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+
 export default defineConfig({
   testDir: './tests/e2e',
 
@@ -49,15 +62,25 @@ export default defineConfig({
 
   outputDir: 'launch/operations/browser-trust-artifacts',
 
+  globalSetup: './tests/e2e/global-setup.ts',
+
   use: {
     baseURL: target.baseURL,
-    trace: isCI ? 'on-first-retry' : 'off',
+    trace: isCI && !bypassSecret ? 'on-first-retry' : 'off',
     screenshot: 'only-on-failure',
     video: 'off',
     actionTimeout: 10_000,
     navigationTimeout: 30_000,
-    // Identifiable in logs, same convention as launch-smoke.mjs.
-    extraHTTPHeaders: { 'X-Catch-Comics-Test': 'browser-trust' },
+    extraHTTPHeaders: {
+      // Identifiable in logs, same convention as launch-smoke.mjs.
+      'X-Catch-Comics-Test': 'browser-trust',
+      ...(bypassSecret
+        ? {
+            'x-vercel-protection-bypass': bypassSecret,
+            'x-vercel-set-bypass-cookie': 'samesitenone',
+          }
+        : {}),
+    },
   },
 
   projects: [

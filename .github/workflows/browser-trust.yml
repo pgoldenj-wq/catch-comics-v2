@@ -86,6 +86,14 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run Browser Trust (read-only)
+        # VERCEL_AUTOMATION_BYPASS_SECRET is only needed while Vercel
+        # Deployment Protection is enabled for Preview deployments. If the
+        # secret is absent the run still works against any public target, and
+        # a protected one fails immediately with an explanatory message rather
+        # than eight locator timeouts. When the secret IS set, Playwright
+        # traces are disabled so the header never reaches an artifact.
+        env:
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: npx playwright test --grep @prod-safe --workers 1
 
       - name: Upload HTML report and failure artifacts
