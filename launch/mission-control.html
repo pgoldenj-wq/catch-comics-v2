@@ -635,14 +635,83 @@ async function actFor(t){
 /* ═══ Boot ═══════════════════════════════════════════════════════════ */
 document.getElementById('connectBtn').onclick = connectRepo;
 
-// "Run Browser Trust" — Mission Control is a static page and cannot start a
-// process, so it hands over the exact command, the same way every other
-// action here works. Nothing runs on page load.
+/* ═══ Browser Trust run control ══════════════════════════════════════
+   The button starts a REAL local run through the bridge that
+   open-command-centre.ps1 starts on 127.0.0.1:8319 (see
+   launch/operations/browser-trust-bridge.mjs — one fixed action, no command
+   input). With no bridge it degrades honestly to copying the command rather
+   than pretending to have run something.
+
+   Nothing here executes a test on page load: probeBridge() only reads. */
+const BT_BRIDGE = 'http://127.0.0.1:8319';
+let btBridgeUp = false, btPolling = null;
+
+function btFetch(path, opts){
+  return fetch(BT_BRIDGE + path, { ...opts, mode:'cors', signal: AbortSignal.timeout(4000) });
+}
+async function probeBridge(){
+  try {
+    const r = await btFetch('/status');
+    if (!r.ok) { btBridgeUp = false; return null; }
+    btBridgeUp = true;
+    return await r.json();
+  } catch(e){ btBridgeUp = false; return null; }
+}
+function setRunBtn(label, disabled){
+  const b = document.getElementById('btRunBtn');
+  b.textContent = label;
+  b.disabled = !!disabled;
+  b.style.opacity = disabled ? '.55' : '';
+  b.style.cursor  = disabled ? 'default' : '';
+}
+// Poll while a run is in progress, then reload the result file so the card
+// shows the run the founder just triggered.
+function watchRun(){
+  clearInterval(btPolling);
+  btPolling = setInterval(async () => {
+    const s = await probeBridge();
+    if (!s || s.state === 'running') return;
+    clearInterval(btPolling); btPolling = null;
+    setRunBtn('Run Browser Trust', false);
+    await loadData(); render();
+    if (s.state === 'completed')   toast('Browser Trust PASSED — card updated');
+    else if (s.state === 'failed') toast('Browser Trust FAILED (' + (s.verdict || 'see report') + ') — card updated');
+  }, 2000);
+}
 document.getElementById('btRunBtn').onclick = async () => {
-  await navigator.clipboard.writeText('npm run test:e2e');
-  toast('Copied "npm run test:e2e" — run it in the repo, then reload this page');
+  const status = await probeBridge();
+  if (!btBridgeUp){
+    await navigator.clipboard.writeText('npm run test:e2e');
+    toast('Run control unavailable — command copied. Reopen via open-command-centre to enable it.');
+    return;
+  }
+  if (status && status.state === 'running'){
+    setRunBtn('Running…', true); watchRun();
+    toast('A Browser Trust run is already in progress');
+    return;
+  }
+  setRunBtn('Starting…', true);
+  try {
+    const r = await btFetch('/run', { method:'POST' });
+    if (r.status === 409) toast('A Browser Trust run is already in progress');
+    else if (!r.ok){ setRunBtn('Run Browser Trust', false); toast('Could not start the run'); return; }
+    else toast('Browser Trust started — about a minute. The card updates when it finishes.');
+    setRunBtn('Running…', true);
+    watchRun();
+  } catch(e){
+    setRunBtn('Run Browser Trust', false);
+    toast('Could not reach the local run control');
+  }
 };
-async function boot(){ await restoreRepo(); await loadData(); render(); }
+
+async function boot(){
+  await restoreRepo(); await loadData(); render();
+  // Reflect reality: label the button honestly when there is no bridge, and
+  // pick up a run already in flight. Starts nothing.
+  const s = await probeBridge();
+  if (!btBridgeUp) setRunBtn('Run Browser Trust (copies command)', false);
+  else if (s && s.state === 'running'){ setRunBtn('Running…', true); watchRun(); }
+}
 boot();
 setInterval(()=>render(), 60_000); // countdown stays honest without reload
 </script>

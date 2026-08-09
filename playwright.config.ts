@@ -74,12 +74,12 @@ export default defineConfig({
     extraHTTPHeaders: {
       // Identifiable in logs, same convention as launch-smoke.mjs.
       'X-Catch-Comics-Test': 'browser-trust',
-      ...(bypassSecret
-        ? {
-            'x-vercel-protection-bypass': bypassSecret,
-            'x-vercel-set-bypass-cookie': 'samesitenone',
-          }
-        : {}),
+      // Deliberately header-only: `x-vercel-set-bypass-cookie` is NOT sent.
+      // extraHTTPHeaders already applies to every request this browser context
+      // makes, so the cookie is redundant — and it would park a `_vercel_jwt`
+      // auth token in browser storage for the whole run. Header-only keeps the
+      // credential out of the browser's persistent state entirely.
+      ...(bypassSecret ? { 'x-vercel-protection-bypass': bypassSecret } : {}),
     },
   },
 

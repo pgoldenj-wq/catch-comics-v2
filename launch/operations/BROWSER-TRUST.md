@@ -172,10 +172,36 @@ above. `npm run test:e2e` and `npm run test:e2e:prod` are unaffected.
 
 Mission Control shows a **Browser Trust** card fed by
 `launch/operations/browser-trust-latest.json`, with three actions: *Run Browser
-Trust* (copies the command), *Open latest report*, *Diagnose with Claude*
-(copies a sanitised failure prompt).
+Trust*, *Open latest report*, *Diagnose with Claude* (copies a sanitised failure
+prompt).
 
-Opening Mission Control never runs Playwright.
+**Opening Mission Control never runs Playwright.**
+
+### Run Browser Trust — the local action bridge
+
+*Run Browser Trust* starts a **real** local run. Because Mission Control is a
+static page and cannot start a process, `open-command-centre.ps1` also starts a
+tiny local bridge: `launch/operations/browser-trust-bridge.mjs`.
+
+The button starts the run, shows *Running…*, refuses repeat clicks, and reloads
+the result card automatically when the run finishes — PASS or FAIL, truthfully.
+If the bridge is not running the button says so and copies the command instead
+of pretending.
+
+The bridge is **not** a command runner. It is deliberately tiny:
+
+| Property | Enforced |
+|---|---|
+| Binds `127.0.0.1:8319` only | unreachable off this machine |
+| Only `GET /status` and `POST /run` | everything else 404 |
+| No request body, query or arguments are read | nothing to inject |
+| Fixed argv, `shell: false` | no command interpreter involved |
+| `Origin` must be the local Command Centre | blocks other pages in your browser |
+| Single-flight | a second `/run` while running returns 409 |
+| Reports state, timing, exit code, verdict only | no env values, no process output |
+| Lives in `launch/` | not part of the Next app; never deployed to Vercel |
+
+Start it standalone if needed: `node launch/operations/browser-trust-bridge.mjs`
 
 Honesty rules the card enforces:
 
@@ -219,20 +245,45 @@ not a phone.
 
 ## Founder workflow
 
-**Day to day** — nothing changes. Open the Command Centre as usual; the Browser
+### Normal development
+
+Before or during UI work:
+
+```bash
+npm run test:e2e
+```
+
+For interactive debugging:
+
+```bash
+npm run test:e2e:ui
+```
+
+### Command Centre
+
+Open the Command Centre as usual — it runs no tests on its own. The Browser
 Trust card shows the last recorded result and its age.
 
-**Before pushing a UI change** — `npm run test:e2e`. About a minute.
+Use **Run Browser Trust** only when a deliberate local browser check is wanted.
 
-**On a pull request** — the Preview deployment triggers Browser Trust
-automatically. Red is informational for now; read it, do not merge past a real
-failure.
+### Pull requests
 
-**If something looks wrong in production** — `npm run test:e2e:prod`.
+A successful Vercel Preview triggers Browser Trust automatically.
 
-**When a run fails** — click *Diagnose with Claude* in the Command Centre, paste
-into Claude Code. The prompt carries the failing test names, environment,
-commit, sanitised errors, page URLs and artifact paths.
+### Production
+
+```bash
+npm run test:e2e:prod
+```
+
+after important Production UI deployments, or when Production behaviour is in
+doubt.
+
+### When a run fails
+
+Click *Diagnose with Claude* and paste into Claude Code. The prompt carries the
+failing test names, project, environment, commit, sanitised errors, page URLs
+and artifact paths — and no credentials.
 
 **Never** weaken an assertion to turn a run green. The first thing this suite
 found was a genuine 16px horizontal overflow on `/search` at phone width, live

@@ -21,6 +21,7 @@ param(
 
 $ErrorActionPreference = 'Continue'
 $Port = 8317
+$BridgePort = 8319          # Browser Trust local action bridge (127.0.0.1 only)
 $BaseUrl = "http://localhost:$Port"
 
 function Say($msg, $color) { if ($color) { Write-Host $msg -ForegroundColor $color } else { Write-Host $msg } }
@@ -164,6 +165,34 @@ if (Test-McServer) {
   }
 }
 
+# -- Browser Trust bridge: gives the "Run Browser Trust" button a real action --
+# Local-only (127.0.0.1:8319), one fixed action, no command input. Without it
+# Mission Control degrades honestly to copying the command. Starting it never
+# runs any test - it only makes the button able to.
+$bridgeStatus = ''
+function Test-Bridge {
+  try {
+    $r = Invoke-WebRequest -Uri "http://127.0.0.1:$BridgePort/status" -UseBasicParsing -TimeoutSec 5
+    return ($r.StatusCode -eq 200)
+  } catch { return $false }
+}
+if (Test-Bridge) {
+  $bridgeStatus = "already running on port $BridgePort (reused)"
+  Say "  Browser Trust bridge $bridgeStatus" Green
+} else {
+  Start-Process -FilePath 'node' `
+    -ArgumentList (Join-Path $RepoRoot 'launch\operations\browser-trust-bridge.mjs') `
+    -WorkingDirectory $RepoRoot -WindowStyle Minimized
+  $bridgeUp = $false
+  foreach ($i in 1..10) { Start-Sleep -Milliseconds 400; if (Test-Bridge) { $bridgeUp = $true; break } }
+  if ($bridgeUp) { $bridgeStatus = "started on port $BridgePort"; Say "  Browser Trust bridge $bridgeStatus" Green }
+  else {
+    # Not a failure: Mission Control falls back to copying the command.
+    $bridgeStatus = 'not available (Run Browser Trust will copy the command instead)'
+    Say "  Browser Trust bridge $bridgeStatus" DarkYellow
+  }
+}
+
 # -- Open the browser only once the server actually responds ----------------
 $targetUrl = "$BaseUrl/$Page"
 if (-not $NoBrowser -and (Test-McServer)) {
@@ -181,6 +210,7 @@ $sc = 'Yellow'; if ($smokeStatus  -eq 'PASSED') { $sc = 'Green' } elseif ($smoke
 Say "  Data health   : $healthStatus" $hc
 Say "  Prod smoke    : $smokeStatus" $sc
 Say "  Server        : $serverStatus"
+Say "  Browser Trust : $bridgeStatus"
 Say "  Mission Control: $targetUrl"
 Say ''
 
