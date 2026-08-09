@@ -96,14 +96,16 @@ jobs:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: npx playwright test --grep @prod-safe --workers 1
 
-      - name: Upload HTML report and failure artifacts
+      # Only the HTML report. Playwright copies every screenshot and trace it
+      # needs into the report's own data/ directory, so also uploading
+      # browser-trust-artifacts/ just ships a second copy of the same bytes —
+      # the first run of this workflow produced a 71.9 MB artifact that way.
+      - name: Upload HTML report (screenshots and traces included)
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: browser-trust-report-${{ github.run_id }}
-          path: |
-            launch/operations/browser-trust-report/
-            launch/operations/browser-trust-artifacts/
+          path: launch/operations/browser-trust-report/
           retention-days: 7
           if-no-files-found: ignore
 
