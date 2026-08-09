@@ -83,6 +83,7 @@
     "test:amazon": "dotenv -e .env.local -- tsx scripts/test-amazon-retirement.ts",
     "launch:smoke": "node scripts/launch-smoke.mjs",
     "costguard:collect": "dotenv -e .env.local -- tsx scripts/costguard-collect.ts",
+    "costguard:runs": "tsx scripts/costguard-runs.ts",
     "costguard:status": "dotenv -e .env.local -- tsx scripts/costguard-status.ts",
     "costguard:clear": "dotenv -e .env.local -- tsx scripts/costguard-clear-lockdown.ts",
     "test:costguard": "tsx scripts/test-costguard.ts",

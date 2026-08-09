@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Catch Comics — Cost Guard</title>
+<style>
+/* ═══ Cost Guard deep dive ═══════════════════════════════════════════════
+   Mission Control answers "can I launch?". This page answers exactly six
+   questions, in this order:
+     1. Is Cost Guard working?
+     2. Is money at risk right now?
+     3. What happened most recently?
+     4. What was the impact?
+     5. Must Joe do anything?
+     6. When was each provider last checked successfully?
+   Every value is read from generated operations JSON. Nothing is inferred
+   optimistically: missing data renders as "unavailable", never as a pass.
+   ═══════════════════════════════════════════════════════════════════════ */
+:root {
+  --bg:#0E1116; --panel:#161B22; --panel2:#1C2330; --line:#2A3240;
+  --ink:#F3F4F6; --ink2:#9CA3AF; --ink3:#6B7280;
+  --red:#F87171; --amber:#FBBF24; --green:#4ADE80; --accent:#E8272A;
+  --focus:#60A5FA;
+}
+* { box-sizing:border-box; }
+html,body { margin:0; background:var(--bg); color:var(--ink);
+  font:15px/1.55 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+button { font:inherit; cursor:pointer; }
+:focus-visible { outline:3px solid var(--focus); outline-offset:2px; border-radius:8px; }
+a { color:var(--ink); }
+code { background:var(--panel2); padding:2px 6px; border-radius:6px; font-size:13px; }
+
+.wrap { max-width:960px; margin:0 auto; padding:28px 20px 80px; }
+.topbar { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:6px; }
+.topbar .brand { font-size:13px; font-weight:700; letter-spacing:.28em; color:var(--ink2); text-transform:uppercase; }
+.topbar .spacer { flex:1; }
+
+.hero { text-align:center; padding:26px 20px 10px; }
+.hero h1 { font-size:clamp(24px,5vw,36px); margin:6px 0 4px; letter-spacing:-0.02em; }
+.verdict { display:inline-block; margin-top:14px; padding:14px 30px; border-radius:16px;
+  font-size:22px; font-weight:800; letter-spacing:.02em; }
+.verdict.healthy  { background:#0E2D18; color:var(--green); border:2px solid #166534; }
+.verdict.degraded { background:#3A2A08; color:var(--amber); border:2px solid #92660D; }
+.verdict.action   { background:#3B1214; color:var(--red);   border:2px solid #7F1D1D; }
+.verdict.lockdown { background:#3B1214; color:#fff;         border:2px solid var(--red); }
+.verdict.unknown  { background:var(--panel2); color:var(--ink2); border:2px solid var(--line); }
+.verdictsub { margin-top:12px; font-size:16px; color:var(--ink2); max-width:720px; margin-inline:auto; }
+.verdictsub strong { color:var(--ink); }
+
+.card { background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:22px; margin-top:18px; }
+.card h2 { margin:0 0 14px; font-size:13px; font-weight:800; letter-spacing:.18em; text-transform:uppercase; color:var(--ink2); }
+
+.answers { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px; }
+.ans { background:var(--panel2); border:1px solid var(--line); border-radius:14px; padding:14px 16px; }
+.ans .q { font-size:12px; color:var(--ink3); text-transform:uppercase; letter-spacing:.12em; font-weight:700; }
+.ans .a { font-size:17px; font-weight:700; margin-top:6px; }
+.ans .a.ok { color:var(--green); } .ans .a.warn { color:var(--amber); } .ans .a.bad { color:var(--red); }
+.ans .why { font-size:13px; color:var(--ink2); margin-top:5px; }
+
+.rows { width:100%; border-collapse:collapse; }
+.rows th { text-align:left; font-size:11px; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--ink3); font-weight:700; padding:8px 10px; border-bottom:1px solid var(--line); }
+.rows td { padding:11px 10px; border-bottom:1px solid var(--line); font-size:14px; vertical-align:top; }
+.rows tr:last-child td { border-bottom:none; }
+.pill { display:inline-block; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:700; }
+.pill.ok { background:#0E2D18; color:var(--green); }
+.pill.warn { background:#3A2A08; color:var(--amber); }
+.pill.bad { background:#3B1214; color:var(--red); }
+.pill.mute { background:var(--panel2); color:var(--ink3); }
+.tblwrap { overflow-x:auto; }
+
+.inc { border:1px solid var(--line); background:var(--panel2); border-radius:14px; padding:14px 16px; margin-bottom:10px; }
+.inc.open { border-color:#7F1D1D; background:#1D1113; }
+.inc .h { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+.inc .t { font-weight:700; flex:1 1 260px; }
+.inc .m { color:var(--ink2); font-size:14px; margin-top:8px; }
+.inc .meta { color:var(--ink3); font-size:12px; margin-top:8px; }
+
+.action { border:2px solid var(--accent); }
+.action .na-label { font-size:12px; font-weight:800; letter-spacing:.16em; color:var(--accent); text-transform:uppercase; }
+.action .na-title { font-size:20px; font-weight:800; margin-top:8px; }
+.action .na-body { color:var(--ink2); margin-top:8px; }
+
+.ghostbtn { background:none; border:1px solid var(--line); color:var(--ink); border-radius:12px;
+  padding:10px 16px; font-weight:600; min-height:44px; }
+.ghostbtn:hover { background:var(--panel2); }
+.bigbtn { background:var(--accent); border:none; color:#fff; font-weight:800; font-size:15px;
+  border-radius:14px; padding:14px 22px; min-height:52px; }
+.bigbtn:hover { background:#c41f22; }
+.bigbtn[disabled] { background:var(--panel2); color:var(--ink3); cursor:not-allowed; }
+.links { display:flex; flex-wrap:wrap; gap:10px; }
+
+details.tech { margin-top:10px; }
+details.tech summary { cursor:pointer; color:var(--ink2); font-weight:600; padding:8px 0; }
+pre { background:var(--panel2); border:1px solid var(--line); border-radius:12px; padding:14px;
+  overflow-x:auto; font-size:12.5px; color:var(--ink2); white-space:pre-wrap; word-break:break-word; }
+.stale { color:var(--amber); font-weight:700; }
+footer { text-align:center; color:var(--ink3); font-size:12px; margin-top:26px; }
+#toast { position:fixed; bottom:22px; left:50%; transform:translateX(-50%);
+  background:var(--panel2); border:1px solid var(--line); border-radius:12px; padding:12px 20px;
+  opacity:0; transition:opacity .25s; pointer-events:none; max-width:90vw; }
+#toast.show { opacity:1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <span class="brand">Catch Comics</span>
+    <span class="spacer"></span>
+    <a class="ghostbtn" href="mission-control.html">← Mission Control</a>
+  </div>
+
+  <div class="hero">
+    <h1>💰 Cost Guard</h1>
+    <div id="verdictBox"></div>
+    <div class="verdictsub" id="verdictSub"></div>
+  </div>
+
+  <div class="card">
+    <h2>The six questions</h2>
+    <div class="answers" id="answers"></div>
+  </div>
+
+  <div class="card action" id="actionCard">
+    <div class="na-label">Recommended action</div>
+    <div class="na-title" id="actionTitle"></div>
+    <div class="na-body" id="actionBody"></div>
+  </div>
+
+  <div class="card">
+    <h2>Latest run</h2>
+    <div id="latestRun"></div>
+  </div>
+
+  <div class="card">
+    <h2>Provider status</h2>
+    <div class="tblwrap"><table class="rows" id="providers"></table></div>
+    <div id="providerNote" style="margin-top:12px;color:var(--ink3);font-size:12px"></div>
+  </div>
+
+  <div class="card">
+    <h2>Recent incidents <span style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--ink3)">— identical repeats grouped</span></h2>
+    <div id="incidents"></div>
+  </div>
+
+  <div class="card">
+    <h2>Ask Claude</h2>
+    <div id="claudeBox"></div>
+    <div style="margin-top:14px"><button class="bigbtn" id="claudeBtn">Diagnose with Claude</button></div>
+    <div style="margin-top:10px;color:var(--ink3);font-size:12px">
+      Copies a sanitised prompt to your clipboard — paste it into Claude Code. No API key, no Anthropic API cost, no secrets included.
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Technical evidence</h2>
+    <div id="evidence"></div>
+  </div>
+
+  <div class="card">
+    <h2>Go deeper</h2>
+    <div class="links" id="deepLinks"></div>
+  </div>
+
+  <footer id="foot"></footer>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ═══ Data ═══════════════════════════════════════════════════════════════
+   Two generated files, both written by read-only scripts:
+     operations/costguard-latest.json      ← npm run costguard:status
+     operations/costguard-runs-latest.json ← npm run costguard:runs
+   Neither contains credentials. Neither is fetched from a provider by the
+   browser — the page never holds a token of any kind.
+   ═══════════════════════════════════════════════════════════════════════ */
+const REPO = 'pgoldenj-wq/catch-comics-v2';
+let CG = null, RUNS = null, LOAD_ERR = [];
+
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
+  ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+function ago(iso){
+  if (!iso) return 'never';
+  const ms = Date.now() - Date.parse(iso);
+  if (!Number.isFinite(ms)) return 'unknown';
+  const m = Math.round(ms/60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return m + 'm ago';
+  const h = Math.round(m/60);
+  if (h < 48) return h + 'h ago';
+  return Math.round(h/24) + 'd ago';
+}
+const fmtUtc = iso => iso ? new Date(iso).toISOString().replace('T',' ').slice(0,16) + 'Z' : '—';
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 4200);
+}
+
+async function load(){
+  try { CG = await (await fetch('operations/costguard-latest.json?'+Date.now())).json(); }
+  catch(e){ LOAD_ERR.push('costguard-latest.json (run: npm run costguard:status)'); }
+  try { RUNS = await (await fetch('operations/costguard-runs-latest.json?'+Date.now())).json(); }
+  catch(e){ LOAD_ERR.push('costguard-runs-latest.json (run: npm run costguard:runs)'); }
+}
+
+/* ═══ Deterministic verdict ══════════════════════════════════════════════
+   Rule-based, in strict precedence order. Claude is not involved in any of
+   this — the page must be able to answer without spending a token.
+   ═══════════════════════════════════════════════════════════════════════ */
+const FRESH_MAX_H = 26; // mirrors COSTGUARD_CONFIG.freshnessMaxAgeMs
+
+function diagnose(){
+  const d = {
+    verdict:'UNKNOWN', cls:'unknown',
+    plain:'', impact:[], action:null, actionBody:'',
+    working:null, moneyAtRisk:null, needsClaude:false, claudeReason:'',
+  };
+  if (!CG){
+    d.plain = 'Cost Guard status has not been generated on this machine, so this page cannot say anything truthful about spend.';
+    d.impact = ['Local diagnosis unavailable — this says nothing about production, which may well be fine.'];
+    d.action = 'Generate the data';
+    d.actionBody = 'Run <code>npm run costguard:status</code> and <code>npm run costguard:runs</code>, then reload.';
+    return d;
+  }
+
+  const stale   = CG.staleProviders || [];
+  const unconf  = CG.unconfiguredProviders || [];
+  const age     = CG.dataAgeHours;
+  const st      = CG.state;
+  const dataOld = age === null || age > FRESH_MAX_H;
+  const openInc = (RUNS?.incidents || []).filter(i => i.state === 'open');
+  const breach  = openInc.some(i => i.moneyAtRisk) || st === 'RED' || st === 'LOCKDOWN';
+
+  // Money at risk is a claim about provider evidence, never about CI colour.
+  d.moneyAtRisk = (st === 'LOCKDOWN' || st === 'RED') && !(stale.length && !openInc.some(i => i.moneyAtRisk));
+  d.working = !(dataOld || stale.length || unconf.length);
+
+  if (CG.lockdownLatched || st === 'LOCKDOWN'){
+    d.verdict = 'LOCKDOWN'; d.cls = 'lockdown';
+    d.plain = 'Cost Guard has latched LOCKDOWN. Bulk and non-essential jobs are being refused until it is manually cleared.';
+    d.impact = ['Automatic containment is ACTIVE — jobs are being refused.', 'Provider spend crossed the catastrophic threshold.'];
+    d.action = 'Review, then clear the latch deliberately';
+    d.actionBody = 'Check the reasons below and the provider dashboards. When satisfied, run <code>npm run costguard:clear -- --confirm CLEAR</code>.';
+  } else if (st === 'RED' && d.moneyAtRisk){
+    d.verdict = 'ACTION REQUIRED'; d.cls = 'action';
+    d.plain = 'Cost Guard measured real provider telemetry and something crossed a RED threshold. This is a genuine spend signal.';
+    d.impact = ['Automatic containment is ACTIVE — non-essential and high-risk jobs are refused.', 'Customer-facing Catch Comics is unaffected: containment only blocks background jobs.'];
+    d.action = 'Investigate the RED reason';
+    d.actionBody = 'Read the reasons below, then the matching provider dashboard. Do not clear anything until the underlying driver is understood.';
+  } else if (unconf.length){
+    d.verdict = 'ACTION REQUIRED'; d.cls = 'action';
+    d.plain = `Cost Guard cannot see ${unconf.join(', ')} at all — those providers have no credentials configured, so their spend is completely unmonitored.`;
+    d.impact = [`No spend data at all for: ${unconf.join(', ')}.`, 'Breakers cannot act on a provider they cannot measure.'];
+    d.action = `Add provider credentials for ${unconf.join(', ')}`;
+    d.actionBody = 'See <code>launch/operations/COST-GUARD.md</code> → Manual actions.';
+  } else if (dataOld){
+    d.verdict = 'ACTION REQUIRED'; d.cls = 'action';
+    d.plain = `The last successful collection was ${age === null ? 'never' : age + 'h ago'}, past the ${FRESH_MAX_H}h freshness limit. Nothing is currently watching spend.`;
+    d.impact = ['Monitoring is effectively OFF — no fresh provider data.', 'Alerts would be delayed or missed entirely.'];
+    d.action = 'Check the scheduled job and the secret';
+    d.actionBody = 'Confirm the Cost Guard workflow is running and that <code>COSTGUARD_CRON_SECRET</code> matches between GitHub and Vercel.';
+  } else if (stale.length){
+    d.verdict = 'DEGRADED'; d.cls = 'degraded';
+    d.plain = `Cost Guard did NOT detect a spend spike. It is collecting normally from ${(CG.perProvider||[]).filter(p=>p.fresh).map(p=>p.provider).join(', ') || 'the other providers'}, but ${stale.join(', ')} returned no usable data, so that provider's spend is currently unmeasured.`;
+    d.impact = [
+      `Monitoring is PARTIAL — ${stale.join(', ')} unmonitored.`,
+      `Totals under-report: the ${stale.join(', ')} share reads as $0 because it is missing, not because it is zero.`,
+      'The other providers are still fully protected, and containment still works for them.',
+      'No customer-facing impact.',
+    ];
+    d.action = `Restore ${stale.join(', ')} collection`;
+    d.actionBody = 'See the provider error under Provider status below.';
+    d.needsClaude = true;
+    d.claudeReason = `${stale.join(', ')} collection is failing and the cause is in the provider error text.`;
+  } else if (st === 'AMBER'){
+    d.verdict = 'DEGRADED'; d.cls = 'degraded';
+    d.plain = 'Cost Guard is watching every provider and reports AMBER — degraded, but inside the approved budget.';
+    d.impact = ['Protection operating normally.', 'Spend elevated but within approved limits.', 'No customer impact.'];
+    d.action = null;
+  } else if (st === 'GREEN'){
+    d.verdict = 'HEALTHY'; d.cls = 'healthy';
+    d.plain = 'Cost Guard collected fresh data from every configured provider and nothing crossed a threshold.';
+    d.impact = ['Protection operating normally.', 'No customer impact.'];
+    d.action = null;
+  } else {
+    d.verdict = 'UNKNOWN'; d.cls = 'unknown';
+    d.plain = `Cost Guard reported state "${st}", which this page has no rule for.`;
+    d.impact = ['Cannot determine protection status.'];
+    d.needsClaude = true;
+    d.claudeReason = `Unrecognised Cost Guard state "${st}".`;
+  }
+
+  // An unclassified CI failure always deserves a human/Claude look.
+  if (openInc.some(i => i.classification === 'unclassified')){
+    d.needsClaude = true;
+    d.claudeReason = 'An open Cost Guard CI failure matches no known rule.';
+  }
+  return d;
+}
+
+/* ═══ Render ═════════════════════════════════════════════════════════════ */
+function render(){
+  const d = diagnose();
+
+  document.getElementById('verdictBox').innerHTML =
+    `<div class="verdict ${d.cls}">${esc(d.verdict)}</div>`;
+  document.getElementById('verdictSub').innerHTML = esc(d.plain);
+
+  // ── Six questions ────────────────────────────────────────────────────
+  const stale = CG?.staleProviders || [];
+  const fresh = (CG?.perProvider || []).filter(p => p.fresh).map(p => p.provider);
+  const latest = RUNS?.latest || null;
+  const lastGood = CG?.lastCollectionAt || null;
+
+  const q = [];
+  q.push({
+    q:'1. Is Cost Guard working?',
+    a: d.working === null ? 'Unknown' : d.working ? 'Yes — fully' : 'Partly',
+    cls: d.working === null ? '' : d.working ? 'ok' : 'warn',
+    why: d.working === null ? 'No local status data.'
+      : d.working ? 'Every configured provider reported fresh data.'
+      : `Collecting from ${fresh.join(', ') || 'nothing'}; blind to ${(stale.concat(CG?.unconfiguredProviders||[])).join(', ') || '—'}.`,
+  });
+  q.push({
+    q:'2. Is money at risk?',
+    a: d.moneyAtRisk === null ? 'Unknown' : d.moneyAtRisk ? 'Yes — threshold crossed' : 'No evidence of overspend',
+    cls: d.moneyAtRisk === null ? '' : d.moneyAtRisk ? 'bad' : 'ok',
+    why: CG?.totals
+      ? `Measured variable spend $${CG.totals.variableMtdUsd} MTD · projected $${CG.totals.projectedMonthUsd}${stale.length ? ` (excludes ${stale.join(', ')})` : ''}.`
+      : 'No totals available.',
+  });
+  q.push({
+    q:'3. What happened most recently?',
+    a: latest ? (latest.conclusion === 'success' ? 'Check passed' : 'Check failed') : 'Unknown',
+    cls: latest ? (latest.conclusion === 'success' ? 'ok' : 'bad') : '',
+    why: latest ? `Run ${latest.id} · ${fmtUtc(latest.createdAt)} (${ago(latest.createdAt)}).` : 'No run history generated.',
+  });
+  q.push({
+    q:'4. What was the impact?',
+    a: d.impact.length ? d.impact[0] : 'Unknown',
+    cls: d.cls === 'healthy' ? 'ok' : d.cls === 'unknown' ? '' : 'warn',
+    why: d.impact.slice(1).join(' '),
+  });
+  q.push({
+    q:'5. Must Joe do anything?',
+    a: d.action ? 'Yes' : 'No action required',
+    cls: d.action ? 'warn' : 'ok',
+    why: d.action ? d.action : 'Cost Guard is handling this on its own.',
+  });
+  q.push({
+    q:'6. Last successful check',
+    a: lastGood ? ago(lastGood) : 'Never',
+    cls: lastGood && CG.dataAgeHours !== null && CG.dataAgeHours <= FRESH_MAX_H ? 'ok' : 'warn',
+    why: `${fmtUtc(lastGood)} · per-provider detail below.`,
+  });
+
+  document.getElementById('answers').innerHTML = q.map(x =>
+    `<div class="ans"><div class="q">${esc(x.q)}</div>
+      <div class="a ${x.cls}">${esc(x.a)}</div>
+      <div class="why">${esc(x.why)}</div></div>`).join('');
+
+  // ── Action ───────────────────────────────────────────────────────────
+  document.getElementById('actionTitle').textContent = d.action || 'No action required.';
+  document.getElementById('actionBody').innerHTML = d.action
+    ? d.actionBody
+    : 'Cost Guard is operating as designed. Nothing for you to do.';
+  document.getElementById('actionCard').style.borderColor = d.action ? 'var(--accent)' : 'var(--line)';
+
+  // ── Latest run ───────────────────────────────────────────────────────
+  const lr = document.getElementById('latestRun');
+  if (!RUNS){
+    lr.innerHTML = `<div class="stale">Run history unavailable</div>
+      <div style="color:var(--ink3);font-size:13px;margin-top:6px">Run <code>npm run costguard:runs</code> then reload.</div>`;
+  } else if (!RUNS.available){
+    lr.innerHTML = `<div class="stale">Run history unavailable</div>
+      <div style="color:var(--ink3);font-size:13px;margin-top:6px">${esc(RUNS.note || '')}</div>`;
+  } else if (!latest){
+    lr.innerHTML = `<div class="stale">No runs found.</div>`;
+  } else {
+    const sameSig = (RUNS.runs||[]).filter(r => r.signature === latest.signature).length;
+    lr.innerHTML = `
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px">
+        <span class="pill ${latest.conclusion==='success'?'ok':'bad'}">${esc(latest.conclusion.toUpperCase())}</span>
+        <strong>${esc(fmtUtc(latest.createdAt))}</strong>
+        <span style="color:var(--ink3)">(${esc(ago(latest.createdAt))})</span>
+      </div>
+      <div class="tblwrap"><table class="rows">
+        <tr><th>Trigger</th><td>${esc(latest.event)} · branch <code>${esc(latest.branch)}</code> · <code>${esc(latest.sha)}</code></td></tr>
+        <tr><th>Duration</th><td>${latest.durationSec === null ? '—' : esc(latest.durationSec)+'s'}</td></tr>
+        <tr><th>Failed job</th><td>${latest.failedJob ? esc(latest.failedJob) + (latest.failedStep ? ' → ' + esc(latest.failedStep) : '') : '<span style="color:var(--ink3)">none</span>'}</td></tr>
+        <tr><th>Classification</th><td><code>${esc(latest.classification)}</code></td></tr>
+        ${latest.conclusion === 'success' ? '' :
+          `<tr><th>Identical repeats</th><td>${esc(sameSig)} of the last ${esc((RUNS.runs||[]).length)} runs failed with this same signature</td></tr>`}
+        <tr><th>GitHub</th><td><a href="${esc(latest.url)}" target="_blank" rel="noopener">Open run ${esc(latest.id)} ↗</a></td></tr>
+      </table></div>
+      <div style="margin-top:12px;color:var(--ink3);font-size:12.5px">
+        <strong>cost-hazard-scan</strong> shows “Skipped” on every scheduled run by design — it only runs on pull requests, where there is changed code to scan. It is not skipped because spend-check failed; the two jobs are independent.
+      </div>`;
+  }
+
+  // ── Providers ────────────────────────────────────────────────────────
+  const tbl = document.getElementById('providers');
+  const budgets = CG?.budgets?.providers || {};
+  if (!CG || !(CG.perProvider||[]).length){
+    tbl.innerHTML = `<tr><td class="stale">Provider status unavailable — run <code>npm run costguard:status</code>.</td></tr>`;
+  } else {
+    // Per-provider "failing since" comes from the grouped incident history,
+    // which is the only place that timestamp actually exists.
+    const blindSince = {};
+    for (const inc of (RUNS?.incidents||[])){
+      if (inc.classification !== 'provider-stale') continue;
+      for (const p of (CG.staleProviders||[])){
+        if (inc.sampleAnnotations.join(' ').toLowerCase().includes(p)) {
+          if (!blindSince[p] || Date.parse(inc.firstSeen) < Date.parse(blindSince[p])) blindSince[p] = inc.firstSeen;
+        }
+      }
+    }
+    tbl.innerHTML = `<tr><th>Provider</th><th>State</th><th>Last good check</th><th>Variable MTD</th><th>Warn</th><th>Critical</th><th>Detail</th></tr>` +
+      CG.perProvider.map(p => {
+        const b = budgets[p.provider] || {};
+        const good = p.fresh;
+        return `<tr>
+          <td><strong>${esc(p.provider)}</strong></td>
+          <td><span class="pill ${good?'ok':'bad'}">${good?'FRESH':'NO DATA'}</span></td>
+          <td>${good ? esc(fmtUtc(CG.lastCollectionAt)) + '<br><span style="color:var(--ink3);font-size:12px">'+esc(ago(CG.lastCollectionAt))+'</span>'
+                     : `<span class="stale">failing${blindSince[p.provider] ? ' since ' + esc(fmtUtc(blindSince[p.provider])) : ''}</span>`}</td>
+          <td>${good ? '$'+esc(p.variableMtdUsd) : '<span style="color:var(--ink3)">unknown</span>'}</td>
+          <td>${b.softBudgetUsd !== undefined ? '$'+esc(b.softBudgetUsd) : '—'}</td>
+          <td>${b.maxApprovedUsd !== undefined ? '$'+esc(b.maxApprovedUsd) : '—'}</td>
+          <td style="color:var(--ink2);font-size:12.5px;max-width:340px">${esc(p.note || '—')}</td>
+        </tr>`;
+      }).join('');
+  }
+  document.getElementById('providerNote').innerHTML = CG
+    ? `Source: <code>operations/costguard-latest.json</code> · generated ${esc(fmtUtc(CG.generatedAt))} (${esc(ago(CG.generatedAt))}) from <strong>${esc(CG.source||'local')}</strong> · store ${esc(CG.storeMode||'?')}.
+       A provider marked <strong>NO DATA</strong> contributes $0 to the totals because it is missing, not because it spent nothing.`
+    : '';
+
+  // ── Incidents ────────────────────────────────────────────────────────
+  const ic = document.getElementById('incidents');
+  const incs = RUNS?.incidents || [];
+  if (!RUNS || !RUNS.available){
+    ic.innerHTML = `<div class="stale">Incident history unavailable — run <code>npm run costguard:runs</code>.</div>`;
+  } else if (!incs.length){
+    ic.innerHTML = `<div style="color:var(--ink2)">No failures in the last ${esc((RUNS.runs||[]).length)} runs.</div>`;
+  } else {
+    ic.innerHTML = incs.map(i => `
+      <div class="inc ${i.state==='open'?'open':''}">
+        <div class="h">
+          <span class="pill ${i.state==='open'?'bad':'mute'}">${i.state==='open'?'OPEN':'RESOLVED'}</span>
+          <span class="t">${esc(i.title)}</span>
+          <span class="pill ${i.count>1?'warn':'mute'}">×${esc(i.count)}</span>
+        </div>
+        <div class="m">${esc(i.meaning)}</div>
+        ${i.stillFailing?.length ? `<div class="m stale">Still failing right now: ${esc(i.stillFailing.join(', '))}. The scheduled run goes green because the other providers report normally — that green tick is not evidence this cleared.</div>` : ''}
+        <div class="meta">
+          First ${esc(fmtUtc(i.firstSeen))} · last CI failure ${esc(fmtUtc(i.lastSeen))} · ${esc(i.durationHours)}h
+          ${i.resolvedAt ? '· recovered ' + esc(fmtUtc(i.resolvedAt)) : '· <strong>ongoing</strong>'}
+          · ${esc(i.count)} identical run${i.count>1?'s':''} grouped into this one incident
+          · <a href="${esc(RUNS.runUrlBase + i.runIds[i.runIds.length-1])}" target="_blank" rel="noopener">latest run ↗</a>
+          · money at risk: <strong>${i.moneyAtRisk?'yes':'no'}</strong>
+        </div>
+      </div>`).join('');
+  }
+
+  // ── Claude box ───────────────────────────────────────────────────────
+  const cb = document.getElementById('claudeBox');
+  const btn = document.getElementById('claudeBtn');
+  if (d.needsClaude){
+    cb.innerHTML = `<div style="color:var(--ink2)">Worth a look: ${esc(d.claudeReason)}</div>`;
+    btn.disabled = false;
+  } else {
+    cb.innerHTML = `<div style="color:var(--green);font-weight:700">Nothing here needs Claude.</div>
+      <div style="color:var(--ink2);margin-top:6px">Every current condition was classified by the rules on this page, so spending tokens on it would tell you nothing new. The button still works if you want a second opinion.</div>`;
+    btn.disabled = false;
+  }
+
+  // ── Evidence ─────────────────────────────────────────────────────────
+  document.getElementById('evidence').innerHTML = `
+    <details class="tech"><summary>Sanitised annotations, exit codes and sources</summary>
+      <pre>${esc(buildEvidence())}</pre>
+    </details>
+    <div style="margin-top:10px;color:var(--ink3);font-size:12px">
+      Secrets are never present in these files: the collect endpoint returns state only, and both generator scripts
+      run server-side/CLI with the founder's own credentials. Nothing on this page holds a token.
+    </div>`;
+
+  document.getElementById('deepLinks').innerHTML = `
+    <a class="ghostbtn" href="https://github.com/${REPO}/actions/workflows/cost-guard.yml" target="_blank" rel="noopener">Cost Guard workflow runs ↗</a>
+    <a class="ghostbtn" href="operations/COST-GUARD.md">Cost Guard runbook</a>
+    <a class="ghostbtn" href="operations/incident-response.md">Incident response</a>
+    <a class="ghostbtn" href="https://console.neon.tech" target="_blank" rel="noopener">Neon console ↗</a>
+    <a class="ghostbtn" href="https://vercel.com/pgoldenj-wqs-projects/catch-comics-v2" target="_blank" rel="noopener">Vercel ↗</a>
+    <a class="ghostbtn" href="mission-control.html">Mission Control</a>`;
+
+  document.getElementById('foot').innerHTML = LOAD_ERR.length
+    ? `<span class="stale">Missing data: ${esc(LOAD_ERR.join(' · '))}</span>`
+    : `Data: costguard-latest.json + costguard-runs-latest.json · refresh with <code>npm run costguard:status</code> and <code>npm run costguard:runs</code>`;
+}
+
+function buildEvidence(){
+  const L = [];
+  if (CG){
+    L.push(`state: ${CG.state}${CG.lockdownLatched?' (LATCHED)':''}  since ${CG.since||'—'}`);
+    L.push(`last collection: ${CG.lastCollectionAt||'never'}  (age ${CG.dataAgeHours}h, source ${CG.source}, store ${CG.storeMode})`);
+    L.push(`stale: ${(CG.staleProviders||[]).join(', ')||'none'}   unconfigured: ${(CG.unconfiguredProviders||[]).join(', ')||'none'}`);
+    for (const r of (CG.reasons||[])) L.push(`reason: ${r}`);
+    for (const p of (CG.perProvider||[])) if (p.note) L.push(`${p.provider}: ${p.note}`);
+  } else L.push('costguard-latest.json not loaded');
+  L.push('');
+  if (RUNS?.available){
+    L.push(`runs analysed: ${(RUNS.runs||[]).length}  failures: ${RUNS.counts?.failures}  API calls used: ${RUNS.apiCalls}`);
+    for (const i of (RUNS.incidents||[])){
+      L.push(`[${i.state}] ${i.classification} ×${i.count}  ${i.firstSeen} → ${i.lastSeen}`);
+      for (const a of i.sampleAnnotations) L.push(`    · ${a}`);
+      L.push(`    runs: ${i.runIds.slice(-6).join(', ')}`);
+    }
+  } else L.push('costguard-runs-latest.json not loaded');
+  return L.join('\n');
+}
+
+/* ═══ Claude handoff ═════════════════════════════════════════════════════
+   Same mechanism Smoke Test V4 already uses: build a prompt, copy it to the
+   clipboard, paste into Claude Code. No Anthropic API call is made from this
+   page, so it cannot create paid API usage. The prompt carries only what is
+   already in the generated ops JSON — no env values, no tokens, no payloads.
+   ═══════════════════════════════════════════════════════════════════════ */
+function buildPrompt(){
+  const d = diagnose();
+  const P = [];
+  P.push('/cost-guard-diagnose');
+  P.push('');
+  P.push('CATCH COMICS — COST GUARD DIAGNOSIS');
+  P.push('');
+  P.push(`Verdict from the Cost Guard page: ${d.verdict}`);
+  P.push(`Plain-English state: ${d.plain}`);
+  P.push(`Money at risk: ${d.moneyAtRisk ? 'YES — provider evidence shows a threshold breach' : 'no evidence of overspend'}`);
+  P.push('');
+  if (CG){
+    P.push(`Engine state: ${CG.state}${CG.lockdownLatched?' (LOCKDOWN LATCHED)':''} since ${CG.since||'—'}`);
+    P.push(`Last successful collection: ${CG.lastCollectionAt||'never'} (${CG.dataAgeHours}h old, source ${CG.source})`);
+    P.push(`Stale providers: ${(CG.staleProviders||[]).join(', ')||'none'}`);
+    P.push(`Unconfigured providers: ${(CG.unconfiguredProviders||[]).join(', ')||'none'}`);
+    if (CG.totals) P.push(`Totals: variable MTD $${CG.totals.variableMtdUsd}, projected $${CG.totals.projectedMonthUsd}, burn $${CG.totals.burnUsdPerDay}/day`);
+    for (const r of (CG.reasons||[])) P.push(`Reason: ${r}`);
+    P.push('');
+    P.push('Provider detail:');
+    for (const p of (CG.perProvider||[])){
+      P.push(`  - ${p.provider}: ${p.fresh?'fresh':'NO DATA'}${p.fresh?`, $${p.variableMtdUsd} MTD`:''}${p.note?` — ${p.note}`:''}`);
+    }
+  }
+  P.push('');
+  if (RUNS?.available){
+    P.push(`GitHub Actions: ${(RUNS.runs||[]).length} recent runs, ${RUNS.counts?.failures} failed.`);
+    for (const i of (RUNS.incidents||[])){
+      P.push(`  [${i.state}] ${i.classification} ×${i.count}: ${i.firstSeen} → ${i.lastSeen} (${i.durationHours}h)`);
+      for (const a of i.sampleAnnotations) P.push(`      annotation: ${a}`);
+      P.push(`      run ids: ${i.runIds.slice(-6).join(', ')}`);
+      P.push(`      run url: ${RUNS.runUrlBase}${i.runIds[i.runIds.length-1]}`);
+    }
+  }
+  P.push('');
+  P.push('Relevant paths:');
+  P.push('  .github/workflows/cost-guard.yml       — scheduled spend-check + PR hazard scan');
+  P.push('  lib/costguard/providers/*.ts           — provider adapters');
+  P.push('  lib/costguard/engine.ts, collect.ts    — state machine + collection');
+  P.push('  app/api/costguard/collect/route.ts     — endpoint the workflow calls');
+  P.push('  scripts/costguard-runs.ts              — the analysis behind this prompt');
+  P.push('  launch/cost-guard.html                 — this page');
+  P.push('');
+  P.push('WANTED OUTCOME:');
+  P.push('  1. Confirm or correct the verdict above from the repository and GitHub run history.');
+  P.push('  2. Say plainly whether money is actually at risk, or whether this is only a monitoring gap.');
+  P.push('  3. If a provider adapter is failing, find the smallest safe fix and apply it.');
+  P.push('  4. Do not trigger Inngest, retailer syncs, bulk jobs or paid provider calls while investigating.');
+  P.push('  5. Preserve every existing threshold and breaker. Never turn a real failure into a green tick.');
+  return P.join('\n');
+}
+
+document.getElementById('claudeBtn').onclick = async () => {
+  try {
+    await navigator.clipboard.writeText(buildPrompt());
+    toast('✓ Prompt copied — paste it into Claude Code.');
+  } catch(e){
+    const ta = document.createElement('textarea');
+    ta.value = buildPrompt(); document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); ta.remove();
+    toast('✓ Prompt copied — paste it into Claude Code.');
+  }
+};
+
+load().then(render);
+</script>
+</body>
+</html>

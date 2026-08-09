@@ -161,6 +161,7 @@ footer button { color:var(--ink3); background:none; border:none; text-decoration
     <h2>Go deeper</h2>
     <div class="links">
       <a class="ghostbtn" href="smoke-test-v4.html">Open Smoke Test V4</a>
+      <a class="ghostbtn" id="costGuardLink" href="cost-guard.html">Cost Guard</a>
       <a class="ghostbtn" href="https://www.catchcomics.com" target="_blank" rel="noopener">Production site</a>
       <a class="ghostbtn" href="https://vercel.com/pgoldenj-wqs-projects/catch-comics-v2" target="_blank" rel="noopener">Vercel</a>
       <a class="ghostbtn" href="https://github.com/pgoldenj-wq/catch-comics-v2" target="_blank" rel="noopener">GitHub</a>
@@ -471,6 +472,25 @@ function render(){
   } else cg += `<div><strong style="color:var(--ink3)">Cost Guard: unavailable</strong>
       <span class="src"> · run <code>npm run costguard:status</code> then reload</span></div>`;
   document.getElementById('costGuard').innerHTML = cg;
+
+  // "Go deeper" label carries the live Cost Guard state, using the same
+  // precedence as cost-guard.html. Never reassuring when checks are stale:
+  // a partial blackout reads Degraded, and no data reads Data unavailable.
+  const cgLink = document.getElementById('costGuardLink');
+  if (cgLink){
+    let word = 'Data unavailable', col = 'var(--ink3)';
+    if (OPS_COSTGUARD){
+      const g = OPS_COSTGUARD;
+      const staleP = g.staleProviders || [], unconfP = g.unconfiguredProviders || [];
+      const old = g.dataAgeHours === null || g.dataAgeHours > 26;
+      if (g.lockdownLatched || g.state === 'LOCKDOWN'){ word = 'LOCKDOWN'; col = 'var(--red)'; }
+      else if (g.state === 'RED' || unconfP.length || old){ word = 'Action required'; col = 'var(--red)'; }
+      else if (staleP.length || g.state === 'AMBER'){ word = 'Degraded'; col = 'var(--amber)'; }
+      else if (g.state === 'GREEN'){ word = 'Healthy'; col = 'var(--green)'; }
+      else { word = 'Unknown'; col = 'var(--ink3)'; }
+    }
+    cgLink.innerHTML = `Cost Guard — <span style="color:${col};font-weight:800">${esc(word)}</span>`;
+  }
 
   // Blockers
   document.getElementById('blockersCard').style.display = d.blockers.length ? '' : 'none';
