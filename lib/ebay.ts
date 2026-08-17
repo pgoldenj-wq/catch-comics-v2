@@ -15,7 +15,34 @@ import { enrichEbayQuery, isNonComicListing } from '@/lib/comicDisambiguation'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+/**
+ * Catch Comics is a UK price-comparison site, so EBAY_GB is the only
+ * marketplace we ever query. The type is kept as a union because call sites
+ * still pass a marketplace through from a `region` param, but searchListings()
+ * pins the request to EBAY_GB regardless — see UK_ONLY below.
+ */
 export type Marketplace = 'EBAY_GB' | 'EBAY_US'
+
+/**
+ * UK-only enforcement, applied at the query boundary rather than in the UI.
+ *
+ * Three separate things went wrong before this existed:
+ *
+ *  1. `region=us` (a US toggle on /search, and an unvalidated URL param)
+ *     switched the whole eBay path to EBAY_US, so a UK shopper was shown
+ *     USD-priced US listings as if they were Catch Comics offers.
+ *  2. The Browse request carried no location filter, so even on EBAY_GB the
+ *     results included overseas inventory that merely ships to the UK — a
+ *     live probe of "Absolute Batman" returned a JP-located item.
+ *  3. Best-price code sorts on `price.value` as a bare number, so a $8.99 US
+ *     listing outranked a £10.99 UK one and became the "From £X" hint.
+ *
+ * Filtering here fixes all four call sites at once (product offers, price
+ * hints, /api/prices and search) and keeps non-GBP out of the data entirely,
+ * rather than hiding a USD figure behind a £ sign in the UI.
+ */
+const UK_MARKETPLACE: Marketplace = 'EBAY_GB'
+const UK_FILTER = 'itemLocationCountry:GB,priceCurrency:GBP'
 
 export interface EbayListing {
   itemId:      string
@@ -114,7 +141,9 @@ interface RawBrowseItem {
 
 export async function searchListings(
   query: string,
-  marketplace: Marketplace,
+  // Accepted for call-site compatibility but deliberately ignored: every
+  // request is pinned to EBAY_GB. See UK_MARKETPLACE above.
+  _marketplace: Marketplace,
   limit = 20,
 ): Promise<EbayListing[]> {
   if (!query.trim()) return []
@@ -124,6 +153,9 @@ export async function searchListings(
   const url            = new URL(`${apiBase()}/buy/browse/v1/item_summary/search`)
   url.searchParams.set('q',            enrichedQuery)
   url.searchParams.set('limit',        String(limit))
+  // UK inventory, priced in GBP. Without this, EBAY_GB still returns overseas
+  // sellers who ship to the UK.
+  url.searchParams.set('filter',       UK_FILTER)
   // Restrict to Comics & Graphic Novels category (259104) to prevent non-comic
   // products (e.g. household cleaners for "Bleach", costumes for "Batman") from
   // appearing in results. This category covers singles, TPBs, omnibuses and manga
@@ -133,7 +165,7 @@ export async function searchListings(
   const res = await fetch(url.toString(), {
     headers: {
       'Authorization':           `Bearer ${token}`,
-      'X-EBAY-C-MARKETPLACE-ID': marketplace,
+      'X-EBAY-C-MARKETPLACE-ID': UK_MARKETPLACE,
       'Accept':                  'application/json',
     },
   })
@@ -163,10 +195,13 @@ function wrapEpn(url: string): string {
   if (!EBAY_CAMPAIGN_ID || !url) return url
   try {
     const u = new URL(url)
-    // We search the EBAY_GB marketplace for UK shoppers, but the Browse API
-    // occasionally returns an ebay.com (US) item URL. eBay item ids are global,
-    // so normalise the host to ebay.co.uk for correct UK pricing/shipping.
-    if (/(^|\.)ebay\.com$/i.test(u.hostname)) u.hostname = 'www.ebay.co.uk'
+    // The previous version rewrote any ebay.com host to www.ebay.co.uk on the
+    // theory that item ids are global. That made a US listing *look* like a UK
+    // one in the link while it stayed a US listing underneath — the customer
+    // still landed on overseas stock, and a rewritten host can miss entirely.
+    // Disguising the destination is the opposite of the fix; UK_FILTER now
+    // keeps non-GB inventory out of the results, so there is nothing to
+    // normalise and the real destination is left intact.
     u.searchParams.set('campid',  EBAY_CAMPAIGN_ID)
     u.searchParams.set('toolid',  EBAY_TOOL_ID)
     u.searchParams.set('mkevt',   '1')   // event type: click
@@ -198,6 +233,13 @@ function mapListing(r: RawBrowseItem): EbayListing | null {
   if (isNonComicListing(r.title)) return null
   if (isBrokenCondition(r.condition || '')) return null
 
+  // Defence in depth behind UK_FILTER. Previously the currency fell back to
+  // `|| 'GBP'`, which asserted GBP for anything eBay left unlabelled — the one
+  // way a non-GBP amount could still reach a customer wearing a £ sign. An
+  // offer we cannot prove is in GBP is dropped rather than guessed, matching
+  // the rule that uncertain data is omitted rather than presented.
+  if (r.price.currency !== 'GBP') return null
+
   const buyingOptions = r.buyingOptions ?? []
   const buyItNow      = buyingOptions.includes('FIXED_PRICE') || buyingOptions.includes('BEST_OFFER')
 
@@ -206,7 +248,7 @@ function mapListing(r: RawBrowseItem): EbayListing | null {
     title:      r.title,
     price:      {
       value:    parseFloat(r.price.value),
-      currency: r.price.currency || 'GBP',
+      currency: r.price.currency,
     },
     condition:  r.condition || 'Unspecified',
     imageUrl:   r.image?.imageUrl    || '',

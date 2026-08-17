@@ -934,7 +934,20 @@ a{color:inherit;text-decoration:none}
   // ─────────────────────────────────────────────────────────────────
 
   const trackGapText  = trackGap >= 0 ? `${trackGap}% ahead of expected pace` : `${Math.abs(trackGap)}% behind expected pace`;
-  const staleWarning  = isStale ? `<div class="stale">⚠ Data is ${Math.floor(dataAgeDays)} days old — update LAUNCH.md or WEEK.md statuses after completing work.</div>` : '';
+  // This page is a HISTORICAL record of the June/July launch sprint. It is
+  // generated from LAUNCH.md and WEEK.md, which were frozen on 2026-06-23, so
+  // its readiness %, "days left", sprint dates and Smoke Test V3 verdict all
+  // describe that sprint and NOT today. Mission Control is the live command
+  // centre. Without this banner the page calls itself "Founder Command Centre"
+  // and reads as current status — which is how a 47-day-old view came to be
+  // mistaken for live operations.
+  const historicalBanner = `<div class="stale" style="background:#7f1d1d;color:#fff;border-color:#b91c1c">
+    📁 <strong>HISTORICAL — June/July launch sprint.</strong> Not current status.
+    Readiness %, days-left, sprint dates and Smoke Test V3 below describe that sprint only.
+    For live status (Production, Browser Trust, Cost Guard, retailers) open
+    <a href="mission-control.html" style="color:#fff;text-decoration:underline">Mission Control</a>.
+  </div>`;
+  const staleWarning  = historicalBanner + (isStale ? `<div class="stale">⚠ Source data (LAUNCH.md / WEEK.md) is ${Math.floor(dataAgeDays)} days old.</div>` : '');
 
   const html = `<!DOCTYPE html>
 <html lang="en">
