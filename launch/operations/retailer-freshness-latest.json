@@ -1,0 +1,238 @@
+{
+  "version": 1,
+  "runAt": "2026-08-17T23:27:31.389Z",
+  "staleAfterDays": 30,
+  "catalogueTotal": 150663,
+  "pricedProducts": 48632,
+  "comparisonDepth": {
+    "exactlyOneRetailer": 48631,
+    "twoPlusRetailers": 1,
+    "threePlusRetailers": 0,
+    "storedEbayOnly": 0
+  },
+  "ebayIsLiveOnly": true,
+  "currency": {
+    "visiblePriced": 50738,
+    "nonGbp": 0
+  },
+  "fuse": {
+    "firstExpiryDate": "2026-08-17",
+    "lastExpiryDate": "2026-09-08",
+    "curve": [
+      {
+        "date": "2026-08-17",
+        "rows": 3264
+      },
+      {
+        "date": "2026-08-18",
+        "rows": 1484
+      },
+      {
+        "date": "2026-08-19",
+        "rows": 3528
+      },
+      {
+        "date": "2026-08-20",
+        "rows": 2876
+      },
+      {
+        "date": "2026-08-21",
+        "rows": 2390
+      },
+      {
+        "date": "2026-08-22",
+        "rows": 2858
+      },
+      {
+        "date": "2026-08-23",
+        "rows": 1334
+      },
+      {
+        "date": "2026-08-24",
+        "rows": 1229
+      },
+      {
+        "date": "2026-08-25",
+        "rows": 750
+      },
+      {
+        "date": "2026-08-26",
+        "rows": 2520
+      },
+      {
+        "date": "2026-08-27",
+        "rows": 663
+      },
+      {
+        "date": "2026-08-28",
+        "rows": 1204
+      },
+      {
+        "date": "2026-08-29",
+        "rows": 724
+      },
+      {
+        "date": "2026-08-30",
+        "rows": 1437
+      },
+      {
+        "date": "2026-08-31",
+        "rows": 1067
+      },
+      {
+        "date": "2026-09-01",
+        "rows": 1201
+      },
+      {
+        "date": "2026-09-02",
+        "rows": 4249
+      },
+      {
+        "date": "2026-09-03",
+        "rows": 3162
+      },
+      {
+        "date": "2026-09-04",
+        "rows": 2998
+      },
+      {
+        "date": "2026-09-05",
+        "rows": 3790
+      },
+      {
+        "date": "2026-09-06",
+        "rows": 1728
+      },
+      {
+        "date": "2026-09-07",
+        "rows": 3352
+      },
+      {
+        "date": "2026-09-08",
+        "rows": 2930
+      }
+    ]
+  },
+  "retailers": [
+    {
+      "name": "World of Books",
+      "syncDisabled": true,
+      "storedRows": 529927,
+      "visiblePriced": 48581,
+      "zeroPriceStubs": 72256,
+      "lastSeen": "2026-08-09T10:18:17.784Z"
+    },
+    {
+      "name": "Travelling Man",
+      "syncDisabled": false,
+      "storedRows": 25674,
+      "visiblePriced": 2157,
+      "zeroPriceStubs": 0,
+      "lastSeen": "2026-08-09T12:18:06.955Z"
+    },
+    {
+      "name": "Forbidden Planet",
+      "syncDisabled": false,
+      "storedRows": 4863,
+      "visiblePriced": 0,
+      "zeroPriceStubs": 0,
+      "lastSeen": "2026-05-17T20:33:45.441Z"
+    },
+    {
+      "name": "WHSmith",
+      "syncDisabled": false,
+      "storedRows": 4863,
+      "visiblePriced": 0,
+      "zeroPriceStubs": 0,
+      "lastSeen": "2026-05-17T20:59:09.616Z"
+    },
+    {
+      "name": "Zavvi",
+      "syncDisabled": false,
+      "storedRows": 4904,
+      "visiblePriced": 0,
+      "zeroPriceStubs": 0,
+      "lastSeen": "2026-05-18T16:10:52.386Z"
+    },
+    {
+      "name": "AbeBooks",
+      "syncDisabled": false,
+      "storedRows": 4947,
+      "visiblePriced": 0,
+      "zeroPriceStubs": 0,
+      "lastSeen": "2026-05-19T15:43:22.566Z"
+    },
+    {
+      "name": "Wordery",
+      "syncDisabled": false,
+      "storedRows": 9150,
+      "visiblePriced": 0,
+      "zeroPriceStubs": 0,
+      "lastSeen": "2026-05-25T22:16:47.440Z"
+    },
+    {
+      "name": "Waterstones",
+      "syncDisabled": false,
+      "storedRows": 17958,
+      "visiblePriced": 0,
+      "zeroPriceStubs": 0,
+      "lastSeen": "2026-06-07T11:48:00.106Z"
+    },
+    {
+      "name": "Bookshop.org (US)",
+      "syncDisabled": false,
+      "storedRows": 93990,
+      "visiblePriced": 0,
+      "zeroPriceStubs": 48453,
+      "lastSeen": "2026-08-17T04:00:51.923Z"
+    },
+    {
+      "name": "Bookshop.org (UK)",
+      "syncDisabled": false,
+      "storedRows": 103618,
+      "visiblePriced": 0,
+      "zeroPriceStubs": 48453,
+      "lastSeen": "2026-08-17T04:00:51.923Z"
+    },
+    {
+      "name": "Scholastic",
+      "syncDisabled": true,
+      "storedRows": 208,
+      "visiblePriced": 0,
+      "zeroPriceStubs": 0,
+      "lastSeen": "2026-06-07T18:24:37.241Z"
+    },
+    {
+      "name": "Lets Buy Books",
+      "syncDisabled": true,
+      "storedRows": 6467,
+      "visiblePriced": 0,
+      "zeroPriceStubs": 0,
+      "lastSeen": "2026-07-16T21:49:46.463Z"
+    },
+    {
+      "name": "eBay UK",
+      "syncDisabled": false,
+      "storedRows": 0,
+      "visiblePriced": 0,
+      "zeroPriceStubs": 0,
+      "lastSeen": null
+    },
+    {
+      "name": "Amazon UK",
+      "syncDisabled": true,
+      "storedRows": 1623,
+      "visiblePriced": 0,
+      "zeroPriceStubs": 0,
+      "lastSeen": "2026-06-26T17:36:21.068Z"
+    },
+    {
+      "name": "eBay US",
+      "syncDisabled": false,
+      "storedRows": 0,
+      "visiblePriced": 0,
+      "zeroPriceStubs": 0,
+      "lastSeen": null
+    }
+  ]
+}
