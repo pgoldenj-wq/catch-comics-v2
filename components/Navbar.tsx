@@ -110,31 +110,27 @@ export default function Navbar({ initialQuery, region: controlledRegion, onRegio
           <SearchBar region={region} variant="header" initialQuery={initialQuery} />
         </div>
 
-        {/* UK / US region pills */}
+        {/* UK indicator. This was a UK/US selector; picking US switched the
+            eBay path to EBAY_US and showed USD-priced US listings as Catch
+            Comics offers, which a UK price-comparison site must not do. It is
+            now a static label — the prices shown really are UK-only, so this
+            states a fact rather than offering a choice. */}
         <div className="flex items-center gap-3 ml-auto shrink-0">
-          {(['uk', 'us'] as const).map(r => (
-            <button
-              key={r}
-              onClick={() => setRegion(r)}
-              aria-label={r === 'uk' ? 'UK prices' : 'US prices'}
-              aria-pressed={region === r}
-              className="flex items-center gap-2.5 pl-2 pr-4 py-1.5 rounded-full border-2 transition-all"
-              style={{
-                borderColor: region === r ? '#0A0A0A' : '#E5E7EB',
-                background:  region === r ? '#0A0A0A' : '#fff',
-              }}
+          <div
+            className="flex items-center gap-2.5 pl-2 pr-4 py-1.5 rounded-full border-2"
+            style={{ borderColor: '#E5E7EB', background: '#fff' }}
+            title="Catch Comics compares UK prices"
+          >
+            <span
+              className="flex items-center justify-center rounded-full overflow-hidden shrink-0"
+              style={{ width: '32px', height: '32px', background: '#f3f4f6' }}
             >
-              <span
-                className="flex items-center justify-center rounded-full overflow-hidden shrink-0"
-                style={{ width: '32px', height: '32px', background: '#f3f4f6' }}
-              >
-                {r === 'uk' ? <UKFlag /> : <USFlag />}
-              </span>
-              <span className="text-sm font-medium" style={{ color: region === r ? '#fff' : '#6B7280' }}>
-                {r === 'uk' ? 'United Kingdom' : 'United States'}
-              </span>
-            </button>
-          ))}
+              <UKFlag />
+            </span>
+            <span className="text-sm font-medium" style={{ color: '#6B7280' }}>
+              United Kingdom
+            </span>
+          </div>
         </div>
 
       </div>

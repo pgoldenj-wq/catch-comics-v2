@@ -508,7 +508,12 @@ function SearchResults() {
 
   // URL-derived values — all filter state lives in the URL
   const query       = searchParams.get('q') || ''
-  const regionParam = searchParams.get('region') as 'uk' | 'us' | null
+  // Catch Comics compares UK prices, so 'uk' is the only region. A stale or
+  // hand-edited ?region=us used to switch the eBay path to EBAY_US and show
+  // USD-priced US listings as if they were our offers; such URLs now simply
+  // behave as UK. lib/ebay.ts pins the marketplace too, so this is the second
+  // of two locks rather than the only one.
+  const regionParam: 'uk' = 'uk'
   // SINGLE-SELECT format. Backwards-compat: if URL still has a comma-separated
   // value from the old multi-select system, take the first segment. Anything
   // we don't recognise falls back to 'all' — prevents stale URLs producing zero results.
@@ -790,32 +795,11 @@ function SearchResults() {
             </div>
           )}
 
-          {/* ── REGION TOGGLE — mobile only. Desktop uses the header pills.
-              display must come from the classes, not inline style — an inline
-              display:flex overrides md:hidden's display:none and the toggle
-              leaks onto desktop, duplicating the header selector (CC-024). */}
-          {!loading && !error && query.length > 0 && (
-            <div className="flex md:hidden" style={{ alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-              <span style={{ fontSize: '11px', color: '#6B7280', flexShrink: 0 }}>Prices for:</span>
-              {(['uk', 'us'] as const).map(r => (
-                <button
-                  key={r}
-                  onClick={() => switchRegion(r)}
-                  style={{
-                    height: '30px', padding: '0 10px', borderRadius: '999px',
-                    border: `1px solid ${region === r ? '#0A0A0A' : '#E5E7EB'}`,
-                    background: region === r ? '#0A0A0A' : '#fff',
-                    fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
-                    color: region === r ? '#fff' : '#6B7280',
-                    display: 'flex', alignItems: 'center', gap: '4px',
-                    transition: 'border-color 0.12s, background 0.12s',
-                  }}>
-                  {r === 'uk' ? '🇬🇧' : '🇺🇸'}
-                  <span>{r === 'uk' ? 'UK' : 'US'}</span>
-                </button>
-              ))}
-            </div>
-          )}
+          {/* The UK/US region toggle that used to sit here has been removed.
+              Choosing US switched the eBay path to EBAY_US and presented
+              USD-priced US listings as Catch Comics offers, which a UK
+              price-comparison site must not do. Prices are UK-only now, so
+              there is no longer a choice to offer. (Previously CC-024.) */}
 
           {/* ── RESULT COUNT — own row, anchored left, predictable position */}
           {!loading && !error && query.length > 0 && (
