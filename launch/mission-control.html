@@ -148,6 +148,14 @@ footer button { color:var(--ink3); background:none; border:none; text-decoration
   </div>
 
   <div class="card">
+    <h2>🏷️ Price freshness &amp; comparison depth</h2>
+    <div id="priceFreshness"></div>
+    <div class="links" style="margin-top:14px">
+      <span class="muted" style="font-size:11px">Refresh with <code>npm run retailer:freshness</code></span>
+    </div>
+  </div>
+
+  <div class="card">
     <h2>🌐 Browser Trust — real browser, real journeys</h2>
     <div id="browserTrust"></div>
     <div class="links" style="margin-top:14px">
@@ -224,7 +232,7 @@ let mc = (()=>{ try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && 
 function saveMc(){ localStorage.setItem(KEY, JSON.stringify(mc)); writeMcToRepo(); }
 
 /* ═══ Live data ══════════════════════════════════════════════════════ */
-let FOUNDER = null, SMOKE = null, OPS_SMOKE = null, OPS_HEALTH = null, OPS_COSTGUARD = null, OPS_BROWSER = null;
+let FOUNDER = null, SMOKE = null, OPS_SMOKE = null, OPS_HEALTH = null, OPS_COSTGUARD = null, OPS_BROWSER = null, OPS_FRESH = null;
 async function loadData(){
   // 1) http(s): plain fetch. 2) file://: FS-handle if connected.
   // Wave 3: also load the generated operations snapshots. A missing file is
@@ -237,6 +245,7 @@ async function loadData(){
       try { OPS_HEALTH = await (await fetch('operations/launch-health-latest.json?'+Date.now())).json(); } catch(e){ OPS_HEALTH = null; }
       try { OPS_COSTGUARD = await (await fetch('operations/costguard-latest.json?'+Date.now())).json(); } catch(e){ OPS_COSTGUARD = null; }
       try { OPS_BROWSER = await (await fetch('operations/browser-trust-latest.json?'+Date.now())).json(); } catch(e){ OPS_BROWSER = null; }
+      try { OPS_FRESH = await (await fetch('operations/retailer-freshness-latest.json?'+Date.now())).json(); } catch(e){ OPS_FRESH = null; }
       return;
     }
   } catch(e){}
@@ -251,6 +260,7 @@ async function loadData(){
       try { OPS_HEALTH = JSON.parse(await (await (await ops.getFileHandle('launch-health-latest.json')).getFile()).text()); } catch(e){}
       try { OPS_COSTGUARD = JSON.parse(await (await (await ops.getFileHandle('costguard-latest.json')).getFile()).text()); } catch(e){}
       try { OPS_BROWSER   = JSON.parse(await (await (await ops.getFileHandle('browser-trust-latest.json')).getFile()).text()); } catch(e){}
+      try { OPS_FRESH     = JSON.parse(await (await (await ops.getFileHandle('retailer-freshness-latest.json')).getFile()).text()); } catch(e){}
     } catch(e){}
   }
 }
@@ -566,6 +576,45 @@ Please: reproduce with "npm run test:e2e" (local) or "npm run test:e2e:prod" (pr
     }
   }
   document.getElementById('browserTrust').innerHTML = bt;
+
+  /* ── Price freshness & comparison depth ────────────────────────────────────
+     Answers two questions no other card can: how many products a customer can
+     genuinely compare, and how long the prices we already have will last.
+
+     The second is the point. Retailer syncs are deliberately paused, and
+     cleanup-stale soft-deletes anything unseen for 30 days, so stored prices
+     expire on a rolling basis. A single-day snapshot looks fine right up until
+     the shelf is empty, which is why this shows the expiry date and not just a
+     total. Written by `npm run retailer:freshness`. */
+  const pfEl = document.getElementById('priceFreshness');
+  if (pfEl){
+    if (!OPS_FRESH){
+      pfEl.innerHTML = `<div class="v-notrun">NOT MEASURED</div>
+        <div class="muted">Run <code>npm run retailer:freshness</code> to measure comparison depth and price expiry.</div>`;
+    } else {
+      const f = OPS_FRESH, d = f.comparisonDepth || {};
+      const ageD = (Date.now() - new Date(f.runAt).getTime()) / 86400000;
+      const daysLeft = f.fuse && f.fuse.lastExpiryDate
+        ? Math.round((new Date(f.fuse.lastExpiryDate) - Date.now()) / 86400000) : null;
+      // Expiring inside a month with no refresh running is the real state of
+      // the shelf, so it reads as a warning even though nothing has broken yet.
+      const sev = daysLeft === null ? 'v-notrun' : daysLeft <= 30 ? 'v-fail' : 'v-pass';
+      const verdict = daysLeft === null ? 'UNKNOWN'
+        : daysLeft <= 0 ? 'PRICES EXPIRED'
+        : `PRICES EXPIRE IN ${daysLeft}d`;
+      const live = f.ebayIsLiveOnly
+        ? ` · eBay is live-only (0 stored rows), so it shows on products the database counts as unpriced`
+        : '';
+      const fresh = ageD > 7 ? ` · ⚠ measurement ${Math.floor(ageD)}d old` : '';
+      pfEl.innerHTML =
+        `<div class="${sev}">${verdict}</div>` +
+        `<div>${(f.pricedProducts||0).toLocaleString()} of ${(f.catalogueTotal||0).toLocaleString()} products carry a real price` +
+        ` · <strong>${(d.twoPlusRetailers||0).toLocaleString()}</strong> ${d.twoPlusRetailers===1?'has':'have'} 2+ retailers to compare</div>` +
+        `<div class="muted">${(d.exactlyOneRetailer||0).toLocaleString()} have exactly one retailer${live}</div>` +
+        `<div class="muted">Expiring ${f.fuse?.firstExpiryDate || '?'} → ${f.fuse?.lastExpiryDate || '?'}` +
+        ` · non-GBP offers: ${f.currency?.nonGbp ?? '?'}${fresh}</div>`;
+    }
+  }
 
   const btReport = document.getElementById('btReportBtn');
   if (btReport){

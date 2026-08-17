@@ -102,7 +102,8 @@
     "audit:fragmentation": "dotenv -e .env.local -- tsx scripts/audit-edition-fragmentation.ts",
     "audit:metadata": "dotenv -e .env.local -- tsx scripts/audit-suspicious-metadata.ts",
     "ingest:issue-covers": "dotenv -e .env.local -- tsx scripts/ingest-issue-covers.ts",
-    "test:ebay-uk": "tsx scripts/test-ebay-uk-only.ts"
+    "test:ebay-uk": "tsx scripts/test-ebay-uk-only.ts",
+    "retailer:freshness": "dotenv -e .env.local -- tsx scripts/retailer-freshness.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1055.0",
