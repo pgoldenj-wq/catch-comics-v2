@@ -372,9 +372,17 @@ function operationalStatus(){
       what:'Prices expire in ' + daysLeft + 'd',
       why:`all ${(f.pricedProducts||0).toLocaleString()} priced products go dark by ${f.fuse.lastExpiryDate} unless a retailer refresh runs`,
       action:'price-fuse' });
-    if ((depth.twoPlusRetailers||0) < 2) conditions.push({
+    // Share, not a raw count. An absolute threshold reads "solved" the moment a
+    // handful of products gain a second retailer: 20 of 150,694 cleared a
+    // `< 2` test on 2026-08-18 while genuine comparison was still 0.04% of the
+    // priced catalogue. Catch Comics compares prices, so this stays visible
+    // until a customer opening a priced product at random has a real chance of
+    // seeing more than one retailer.
+    const comparable = depth.twoPlusRetailers || 0;
+    const share = (f.pricedProducts||0) > 0 ? comparable / f.pricedProducts : 0;
+    if (share < 0.01) conditions.push({
       what:'No genuine comparison',
-      why:`${depth.twoPlusRetailers||0} product${(depth.twoPlusRetailers||0)===1?'':'s'} in the catalogue has 2+ retailers to compare`,
+      why:`only ${comparable.toLocaleString()} of ${(f.pricedProducts||0).toLocaleString()} priced products (${(share*100).toFixed(2)}%) have 2+ retailers to compare`,
       action:'price-fuse' });
     if (ageH(f.runAt) > MAX_SIGNAL_AGE_H) conditions.push({ what:'Price freshness', why:'measurement is out of date — `npm run retailer:freshness`' });
   }
