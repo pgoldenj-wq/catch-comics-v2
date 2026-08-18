@@ -133,7 +133,7 @@
     "exceljs": "^4.4.0",
     "prisma": "^5.22.0",
     "tailwindcss": "^4",
-    "tsx": "^4.21.0",
+    "tsx": "^4.23.11",
     "typescript": "^5"
   }
 }
