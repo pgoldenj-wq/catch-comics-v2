@@ -1,14 +1,14 @@
 {
-  "version": 1,
+  "version": 2,
   "tool": "playwright",
   "toolVersion": "1.62.1",
   "environment": "local",
   "url": "http://localhost:3000",
   "host": "localhost:3000",
-  "runAt": "2026-08-17T22:26:29.783Z",
-  "durationMs": 49585,
-  "commitSha": "f6c19d63b743350f965442436a48f37ce27afba3",
-  "branch": "feat/playwright-browser-trust",
+  "runAt": "2026-08-18T12:55:58.947Z",
+  "durationMs": 71503,
+  "commitSha": "d2e1376f45f7214f026a820888ad0d63dfe8fb56",
+  "branch": "fix/browser-trust-honesty-model",
   "ci": false,
   "runUrl": null,
   "verdict": "PASS",
@@ -22,15 +22,18 @@
       "passed": 7,
       "failed": 0,
       "skipped": 1,
-      "flaky": 0
+      "flaky": 0,
+      "blocked": 0
     },
     "mobile-chromium": {
       "passed": 6,
       "failed": 0,
       "skipped": 2,
-      "flaky": 0
+      "flaky": 0,
+      "blocked": 0
     }
   },
   "reportPath": "launch/operations/browser-trust-report/index.html",
-  "failures": []
+  "failures": [],
+  "blocked": null
 }

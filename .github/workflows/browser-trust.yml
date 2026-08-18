@@ -129,6 +129,11 @@ jobs:
               const r = require("./launch/operations/browser-trust-latest.json");
               const lines = [
                 `**${r.verdict}** — ${r.passed} passed · ${r.failed} failed · ${r.skipped} skipped · ${r.flaky} flaky`,
+                ...(r.blocked ? [
+                  "",
+                  `> **Environment error, not a product failure.** ${r.blocked.summary}`,
+                  `> Reason: \`${r.blocked.reason}\` · detected at ${r.blocked.stage}. No verdict about Catch Comics was recorded.`,
+                ] : []),
                 "",
                 "| project | passed | failed | skipped |",
                 "|---|---|---|---|",
