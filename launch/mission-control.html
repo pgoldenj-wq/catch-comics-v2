@@ -127,14 +127,14 @@ footer button { color:var(--ink3); background:none; border:none; text-decoration
   </div>
 
   <div class="card">
-    <h2>What must happen next</h2>
+    <h2>What must happen next — July launch programme (history)</h2>
     <div id="todoList"></div>
   </div>
 
   <div class="checkgrid">
     <div class="card"><h2>🛡 Trust</h2><div id="trustList"></div></div>
-    <div class="card"><h2>🧪 Testing — Smoke Test V4</h2><div id="testList"></div></div>
-    <div class="card"><h2>🚀 Launch ops</h2><div id="opsList"></div></div>
+    <div class="card"><h2>🧪 Testing — Smoke Test V4 (founder review)</h2><div id="testList"></div></div>
+    <div class="card"><h2>🚀 Launch ops — July programme (history)</h2><div id="opsList"></div></div>
   </div>
 
   <div class="card">
@@ -310,6 +310,85 @@ async function writeMcToRepo(){
    Verdict: NO-GO while any trust blocker is open.
             NOT YET when blockers are clear but testing/ops incomplete.
             GO only when every gate passes. No vanity numbers.          */
+/* ═══ Operational status — the question that matters after launch ═════
+   Until 2026-08-18 this page led with a launch countdown and a readiness
+   percentage built from Joe's pre-launch checklists (V4 pages ticked, launch
+   ops ticked). Twenty-three days after launch that answered the wrong
+   question: it showed "30% ready · NOT YET READY" for a site that was live,
+   passing every automated check, and carrying a real dated risk nobody could
+   see from the hero.
+
+   This reads only signals that are measured, never ticked:
+     launch:smoke      is Production serving correctly right now
+     Browser Trust     do the journeys work in a real browser
+     Cost Guard        is spend safe, and is the monitoring itself honest
+     retailer:freshness how long the prices we show have left, and how many
+                       products can genuinely be compared
+
+   Three states, no invented percentage:
+     NOT READY               something is failing for customers today
+     READY WITH CONDITIONS   nothing is failing, but a dated risk is running
+     READY                   green, and no risk with a date on it
+
+   A missing or stale snapshot is never read as good news — it becomes a
+   condition in its own right, the same rule the Browser Trust card follows. */
+const MAX_SIGNAL_AGE_H = 48;
+const FUSE_WARN_DAYS   = 60;
+
+function operationalStatus(){
+  const conditions = [], failures = [], unknowns = [];
+  const ageH = ts => ts ? (Date.now() - new Date(ts).getTime()) / 3.6e6 : null;
+
+  // ── Production, right now ────────────────────────────────────────────
+  const s = OPS_SMOKE;
+  if (!s) unknowns.push({ what:'Production smoke', why:'never run — `npm run launch:smoke`' });
+  else if ((s.failed||0) > 0) failures.push({ what:'Production smoke', why:`${s.failed} check${s.failed===1?'':'s'} failing on ${s.environment}` });
+  else if (ageH(s.checkedAt) > MAX_SIGNAL_AGE_H) conditions.push({ what:'Production smoke', why:`last run ${Math.round(ageH(s.checkedAt)/24)}d ago — re-run \`npm run launch:smoke\`` });
+  else if ((s.warned||0) > 0) conditions.push({ what:'Production smoke', why:`${s.warned} warning${s.warned===1?'':'s'}` });
+
+  // ── Browser Trust ────────────────────────────────────────────────────
+  const b = OPS_BROWSER;
+  if (!b) unknowns.push({ what:'Browser Trust', why:'never run — `npm run test:e2e:prod`' });
+  else if (b.verdict === 'BLOCKED' || b.blocked) conditions.push({ what:'Browser Trust', why:'BLOCKED — the browser never started, so nothing was tested' });
+  else if ((b.failed||0) > 0 || b.verdict === 'FAIL') failures.push({ what:'Browser Trust', why:`${b.failed} journey${b.failed===1?'':'s'} failing on ${b.environment}` });
+  else if (ageH(b.runAt) > MAX_SIGNAL_AGE_H) conditions.push({ what:'Browser Trust', why:`last run ${Math.round(ageH(b.runAt)/24)}d ago — re-run it` });
+
+  // ── Cost Guard (and whether the monitoring itself is honest) ─────────
+  const g = OPS_COSTGUARD;
+  if (!g) unknowns.push({ what:'Cost Guard', why:'no data — `npm run costguard:status`' });
+  else if (g.lockdownLatched || g.state === 'LOCKDOWN' || g.state === 'RED') failures.push({ what:'Cost Guard', why:`${g.state} — spend needs attention` });
+  else if ((g.unconfiguredProviders||[]).length) conditions.push({ what:'Cost Guard', why:`${g.unconfiguredProviders.length} provider(s) unmonitored — a green run is not proof` });
+  else if (g.state === 'AMBER' || (g.staleProviders||[]).length) conditions.push({ what:'Cost Guard', why:`${g.state==='AMBER'?'AMBER':'stale providers'} — monitoring degraded` });
+
+  // ── The price fuse: the risk with an actual date on it ───────────────
+  const f = OPS_FRESH;
+  if (!f) unknowns.push({ what:'Price freshness', why:'never measured — `npm run retailer:freshness`' });
+  else {
+    const daysLeft = f.fuse && f.fuse.lastExpiryDate
+      ? Math.round((new Date(f.fuse.lastExpiryDate) - Date.now()) / 86400000) : null;
+    const depth = f.comparisonDepth || {};
+    if (daysLeft !== null && daysLeft <= 0) failures.push({ what:'Prices', why:'every stored price has expired — nothing left to compare' });
+    else if (daysLeft !== null && daysLeft < FUSE_WARN_DAYS) conditions.push({
+      what:'Prices expire in ' + daysLeft + 'd',
+      why:`all ${(f.pricedProducts||0).toLocaleString()} priced products go dark by ${f.fuse.lastExpiryDate} unless a retailer refresh runs`,
+      action:'price-fuse' });
+    if ((depth.twoPlusRetailers||0) < 2) conditions.push({
+      what:'No genuine comparison',
+      why:`${depth.twoPlusRetailers||0} product${(depth.twoPlusRetailers||0)===1?'':'s'} in the catalogue has 2+ retailers to compare`,
+      action:'price-fuse' });
+    if (ageH(f.runAt) > MAX_SIGNAL_AGE_H) conditions.push({ what:'Price freshness', why:'measurement is out of date — `npm run retailer:freshness`' });
+  }
+
+  const verdict = failures.length ? 'nogo' : (conditions.length || unknowns.length) ? 'notyet' : 'go';
+  return {
+    verdict,
+    word: verdict === 'go' ? '🟢 READY' : verdict === 'nogo' ? '🔴 NOT READY' : '🟡 READY WITH CONDITIONS',
+    failures, conditions, unknowns,
+    // Highest-value live action: a failure outranks a dated risk outranks a gap.
+    top: failures[0] || conditions[0] || unknowns[0] || null,
+  };
+}
+
 function derive(){
   const pages = (FOUNDER && FOUNDER.pages) || {};
   const testDone = TEST_ORDER.filter(id => pages[id] && pages[id].status === 'good');
@@ -364,25 +443,42 @@ function render(){
   document.getElementById('countdown').innerHTML = postLaunch
     ? '🎉' : `${days} <small>DAYS REMAINING</small>`;
 
-  document.getElementById('readyFill').style.width = d.pct + '%';
-  document.getElementById('readyPct').textContent = d.pct;
-  document.getElementById('readyHow').textContent =
-    `Honest maths: testing ${d.testDone.length}/14 areas (50%) · trust ${Math.round(d.trust*100)}% verified (30%) · launch ops ${d.opsDone.length}/${OPS_ITEMS.length} (20%). No vanity metrics.`;
+  // The hero answers "is Catch Comics healthy today?" from measured signals.
+  // The launch-checklist percentage still exists, but as history — it measures
+  // how much of the July launch programme Joe ticked off, which is not a
+  // statement about the health of a site that has been live for weeks.
+  const op = operationalStatus();
+  const opBar = op.verdict === 'go' ? 100 : op.verdict === 'nogo' ? 25 : 70;
+  document.getElementById('readyFill').style.width = opBar + '%';
+  document.getElementById('readyPct').textContent = op.verdict === 'go' ? 'OK' : op.verdict === 'nogo' ? '!' : '⚠';
+  document.getElementById('readyHow').textContent = postLaunch
+    ? `Live signals only: Production smoke · Browser Trust · Cost Guard · price freshness. Launch checklist (${d.pct}% of the July programme) is history, below.`
+    : `Honest maths: testing ${d.testDone.length}/14 areas (50%) · trust ${Math.round(d.trust*100)}% verified (30%) · launch ops ${d.opsDone.length}/${OPS_ITEMS.length} (20%). No vanity metrics.`;
 
   const v = document.getElementById('verdict');
-  v.className = 'verdict ' + d.verdict;
-  v.textContent = d.verdict === 'go' ? '🟢 GO' : d.verdict === 'nogo' ? '🔴 NOT READY — BLOCKED' : '🟡 NOT YET READY';
+  v.className = 'verdict ' + op.verdict;
+  v.textContent = op.word;
+  const sub = [];
+  if (op.failures.length)   sub.push(`<strong>${op.failures.length}</strong> failing`);
+  if (op.conditions.length) sub.push(`<strong>${op.conditions.length}</strong> condition${op.conditions.length===1?'':'s'}`);
+  if (op.unknowns.length)   sub.push(`<strong>${op.unknowns.length}</strong> unmeasured`);
   document.getElementById('verdictSub').innerHTML =
-    `<strong>${d.blockers.length}</strong> trust blocker${d.blockers.length===1?'':'s'} · <strong>${d.testRemaining.length}</strong> test area${d.testRemaining.length===1?'':'s'} remaining · <strong>${OPS_ITEMS.length - d.opsDone.length}</strong> ops item${OPS_ITEMS.length-d.opsDone.length===1?'':'s'} open`;
+    (sub.join(' · ') || '<strong>Everything measured is green</strong>') +
+    (op.top ? `<br><span style="color:var(--ink2)">${esc(op.top.what)} — ${esc(op.top.why)}</span>` : '');
 
-  // Next action = first todo
-  const na = d.todos[0];
-  document.getElementById('naTitle').textContent = na ? na.t : 'Nothing — you are GO 🎉';
+  // Next action = the highest-value LIVE action, then the launch checklist.
+  const na = op.top
+    ? { t: op.top.what + ' — ' + op.top.why, act:'claude',
+        prompt: op.top.action === 'price-fuse'
+          ? 'Catch Comics: stored retailer prices expire between now and ' + ((OPS_FRESH&&OPS_FRESH.fuse&&OPS_FRESH.fuse.lastExpiryDate)||'early September') + ', and only ' + ((OPS_FRESH&&OPS_FRESH.comparisonDepth&&OPS_FRESH.comparisonDepth.twoPlusRetailers)||0) + ' product(s) have 2+ retailers to compare. Scheduled retailer sync is deliberately paused after the Inngest quota incident. Work out the cheapest safe way to refresh World of Books and Travelling Man prices before they expire: bound the cost first (rows, requests, executions, £), do not resume any Inngest schedule without proof it cannot loop, and do not weaken product-identity matching to inflate coverage.'
+          : 'Catch Comics Command Centre reports: ' + op.top.what + ' — ' + op.top.why + '. Diagnose honestly and fix the root cause. Do not weaken any assertion or check to make this go green.' }
+    : d.todos[0];
+  document.getElementById('naTitle').textContent = na ? na.t : 'Nothing failing, nothing expiring 🎉';
   const naBtn = document.getElementById('naBtn');
   if (na){
     naBtn.textContent = na.act==='smoke' ? 'OPEN SMOKE TEST' : na.act==='claude' ? 'FIX WITH CLAUDE' : 'MARK DONE BELOW';
     naBtn.onclick = ()=> actFor(na);
-  } else { naBtn.textContent = 'LAUNCH 🚀'; naBtn.onclick = ()=> toast('Ship it, Joe.'); }
+  } else { naBtn.textContent = 'ALL CLEAR'; naBtn.onclick = ()=> toast('Nothing to do, Joe.'); }
 
   // Todo list (top 5)
   document.getElementById('todoList').innerHTML = d.todos.slice(0,5).map((t,i)=>`
