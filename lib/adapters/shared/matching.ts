@@ -52,6 +52,56 @@ export interface SyncResult {
   priceChanges    : number
   errors          : SyncError[]
   durationMs      : number
+  /**
+   * True only when the adapter proved it reached the end of the retailer's
+   * catalogue. Absence reconciliation (marking unseen listings OUT_OF_STOCK)
+   * is valid only on a complete traversal — a capped, aborted or interrupted
+   * run has learned nothing about the pages it never fetched. Optional because
+   * adapters that always traverse fully do not set it.
+   */
+  traversalComplete?: boolean
+}
+
+/**
+ * Decide what a catalogue traversal has actually proved about absence.
+ *
+ * Pure, so the rule can be tested without a retailer or a database. The rule:
+ *
+ *   • An incomplete traversal proves NOTHING. It must not mark anything
+ *     OUT_OF_STOCK and must not record missing SKUs, because recording them
+ *     arms the next run to mark them.
+ *   • A complete traversal may mark a listing OUT_OF_STOCK only when it was
+ *     also absent from the previous complete traversal (the existing
+ *     two-consecutive-syncs rule, unchanged).
+ *
+ * @param traversalComplete  proof the run reached the end of the catalogue
+ * @param dbListings         live listings currently stored for the retailer
+ * @param skusEncountered    every SKU seen in the feed, before any filtering
+ * @param prevMissingSkus    SKUs missing from the previous complete traversal
+ */
+export function reconcileAbsence(args: {
+  traversalComplete: boolean
+  dbListings       : { id: string; retailerSku: string; stockStatus: StockStatus }[]
+  skusEncountered  : Set<string>
+  prevMissingSkus  : Set<string>
+}): { reconciled: boolean; currentMissingSkus: string[]; idsToMarkOos: string[] } {
+  if (!args.traversalComplete) {
+    return { reconciled: false, currentMissingSkus: [], idsToMarkOos: [] }
+  }
+
+  const currentMissing = args.dbListings
+    .filter(row => !args.skusEncountered.has(row.retailerSku))
+    .map(row => row.retailerSku)
+  const currentMissingSet = new Set(currentMissing)
+
+  const idsToMarkOos = args.dbListings
+    .filter(row =>
+      currentMissingSet.has(row.retailerSku) &&
+      args.prevMissingSkus.has(row.retailerSku) &&
+      row.stockStatus !== StockStatus.OUT_OF_STOCK)
+    .map(row => row.id)
+
+  return { reconciled: true, currentMissingSkus: currentMissing, idsToMarkOos }
 }
 
 export interface SyncError {
@@ -122,11 +172,20 @@ export function makeCanonicalSlug(title: string, isbn13: string): string {
  *
  * @param adapterTag  Short label for log lines, e.g. "[shopify]"
  */
+/**
+ * @param allowCreate  When false, a listing that matches nothing stays
+ *   UNMATCHED instead of minting a stub canonical product. Recovery and
+ *   comparison-depth runs use this: they exist to attach prices to products we
+ *   already trust, and a run whose job is repair must not also grow the
+ *   catalogue. Every creation path in this function is gated on it, so
+ *   "no-create" is a property of the function rather than of its callers.
+ */
 export async function matchCanonical(
   isbn13     : string | null,
   ean        : string | null,
   title      : string,
   adapterTag = '[adapter]',
+  allowCreate = true,
 ): Promise<Pick<BaseListing, 'canonicalProductId' | 'matchMethod' | 'matchConfidence'>> {
 
   if (isbn13) {
@@ -140,6 +199,13 @@ export async function matchCanonical(
     }
 
     // ── 2. No existing match — create a stub canonical product ────────────
+    // Unless the caller forbade it: in no-create mode an unmatched product is
+    // simply left unmatched, which keeps it out of every customer surface
+    // (they all join through canonicalProductId).
+    if (!allowCreate) {
+      return { canonicalProductId: null, matchMethod: MatchMethod.UNMATCHED, matchConfidence: 0 }
+    }
+
     const format = inferFormat(title) ?? 'OTHER'
     const slug   = makeCanonicalSlug(title, isbn13)
 
