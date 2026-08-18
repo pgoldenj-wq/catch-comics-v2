@@ -233,6 +233,9 @@ function saveMc(){ localStorage.setItem(KEY, JSON.stringify(mc)); writeMcToRepo(
 
 /* ═══ Live data ══════════════════════════════════════════════════════ */
 let FOUNDER = null, SMOKE = null, OPS_SMOKE = null, OPS_HEALTH = null, OPS_COSTGUARD = null, OPS_BROWSER = null, OPS_FRESH = null;
+// What the run button should say right now. Becomes "Retry Browser Trust"
+// after a BLOCKED run, because retrying is the whole of the next action there.
+let btRunLabel = 'Run Browser Trust';
 async function loadData(){
   // 1) http(s): plain fetch. 2) file://: FS-handle if connected.
   // Wave 3: also load the generated operations snapshots. A missing file is
@@ -501,6 +504,10 @@ function render(){
   //
   // Honesty rules, in precedence order:
   //   • no file at all           → NOT RUN  (never a green)
+  //   • verdict BLOCKED          → BLOCKED  (the browser or the dev server never
+  //                                          started, so nothing was learned about
+  //                                          Catch Comics — NOT a product failure,
+  //                                          and it never touches launch readiness)
   //   • any failure              → FAIL     (stays FAIL however old it is)
   //   • older than 48h           → STALE    (a passing run stops counting as
   //                                          evidence once it is out of date)
@@ -508,6 +515,7 @@ function render(){
   // Opening this page runs nothing; the run action below is deliberate.
   const BT_STALE_HOURS = 48;
   let bt = '', btPrompt = null, btReportHref = null, btReportLabel = 'Open latest report';
+  btRunLabel = 'Run Browser Trust';
   if (!OPS_BROWSER){
     bt = `<div><strong style="color:var(--ink3)">Browser Trust: NOT RUN</strong>
       <span class="src"> · no result recorded yet — run <code>npm run test:e2e</code>, then reload</span></div>`;
@@ -516,10 +524,14 @@ function render(){
     const runMs  = new Date(b.runAt).getTime();
     const hours  = (Date.now() - runMs) / 3.6e6;
     const stale  = !(hours < BT_STALE_HOURS);
-    const failed = (b.failed || 0) > 0 || b.verdict === 'FAIL';
+    // A blocked run made no claim about the product, so it can never be read as
+    // a failure of it — checked before `failed` for exactly that reason.
+    const blocked = b.verdict === 'BLOCKED' || !!b.blocked;
+    const failed = !blocked && ((b.failed || 0) > 0 || b.verdict === 'FAIL');
 
     let word, col;
-    if (failed)                                        { word = 'FAIL';        col = 'var(--red)'; }
+    if (blocked)                                       { word = 'BLOCKED';     col = 'var(--amber)'; }
+    else if (failed)                                   { word = 'FAIL';        col = 'var(--red)'; }
     else if (b.verdict === 'INCOMPLETE')               { word = 'INCOMPLETE';  col = 'var(--amber)'; }
     else if (b.verdict === 'NOT RUN' || (b.passed||0) === 0) { word = 'NOT RUN'; col = 'var(--ink3)'; }
     else if (stale)                                    { word = 'STALE';       col = 'var(--amber)'; }
@@ -538,8 +550,23 @@ function render(){
       <span class="src"> · ${envLabel} · ${esc(b.host||'unknown host')} · ${age(b.runAt)}</span></div>`;
     // NB: age() already appends "— STALE, re-run" past 48h, which is the same
     // threshold as BT_STALE_HOURS. Do not add a second suffix here.
-    bt += `<div class="win" style="color:var(--ink2)">🖥 ${esc(projLine('desktop-chromium'))} &nbsp;·&nbsp; 📱 ${esc(projLine('mobile-chromium'))}</div>`;
-    bt += `<div class="win" style="color:var(--ink2)">${b.passed} passed · ${b.failed} failed · ${b.skipped} skipped · ${b.flaky} flaky (of ${b.declared} declared)</div>`;
+    if (blocked){
+      // Say the two things that matter, in this order: the browser did not
+      // start, and therefore nothing is known about Catch Comics. Everything
+      // else on this card is detail for whoever has to fix the machine.
+      const bl = b.blocked || {};
+      bt += `<div class="win" style="color:var(--ink);font-weight:700">${esc(bl.summary || 'Playwright could not start Chromium. Catch Comics was not tested.')}</div>`;
+      if (bl.partial && (b.passed||0) > 0){
+        bt += `<div class="win" style="color:var(--ink2)">${b.passed} journey${b.passed===1?'':'s'} ran before the browser became unusable · ${esc(String(bl.testsAffected ?? '?'))} could not start</div>`;
+      }
+      const firstLine = String(bl.detail || bl.technicalError || '').split('\n')[0];
+      if (firstLine) bt += `<div class="win" style="color:var(--ink2);word-break:break-word">${esc(firstLine)}</div>`;
+      bt += `<div class="win" style="color:var(--ink3)">Environment error${bl.reason?` · ${esc(bl.reason)}`:''}${bl.status?` · browser ${esc(bl.status)}`:''}${bl.stage?` · detected at ${esc(bl.stage)}`:''}</div>`;
+      bt += `<div class="win" style="color:var(--ink3)">Not a product failure: launch readiness is unchanged, and no verdict about Catch Comics has been recorded.</div>`;
+    } else {
+      bt += `<div class="win" style="color:var(--ink2)">🖥 ${esc(projLine('desktop-chromium'))} &nbsp;·&nbsp; 📱 ${esc(projLine('mobile-chromium'))}</div>`;
+      bt += `<div class="win" style="color:var(--ink2)">${b.passed} passed · ${b.failed} failed · ${b.skipped} skipped · ${b.flaky} flaky (of ${b.declared} declared)</div>`;
+    }
     bt += `<div class="win" style="color:var(--ink3)">commit ${esc(String(b.commitSha||'unknown').slice(0,8))}${b.branch?` · ${esc(b.branch)}`:''} · ${esc(b.tool)} ${esc(b.toolVersion)}${b.ci?' · CI':''}</div>`;
 
     for (const f of (b.failures||[]).slice(0,5)){
@@ -549,11 +576,42 @@ function render(){
     // Where the report actually lives for THIS run. A CI run's HTML report is
     // a GitHub artifact, not a local file — linking to the local path would
     // open a stale report or a 404.
-    if (b.ci && b.runUrl){ btReportHref = b.runUrl; btReportLabel = 'Open CI run (report attached)'; }
-    else if (!b.ci)      { btReportHref = 'operations/browser-trust-report/index.html'; }
-    bt += `<div class="win" style="color:var(--ink3)">Report: ${b.ci ? (b.runUrl ? 'GitHub Actions artifact' : 'CI run — see the Actions tab') : esc(b.reportPath || 'n/a')}</div>`;
+    // A run blocked at preflight never started Playwright, so there is no
+    // report for it. Linking one would open the previous run's and invite the
+    // founder to read it as this run's evidence.
+    const preflightBlocked = blocked && (b.blocked||{}).stage === 'preflight';
+    if (preflightBlocked)                { btReportHref = null; btReportLabel = 'No report — nothing ran'; }
+    else if (b.ci && b.runUrl)           { btReportHref = b.runUrl; btReportLabel = 'Open CI run (report attached)'; }
+    else if (!b.ci)                      { btReportHref = 'operations/browser-trust-report/index.html'; }
+    bt += `<div class="win" style="color:var(--ink3)">Report: ${preflightBlocked ? 'none — Playwright never started' : (b.ci ? (b.runUrl ? 'GitHub Actions artifact' : 'CI run — see the Actions tab') : esc(b.reportPath || 'n/a'))}</div>`;
 
-    if (failed){
+    if (blocked){
+      // A blocked run needs a different question asked of Claude: nothing is
+      // wrong with Catch Comics as far as this run knows, so the prompt must
+      // not send anyone hunting through product code — or "fixing" the suite
+      // by loosening what it checks.
+      const bl = b.blocked || {};
+      btRunLabel = 'Retry Browser Trust';
+      btPrompt =
+`Catch Comics — Browser Trust (Playwright) was BLOCKED. The browser never started, so Catch Comics was NOT tested. This is an environment failure, not a product failure.
+
+Environment : ${envLabel} (${b.url})
+Commit      : ${b.commitSha || 'unknown'}${b.branch ? ` on ${b.branch}` : ''}
+Run at      : ${b.runAt}
+State       : BLOCKED · ${bl.reason || 'infrastructure-error'}${bl.status ? ` · browser ${bl.status}` : ''} · detected at ${bl.stage || 'run'}
+Ran         : ${b.passed || 0} passed, ${b.failed || 0} failed, ${b.declared || 0} declared${bl.testsAffected ? ` · ${bl.testsAffected} could not start` : ''}
+Executable  : ${bl.executablePath || 'unknown'}
+
+Technical error, verbatim:
+${bl.technicalError || bl.detail || '(none recorded)'}
+
+Please: work out why a browser could not start on this machine, and say plainly whether it is missing, blocked by something on the machine, or something else. Reproduce with "${bl.remedy || 'npm run test:e2e'}".
+
+Rules for this one:
+- Do NOT weaken, skip, retag or delete any product assertion. Nothing here is evidence about the product.
+- Do NOT change antivirus or security settings, and do not ask for an exclusion without proof.
+- Do not run retailer syncs, Inngest, or any write path.`;
+    } else if (failed){
       const lines = (b.failures||[]).map(f =>
         `- [${f.project}] ${f.test} (${f.file})${f.pageUrl?` on ${f.pageUrl}`:''}\n  error: ${String(f.error||'').split('\n')[0]}`).join('\n');
       btPrompt =
@@ -622,6 +680,16 @@ Please: reproduce with "npm run test:e2e" (local) or "npm run test:e2e:prod" (pr
     if (btReportHref){ btReport.href = btReportHref; btReport.style.opacity = ''; btReport.style.pointerEvents = ''; }
     else { btReport.removeAttribute('href'); btReport.style.opacity = '.45'; btReport.style.pointerEvents = 'none'; }
   }
+  // The run control doubles as the retry control after a BLOCKED run. Left
+  // alone while a run is in flight so it cannot overwrite "Running…".
+  const btRun = document.getElementById('btRunBtn');
+  if (btRun && !btRun.disabled){
+    btRun.textContent = btBridgeUp ? btRunLabel : `${btRunLabel} (copies command)`;
+    const retry = btRunLabel.startsWith('Retry');
+    btRun.style.borderColor = retry ? 'var(--amber)' : '';
+    btRun.style.color       = retry ? 'var(--amber)' : '';
+  }
+
   const btClaude = document.getElementById('btClaudeBtn');
   if (btClaude){
     btClaude.style.opacity = btPrompt ? '' : '.45';
@@ -721,10 +789,14 @@ function watchRun(){
     const s = await probeBridge();
     if (!s || s.state === 'running') return;
     clearInterval(btPolling); btPolling = null;
-    setRunBtn('Run Browser Trust', false);
+    setRunBtn(btRunLabel, false);
     await loadData(); render();
-    if (s.state === 'completed')   toast('Browser Trust PASSED — card updated');
-    else if (s.state === 'failed') toast('Browser Trust FAILED (' + (s.verdict || 'see report') + ') — card updated');
+    // render() has just re-read the result file, so btRunLabel and the toast
+    // both describe the run that finished, not the one before it.
+    setRunBtn(btRunLabel, false);
+    if (s.verdict === 'BLOCKED')        toast('Browser Trust BLOCKED — no browser started, so Catch Comics was not tested');
+    else if (s.state === 'completed')   toast('Browser Trust PASSED — card updated');
+    else if (s.state === 'failed')      toast('Browser Trust FAILED (' + (s.verdict || 'see report') + ') — card updated');
   }, 2000);
 }
 document.getElementById('btRunBtn').onclick = async () => {
@@ -743,12 +815,12 @@ document.getElementById('btRunBtn').onclick = async () => {
   try {
     const r = await btFetch('/run', { method:'POST' });
     if (r.status === 409) toast('A Browser Trust run is already in progress');
-    else if (!r.ok){ setRunBtn('Run Browser Trust', false); toast('Could not start the run'); return; }
+    else if (!r.ok){ setRunBtn(btRunLabel, false); toast('Could not start the run'); return; }
     else toast('Browser Trust started — about a minute. The card updates when it finishes.');
     setRunBtn('Running…', true);
     watchRun();
   } catch(e){
-    setRunBtn('Run Browser Trust', false);
+    setRunBtn(btRunLabel, false);
     toast('Could not reach the local run control');
   }
 };
@@ -758,7 +830,7 @@ async function boot(){
   // Reflect reality: label the button honestly when there is no bridge, and
   // pick up a run already in flight. Starts nothing.
   const s = await probeBridge();
-  if (!btBridgeUp) setRunBtn('Run Browser Trust (copies command)', false);
+  if (!btBridgeUp) setRunBtn(btRunLabel + ' (copies command)', false);
   else if (s && s.state === 'running'){ setRunBtn('Running…', true); watchRun(); }
 }
 boot();

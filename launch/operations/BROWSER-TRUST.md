@@ -45,6 +45,41 @@ npm run test:e2e:report
 
 Opens the HTML report from the last local run.
 
+```bash
+npm run test:browser-trust
+```
+
+Proves the honesty model itself: that a browser which cannot start is recorded
+as `BLOCKED` and never as product failures, and that a real failed assertion is
+never relabelled as an environment problem. Pure functions plus one synthetic
+preflight — no browser, no dev server, no network, no database.
+
+---
+
+## Three states, and only three
+
+| Verdict | What was true | What it means |
+|---|---|---|
+| `PASS` | browser launched · tests ran · every assertion held | the journeys work |
+| `FAIL` | browser launched · tests ran · an assertion failed | **Catch Comics has a problem** |
+| `BLOCKED` | the browser or the infrastructure never started | **nothing is known about Catch Comics** |
+
+`BLOCKED` covers a Chromium binary that is missing or that this machine cannot
+open, a dev server that never comes up, and a target that cannot be reached. It
+is deliberately *not* a product verdict: it never counts as a failure, never
+appears as a launch blocker, and never moves the readiness score.
+
+Two things enforce it. `scripts/run-e2e.mjs` runs a **preflight** that resolves
+the exact executable Playwright will use and separates *absent* (never
+downloaded) from *inaccessible* (there, but this process cannot open it) — the
+distinction Playwright's own `fs.accessSync()` gate cannot make. And
+`tests/e2e/command-centre-reporter.ts` classifies a finished run, so a browser
+lost part-way through is still `BLOCKED` rather than a screenful of failures.
+
+A single genuine product failure always outranks any amount of infrastructure
+noise: an assertion cannot fail unless a browser ran. See
+`tests/e2e/browser-trust-result.mjs`.
+
 Extra Playwright flags pass straight through:
 
 ```bash
@@ -184,9 +219,10 @@ static page and cannot start a process, `open-command-centre.ps1` also starts a
 tiny local bridge: `launch/operations/browser-trust-bridge.mjs`.
 
 The button starts the run, shows *Running…*, refuses repeat clicks, and reloads
-the result card automatically when the run finishes — PASS or FAIL, truthfully.
-If the bridge is not running the button says so and copies the command instead
-of pretending.
+the result card automatically when the run finishes — PASS, FAIL or BLOCKED,
+truthfully. After a BLOCKED run it becomes **Retry Browser Trust**. If the
+bridge is not running the button says so and copies the command instead of
+pretending.
 
 The bridge is **not** a command runner. It is deliberately tiny:
 
@@ -288,6 +324,24 @@ and artifact paths — and no credentials.
 **Never** weaken an assertion to turn a run green. The first thing this suite
 found was a genuine 16px horizontal overflow on `/search` at phone width, live
 in production — a test that had been softened would have found nothing.
+
+### When a run is BLOCKED
+
+`BLOCKED` means the browser, the dev server or the target never got far enough
+for Catch Comics to be tested. **It is not a failure of the product and it never
+counts as one** — the card says so, the readiness score ignores it, and the
+diagnosis prompt tells Claude to fix the machine rather than the assertions.
+
+Retry first: the run button becomes **Retry Browser Trust**. If it keeps
+happening, diagnose the machine.
+
+Why this exists: on 2026-08-18 a run recorded **16 product failures** in 8.5
+seconds without ever opening a page. Every one was
+`browserType.launch: Executable doesn't exist` — while the executable was on
+disk, unchanged since it had last run successfully. Playwright's gate is
+`fs.accessSync()`, which returns false for *denied* exactly as it does for
+*missing*, so its message cannot tell you which. A run that never started a
+browser now says so.
 
 ---
 

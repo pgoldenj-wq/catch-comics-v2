@@ -86,7 +86,10 @@ function startRun() {
     run.exitCode = code
     run.finishedAt = new Date().toISOString()
     run.verdict = readVerdict()
-    run.state = code === 0 ? 'completed' : 'failed'
+    // A blocked run is not a failed run: the browser never started, so nothing
+    // failed. Reported as its own state so the Command Centre never has to
+    // infer "environment problem" from an exit code. (See run-e2e.mjs.)
+    run.state = code === 0 ? 'completed' : run.verdict === 'BLOCKED' ? 'blocked' : 'failed'
     console.log(`[browser-trust] run finished — exit ${code}, verdict ${run.verdict ?? 'unknown'}`)
   })
 

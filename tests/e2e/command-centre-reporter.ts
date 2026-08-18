@@ -6,6 +6,9 @@
  * rules that matter:
  *
  *   • It records what actually ran. A run that tested nothing is NOT a pass.
+ *   • A run that never started a browser is NOT a product failure either. That
+ *     is BLOCKED, and it is kept strictly apart from FAIL — see
+ *     browser-trust-result.mjs for the three-state model.
  *   • It always carries its own timestamp so the Command Centre can age it out.
  *   • Error text is sanitised before it is written. Nothing in this suite
  *     handles secrets, but a stack trace can still quote an environment value,
@@ -16,17 +19,23 @@
  * counting there would report a retried test twice.
  */
 
-import type { FullConfig, FullResult, Reporter, Suite, TestCase } from '@playwright/test/reporter'
-import { execFileSync } from 'node:child_process'
-import { mkdirSync, writeFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
-import { dirname, join, relative } from 'node:path'
+import type { FullConfig, FullResult, Reporter, Suite, TestCase, TestError } from '@playwright/test/reporter'
+import { dirname, relative } from 'node:path'
+import {
+  REPORT_PATH,
+  VERDICT,
+  classifyInfrastructure,
+  gitBranch,
+  gitSha,
+  isInfrastructureFailure,
+  playwrightVersion,
+  resultPath,
+  sanitise,
+  writeResult,
+} from './browser-trust-result.mjs'
 import { resolveTarget } from './target'
 
-const OUTPUT_PATH = join('launch', 'operations', 'browser-trust-latest.json')
-const REPORT_PATH = 'launch/operations/browser-trust-report/index.html'
-
-interface ProjectTally { passed: number; failed: number; skipped: number; flaky: number }
+interface ProjectTally { passed: number; failed: number; skipped: number; flaky: number; blocked: number }
 interface Failure {
   test:    string
   project: string
@@ -35,60 +44,13 @@ interface Failure {
   pageUrl: string | null
 }
 
-/** Patterns that must never reach a committed JSON file, a report or a trace. */
-const REDACTIONS: { re: RegExp; to: string }[] = [
-  { re: /postgres(?:ql)?:\/\/[^\s"']+/gi,                      to: '[redacted-database-url]' },
-  { re: /\beyJ[\w-]{8,}\.[\w-]{8,}\.[\w-]{8,}\b/g,             to: '[redacted-jwt]' },
-  { re: /\bBearer\s+[\w.\-~+/]{12,}=*/gi,                      to: 'Bearer [redacted]' },
-  { re: /\b(?:sk|pk|ghp|gho|ghs|github_pat|npm|vercel|neon|rk)_[A-Za-z0-9_-]{16,}\b/gi, to: '[redacted-token]' },
-  // key=value / key: value forms — keep the key name, drop the value.
-  {
-    re: /\b(api[_-]?key|apikey|token|secret|password|passwd|pwd|authorization|cookie|connection[_-]?string)\b(\s*[:=]\s*)["']?[^\s"',;)]{6,}/gi,
-    to: '$1$2[redacted]',
-  },
-]
-
-function sanitise(raw: string): string {
-  // Strip ANSI colour codes Playwright puts in error messages.
-  let s = raw.replace(/\[[0-9;]*m/g, '')
-  for (const r of REDACTIONS) s = s.replace(r.re, r.to)
-  // Bounded: a JSON file the Command Centre renders must stay readable.
-  return s.length > 1200 ? `${s.slice(0, 1200)}\n… (truncated)` : s
-}
-
-function git(args: string[]): string | null {
-  try {
-    const out = execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
-    return out || null
-  } catch {
-    return null
-  }
-}
-
-function gitSha(): string | null {
-  return process.env.GITHUB_SHA || git(['rev-parse', 'HEAD'])
-}
-
-function gitBranch(): string | null {
-  if (process.env.GITHUB_HEAD_REF) return process.env.GITHUB_HEAD_REF
-  if (process.env.GITHUB_REF_NAME) return process.env.GITHUB_REF_NAME
-  const b = git(['rev-parse', '--abbrev-ref', 'HEAD'])
-  return b === 'HEAD' ? null : b
-}
-
-function playwrightVersion(): string {
-  try {
-    return createRequire(__filename)('@playwright/test/package.json').version as string
-  } catch {
-    return 'unknown'
-  }
-}
-
 export default class CommandCentreReporter implements Reporter {
   private rootDir = process.cwd()
   private startedAt = Date.now()
   private suite: Suite | null = null
   private projectNames: string[] = []
+  /** Errors Playwright raises outside any test: webServer, globalSetup, config. */
+  private globalErrors: string[] = []
 
   onBegin(config: FullConfig, suite: Suite): void {
     // NOT config.rootDir — Playwright sets that to the common ancestor of the
@@ -101,29 +63,40 @@ export default class CommandCentreReporter implements Reporter {
     this.projectNames = config.projects.map(p => p.name)
   }
 
+  /**
+   * A dev server that never came up, or a globalSetup that threw, produces no
+   * failing test at all — just this. Capturing it is what lets an environment
+   * failure be reported as BLOCKED instead of vanishing into "NOT RUN".
+   */
+  onError(error: TestError): void {
+    this.globalErrors.push(sanitise(error.message ?? error.stack ?? String(error)))
+  }
+
   onEnd(result: FullResult): void {
     const projects: Record<string, ProjectTally> = {}
-    for (const name of this.projectNames) projects[name] = { passed: 0, failed: 0, skipped: 0, flaky: 0 }
+    const tallyFor = (name: string) =>
+      (projects[name] ||= { passed: 0, failed: 0, skipped: 0, flaky: 0, blocked: 0 })
+    for (const name of this.projectNames) tallyFor(name)
 
-    const failures: Failure[] = []
     const tests: TestCase[] = this.suite ? this.suite.allTests() : []
+    const unexpected: Failure[] = []
 
     for (const test of tests) {
       const project = test.parent.project()?.name ?? 'unknown'
-      const tally = (projects[project] ||= { passed: 0, failed: 0, skipped: 0, flaky: 0 })
+      const tally = tallyFor(project)
 
       switch (test.outcome()) {
         case 'expected':   tally.passed  += 1; break
         case 'flaky':      tally.flaky   += 1; break
         case 'skipped':    tally.skipped += 1; break
-        case 'unexpected': tally.failed  += 1; break
+        case 'unexpected': /* tallied below, once we know what kind it was */ break
       }
 
       if (test.outcome() !== 'unexpected') continue
 
       const last = test.results[test.results.length - 1]
       const pageUrl = last?.attachments.find(a => a.name === 'page-url')?.body?.toString('utf8') ?? null
-      failures.push({
+      unexpected.push({
         test:    test.titlePath().filter(Boolean).slice(1).join(' › '),
         project,
         file:    relative(this.rootDir, test.location.file).replace(/\\/g, '/'),
@@ -139,21 +112,41 @@ export default class CommandCentreReporter implements Reporter {
       target = { mode: 'unknown', baseURL: 'unknown', host: 'unknown' }
     }
 
+    const passedSoFar = Object.values(projects).reduce((a, p) => a + p.passed, 0)
+
+    // Was this a run, or an environment that never let one happen? A single
+    // genuine product failure settles it: an assertion cannot fail unless a
+    // browser ran, so classifyInfrastructure returns null and this is a FAIL.
+    const blocked = classifyInfrastructure({
+      passed: passedSoFar,
+      failures: unexpected,
+      globalErrors: this.globalErrors,
+    })
+
+    // Infrastructure casualties are never written as product failures.
+    const failures: Failure[] = []
+    for (const f of unexpected) {
+      if (blocked && isInfrastructureFailure(f.error)) tallyFor(f.project).blocked += 1
+      else { tallyFor(f.project).failed += 1; failures.push(f) }
+    }
+
     const sum = (k: keyof ProjectTally) => Object.values(projects).reduce((a, p) => a + p[k], 0)
     const passed = sum('passed'), failed = sum('failed'), skipped = sum('skipped'), flaky = sum('flaky')
     const ran = passed + failed + flaky
 
-    // An interrupted run, or a run where nothing executed, is not a pass.
-    // Silence is never evidence that the site is healthy.
+    // Precedence. BLOCKED comes first because everything below it is a claim
+    // about Catch Comics, and a run that never reached Catch Comics may not
+    // make one — in either direction.
     const verdict =
-      failed > 0 || result.status === 'failed' || result.status === 'timedout' ? 'FAIL'
-      : result.status === 'interrupted'                                        ? 'INCOMPLETE'
-      : ran === 0                                                              ? 'NOT RUN'
-      : flaky > 0                                                              ? 'PASS-WITH-FLAKES'
-      : 'PASS'
+      blocked                                                                  ? VERDICT.BLOCKED
+      : failed > 0 || result.status === 'failed' || result.status === 'timedout' ? VERDICT.FAIL
+      : result.status === 'interrupted'                                        ? VERDICT.INCOMPLETE
+      : ran === 0                                                              ? VERDICT.NOT_RUN
+      : flaky > 0                                                              ? VERDICT.PASS_WITH_FLAKES
+      : VERDICT.PASS
 
     const out = {
-      version: 1,
+      version: 2,
       tool: 'playwright',
       toolVersion: playwrightVersion(),
       environment: target.mode,               // local | preview | production
@@ -173,16 +166,23 @@ export default class CommandCentreReporter implements Reporter {
       projects,
       reportPath: REPORT_PATH,
       failures,
+      blocked,
     }
 
-    const dest = join(this.rootDir, OUTPUT_PATH)
     try {
-      mkdirSync(dirname(dest), { recursive: true })
-      writeFileSync(dest, `${JSON.stringify(out, null, 2)}\n`)
-      console.log(`\nBrowser Trust: ${verdict} — ${passed} passed · ${failed} failed · ${skipped} skipped · ${flaky} flaky`)
-      console.log(`Recorded → ${OUTPUT_PATH.replace(/\\/g, '/')}`)
+      const dest = writeResult(this.rootDir, out)
+      if (blocked) {
+        console.log(`\nBrowser Trust: BLOCKED — ${blocked.summary}`)
+        console.log(blocked.partial
+          ? `${passed} journey(s) ran before the browser became unusable; ${blocked.testsAffected} could not start.`
+          : `${blocked.testsAffected} test(s) could not start a browser. No product verdict recorded.`)
+        console.log(`Retry with: ${blocked.remedy}`)
+      } else {
+        console.log(`\nBrowser Trust: ${verdict} — ${passed} passed · ${failed} failed · ${skipped} skipped · ${flaky} flaky`)
+      }
+      console.log(`Recorded → ${relative(this.rootDir, dest).replace(/\\/g, '/')}`)
     } catch (e) {
-      console.error(`Browser Trust: could not write ${OUTPUT_PATH}:`, e)
+      console.error(`Browser Trust: could not write ${relative(this.rootDir, resultPath(this.rootDir))}:`, e)
     }
   }
 }
