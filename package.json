@@ -99,6 +99,7 @@
     "test:identity": "tsx scripts/test-edition-identity.ts",
     "test:containment": "tsx scripts/test-lbb-containment.ts",
     "test:sync-backoff": "tsx scripts/test-sync-backoff.ts",
+    "test:traversal-safety": "tsx scripts/test-sync-traversal-safety.ts",
     "test:price-check": "tsx scripts/test-price-check-guards.ts",
     "audit:fragmentation": "dotenv -e .env.local -- tsx scripts/audit-edition-fragmentation.ts",
     "audit:metadata": "dotenv -e .env.local -- tsx scripts/audit-suspicious-metadata.ts",

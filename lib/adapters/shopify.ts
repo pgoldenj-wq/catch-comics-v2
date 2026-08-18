@@ -19,6 +19,10 @@
  *   immediately marked OUT_OF_STOCK (could be a transient pagination gap).
  *   Missing SKUs are stored in retailers.sync_config.prev_missing_skus; only
  *   items missing from two consecutive syncs get marked OUT_OF_STOCK.
+ * - Absence reconciliation requires a PROVEN COMPLETE traversal. A run capped
+ *   by maxPages, aborted by an HTTP error, or interrupted never learned what is
+ *   on the pages it did not fetch, so it neither marks stock nor records
+ *   missing SKUs. See reconcileAbsence() in shared/matching.ts.
  * - Batching: upserts are currently serial. For stores > 5 000 products,
  *   a future iteration should batch findMany + createMany/updateMany.
  */
@@ -33,6 +37,7 @@ import {
 import {
   extractIdentifiers,
   matchCanonical,
+  reconcileAbsence,
   type SyncResult,
   type SyncError,
 } from '@/lib/adapters/shared/matching'
@@ -499,8 +504,19 @@ export class ShopifyAdapter {
    *
    * @param retailerId  UUID from the retailers table.
    * @param maxPages    Optional page cap for controlled tests (default: MAX_PAGES).
+   * @param opts.allowCreate  When false, unmatched retailer products stay
+   *   unmatched instead of minting stub canonical products (default: true).
+   *
+   * ABSENCE RECONCILIATION IS GATED ON PROVEN COMPLETION — see
+   * `traversalComplete` below. A run that stopped early has learned nothing
+   * about the pages it never fetched.
    */
-  async syncRetailer(retailerId: string, maxPages = MAX_PAGES): Promise<SyncResult> {
+  async syncRetailer(
+    retailerId: string,
+    maxPages = MAX_PAGES,
+    opts: { allowCreate?: boolean } = {},
+  ): Promise<SyncResult> {
+    const allowCreate = opts.allowCreate !== false
     const startedAt = Date.now()
     const syncStart = new Date()
 
@@ -535,6 +551,16 @@ export class ShopifyAdapter {
     const prevMissingSkus = new Set<string>(syncCfg.prev_missing_skus ?? [])
 
     const seenSkus       = new Set<string>()
+    // Every SKU this run saw in the retailer's feed, BEFORE the comic filter.
+    // Absence must mean "the retailer no longer lists it", never "our comic
+    // filter skipped it" — otherwise a filtered catalogue reconciles its own
+    // non-comic rows into OUT_OF_STOCK.
+    const skusEncountered = new Set<string>()
+    // Proof that we reached the real end of the catalogue. Set ONLY at a
+    // genuine terminal condition (an empty page, or Shopify's legacy 400 after
+    // at least one good page). Exhausting maxPages, aborting on 403/5xx, or
+    // throwing all leave this false, and absence reconciliation is then skipped.
+    let traversalComplete = false
     const applyComicFilter = syncCfg.comic_filter === true
     let   filteredOut    = 0
 
@@ -634,6 +660,7 @@ export class ShopifyAdapter {
         // valid pages have been returned. Treat it as a clean end-of-catalogue when
         // at least one page already succeeded; only error if this is the very first request.
         if (res.status === 400 && pagesFetched > 0) {
+          traversalComplete = true
           break paginationLoop
         }
         errors.push({
@@ -650,7 +677,7 @@ export class ShopifyAdapter {
       const products = body.products ?? []
 
       // Empty page = end of catalog
-      if (products.length === 0) break paginationLoop
+      if (products.length === 0) { traversalComplete = true; break paginationLoop }
 
       pagesFetched++
       productsFetched += products.length
@@ -658,6 +685,18 @@ export class ShopifyAdapter {
 
       // ── 3. Normalise + upsert each product ──────────────────────────────────
       for (const product of products) {
+        // Record presence in the retailer's catalogue before any filtering, so
+        // absence reconciliation later means "gone from the store" rather than
+        // "not a comic by our rules". normaliseProduct emits either
+        // `${product.id}` or `${product.id}-${variant.id}` depending on whether
+        // the product needed splitting, so both shapes are recorded: this set
+        // is only ever asked "was this seen?", and a superset can prevent a
+        // false absence but can never manufacture one.
+        skusEncountered.add(String(product.id))
+        for (const variant of product.variants ?? []) {
+          skusEncountered.add(`${product.id}-${variant.id}`)
+        }
+
         // Opt-in comic filter — skip non-comic product types when enabled.
         // Silently counted; does not generate an error entry.
         //
@@ -698,7 +737,7 @@ export class ShopifyAdapter {
         for (const pre of preListings) {
           let matchData: Pick<NormalizedListing, 'canonicalProductId' | 'matchMethod' | 'matchConfidence'>
           try {
-            matchData = await matchCanonical(pre.isbn13, pre.ean, pre.title, '[shopify]')
+            matchData = await matchCanonical(pre.isbn13, pre.ean, pre.title, '[shopify]', allowCreate)
           } catch (err) {
             // DB look-up failed — treat as unmatched, don't skip the listing
             errors.push({
@@ -741,32 +780,60 @@ export class ShopifyAdapter {
     // and recorded in sync_config.prev_missing_skus for the next run.
 
     try {
-      const allDbListings = await prisma.retailerListing.findMany({
-        where:  { retailerId },
-        select: { id: true, retailerSku: true, stockStatus: true },
-      })
-
-      const currentMissingSkus = new Set<string>()
-      for (const row of allDbListings) {
-        if (!seenSkus.has(row.retailerSku)) {
-          currentMissingSkus.add(row.retailerSku)
+      // THE INVARIANT: a partial traversal is not evidence of absence.
+      //
+      // On 2026-08-18 a deliberate 5-page run over a ~90-page catalogue treated
+      // the 95% it never fetched as missing inventory: 1,361 listings flipped to
+      // OUT_OF_STOCK and 25,381 SKUs were written to prev_missing_skus, arming
+      // the next run to flip the rest. Nothing was wrong with the retailer — the
+      // run simply had not looked. Reconciliation now requires proof that the
+      // traversal reached the end of the catalogue.
+      if (!traversalComplete) {
+        console.log(
+          `[shopify] traversal incomplete (${pagesFetched} pages fetched, maxPages=${maxPages}` +
+          `${paginationAborted ? ', aborted' : ''}) — skipping absence reconciliation ` +
+          `and leaving prev_missing_skus untouched`,
+        )
+        await prisma.retailer.update({
+          where: { id: retailerId },
+          data: {
+            ...(!paginationAborted && { lastSyncedAt: syncStart }),
+            syncConfig: {
+              ...syncCfg,
+              ...runtimeSyncCfgOverrides,
+            } satisfies ShopifySyncConfig as unknown as Prisma.InputJsonValue,
+          },
+        })
+        return {
+          retailerId, domain, pagesFetched, productsFetched,
+          listingsCreated, listingsUpdated, priceChanges, errors,
+          durationMs: Date.now() - startedAt,
+          traversalComplete,
         }
       }
 
-      // SKUs absent from BOTH this sync and the previous one → OUT_OF_STOCK
-      const toMarkOos = allDbListings.filter(
-        row =>
-          currentMissingSkus.has(row.retailerSku) &&
-          prevMissingSkus.has(row.retailerSku) &&
-          row.stockStatus !== StockStatus.OUT_OF_STOCK,
-      )
+      const allDbListings = await prisma.retailerListing.findMany({
+        // Soft-deleted rows are already invisible; re-marking them teaches
+        // nothing and only inflates the missing set.
+        where:  { retailerId, deletedAt: null },
+        select: { id: true, retailerSku: true, stockStatus: true },
+      })
 
-      if (toMarkOos.length > 0) {
+      // skusEncountered, not seenSkus: a row skipped by the comic filter was
+      // still present in the retailer's catalogue. See reconcileAbsence().
+      const { currentMissingSkus, idsToMarkOos } = reconcileAbsence({
+        traversalComplete,
+        dbListings: allDbListings,
+        skusEncountered,
+        prevMissingSkus,
+      })
+
+      if (idsToMarkOos.length > 0) {
         await prisma.retailerListing.updateMany({
-          where: { id: { in: toMarkOos.map(r => r.id) } },
+          where: { id: { in: idsToMarkOos } },
           data:  { stockStatus: StockStatus.OUT_OF_STOCK },
         })
-        console.log(`[shopify] marked ${toMarkOos.length} listings OUT_OF_STOCK (missing 2 consecutive syncs)`)
+        console.log(`[shopify] marked ${idsToMarkOos.length} listings OUT_OF_STOCK (missing 2 consecutive complete syncs)`)
       }
 
       // ── 5. Update retailer ────────────────────────────────────────────────────
@@ -782,7 +849,7 @@ export class ShopifyAdapter {
           syncConfig: {
             ...syncCfg,
             ...runtimeSyncCfgOverrides,
-            prev_missing_skus: Array.from(currentMissingSkus),
+            prev_missing_skus: currentMissingSkus,
           } satisfies ShopifySyncConfig as unknown as Prisma.InputJsonValue,
         },
       })
@@ -812,6 +879,7 @@ export class ShopifyAdapter {
       priceChanges,
       errors,
       durationMs,
+      traversalComplete,
     }
   }
 }
