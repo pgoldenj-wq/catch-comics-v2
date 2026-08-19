@@ -71,16 +71,37 @@ check('no-ISBN duplicate pair → newest survives', out.length === 1 && out[0].i
 out = suppressDuplicateRetailerListings([lbb('badsum', '9781338730853', 1), lbb('valid', '9780702330025', 20)])
 check('checksum-invalid 13-digit SKU is not an ISBN — valid ISBN wins', out.length === 1 && out[0].id === 'valid')
 
+// Travelling Man joined the deduped set on 2026-08-19: the shop carries two
+// product pages for the same book, and one live pair pointed at the wrong
+// volume. Two rows from one shop must never read as two retailers.
 out = suppressDuplicateRetailerListings([tm('tm1', 'sku-a', 5), tm('tm2', 'sku-b', 1)])
-check('other retailers untouched (TM duplicate preserved)', out.length === 2)
+check('TM duplicate collapses to one row', out.length === 1)
+check('TM keeps the most recently seen listing', out[0].id === 'tm2')
+
+// The real Ancient Magus' Bride Volume 22 shape: a stale row whose URL points
+// at Volume 23 must lose to the row the last complete sync actually saw.
+out = suppressDuplicateRetailerListings([
+  tm('wrong-volume-url', '15812402053494', 24 * 19),   // last seen 2026-07-31
+  tm('correct-url',      '15627279237494', 1),         // seen by the complete sync
+])
+check('stale wrong-destination TM row is suppressed', out.length === 1 && out[0].id === 'correct-url')
+
+check('a single TM listing is untouched',
+  suppressDuplicateRetailerListings([tm('solo', 'sku-a', 5)]).length === 1)
+
+// A retailer outside the deduped set still shows every row it has.
+const wob = (id: string, sku: string, h: number): L =>
+  ({ id, retailerSku: sku, lastSeenAt: hoursAgo(h), retailer: { domain: 'worldofbooks.com' } })
+check('retailers outside the deduped set are untouched',
+  suppressDuplicateRetailerListings([wob('w1', 'a', 5), wob('w2', 'b', 1)]).length === 2)
 
 out = suppressDuplicateRetailerListings([lbb('only', '9781338730852', 5)])
 check('single LBB listing untouched', out.length === 1 && out[0].id === 'only')
 
 const mixed = [tm('tm1', 'x', 9), lbb('merchant', '56699608465790', 1), tm('tm2', 'y', 3), lbb('isbn', '9781338730852', 10)]
 out = suppressDuplicateRetailerListings(mixed)
-check('mixed page: LBB collapsed to ISBN row, others in original order',
-  out.map(l => l.id).join(',') === 'tm1,tm2,isbn')
+check('mixed page: LBB collapses to its ISBN row, TM to its most recent, order preserved',
+  out.map(l => l.id).join(',') === 'tm2,isbn')
 
 check('empty list handled', suppressDuplicateRetailerListings([]).length === 0)
 
