@@ -62,6 +62,30 @@ export interface SyncResult {
   traversalComplete?: boolean
 }
 
+/** How a catalogue traversal stopped. */
+export type TraversalEnd =
+  | 'empty-page'   // the store returned zero products: the catalogue ran out
+  | 'http-400'     // Shopify's legacy pagination error — ambiguous, see below
+  | 'page-cap'     // our own maxPages ceiling was reached
+  | 'aborted'      // 403/404/5xx, or the run threw
+
+/**
+ * Did the traversal reach the real end of the catalogue?
+ *
+ * The subtle case is `http-400`. Shopify uses it both for "you have walked off
+ * the end" and for "Page * Limit exceeds the 25000 limit", and only the first
+ * is proof of completion. The previous page tells them apart: a catalogue that
+ * ended returns a short final page, while one that was truncated returns a full
+ * page and then the error. Travelling Man on 2026-08-19 returned a full
+ * 250-product page 100 followed by the limit error — reading that as "complete"
+ * would licence marking everything beyond 25,000 products as missing stock.
+ */
+export function isTraversalComplete(end: TraversalEnd, lastPageWasFull: boolean): boolean {
+  if (end === 'empty-page') return true
+  if (end === 'http-400')   return !lastPageWasFull
+  return false
+}
+
 /**
  * Decide what a catalogue traversal has actually proved about absence.
  *

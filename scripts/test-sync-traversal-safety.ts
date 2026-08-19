@@ -18,7 +18,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { StockStatus } from '@prisma/client'
-import { reconcileAbsence } from '../lib/adapters/shared/matching'
+import { isTraversalComplete, reconcileAbsence } from '../lib/adapters/shared/matching'
 
 let failures = 0
 function check(label: string, ok: boolean, detail = '') {
@@ -134,6 +134,31 @@ const filtered = reconcileAbsence({
 })
 check('products skipped by the comic filter are not treated as absent',
   filtered.idsToMarkOos.length === 0 && filtered.currentMissingSkus.length === 0)
+
+/* ── Shopify's two different 400s ────────────────────────────────────────── */
+// The store uses 400 both for "you walked off the end" and for "Page * Limit
+// exceeds the 25000 limit". Only the first proves completion. Travelling Man
+// returned a FULL page 100 and then the limit error on 2026-08-19; reading that
+// as complete would licence marking everything past 25,000 products as missing.
+
+check('empty page always proves completion', isTraversalComplete('empty-page', false) === true)
+check('empty page proves completion even after a full page', isTraversalComplete('empty-page', true) === true)
+check('400 after a SHORT page = catalogue finished', isTraversalComplete('http-400', false) === true)
+check('400 after a FULL page = truncated by the store, NOT complete',
+  isTraversalComplete('http-400', true) === false)
+check('hitting our own page ceiling is never completion', isTraversalComplete('page-cap', false) === false)
+check('a full page then our ceiling is never completion', isTraversalComplete('page-cap', true) === false)
+check('an aborted run is never completion', isTraversalComplete('aborted', false) === false)
+
+// End to end: the exact Travelling Man shape must reconcile nothing.
+const truncated = reconcileAbsence({
+  traversalComplete: isTraversalComplete('http-400', true),
+  dbListings: listings,
+  skusEncountered: partialPages,
+  prevMissingSkus: new Set(['103', '104']),
+})
+check('a store-truncated catalogue reconciles nothing (the WoB-scale hazard)',
+  truncated.reconciled === false && truncated.idsToMarkOos.length === 0)
 
 /* ── no-create mode ──────────────────────────────────────────────────────── */
 // matchCanonical talks to the database directly, so this asserts the property
