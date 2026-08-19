@@ -9,10 +9,19 @@
  * table showed "Lets Buy Books" twice at the same price (31 products affected
  * at containment time, 2026-07-16).
  *
- * This is DISPLAY-LEVEL suppression, deliberately scoped to Lets Buy Books:
- * no rows are deleted or modified, other retailers are untouched (Travelling
- * Man's single duplicate is a separate, unrelated artifact), and the /go
- * redirect keeps working for every listing id.
+ * Travelling Man was added on 2026-08-19. Its duplicates have a different
+ * cause — the shop carries two product pages for the same book (a reissue
+ * handle alongside the original, e.g. `elephantmen-volume-2-fatal-diseases`
+ * and `elephantmen-volume-02-hardcover`) — but the customer-facing damage is
+ * identical, and worse in one case: The Ancient Magus' Bride Volume 22 showed
+ * two Travelling Man rows, £9.99 in stock at the correct URL and £11.99 out of
+ * stock at a URL for *Volume 23*. Two rows from one shop were being counted
+ * and labelled as "2 tracked retailers", which overstates comparison depth,
+ * and the losing row sent customers to the wrong volume.
+ *
+ * This is DISPLAY-LEVEL suppression: no rows are deleted or modified, other
+ * retailers are untouched, and the /go redirect keeps working for every
+ * listing id.
  *
  * Preference within a duplicate group:
  *   1. the listing whose retailerSku is a checksum-valid ISBN-13
@@ -25,7 +34,7 @@
 import { normalizeIsbn13 } from '../identity/edition'
 
 /** Retailer domains whose duplicate listings are suppressed at display time. */
-const DEDUPE_DOMAINS = new Set(['letsbuybooks.com'])
+const DEDUPE_DOMAINS = new Set(['letsbuybooks.com', 'travellingman.com'])
 
 export interface DedupableListing {
   retailerSku: string
