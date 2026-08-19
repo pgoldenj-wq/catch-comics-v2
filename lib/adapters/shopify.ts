@@ -36,6 +36,7 @@ import {
 } from '@prisma/client'
 import {
   extractIdentifiers,
+  isTraversalComplete,
   matchCanonical,
   reconcileAbsence,
   type SyncResult,
@@ -561,6 +562,9 @@ export class ShopifyAdapter {
     // at least one good page). Exhausting maxPages, aborting on 403/5xx, or
     // throwing all leave this false, and absence reconciliation is then skipped.
     let traversalComplete = false
+    // Was the most recent successful page full? A short page means the
+    // catalogue ran out; a full page followed by an error means it was cut off.
+    let lastPageWasFull = false
     const applyComicFilter = syncCfg.comic_filter === true
     let   filteredOut    = 0
 
@@ -659,8 +663,30 @@ export class ShopifyAdapter {
         // Shopify legacy pagination signals "no more pages" with a 400 after all
         // valid pages have been returned. Treat it as a clean end-of-catalogue when
         // at least one page already succeeded; only error if this is the very first request.
+        // Shopify uses 400 for two very different things on legacy pagination:
+        //
+        //   a) "you have walked off the end"      → the catalogue is finished
+        //   b) "Page * Limit exceeds the 25000 limit" → the API refuses to go
+        //      further, and the catalogue may well continue past it
+        //
+        // Only (a) is proof of completion. The tell is the previous page: a
+        // catalogue that ended gives a short final page, while one that was
+        // truncated gives a full one and then the error. Travelling Man on
+        // 2026-08-19 returned a full 250-product page 100 followed by the
+        // limit error — treating that as "complete" would licence marking
+        // everything past 25,000 products as missing stock, which is the whole
+        // bug this invariant exists to prevent. It matters more for larger
+        // Shopify retailers: World of Books has ~190k listings, so a false
+        // completion there would condemn most of the catalogue.
         if (res.status === 400 && pagesFetched > 0) {
-          traversalComplete = true
+          traversalComplete = isTraversalComplete('http-400', lastPageWasFull)
+          if (!traversalComplete) {
+            console.warn(
+              `[shopify] HTTP 400 after a FULL page ${page - 1} — the catalogue is ` +
+              `truncated by the store's pagination limit, not finished. ` +
+              `Absence reconciliation will be skipped.`,
+            )
+          }
           break paginationLoop
         }
         errors.push({
@@ -677,9 +703,10 @@ export class ShopifyAdapter {
       const products = body.products ?? []
 
       // Empty page = end of catalog
-      if (products.length === 0) { traversalComplete = true; break paginationLoop }
+      if (products.length === 0) { traversalComplete = isTraversalComplete('empty-page', lastPageWasFull); break paginationLoop }
 
       pagesFetched++
+      lastPageWasFull = products.length >= PAGE_SIZE
       productsFetched += products.length
       console.log(`[shopify] page ${page}: ${products.length} products`)
 
