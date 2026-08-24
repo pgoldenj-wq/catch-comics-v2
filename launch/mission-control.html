@@ -51,6 +51,13 @@ a { color:var(--ink); }
 /* ── Cards ── */
 .card { background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:22px; margin-top:18px; }
 .card h2 { margin:0 0 14px; font-size:13px; font-weight:800; letter-spacing:.18em; text-transform:uppercase; color:var(--ink2); }
+/* Verdict lines. These class names were already in use by the ops cards but
+   had no styling, so every verdict rendered as plain body text. */
+.v-pass, .v-warn, .v-fail, .v-notrun { font-weight:800; letter-spacing:.06em; margin-bottom:6px; }
+.v-pass   { color:var(--green); }
+.v-warn   { color:var(--amber); }
+.v-fail   { color:var(--red); }
+.v-notrun { color:var(--ink3); }
 
 /* next action */
 .nextaction { display:flex; flex-wrap:wrap; align-items:center; gap:16px; border:2px solid var(--accent); }
@@ -155,6 +162,14 @@ footer button { color:var(--ink3); background:none; border:none; text-decoration
     </div>
   </div>
 
+  <div class="card" id="retailerRefreshCard">
+    <h2>🔄 Retailer Price Refresh</h2>
+    <div id="retailerRefresh"></div>
+    <div class="links" style="margin-top:14px">
+      <button class="ghostbtn" id="rrRunBtn">Refresh Retailer Prices</button>
+    </div>
+  </div>
+
   <div class="card">
     <h2>🌐 Browser Trust — real browser, real journeys</h2>
     <div id="browserTrust"></div>
@@ -233,6 +248,15 @@ function saveMc(){ localStorage.setItem(KEY, JSON.stringify(mc)); writeMcToRepo(
 
 /* ═══ Live data ══════════════════════════════════════════════════════ */
 let FOUNDER = null, SMOKE = null, OPS_SMOKE = null, OPS_HEALTH = null, OPS_COSTGUARD = null, OPS_BROWSER = null, OPS_FRESH = null;
+let RR_SUCCESS = null, RR_STATUS = null;
+/* The status/countdown rules live in one importable module so the states the
+   tests prove are the states this page shows. See
+   launch/operations/retailer-refresh-state.mjs and
+   scripts/test-retailer-refresh-card.mjs. */
+let RRS = null;
+import('./operations/retailer-refresh-state.mjs')
+  .then(m => { RRS = m; try { render(); } catch(e){} })
+  .catch(() => { RRS = null; });
 // What the run button should say right now. Becomes "Retry Browser Trust"
 // after a BLOCKED run, because retrying is the whole of the next action there.
 let btRunLabel = 'Run Browser Trust';
@@ -249,6 +273,11 @@ async function loadData(){
       try { OPS_COSTGUARD = await (await fetch('operations/costguard-latest.json?'+Date.now())).json(); } catch(e){ OPS_COSTGUARD = null; }
       try { OPS_BROWSER = await (await fetch('operations/browser-trust-latest.json?'+Date.now())).json(); } catch(e){ OPS_BROWSER = null; }
       try { OPS_FRESH = await (await fetch('operations/retailer-freshness-latest.json?'+Date.now())).json(); } catch(e){ OPS_FRESH = null; }
+      // Retailer Price Refresh: last SUCCESSFUL run, plus the latest attempt /
+      // live progress. Reading files only — opening this page never starts a
+      // run and never touches a retailer.
+      try { RR_SUCCESS = await (await fetch('operations/price-verify-write-latest.json?'+Date.now())).json(); } catch(e){ RR_SUCCESS = null; }
+      try { RR_STATUS  = await (await fetch('operations/price-verify-status.json?'+Date.now())).json(); } catch(e){ RR_STATUS = null; }
       return;
     }
   } catch(e){}
@@ -481,11 +510,31 @@ function render(){
           ? 'Catch Comics: stored retailer prices expire between now and ' + ((OPS_FRESH&&OPS_FRESH.fuse&&OPS_FRESH.fuse.lastExpiryDate)||'early September') + ', and only ' + ((OPS_FRESH&&OPS_FRESH.comparisonDepth&&OPS_FRESH.comparisonDepth.twoPlusRetailers)||0) + ' product(s) have 2+ retailers to compare. Scheduled retailer sync is deliberately paused after the Inngest quota incident. Work out the cheapest safe way to refresh World of Books and Travelling Man prices before they expire: bound the cost first (rows, requests, executions, £), do not resume any Inngest schedule without proof it cannot loop, and do not weaken product-identity matching to inflate coverage.'
           : 'Catch Comics Command Centre reports: ' + op.top.what + ' — ' + op.top.why + '. Diagnose honestly and fix the root cause. Do not weaken any assertion or check to make this go green.' }
     : d.todos[0];
-  document.getElementById('naTitle').textContent = na ? na.t : 'Nothing failing, nothing expiring 🎉';
+  // A due retailer refresh outranks everything else here, because unlike the
+  // rest of this list it has a deadline and a one-click fix. The reminder is
+  // automatic; the production write still only happens when Joe clicks.
+  const rrState = RRS ? RRS.deriveRetailerState(RR_SUCCESS, RR_STATUS, Date.now()) : null;
+  const rrDue = rrState && rrState.needsAction && !rrState.inFlight;
+
+  // The old "price fuse" action told Joe to go and work out a refresh plan.
+  // That plan exists and shipped, so while the refresh is healthy or running
+  // this is no longer the top thing to do — the card carries the state instead.
+  const rrHandlesIt = rrState && !rrState.needsAction;
+  const naEffective = (rrHandlesIt && na && na.prompt && op.top && op.top.action === 'price-fuse')
+    ? d.todos[0] : na;
+
+  document.getElementById('naTitle').textContent =
+    rrDue ? (/need refreshing/i.test(rrState.headline) ? rrState.headline : `Retailer prices need refreshing — ${rrState.headline}`)
+          : (naEffective ? naEffective.t
+             : (rrHandlesIt ? `Retailer prices refreshed — next due in ${rrState.daysLeft} days`
+                            : 'Nothing failing, nothing expiring 🎉'));
   const naBtn = document.getElementById('naBtn');
-  if (na){
-    naBtn.textContent = na.act==='smoke' ? 'OPEN SMOKE TEST' : na.act==='claude' ? 'FIX WITH CLAUDE' : 'MARK DONE BELOW';
-    naBtn.onclick = ()=> actFor(na);
+  if (rrDue){
+    naBtn.textContent = 'REFRESH RETAILER PRICES';
+    naBtn.onclick = ()=> startRetailerRefresh();
+  } else if (naEffective){
+    naBtn.textContent = naEffective.act==='smoke' ? 'OPEN SMOKE TEST' : naEffective.act==='claude' ? 'FIX WITH CLAUDE' : 'MARK DONE BELOW';
+    naBtn.onclick = ()=> actFor(naEffective);
   } else { naBtn.textContent = 'ALL CLEAR'; naBtn.onclick = ()=> toast('Nothing to do, Joe.'); }
 
   // Todo list (top 5)
@@ -778,6 +827,69 @@ Please: reproduce with "npm run test:e2e" (local) or "npm run test:e2e:prod" (pr
     }
   }
 
+  /* ── Retailer Price Refresh ────────────────────────────────────────────────
+     A founder-facing wrapper around scripts/price-verify-dryrun.ts --write.
+     Every number here comes from a file that script wrote; nothing about
+     cohorts, identity, verification or ceilings is decided in this page. */
+  const rrEl = document.getElementById('retailerRefresh');
+  if (rrEl){
+    if (!RRS){
+      rrEl.innerHTML = `<div class="v-notrun">UNAVAILABLE</div>
+        <div class="muted">State module did not load. Open Command Centre via <code>open-command-centre.cmd</code> so the page is served over http.</div>`;
+    } else {
+      const st = RRS.deriveRetailerState(RR_SUCCESS, RR_STATUS, Date.now());
+      const target = RRS.measuredTarget(RR_SUCCESS, RR_STATUS);
+      const sevClass = { pass:'v-pass', warn:'v-warn', fail:'v-fail', blocked:'v-fail', running:'v-notrun', notrun:'v-notrun' }[st.severity] || 'v-notrun';
+      rrRunLabel = st.inFlight ? 'Running…' : (st.needsAction ? 'Refresh Retailer Prices now' : 'Refresh Retailer Prices');
+
+      let body = `<div class="${sevClass}">${esc(st.status)}</div><div>${esc(st.headline)}</div>`;
+
+      // Last SUCCESSFUL refresh — preserved even when the latest attempt failed.
+      if (RR_SUCCESS){
+        const s = RR_SUCCESS, tm = s.travellingMan || {}, wob = s.worldOfBooks || {};
+        const written = (tm.rowsWritten || 0) + (wob.rowsWritten || 0);
+        const avail = (tm.availableUnchangedPrice||0)+(tm.availablePriceChanged||0)+(wob.availableUnchangedPrice||0)+(wob.availablePriceChanged||0);
+        const unavail = (tm.unavailable||0) + (wob.unavailable||0);
+        const errs = ['variantMissing','productIdMismatch','notFound404','transientFailures','otherErrors']
+          .reduce((n,k)=> n + (tm[k]||0) + (wob[k]||0), 0)
+          + (s.writeTotals?.excludedImplausiblePrice || 0);
+        const mins = s.cost?.wallClockMin != null ? `${s.cost.wallClockMin} min` : '?';
+        const when = s.freshness?.refreshedAt ? new Date(s.freshness.refreshedAt) : new Date(s.runAt);
+        const due = s.freshness?.nextExpiryAt ? new Date(s.freshness.nextExpiryAt) : null;
+        body +=
+          `<div class="muted" style="margin-top:10px">Last successful refresh <strong>${when.toLocaleString()}</strong> · ${mins}</div>` +
+          `<div>${written.toLocaleString()} rows refreshed — Travelling Man ${(tm.rowsWritten||0).toLocaleString()} · World of Books ${(wob.rowsWritten||0).toLocaleString()}</div>` +
+          `<div class="muted">${avail.toLocaleString()} available · ${unavail.toLocaleString()} unavailable · ${errs} errors/excluded · ${(s.priceChanges||[]).length} price change${(s.priceChanges||[]).length===1?'':'s'}</div>` +
+          (due ? `<div class="muted">Next refresh due <strong>${due.toLocaleDateString(undefined,{day:'numeric',month:'long'})}</strong> (${s.freshness.policyDays}-day freshness policy)</div>` : '') +
+          `<div class="muted">Cost: ${(s.cost?.totalHttpRequests||0).toLocaleString()} requests · ${s.cost?.retryRequests||0} retries · ${s.cost?.inboundMiB ?? '?'} MiB · external API £${s.cost?.externalApiCostGBP ?? 0} · Inngest ${s.cost?.inngestExecutions ?? 0}</div>`;
+      }
+
+      // Target cohort. Labelled as last-measured, because keeping it live would
+      // mean 38 sitemap requests every time this page opens.
+      body += target === null
+        ? `<div class="muted">Target cohort not yet measured.</div>`
+        : `<div class="muted">Last measured target: <strong>${target.toLocaleString()}</strong> rows · safety ceiling ${(RR_STATUS?.maxRowsCeiling || 2300).toLocaleString()} (re-measured on each run)</div>`;
+
+      // A failed/blocked attempt is shown separately so it can never be read as
+      // the last successful refresh.
+      if ((RR_STATUS?.state === 'blocked' || RR_STATUS?.state === 'failed') && RR_STATUS?.finishedAt){
+        body += `<div class="muted" style="margin-top:8px;color:var(--amber)">Latest attempt ${new Date(RR_STATUS.finishedAt).toLocaleString()} — ` +
+          `${esc(RR_STATUS.reason || RR_STATUS.state)} · ${(RR_STATUS.rowsWritten||0).toLocaleString()} rows written. ` +
+          `The freshness deadline above is unchanged.</div>`;
+      }
+      if (st.inFlight){
+        const el = RR_STATUS?.elapsedMs ? Math.round(RR_STATUS.elapsedMs/60000) : 0;
+        body += `<div class="muted" style="margin-top:8px">Elapsed ${el} min · written ${(RR_STATUS?.rowsWritten||0).toLocaleString()} · errors ${(RR_STATUS?.errors||0).toLocaleString()} · requests ${(RR_STATUS?.requests||0).toLocaleString()}</div>`;
+      }
+      rrEl.innerHTML = body;
+
+      const card = document.getElementById('retailerRefreshCard');
+      if (card) card.style.borderColor = st.needsAction ? 'var(--amber)' : '';
+    }
+  }
+  const rrBtn = document.getElementById('rrRunBtn');
+  if (rrBtn && !rrBtn.disabled) rrBtn.textContent = rrBridgeUp ? rrRunLabel : `${rrRunLabel} (copies command)`;
+
   const btReport = document.getElementById('btReportBtn');
   if (btReport){
     btReport.textContent = btReportLabel;
@@ -929,6 +1041,80 @@ document.getElementById('btRunBtn').onclick = async () => {
   }
 };
 
+/* ═══ Retailer Price Refresh run control ═════════════════════════════
+   Same bridge, second fixed action (/retailer/run). This page cannot pass a
+   row count, a retailer or any flag — the bridge takes no input at all, and
+   every bound lives in scripts/price-verify-dryrun.ts. Nothing here runs on
+   page load: probing only reads state. */
+let rrBridgeUp = false, rrPolling = null, rrRunLabel = 'Refresh Retailer Prices', rrStarting = false;
+
+async function probeRetailerBridge(){
+  try {
+    const r = await btFetch('/retailer/status');
+    if (!r.ok) { rrBridgeUp = false; return null; }
+    rrBridgeUp = true;
+    return await r.json();
+  } catch(e){ rrBridgeUp = false; return null; }
+}
+function setRrBtn(label, disabled){
+  const b = document.getElementById('rrRunBtn');
+  if (!b) return;
+  b.textContent = label;
+  b.disabled = !!disabled;
+  b.style.opacity = disabled ? '.55' : '';
+  b.style.cursor  = disabled ? 'default' : '';
+}
+// The run is ~45 minutes, so poll slowly and re-read the status file each time
+// so the card shows real progress rather than a spinner.
+function watchRetailerRun(){
+  clearInterval(rrPolling);
+  rrPolling = setInterval(async () => {
+    const s = await probeRetailerBridge();
+    if (!s) return;
+    await loadData(); render();
+    if (s.state === 'running'){ setRrBtn('Running…', true); return; }
+    clearInterval(rrPolling); rrPolling = null;
+    setRrBtn(rrRunLabel, false);
+    const fin = RR_STATUS?.state;
+    if (fin === 'success')      toast('Retailer refresh SUCCESS — card and countdown updated');
+    else if (fin === 'blocked') toast('Retailer refresh SAFE STOP — nothing was written. See the card.');
+    else                        toast('Retailer refresh did not complete — last successful refresh and its deadline are unchanged');
+  }, 5000);
+}
+async function startRetailerRefresh(){
+  // Guard 1: a click already being processed.
+  if (rrStarting) return;
+  rrStarting = true;
+  try {
+    const status = await probeRetailerBridge();
+    if (!rrBridgeUp){
+      await navigator.clipboard.writeText('npx dotenv -e .env.local -- npx tsx scripts/price-verify-dryrun.ts --write --max-rows 2300');
+      toast('Run control unavailable — command copied. Reopen via open-command-centre to enable the button.');
+      return;
+    }
+    // Guard 2: a run already in flight, as reported by the bridge.
+    if (status && status.state === 'running'){
+      setRrBtn('Running…', true); watchRetailerRun();
+      toast('A retailer refresh is already in progress');
+      return;
+    }
+    setRrBtn('Starting…', true);
+    const r = await btFetch('/retailer/run', { method:'POST' });
+    // Guard 3: the bridge itself refuses a second concurrent run.
+    if (r.status === 409){ toast('A retailer refresh is already in progress'); }
+    else if (!r.ok){ setRrBtn(rrRunLabel, false); toast('Could not start the refresh'); return; }
+    else toast('Retailer refresh started — about 45 minutes. Leave it running; the card updates itself.');
+    setRrBtn('Running…', true);
+    watchRetailerRun();
+  } catch(e){
+    setRrBtn(rrRunLabel, false);
+    toast('Could not reach the local run control');
+  } finally {
+    rrStarting = false;
+  }
+}
+document.getElementById('rrRunBtn').onclick = startRetailerRefresh;
+
 async function boot(){
   await restoreRepo(); await loadData(); render();
   // Reflect reality: label the button honestly when there is no bridge, and
@@ -936,6 +1122,14 @@ async function boot(){
   const s = await probeBridge();
   if (!btBridgeUp) setRunBtn(btRunLabel + ' (copies command)', false);
   else if (s && s.state === 'running'){ setRunBtn('Running…', true); watchRun(); }
+
+  // Same for the retailer refresh: reflect a run already in flight, start none.
+  // The probe finishes after the first render, so the label is set explicitly
+  // here rather than left saying "(copies command)" next to a live bridge.
+  const rs = await probeRetailerBridge();
+  if (!rrBridgeUp) setRrBtn(rrRunLabel + ' (copies command)', false);
+  else if (rs && rs.state === 'running'){ setRrBtn('Running…', true); watchRetailerRun(); }
+  else setRrBtn(rrRunLabel, false);
 }
 boot();
 setInterval(()=>render(), 60_000); // countdown stays honest without reload

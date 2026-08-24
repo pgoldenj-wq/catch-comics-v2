@@ -11,9 +11,18 @@
  * WHAT IT IS NOT
  * This is NOT a command runner. There is no way to tell it what to execute.
  * It accepts no request body, no query string, no arguments, no shell input
- * and no environment overrides. It exposes exactly one action, hard-coded:
+ * and no environment overrides. It exposes exactly TWO actions, both
+ * hard-coded, each with its own independent single-flight lock:
  *
- *     node scripts/run-e2e.mjs        (i.e. `npm run test:e2e`, LOCAL only)
+ *     node scripts/run-e2e.mjs               (i.e. `npm run test:e2e`, LOCAL)
+ *     node scripts/run-retailer-refresh.mjs  (bounded retailer price refresh)
+ *
+ * The second one writes to production data, so it is worth being explicit
+ * about what the bridge does and does not decide: it decides nothing. Every
+ * bound, ceiling, identity rule and circuit breaker lives in
+ * scripts/price-verify-dryrun.ts, which run-retailer-refresh.mjs invokes with
+ * a fixed argv. The bridge cannot pass a row count, a retailer, a flag, or
+ * anything else — there is no code path from an HTTP request to an argument.
  *
  * SAFETY PROPERTIES (all enforced below, in this order)
  *   1. Binds to 127.0.0.1 only — never 0.0.0.0, so it is unreachable off-box.
@@ -44,6 +53,9 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const RUNNER = join(REPO_ROOT, 'scripts', 'run-e2e.mjs')
 const RESULT_JSON = join(REPO_ROOT, 'launch', 'operations', 'browser-trust-latest.json')
 
+const RETAILER_RUNNER = join(REPO_ROOT, 'scripts', 'run-retailer-refresh.mjs')
+const RETAILER_STATUS_JSON = join(REPO_ROOT, 'launch', 'operations', 'price-verify-status.json')
+
 // Only the local Command Centre may drive this. Browsers always attach Origin
 // to a cross-origin POST, so this is what stops any other page in the founder's
 // browser from firing the action at localhost.
@@ -54,6 +66,10 @@ const ALLOWED_ORIGINS = new Set([
 
 if (!existsSync(RUNNER)) {
   console.error(`Browser Trust bridge: cannot find ${RUNNER} — is this file still inside <repo>/launch/operations/?`)
+  process.exit(1)
+}
+if (!existsSync(RETAILER_RUNNER)) {
+  console.error(`Bridge: cannot find ${RETAILER_RUNNER} — the retailer refresh action would 500 on use.`)
   process.exit(1)
 }
 
@@ -104,6 +120,56 @@ function startRun() {
   console.log('[browser-trust] run started')
 }
 
+/* ── Action 2: bounded retailer price refresh ────────────────────────────────
+   Same shape as above and the same guarantees: fixed argv, shell:false, its own
+   single-flight lock, and nothing from the request reaches the child. The run
+   takes roughly 45 minutes, so `state` is the only thing the page polls; the
+   detail it displays comes from the status file the operational script writes.
+*/
+/** @type {{state:'idle'|'running'|'completed'|'failed', startedAt:string|null, finishedAt:string|null, exitCode:number|null}} */
+let retailerRun = { state: 'idle', startedAt: null, finishedAt: null, exitCode: null }
+let retailerChild = null
+
+function readRetailerStatus() {
+  try {
+    return JSON.parse(readFileSync(RETAILER_STATUS_JSON, 'utf8'))
+  } catch {
+    return null
+  }
+}
+
+function startRetailerRun() {
+  retailerRun = { state: 'running', startedAt: new Date().toISOString(), finishedAt: null, exitCode: null }
+
+  retailerChild = spawn(process.execPath, [RETAILER_RUNNER], {
+    cwd: REPO_ROOT,
+    shell: false,
+    stdio: 'ignore',
+    windowsHide: true,
+  })
+
+  retailerChild.on('exit', code => {
+    retailerChild = null
+    retailerRun.exitCode = code
+    retailerRun.finishedAt = new Date().toISOString()
+    // A non-zero exit is usually a deliberate SAFE STOP, not a crash. The
+    // bridge does not try to tell them apart — the status file the script
+    // writes says which, and the card reads that.
+    retailerRun.state = code === 0 ? 'completed' : 'failed'
+    console.log(`[retailer-refresh] run finished — exit ${code}`)
+  })
+
+  retailerChild.on('error', err => {
+    retailerChild = null
+    retailerRun.exitCode = -1
+    retailerRun.finishedAt = new Date().toISOString()
+    retailerRun.state = 'failed'
+    console.error('[retailer-refresh] failed to start:', err.message)
+  })
+
+  console.log('[retailer-refresh] run started')
+}
+
 const server = createServer((req, res) => {
   const origin = req.headers.origin
   const originOk = origin === undefined || ALLOWED_ORIGINS.has(origin)
@@ -147,6 +213,19 @@ const server = createServer((req, res) => {
     return send(202, { ...run })
   }
 
+  if (req.method === 'GET' && path === '/retailer/status') {
+    return send(200, { ...retailerRun, progress: readRetailerStatus(), port: PORT })
+  }
+
+  if (req.method === 'POST' && path === '/retailer/run') {
+    // Single-flight. A second click while a refresh is in progress is refused
+    // outright — this action writes to production, so "probably fine" is not
+    // good enough.
+    if (retailerRun.state === 'running') return send(409, { ...retailerRun, state: 'already-running' })
+    startRetailerRun()
+    return send(202, { ...retailerRun })
+  }
+
   return send(404, { error: 'not found' })
 })
 
@@ -166,10 +245,15 @@ server.listen(PORT, HOST, () => {
   console.log(`Repo: ${REPO_ROOT}`)
 })
 
-// Do not leave a suite running if the bridge is closed.
+// Do not leave a TEST suite running if the bridge is closed — nothing is lost
+// by stopping it. A retailer refresh is deliberately NOT killed: it writes
+// verified production rows one at a time, so aborting half way through would
+// throw away real work to no benefit. It finishes and writes its own status
+// file; the card picks the result up next time it is opened.
 for (const sig of ['SIGINT', 'SIGTERM']) {
   process.on(sig, () => {
     if (child) child.kill()
+    if (retailerChild) console.log('[retailer-refresh] still running — left to finish; it will write its own result')
     server.close(() => process.exit(0))
   })
 }

@@ -2,7 +2,7 @@
   "version": 1,
   "environment": "production",
   "url": "https://www.catchcomics.com",
-  "checkedAt": "2026-07-13T08:43:33.943Z",
+  "checkedAt": "2026-08-24T17:07:56.323Z",
   "verdict": "PASS",
   "passed": 20,
   "warned": 0,
@@ -60,7 +60,7 @@
       "id": "search-api",
       "label": "Search API returns valid unified shape",
       "status": "pass",
-      "detail": "49 canonical results"
+      "detail": "52 canonical results"
     },
     {
       "id": "search-flagship",

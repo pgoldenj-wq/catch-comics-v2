@@ -92,8 +92,40 @@ const TRANSIENT_RATE_MIN_SAMPLE = 200
 const OUT = join(process.cwd(), 'launch', 'operations',
   WRITE ? 'price-verify-write-latest.json' : 'price-verify-dryrun-latest.json')
 
+/**
+ * Single durable state file the Command Centre reads: current/last attempt,
+ * live progress, and the computed next deadline. Written ONLY in --write mode,
+ * so a dry run never disturbs founder-facing state.
+ *
+ * `price-verify-write-latest.json` remains the last SUCCESSFUL run and is
+ * never written by a blocked or failed attempt — that is what stops a failure
+ * moving the freshness deadline.
+ */
+const STATUS_OUT = join(process.cwd(), 'launch', 'operations', 'price-verify-status.json')
+
+/**
+ * cleanup-stale soft-deletes anything unseen for this many days
+ * (lib/inngest/functions/cleanup-stale.ts SOFT_DELETE_DAYS). This script is the
+ * authority for the deadline; the Command Centre only displays what it writes.
+ */
+const FRESHNESS_POLICY_DAYS = 30
+
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms))
 const log   = (m: string) => console.log(`[${new Date().toISOString()}] ${m}`)
+
+const startedAt = new Date().toISOString()
+
+/** Overwrite the status file. No-op unless --write, and never throws. */
+function writeStatus(state: string, extra: Record<string, unknown> = {}): void {
+  if (!WRITE) return
+  try {
+    mkdirSync(dirname(STATUS_OUT), { recursive: true })
+    writeFileSync(STATUS_OUT, JSON.stringify({
+      version: 1, state, startedAt, updatedAt: new Date().toISOString(),
+      maxRowsCeiling: TM_MAX_ROWS, ...extra,
+    }, null, 2))
+  } catch { /* status reporting must never break the operation */ }
+}
 
 let sitemapRequests = 0
 let productRequests = 0   // first attempts only
@@ -285,6 +317,7 @@ async function main() {
   const t0 = Date.now()
   const tally = (rs: RowResult[], k: Klass) => rs.filter(r => r.klass === k).length
 
+  writeStatus('running', { phase: 'starting' })
   log('── INTENDED WORK (printed before any product request) ──────────────────')
   log(`MODE: ${WRITE ? 'WRITE (bounded, verified-in-run rows only)' : 'DRY-RUN (read-only, default)'}`)
   log(`ceilings: TM rows <= ${TM_MAX_ROWS} · WoB rows <= ${WOB_MAX_ROWS} · total target rows <= ${TOTAL_TARGET_ROWS}`)
@@ -335,6 +368,7 @@ async function main() {
   log(`TM scheduled_sync_disabled = ${JSON.stringify(tmCfg.scheduled_sync_disabled ?? null)}`)
 
   // ── Cohort A: complete sitemap enumeration, then ACTIVE ∩ sitemap ─────────
+  writeStatus('running', { phase: 'enumerating catalogue', retailer: 'Travelling Man' })
   log('enumerating TM catalogue from sitemaps (membership source of record)…')
   sitemapRequests++
   const idx = await fetchRaw(`https://${TM_DOMAIN}/sitemap.xml`, 'application/xml')
@@ -380,14 +414,40 @@ async function main() {
   log(`estimated wall clock: ~${estMin} min`)
 
   const tmCeiling = Number.isFinite(MAX_ROWS_ARG) ? Math.min(MAX_ROWS_ARG, TM_MAX_ROWS) : TM_MAX_ROWS
-  if (tmTargets.length > tmCeiling)     { log(`SAFE STOP — TM targets ${tmTargets.length} > ceiling ${tmCeiling}`); await prisma.$disconnect(); process.exit(1) }
-  if (wobTargets.length > WOB_MAX_ROWS) { log(`SAFE STOP — WoB targets ${wobTargets.length} > ceiling ${WOB_MAX_ROWS}`); await prisma.$disconnect(); process.exit(1) }
-  if (tmTargets.length + wobTargets.length > TOTAL_TARGET_ROWS)      { log('SAFE STOP — total target row ceiling'); await prisma.$disconnect(); process.exit(1) }
-  if (tmTargets.length + wobTargets.length > TOTAL_PRODUCT_REQUESTS) { log('SAFE STOP — base product request ceiling'); await prisma.$disconnect(); process.exit(1) }
+  const measuredTarget = tmTargets.length + wobTargets.length
+
+  // A SAFE STOP is a real operational state, not an error to be swallowed: it
+  // is recorded so the Command Centre can say exactly why nothing was written,
+  // and it never touches the last-successful-run file.
+  const safeStop = async (reason: string) => {
+    log(`SAFE STOP — ${reason}`)
+    writeStatus('blocked', {
+      reason, measuredTarget,
+      travellingManTarget: tmTargets.length, worldOfBooksTarget: wobTargets.length,
+      rowsWritten: 0, finishedAt: new Date().toISOString(),
+    })
+    await prisma.$disconnect()
+    process.exit(1)
+  }
+
+  if (tmTargets.length > tmCeiling)     await safeStop(`${tmTargets.length.toLocaleString()} Travelling Man rows exceeds the ${tmCeiling.toLocaleString()} safety ceiling`)
+  if (wobTargets.length > WOB_MAX_ROWS) await safeStop(`${wobTargets.length} World of Books rows exceeds the ${WOB_MAX_ROWS} safety ceiling`)
+  if (measuredTarget > TOTAL_TARGET_ROWS)      await safeStop(`${measuredTarget.toLocaleString()} rows exceeds the ${TOTAL_TARGET_ROWS.toLocaleString()} total safety ceiling`)
+  if (measuredTarget > TOTAL_PRODUCT_REQUESTS) await safeStop(`${measuredTarget.toLocaleString()} rows exceeds the ${TOTAL_PRODUCT_REQUESTS.toLocaleString()} base request ceiling`)
+
+  writeStatus('running', {
+    phase: 'verifying', measuredTarget,
+    travellingManTarget: tmTargets.length, worldOfBooksTarget: wobTargets.length,
+  })
 
   // ── Verification loop ────────────────────────────────────────────────────
   let consecutiveTransient = 0
   let breakerTripped: string | null = null
+
+  // Cumulative across cohorts, so progress reflects the whole operation rather
+  // than restarting at zero when the second retailer begins.
+  const totalTargets = measuredTarget
+  let rowsCheckedSoFar = 0, rowsVerifiedSoFar = 0, rowsErroredSoFar = 0
 
   async function runCohort(name: string, domain: string, rows: any[]): Promise<RowResult[]> {
     const out: RowResult[] = []
@@ -423,8 +483,24 @@ async function main() {
       if ((i + 1) % 250 === 0) {
         log(`  ${i + 1}/${rows.length} · unchanged ${tally(out, 'availableUnchanged')} · changed ${tally(out, 'availablePriceChanged')} · unavailable ${tally(out, 'unavailable')} · transient ${transientSoFar}${WRITE ? ` · written ${rowsWritten}` : ''}`)
       }
+      // Progress the Command Centre can actually show. Only real counters —
+      // nothing is interpolated or estimated between updates.
+      if ((i + 1) % 25 === 0 || i + 1 === rows.length) {
+        writeStatus('running', {
+          phase: 'verifying', retailer: name,
+          measuredTarget: totalTargets,
+          rowsChecked: rowsCheckedSoFar + out.length,
+          rowsVerified: rowsVerifiedSoFar + tally(out, 'availableUnchanged') + tally(out, 'availablePriceChanged') + tally(out, 'unavailable'),
+          rowsWritten, errors: rowsErroredSoFar + transientSoFar + tally(out, 'notFound') + tally(out, 'variantMissing') + tally(out, 'productIdMismatch') + tally(out, 'otherError'),
+          requests: sitemapRequests + productRequests + retryRequests,
+          elapsedMs: Date.now() - t0,
+        })
+      }
       await sleep(BETWEEN_PRODUCT_MS)
     }
+    rowsCheckedSoFar  += out.length
+    rowsVerifiedSoFar += tally(out, 'availableUnchanged') + tally(out, 'availablePriceChanged') + tally(out, 'unavailable')
+    rowsErroredSoFar  += out.length - (tally(out, 'availableUnchanged') + tally(out, 'availablePriceChanged') + tally(out, 'unavailable'))
     return out
   }
 
@@ -455,6 +531,19 @@ async function main() {
 
   const after = WRITE ? await snapshot() : before
   const wallMs = Date.now() - t0
+  const finishedAt = new Date().toISOString()
+
+  /**
+   * A run only counts as successful — and only then moves the freshness
+   * deadline — when it verified and wrote every row in the cohort it measured.
+   * A tripped breaker or any shortfall leaves the previous successful run (and
+   * therefore the previous deadline) exactly where it was: the rows that were
+   * never re-verified still expire on their original schedule.
+   */
+  const fullSuccess = WRITE && !breakerTripped && rowsWritten === measuredTarget && measuredTarget > 0
+  const nextExpiryAt = fullSuccess
+    ? new Date(Date.now() + FRESHNESS_POLICY_DAYS * 86_400_000).toISOString()
+    : null
   const report = {
     version: 2, runAt: new Date().toISOString(),
     mode: WRITE ? 'WRITE (bounded, verified-in-run only)' : 'DRY-RUN (read-only, zero writes)',
@@ -481,10 +570,28 @@ async function main() {
       inngestExecutions: 0, externalApiCostGBP: 0,
     },
     softDeletedTmRowsTouched: 0,
+    freshness: { policyDays: FRESHNESS_POLICY_DAYS, refreshedAt: fullSuccess ? finishedAt : null, nextExpiryAt },
   }
 
   mkdirSync(dirname(OUT), { recursive: true })
-  writeFileSync(OUT, JSON.stringify(report, null, 2))
+  // In --write mode this file IS the "last successful run" record, so a
+  // partial or blocked attempt must not overwrite it.
+  if (!WRITE || fullSuccess) writeFileSync(OUT, JSON.stringify(report, null, 2))
+
+  writeStatus(fullSuccess ? 'success' : 'failed', {
+    phase: 'finished', finishedAt, measuredTarget,
+    travellingManTarget: tmTargets.length, worldOfBooksTarget: wobTargets.length,
+    rowsChecked: rowsCheckedSoFar, rowsVerified: rowsVerifiedSoFar, rowsWritten,
+    errors: rowsErroredSoFar, breakerTripped, nextExpiryAt,
+    reason: fullSuccess ? null : breakerTripped ?? `wrote ${rowsWritten} of ${measuredTarget} rows`,
+    cost: {
+      requests: sitemapRequests + productRequests + retryRequests,
+      retries: retryRequests,
+      inboundMiB: Number((inboundBytes / 1048576).toFixed(2)),
+      inngestExecutions: 0, externalApiCostGBP: 0,
+    },
+    elapsedMs: wallMs,
+  })
 
   const show = (label: string, s: ReturnType<typeof summarise>) => {
     log('')
@@ -550,4 +657,15 @@ async function main() {
   await prisma.$disconnect()
 }
 
-main().catch(async e => { console.error(e); await prisma.$disconnect(); process.exit(1) })
+main().catch(async e => {
+  console.error(e)
+  // A crash is an attempt, not a refresh: recorded so the card can show it,
+  // while the last successful run and its deadline stay untouched.
+  writeStatus('failed', {
+    phase: 'crashed', finishedAt: new Date().toISOString(),
+    reason: e instanceof Error ? e.message.slice(0, 300) : String(e).slice(0, 300),
+    rowsWritten,
+  })
+  await prisma.$disconnect()
+  process.exit(1)
+})

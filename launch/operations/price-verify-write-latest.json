@@ -1,0 +1,220 @@
+{
+  "version": 2,
+  "runAt": "2026-08-23T22:31:48.782Z",
+  "mode": "WRITE (bounded, verified-in-run only)",
+  "breakerTripped": null,
+  "bounds": {
+    "TM_MAX_ROWS": 2300,
+    "WOB_MAX_ROWS": 50,
+    "TOTAL_TARGET_ROWS": 2350,
+    "TOTAL_PRODUCT_REQUESTS": 2350,
+    "TOTAL_REQUESTS_MAX": 2600,
+    "BETWEEN_PRODUCT_MS": 1000,
+    "MAX_RETRIES": 3,
+    "MAX_PRICE_RATIO": 10
+  },
+  "enumeration": {
+    "source": "sitemap index + product sitemaps",
+    "filesDiscovered": 38,
+    "filesFetched": 38,
+    "distinctHandles": 37782,
+    "complete": true
+  },
+  "travellingMan": {
+    "targetRows": 2246,
+    "rowsAttempted": 2246,
+    "successfulExactVerifications": 2246,
+    "availableUnchangedPrice": 1599,
+    "availablePriceChanged": 4,
+    "unavailable": 643,
+    "variantMissing": 0,
+    "productIdMismatch": 0,
+    "notFound404": 0,
+    "transientFailures": 0,
+    "otherErrors": 0,
+    "safeForSubsequentWrite": 2246,
+    "mustNotBeRefreshed": 0,
+    "rowsWritten": 2246,
+    "activeRowsExcludedNotInSitemap": 1,
+    "scheduledSyncDisabled": true
+  },
+  "worldOfBooks": {
+    "targetRows": 34,
+    "rowsAttempted": 34,
+    "successfulExactVerifications": 34,
+    "availableUnchangedPrice": 18,
+    "availablePriceChanged": 1,
+    "unavailable": 15,
+    "variantMissing": 0,
+    "productIdMismatch": 0,
+    "notFound404": 0,
+    "transientFailures": 0,
+    "otherErrors": 0,
+    "safeForSubsequentWrite": 34,
+    "mustNotBeRefreshed": 0,
+    "rowsWritten": 34
+  },
+  "priceChanges": [
+    {
+      "retailer": "Travelling Man",
+      "listingId": "761d8e37-1678-4cbf-9047-faf363bc5228",
+      "sku": "15807843369334",
+      "oldPrice": 8.99,
+      "newPrice": 7.99,
+      "absDiff": -1,
+      "pctDiff": -11.12,
+      "written": true
+    },
+    {
+      "retailer": "Travelling Man",
+      "listingId": "fda9a6fa-21c3-4ea6-a7a4-8f4d2bab8038",
+      "sku": "15844302356854",
+      "oldPrice": 10.99,
+      "newPrice": 14.99,
+      "absDiff": 4,
+      "pctDiff": 36.4,
+      "written": true
+    },
+    {
+      "retailer": "Travelling Man",
+      "listingId": "5a0f6c8f-66d9-483d-b11e-2d467741159e",
+      "sku": "15713225015670",
+      "oldPrice": 20.99,
+      "newPrice": 18.99,
+      "absDiff": -2,
+      "pctDiff": -9.53,
+      "written": true
+    },
+    {
+      "retailer": "Travelling Man",
+      "listingId": "6d81fa29-61eb-4f5a-9300-68dd46fa3aef",
+      "sku": "15655777894774",
+      "oldPrice": 13.99,
+      "newPrice": 9.59,
+      "absDiff": -4.4,
+      "pctDiff": -31.45,
+      "written": true
+    },
+    {
+      "retailer": "Travelling Man",
+      "listingId": "54825426-d6a6-46aa-84d5-25798c332626",
+      "sku": "15798055862646",
+      "oldPrice": 8.99,
+      "newPrice": 6.29,
+      "absDiff": -2.7,
+      "pctDiff": -30.03,
+      "written": true
+    },
+    {
+      "retailer": "Travelling Man",
+      "listingId": "b95cc38c-9b18-4e0c-8a1e-f5decc76ae3f",
+      "sku": "15762898157942",
+      "oldPrice": 13.99,
+      "newPrice": 14.99,
+      "absDiff": 1,
+      "pctDiff": 7.15,
+      "written": true
+    },
+    {
+      "retailer": "World of Books",
+      "listingId": "e099cad5-7f8e-4d59-b351-b97a8bb366dc",
+      "sku": "11165404299537",
+      "oldPrice": 194.29,
+      "newPrice": 201.99,
+      "absDiff": 7.7,
+      "pctDiff": 3.96,
+      "written": true
+    }
+  ],
+  "writeTotals": {
+    "rowsWritten": 2280,
+    "priceHistoryRowsCreated": 7,
+    "skippedRowNotActive": 0,
+    "excludedImplausiblePrice": 0,
+    "listingsCreated": 0,
+    "canonicalProductsCreated": 0,
+    "deletedRowsTouched": 0,
+    "deletedAtCleared": 0,
+    "retailerLastSyncedAtTouched": 0,
+    "syncLogsCreated": 0
+  },
+  "productionState": {
+    "before": {
+      "travellingman.com": {
+        "total": 25764,
+        "active": 2247,
+        "deleted": 23517,
+        "inStock": 1584,
+        "outOfStock": 663,
+        "maxLastSeenAt": "2026-08-18T22:30:42.211Z",
+        "lastSyncedAt": "2026-08-18T22:30:42.211Z",
+        "syncLogs": 2375,
+        "syncLogsLatest": "2026-08-18T22:30:41.399Z",
+        "scheduledSyncDisabled": true
+      },
+      "worldofbooks.com": {
+        "total": 529927,
+        "active": 83078,
+        "deleted": 446849,
+        "inStock": 81417,
+        "outOfStock": 1661,
+        "maxLastSeenAt": "2026-08-09T10:18:17.784Z",
+        "lastSyncedAt": "2026-06-03T13:05:51.760Z",
+        "syncLogs": 2180,
+        "syncLogsLatest": "2026-08-09T10:01:01.094Z",
+        "scheduledSyncDisabled": true
+      },
+      "canonicalProducts": 150694,
+      "retailerListings": 808344,
+      "priceHistory": 624271
+    },
+    "after": {
+      "travellingman.com": {
+        "total": 25764,
+        "active": 2247,
+        "deleted": 23517,
+        "inStock": 1603,
+        "outOfStock": 644,
+        "maxLastSeenAt": "2026-08-23T22:30:59.394Z",
+        "lastSyncedAt": "2026-08-18T22:30:42.211Z",
+        "syncLogs": 2375,
+        "syncLogsLatest": "2026-08-18T22:30:41.399Z",
+        "scheduledSyncDisabled": true
+      },
+      "worldofbooks.com": {
+        "total": 529927,
+        "active": 83078,
+        "deleted": 446849,
+        "inStock": 81415,
+        "outOfStock": 1663,
+        "maxLastSeenAt": "2026-08-23T22:31:43.480Z",
+        "lastSyncedAt": "2026-06-03T13:05:51.760Z",
+        "syncLogs": 2180,
+        "syncLogsLatest": "2026-08-09T10:01:01.094Z",
+        "scheduledSyncDisabled": true
+      },
+      "canonicalProducts": 150694,
+      "retailerListings": 808344,
+      "priceHistory": 624278
+    }
+  },
+  "cost": {
+    "sitemapRequests": 39,
+    "productRequests": 2280,
+    "retryRequests": 0,
+    "totalHttpRequests": 2319,
+    "inboundBytes": 25676584,
+    "inboundMiB": 24.49,
+    "wallClockMs": 2862524,
+    "wallClockMin": 47.7,
+    "inngestExecutions": 0,
+    "externalApiCostGBP": 0
+  },
+  "softDeletedTmRowsTouched": 0,
+  "freshness": {
+    "policyDays": 30,
+    "refreshedAt": "2026-08-23T21:44:06.782Z",
+    "nextExpiryAt": "2026-09-22T21:44:06.782Z",
+    "backfilled": "derived from runAt - cost.wallClockMin; this run predates the freshness field"
+  }
+}

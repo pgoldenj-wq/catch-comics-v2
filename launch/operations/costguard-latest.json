@@ -1,38 +1,35 @@
 {
-  "generatedAt": "2026-08-09T10:33:56.135Z",
+  "generatedAt": "2026-08-24T17:08:01.390Z",
   "source": "production",
   "storeMode": "kv",
   "configured": true,
-  "state": "AMBER",
-  "since": "2026-08-08T10:51:46.228Z",
+  "state": "GREEN",
+  "since": "2026-08-17T21:41:42.620Z",
   "lockdownLatched": false,
-  "reasons": [
-    "Stale/failed provider data: neon."
-  ],
-  "lastCollectionAt": "2026-08-09T09:56:56.321Z",
-  "dataAgeHours": 0.6,
-  "staleProviders": [
-    "neon"
-  ],
+  "reasons": [],
+  "lastCollectionAt": "2026-08-24T16:55:42.469Z",
+  "dataAgeHours": 0.2,
+  "staleProviders": [],
   "unconfiguredProviders": [],
   "totals": {
-    "variableMtdUsd": 0,
+    "variableMtdUsd": 28.78,
     "fixedMonthlyUsd": 20,
-    "projectedMonthUsd": 0,
-    "burnUsdPerDay": 0,
-    "baselineUsdPerDay": null
+    "projectedMonthUsd": 36.98,
+    "burnUsdPerDay": 1.29,
+    "baselineUsdPerDay": 1.34
   },
   "perProvider": [
     {
       "provider": "neon",
       "configured": true,
-      "fresh": false,
-      "variableMtdUsd": 0,
-      "projectedMonthUsd": 28.48,
+      "fresh": true,
+      "variableMtdUsd": 28.78,
+      "projectedMonthUsd": 36.98,
       "budgetSoftUsd": 60,
       "budgetMaxUsd": 90,
-      "budgetUsedPct": 0,
-      "note": "Neon consumption unavailable (org resolved, 1 project(s)). Tried: v2/projects?org_id+metrics→406 specified date-time range start is outside the boundaries of the specified granularity; start:\"2026-08-01 00:00:00 +0000 UTC\"; v2/projects?org_id+metrics(csv)→406 specified date-time range start is outside the boundaries of the specified granularity; start:\"2026-08-01 00:00:00 +0000 UTC\"; v2/projects?org_id+project_ids+metrics→406 specified date-time range start is outside the boundaries of the specified granularity; start:\"2026-08-01 00:00:00 +0000 UTC\"; projects?org_id+project_ids→406 specified date-time range start is outside the boundaries of the specified granularity; start:\"2026-08-01 00:00:00 +0000 UTC\"; account?org_id→404 this route does not exist; projects?project_ids→400 org_id is required, you can find it on your organization settings page; account (unscoped)→404 this route does not exist."
+      "budgetUsedPct": 32,
+      "topMetric": "compute_cu_hours",
+      "note": "Neon consumption via v2/projects?org_id+metrics@daily [v2], 23 rows."
     },
     {
       "provider": "vercel",
@@ -69,28 +66,7 @@
       "topMetric": "r2_class_a_ops"
     }
   ],
-  "activeRestrictions": [
-    {
-      "operation": "inngest:sync-retailer-scheduled",
-      "count": 30,
-      "lastAt": "2026-08-08T10:00:38.066Z"
-    },
-    {
-      "operation": "inngest:sync-retailer",
-      "count": 8,
-      "lastAt": "2026-08-08T08:00:45.683Z"
-    },
-    {
-      "operation": "inngest:enrich-canonical",
-      "count": 1,
-      "lastAt": "2026-08-08T02:00:24.013Z"
-    },
-    {
-      "operation": "inngest:bookshop-refresh",
-      "count": 1,
-      "lastAt": "2026-08-08T04:00:03.398Z"
-    }
-  ],
+  "activeRestrictions": [],
   "budgets": {
     "global": {
       "fixedMonthlyUsd": 20,
@@ -131,6 +107,104 @@
     }
   },
   "recentEvents": [
+    {
+      "at": "2026-08-17T21:41:42.620Z",
+      "kind": "state-change",
+      "provider": "global",
+      "dedupeKey": "finding:State changed AMBER → GREEN#",
+      "message": "State changed AMBER → GREEN.",
+      "detail": {
+        "variableMtdUsd": 19.47,
+        "projectedMonthUsd": 34.29,
+        "burnUsdPerDay": 1.13,
+        "state": "GREEN"
+      }
+    },
+    {
+      "at": "2026-08-17T21:41:42.620Z",
+      "kind": "anomaly",
+      "provider": "global",
+      "dedupeKey": "finding:Recovered one level to GREEN after clean streak#",
+      "message": "Recovered one level to GREEN after clean streak.",
+      "detail": {
+        "variableMtdUsd": 19.47,
+        "projectedMonthUsd": 34.29,
+        "burnUsdPerDay": 1.13,
+        "state": "GREEN"
+      }
+    },
+    {
+      "at": "2026-08-17T15:40:14.914Z",
+      "kind": "state-change",
+      "provider": "global",
+      "dedupeKey": "finding:State changed AMBER → GREEN#",
+      "message": "State changed AMBER → GREEN.",
+      "detail": {
+        "variableMtdUsd": 19.47,
+        "projectedMonthUsd": 34.45,
+        "burnUsdPerDay": 1.12,
+        "state": "GREEN"
+      }
+    },
+    {
+      "at": "2026-08-17T15:40:14.914Z",
+      "kind": "anomaly",
+      "provider": "global",
+      "dedupeKey": "finding:Recovered one level to GREEN after clean streak#",
+      "message": "Recovered one level to GREEN after clean streak.",
+      "detail": {
+        "variableMtdUsd": 19.47,
+        "projectedMonthUsd": 34.45,
+        "burnUsdPerDay": 1.12,
+        "state": "GREEN"
+      }
+    },
+    {
+      "at": "2026-08-17T14:44:58.157Z",
+      "kind": "collection-error",
+      "provider": "github",
+      "dedupeKey": "collect-error:github",
+      "message": "github collection failed: GitHub billing API HTTP 503."
+    },
+    {
+      "at": "2026-08-17T14:44:58.157Z",
+      "kind": "state-change",
+      "provider": "global",
+      "dedupeKey": "finding:State changed GREEN → AMBER#",
+      "message": "State changed GREEN → AMBER.",
+      "detail": {
+        "variableMtdUsd": 19.47,
+        "projectedMonthUsd": 34.49,
+        "burnUsdPerDay": 1.12,
+        "state": "AMBER"
+      }
+    },
+    {
+      "at": "2026-08-09T11:09:35.371Z",
+      "kind": "state-change",
+      "provider": "global",
+      "dedupeKey": "finding:State changed AMBER → GREEN#",
+      "message": "State changed AMBER → GREEN.",
+      "detail": {
+        "variableMtdUsd": 10.37,
+        "projectedMonthUsd": 10.37,
+        "burnUsdPerDay": 0,
+        "state": "GREEN"
+      }
+    },
+    {
+      "at": "2026-08-09T11:09:35.371Z",
+      "kind": "anomaly",
+      "provider": "global",
+      "dedupeKey": "finding:Recovered one level to GREEN after clean streak#",
+      "message": "Recovered one level to GREEN after clean streak.",
+      "detail": {
+        "variableMtdUsd": 10.37,
+        "projectedMonthUsd": 10.37,
+        "burnUsdPerDay": 0,
+        "state": "GREEN"
+      }
+    },
     {
       "at": "2026-08-09T07:01:04.852Z",
       "kind": "job-allowed-with-warning",
@@ -235,108 +309,6 @@
       "kind": "job-allowed-with-warning",
       "dedupeKey": "allowed-warn:inngest:sync-retailer-scheduled:AMBER",
       "message": "inngest:sync-retailer-scheduled allowed in AMBER (class=nonessential)."
-    },
-    {
-      "at": "2026-08-08T10:51:46.228Z",
-      "kind": "state-change",
-      "provider": "global",
-      "dedupeKey": "finding:State changed RED → AMBER#",
-      "message": "State changed RED → AMBER.",
-      "detail": {
-        "variableMtdUsd": 0,
-        "projectedMonthUsd": 0,
-        "burnUsdPerDay": 0,
-        "state": "AMBER"
-      }
-    },
-    {
-      "at": "2026-08-08T10:51:46.228Z",
-      "kind": "anomaly",
-      "provider": "global",
-      "dedupeKey": "finding:Recovered one level to AMBER after clean streak#",
-      "message": "Recovered one level to AMBER after clean streak.",
-      "detail": {
-        "variableMtdUsd": 0,
-        "projectedMonthUsd": 0,
-        "burnUsdPerDay": 0,
-        "state": "AMBER"
-      }
-    },
-    {
-      "at": "2026-08-08T09:00:22.661Z",
-      "kind": "collection-error",
-      "provider": "neon",
-      "dedupeKey": "collect-error:neon",
-      "message": "neon collection failed: Neon consumption unavailable (org resolved, 1 project(s)). Tried: v2/projects?org_id+metrics→406 specified date-time range start is outside the boundaries of the specified granularity; start:\"2026-08-01 00:00:00 +0000 UTC\"; v2/projects?org_id+metrics(csv)→406 specified date-time range start is outside the boundaries of the specified granularity; start:\"2026-08-01 00:00:00 +0000 UTC\"; v2/projects?org_id+project_ids+metrics→406 specified date-time range start is outside the boundaries of the specified granularity; start:\"2026-08-01 00:00:00 +0000 UTC\"; projects?org_id+project_ids→406 specified date-time range start is outside the boundaries of the specified granularity; start:\"2026-08-01 00:00:00 +0000 UTC\"; account?org_id→404 this route does not exist; projects?project_ids→400 org_id is required, you can find it on your organization settings page; account (unscoped)→404 this route does not exist."
-    },
-    {
-      "at": "2026-08-08T08:00:45.414Z",
-      "kind": "job-refused",
-      "provider": "global",
-      "dedupeKey": "refused:inngest:sync-retailer:RED",
-      "message": "Refused inngest:sync-retailer: Cost Guard is RED (Stale/failed provider data: neon.) — nonessential and high-risk jobs are blocked.",
-      "detail": {
-        "trigger": "Cost Guard is RED (Stale/failed provider data: neon.) — nonessential and high-risk jobs are blocked.",
-        "operation": "inngest:sync-retailer",
-        "jobClass": "nonessential",
-        "guardState": "RED",
-        "write": true,
-        "estRows": 50000,
-        "estRequests": 2000,
-        "projectedMonthUsd": 0,
-        "thresholdMaxApprovedUsd": 150,
-        "action": "job refused before any work ran"
-      }
-    },
-    {
-      "at": "2026-08-08T08:00:38.157Z",
-      "kind": "job-refused",
-      "provider": "global",
-      "dedupeKey": "refused:inngest:sync-retailer-scheduled:RED",
-      "message": "Refused inngest:sync-retailer-scheduled: Cost Guard is RED (Stale/failed provider data: neon.) — nonessential and high-risk jobs are blocked.",
-      "detail": {
-        "trigger": "Cost Guard is RED (Stale/failed provider data: neon.) — nonessential and high-risk jobs are blocked.",
-        "operation": "inngest:sync-retailer-scheduled",
-        "jobClass": "nonessential",
-        "guardState": "RED",
-        "write": false,
-        "estRows": 500,
-        "estRequests": 50,
-        "projectedMonthUsd": 0,
-        "thresholdMaxApprovedUsd": 150,
-        "action": "job refused before any work ran"
-      }
-    },
-    {
-      "at": "2026-08-08T08:00:37.429Z",
-      "kind": "job-allowed-with-warning",
-      "dedupeKey": "allowed-warn:inngest:price-check:RED",
-      "message": "inngest:price-check allowed in RED (class=deferrable)."
-    },
-    {
-      "at": "2026-08-08T04:00:03.225Z",
-      "kind": "job-refused",
-      "provider": "global",
-      "dedupeKey": "refused:inngest:bookshop-refresh:RED",
-      "message": "Refused inngest:bookshop-refresh: Cost Guard is RED (Stale/failed provider data: neon.) — nonessential and high-risk jobs are blocked.",
-      "detail": {
-        "trigger": "Cost Guard is RED (Stale/failed provider data: neon.) — nonessential and high-risk jobs are blocked.",
-        "operation": "inngest:bookshop-refresh",
-        "jobClass": "nonessential",
-        "guardState": "RED",
-        "write": true,
-        "estRows": 5000,
-        "estRequests": 1000,
-        "projectedMonthUsd": 0,
-        "thresholdMaxApprovedUsd": 150,
-        "action": "job refused before any work ran"
-      }
-    },
-    {
-      "at": "2026-08-08T03:00:40.072Z",
-      "kind": "job-allowed-with-warning",
-      "dedupeKey": "allowed-warn:inngest:cleanup-stale:RED",
-      "message": "inngest:cleanup-stale allowed in RED (class=deferrable)."
     }
   ]
 }
