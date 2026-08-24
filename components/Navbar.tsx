@@ -77,6 +77,7 @@ export default function Navbar({ initialQuery, region: controlledRegion, onRegio
     setInternalRegion(r)
     onRegionChange?.(r)
   }
+  const isSeries  = pathname.startsWith('/series')
 
   return (
     <header style={{ background: '#fff', borderBottom: '1px solid #F0F0F0', position: 'sticky', top: 0, zIndex: 20 }}>
@@ -87,23 +88,41 @@ export default function Navbar({ initialQuery, region: controlledRegion, onRegio
           <img src="/logo.png" alt="Catch Comics" className="h-12 w-auto" />
         </Link>
 
-        {/* Series nav link — hidden below sm (640px) to prevent cramping on narrow viewports */}
-        <Link
-          href="/series"
-          className="shrink-0 hidden sm:block"
-          style={{
-            fontSize:       '14px',
-            fontWeight:     600,
-            textDecoration: 'none',
-            whiteSpace:     'nowrap',
-            color:          pathname.startsWith('/series') ? '#E8272A' : '#374151',
-            transition:     'color 0.15s',
-          }}
-          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#E8272A' }}
-          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = pathname.startsWith('/series') ? '#E8272A' : '#374151' }}
-        >
-          Series
-        </Link>
+        {/* Primary navigation. Series used to be bare text sitting one gap from
+            the wordmark, so it read as part of the brand mark rather than as a
+            destination (founder review 2026-08-24). A rule separates it from the
+            logo and the link carries a real chip affordance + active state.
+            Hidden below sm (640px) to prevent cramping on narrow viewports. */}
+        <div className="shrink-0 hidden sm:block" style={{ width: '1px', height: '24px', background: '#E5E7EB' }} aria-hidden="true" />
+        <nav aria-label="Primary" className="shrink-0 hidden sm:block">
+          <Link
+            href="/series"
+            aria-current={isSeries ? 'page' : undefined}
+            className="inline-flex items-center rounded-full"
+            style={{
+              padding:        '7px 14px',
+              fontSize:       '14px',
+              fontWeight:     600,
+              textDecoration: 'none',
+              whiteSpace:     'nowrap',
+              color:          isSeries ? '#E8272A' : '#374151',
+              background:     isSeries ? 'rgba(232,39,42,0.07)' : 'transparent',
+              transition:     'color 0.15s, background 0.15s',
+            }}
+            onMouseEnter={e => {
+              const el = e.currentTarget as HTMLElement
+              el.style.color = '#E8272A'
+              if (!isSeries) el.style.background = '#F3F4F6'
+            }}
+            onMouseLeave={e => {
+              const el = e.currentTarget as HTMLElement
+              el.style.color = isSeries ? '#E8272A' : '#374151'
+              el.style.background = isSeries ? 'rgba(232,39,42,0.07)' : 'transparent'
+            }}
+          >
+            Series
+          </Link>
+        </nav>
 
         {/* Search bar */}
         <div className="flex-1" style={{ maxWidth: '520px' }}>

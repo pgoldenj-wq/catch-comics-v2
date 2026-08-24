@@ -4,6 +4,7 @@ import "./globals.css";
 import SiteFooter  from "@/components/SiteFooter";
 import CookieNotice from "@/components/CookieNotice";
 import { Analytics } from "@vercel/analytics/next";
+import { BASE_URL } from '@/lib/site-url'
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,7 +16,6 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const BASE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://catchcomics.com').replace(/\/$/, '');
 
 export const metadata: Metadata = {
   title: {

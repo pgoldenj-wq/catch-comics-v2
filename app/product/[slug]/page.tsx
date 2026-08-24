@@ -39,6 +39,7 @@ import { seriesNameToSlug, getSeriesEntry } from '@/lib/series/registry'
 import { jsonLdScriptString }               from '@/lib/security/jsonLd'
 import { displayPublisher }                 from '@/lib/identity/publisher'
 import { suppressDuplicateRetailerListings } from '@/lib/listings/dedupeListings'
+import { BASE_URL } from '@/lib/site-url'
 
 // ISR: cache each product page for 1 hour, then regenerate in the background.
 // Switched from force-dynamic (which hit the DB on every request) — there is no
@@ -316,7 +317,6 @@ export async function generateMetadata(
   const title       = product.title
   const description = product.description
     ?? `Compare prices for ${title}${displayPublisher(product.publisher) ? ` from ${displayPublisher(product.publisher)}` : ''}.`
-  const BASE_URL    = (process.env.NEXT_PUBLIC_SITE_URL || 'https://catchcomics.com').replace(/\/$/, '')
   const url         = `${BASE_URL}/product/${slug}`
   const image       = product.coverImageUrl
 
@@ -486,7 +486,6 @@ export default async function ProductPage(
   //   3. Individual Offer items per retailer allow each to surface in Shopping
   // Schema: https://schema.org/Book
   const inStockOffers = allListings.filter(l => IN_STOCK_STATUSES.has(l.stockStatus))
-  const BASE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://catchcomics.com').replace(/\/$/, '')
 
   const jsonLd = {
     '@context': 'https://schema.org',

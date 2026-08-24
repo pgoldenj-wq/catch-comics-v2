@@ -10,10 +10,10 @@
 import type { MetadataRoute }             from 'next'
 import { prisma }                          from '@/lib/prisma'
 import { getAllSeriesSlugs }               from '@/lib/series/registry'
+import { BASE_URL } from '@/lib/site-url'
 
 export const revalidate = 86_400 // 24 hours
 
-const BASE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://catchcomics.com').replace(/\/$/, '')
 
 // ── Static pages ──────────────────────────────────────────────────────────────
 

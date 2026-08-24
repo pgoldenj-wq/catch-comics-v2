@@ -49,6 +49,33 @@ export default function SiteFooter() {
         We are not a retailer and do not process payments or hold stock.
       </p>
 
+      {/* Browse links — kept in their own nav (not merged into the legal row)
+          so Series is reachable from every page on mobile, where only the
+          homepage header carries it (founder review 2026-08-24). */}
+      <nav
+        aria-label="Browse"
+        style={{
+          display:        'flex',
+          justifyContent: 'center',
+          flexWrap:       'wrap',
+          gap:            '6px 18px',
+          marginBottom:   '14px',
+        }}
+      >
+        <Link
+          href="/series"
+          style={{
+            fontSize:       '12px',
+            fontWeight:     600,
+            color:          'rgba(255,255,255,0.55)',
+            textDecoration: 'none',
+          }}
+          className="hover:text-[#E8272A] transition-colors"
+        >
+          Browse Series
+        </Link>
+      </nav>
+
       {/* Legal links */}
       <nav
         aria-label="Legal pages"

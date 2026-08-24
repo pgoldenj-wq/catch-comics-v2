@@ -8,6 +8,7 @@ import SeriesHero           from './_components/SeriesHero'
 import VolumeGrid           from './_components/VolumeGrid'
 import EditionComparison    from './_components/EditionComparison'
 import { jsonLdScriptString } from '@/lib/security/jsonLd'
+import { BASE_URL } from '@/lib/site-url'
 
 // ISR: same cadence as product pages
 export const revalidate = 3600
@@ -39,7 +40,6 @@ export async function generateMetadata(
     : `${entry.displayName} — ${volCount} volume${volCount !== 1 ? 's' : ''}.` +
       ` Start with Vol. 1${fromText}. Compare prices across UK retailers.`
 
-  const BASE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://catchcomics.com').replace(/\/$/, '')
   const url      = `${BASE_URL}/series/${slug}`
 
   return {
@@ -72,7 +72,6 @@ export default async function SeriesPage(
   if (!entry) notFound()
 
   const data     = await getSeriesData(entry)
-  const BASE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://catchcomics.com').replace(/\/$/, '')
 
   // ── JSON-LD ────────────────────────────────────────────────────────────────
   const bookSeriesLd = {

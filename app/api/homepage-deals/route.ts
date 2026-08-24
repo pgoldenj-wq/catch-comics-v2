@@ -56,9 +56,17 @@ const PINNED_SERIES_PATTERNS = [
 // rail. Display-only gate — these products remain searchable and purchasable.
 // Includes editorial exclusions for known explicit series that carry no
 // flagged keyword in their titles (Painter of the Night is 18+ BL).
+// Also excludes merchandise that carries a comic format tag but is not a comic:
+// "Demon Slayer Coloring Book 3" and databooks were surfacing on the rail as
+// MANGA_VOLUME, which undercuts "recognisable series" on the first screen
+// (founder review 2026-08-24). Display-only — they stay searchable.
 const EXCLUDED_TITLE_PATTERNS = [
   '%brothel%', '%hentai%', '%erotica%', '%ecchi%',
   '%painter of the night%',
+  // Substrings only — no bare '%art of %' (it also matches "he-art of ...",
+  // e.g. "The Heart of the Empire").
+  '%coloring book%', '%colouring book%', '%activity book%',
+  '%sticker book%', '%artbook%', '%art book%',
 ]
 
 export interface HomepageDeal {
