@@ -3,16 +3,21 @@
  * MobileHeader — shared sticky header for all mobile pages (md:hidden).
  *
  * Two variants:
- *   'discovery' — homepage. Logo left, UK / US abbreviated region pills right.
- *   'search'    — search + comic detail. Logo left, search bar centre, region pills right.
+ *   'discovery' — homepage. Logo left, Series nav + static UK indicator right.
+ *   'search'    — search + comic detail. Logo left, search bar fills the rest.
  *
- * Region pills match the desktop pill system exactly:
- *   active   → filled #0A0A0A, white text
- *   inactive → 1px #E5E7EB border, white bg, #6B7280 text
+ * Region: this header used to carry UK / US pills. Desktop dropped its selector
+ * because picking US switched the eBay path to EBAY_US and presented USD listings
+ * as Catch Comics offers, which a UK price-comparison site must not do; mobile
+ * kept the pills and was worse — every homepage deal has lowestPriceUSD = null,
+ * so tapping "US" removed every price from the rail while the heading still read
+ * "Live prices from retailers" (founder review 2026-08-24). It is now the same
+ * static UK indicator the desktop Navbar shows: a fact, not a choice.
  *
  * Desktop headers (hidden md:block wrappers) are untouched.
  */
 
+import Link      from 'next/link'
 import SearchBar from '@/components/SearchBar'
 
 // ── Flag SVGs ─────────────────────────────────────────────────────────────────
@@ -34,72 +39,25 @@ function UKFlag() {
   )
 }
 
-const STAR_5_POINTS = '0,-1.2 0.27,-0.37 1.14,-0.37 0.44,0.14 0.71,0.97 0,0.46 -0.71,0.97 -0.44,0.14 -1.14,-0.37 -0.27,-0.37'
+// ── Static UK indicator ───────────────────────────────────────────────────────
+// Mirrors the desktop Navbar: Catch Comics compares UK prices, so this states a
+// fact rather than offering a region choice. See the file header for why.
 
-function USFlag() {
+function UKIndicator() {
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 60 30"
-      preserveAspectRatio="xMinYMid slice"
-      style={{ width: '100%', height: '100%', display: 'block' }}
-      aria-hidden="true">
-      <rect width="60" height="30" fill="#B22234"/>
-      <path d="M0 3.46h60M0 6.92h60M0 10.38h60M0 13.85h60M0 17.31h60M0 20.77h60M0 24.23h60" stroke="#fff" strokeWidth="2.31"/>
-      <rect width="24" height="16.15" fill="#3C3B6E"/>
-      <g fill="#fff">
-        {[...Array(5)].map((_, row) =>
-          [...Array(row % 2 === 0 ? 6 : 5)].map((_, col) => {
-            const cx = row % 2 === 0 ? 2 + col * 4 : 4 + col * 4
-            const cy = 2 + row * 3
-            return (
-              <polygon
-                key={`${row}-${col}`}
-                points={STAR_5_POINTS}
-                transform={`translate(${cx} ${cy})`}
-              />
-            )
-          })
-        )}
-      </g>
-    </svg>
-  )
-}
-
-// ── Region pill ───────────────────────────────────────────────────────────────
-// Mirrors the desktop pill logic exactly (filled black active / bordered inactive).
-
-function RegionPill({
-  active, value, label, onClick,
-}: {
-  active: boolean
-  value:  'uk' | 'us'
-  label:  string
-  onClick: () => void
-}) {
-  return (
-    <button
-      onClick={onClick}
-      aria-label={value === 'uk' ? 'UK prices' : 'US prices'}
-      aria-pressed={active}
-      style={{
-        display: 'flex', alignItems: 'center', gap: '5px',
-        padding: '0 10px', height: '36px', borderRadius: '999px',
-        border: `${active ? '1.5' : '1'}px solid ${active ? '#0A0A0A' : '#E5E7EB'}`,
-        background: active ? '#0A0A0A' : '#fff',
-        cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0,
-        transition: 'border-color 0.12s, background 0.12s',
-      }}>
-      <span style={{
-        width: '20px', height: '20px', borderRadius: '50%',
-        overflow: 'hidden', flexShrink: 0, display: 'block', background: '#f3f4f6',
-      }}>
-        {value === 'uk' ? <UKFlag /> : <USFlag />}
+    <div
+      className="flex items-center gap-1.5 rounded-full border shrink-0"
+      style={{ borderColor: '#E5E7EB', background: '#fff', padding: '0 10px', height: '36px' }}
+      title="Catch Comics compares UK prices"
+    >
+      <span
+        className="rounded-full overflow-hidden shrink-0 block"
+        style={{ width: '20px', height: '20px', background: '#f3f4f6' }}
+      >
+        <UKFlag />
       </span>
-      <span style={{ fontSize: '12px', fontWeight: 600, color: active ? '#fff' : '#6B7280' }}>
-        {label}
-      </span>
-    </button>
+      <span style={{ fontSize: '12px', fontWeight: 600, color: '#6B7280' }}>UK</span>
+    </div>
   )
 }
 
@@ -108,13 +66,18 @@ function RegionPill({
 export interface MobileHeaderProps {
   variant:        'discovery' | 'search'
   region:         'uk' | 'us'
-  onRegionChange: (r: 'uk' | 'us') => void
+  /**
+   * @deprecated No longer called — the header shows a static UK indicator rather
+   * than a region selector (see the file header). Kept so existing call sites
+   * keep type-checking; safe to drop once they stop passing it.
+   */
+  onRegionChange?: (r: 'uk' | 'us') => void
   /** Search variant only — pre-fills the SearchBar input. */
   initialQuery?:  string
 }
 
 export default function MobileHeader({
-  variant, region, onRegionChange, initialQuery,
+  variant, region, initialQuery,
 }: MobileHeaderProps) {
   return (
     <header
@@ -132,32 +95,35 @@ export default function MobileHeader({
       }}>
 
         {/* Logo — always left, links home */}
-        <a href="/" style={{ flexShrink: 0, lineHeight: 0 }}>
+        <Link href="/" style={{ flexShrink: 0, lineHeight: 0 }} aria-label="Catch Comics home">
           <img src="/logo.png" alt="Catch Comics" style={{ height: '40px', width: 'auto' }} />
-        </a>
+        </Link>
 
         {variant === 'discovery' ? (
-          /* Discovery: Series link + region pills on the right */
+          /* Discovery: primary nav + static UK indicator on the right. Series is
+             a bordered chip so it reads as a destination rather than loose text
+             beside the wordmark (founder review 2026-08-24). */
           <>
-            <a
-              href="/series"
-              style={{
-                marginLeft:     'auto',
-                fontSize:       '13px',
-                fontWeight:     600,
-                color:          '#374151',
-                textDecoration: 'none',
-                whiteSpace:     'nowrap',
-                padding:        '8px 4px',
-                flexShrink:     0,
-              }}
-            >
-              Series
-            </a>
-            <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-              <RegionPill active={region === 'uk'} value="uk" label="UK" onClick={() => onRegionChange('uk')} />
-              <RegionPill active={region === 'us'} value="us" label="US" onClick={() => onRegionChange('us')} />
-            </div>
+            <nav aria-label="Primary" style={{ marginLeft: 'auto', display: 'flex', flexShrink: 0 }}>
+              <Link
+                href="/series"
+                className="flex items-center rounded-full border shrink-0"
+                style={{
+                  borderColor:    '#E5E7EB',
+                  background:     '#fff',
+                  padding:        '0 14px',
+                  height:         '36px',
+                  fontSize:       '13px',
+                  fontWeight:     600,
+                  color:          '#374151',
+                  textDecoration: 'none',
+                  whiteSpace:     'nowrap',
+                }}
+              >
+                Series
+              </Link>
+            </nav>
+            <UKIndicator />
           </>
         ) : (
           /* Search: search bar fills remaining space after logo.

@@ -11,8 +11,8 @@
  */
 
 import type { MetadataRoute } from 'next'
+import { BASE_URL } from '@/lib/site-url'
 
-const BASE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://catchcomics.com').replace(/\/$/, '')
 
 export default function robots(): MetadataRoute.Robots {
   return {

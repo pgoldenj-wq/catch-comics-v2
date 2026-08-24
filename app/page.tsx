@@ -70,6 +70,19 @@ const DEAL_FALLBACKS: Record<number, string> = {
 // Local alias kept for the existing call site below.
 const isPlaceholderCoverUrl = (url: string) => isBadCoverUrl(url)
 
+// What the rail's number actually is. /api/homepage-deals MINs over stored
+// retailer_listings; eBay is live-only and therefore NOT in that number, so the
+// product page's own comparison table regularly opens below it (measured
+// 2026-08-24: Hellboy Omnibus rail £27.54 → page £10.80). Saying "live prices
+// from retailers" let the number read as "the cheapest", which it is not.
+// Declared once so the desktop and mobile rails cannot drift apart.
+const RAIL_PRICE_NOTE = 'Cheapest tracked retailer — eBay may be lower'
+
+// Vertical headroom added to the deal rail's clip box so a hover-enlarged cover
+// (.cover-card-lg scales 1.53× from centre) is not sliced off at the top.
+// 185px cover → 283px enlarged → 49px needed above; 56px leaves a little slack.
+const RAIL_HOVER_HEADROOM = 56
+
 // adjustImgSrc lives in lib/images/url-filters (imported above).
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -350,11 +363,13 @@ export default function Home() {
 
       {/* ── Mobile: top deals 2-column grid ─────────────────────────────────── */}
       <div className="md:hidden" style={{ padding: '16px 16px 0' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '14px' }}>
+        {/* Stacked, not a baseline row: the price note is too long to sit beside
+            the heading at 390px. Same shape as the desktop rail header. */}
+        <div style={{ marginBottom: '14px' }}>
           <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#111', margin: 0 }}>Price finds today</h2>
-          <span style={{ fontSize: '11px', color: '#6B7280' }}>
-            {liveDeals ? 'Live prices from retailers' : 'Sample prices'}
-          </span>
+          <p style={{ fontSize: '11px', color: '#6B7280', margin: '2px 0 0' }}>
+            {liveDeals ? RAIL_PRICE_NOTE : 'Sample prices'}
+          </p>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
           {(liveDeals ?? TOP_DEALS).slice(0, 6).map((deal, idx) => {
@@ -455,7 +470,10 @@ export default function Home() {
       {/* ── HERO CARD ───────────────────────────────────────────────────────── */}
       <div className="max-w-6xl mx-auto px-6 pt-8 pb-4">
         <div style={{ background: '#111827', borderRadius: '28px', minHeight: '420px', overflow: 'visible', position: 'relative', display: 'flex', alignItems: 'stretch' }}>
-          <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px)', backgroundSize: '22px 22px' }} />
+          {/* Decorative overlays inherit the card's 28px radius. Without it they
+              paint square-cornered rectangles over the rounded card (founder
+              review 2026-08-24 — the hero read as square on the right). */}
+          <div style={{ position: 'absolute', inset: 0, borderRadius: '28px', pointerEvents: 'none', backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px)', backgroundSize: '22px 22px' }} />
           <div style={{ position: 'absolute', top: '-80px', right: '-80px', width: '420px', height: '420px', pointerEvents: 'none', background: 'radial-gradient(circle, rgba(232,39,42,0.14) 0%, transparent 65%)' }} />
 
           {/* LEFT — copy + search + category hints */}
@@ -498,8 +516,12 @@ export default function Home() {
           {/* RIGHT — book covers + publisher strip.
               overflow:visible so covers can scale beyond container bounds on hover. */}
           <div className="hero-right" style={{ position: 'relative', flex: 1, minWidth: 0, overflow: 'visible', display: 'flex', flexDirection: 'column', justifyContent: 'center', borderRadius: '0 28px 28px 0' }}>
-            {/* Right-edge fade so covers dissolve naturally into the card border */}
-            <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '56px', zIndex: 20, pointerEvents: 'none', background: 'linear-gradient(to left, #111827 0%, transparent 100%)' }} />
+            {/* Right-edge fade so covers dissolve naturally into the card border.
+                borderRadius is REQUIRED: this band is opaque #111827 at its right
+                edge and sits above everything (z-index 20), so without the radius
+                it squares off the card's top-right and bottom-right corners while
+                the left side stays rounded (founder review 2026-08-24). */}
+            <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '56px', borderRadius: '0 28px 28px 0', zIndex: 20, pointerEvents: 'none', background: 'linear-gradient(to left, #111827 0%, transparent 100%)' }} />
 
             {/* Cover stack — height is a flex spacer; covers are absolutely positioned.
                 Each cover has a wrapper div that handles hover-scale so the whole frame
@@ -556,10 +578,16 @@ export default function Home() {
             </div>
 
             {/* Publisher logo strip — wrapped in its own overflow:hidden so the
-                strip scrolls cleanly after hero-right was changed to overflow:visible. */}
-            <div aria-hidden="true" style={{ position: 'relative', marginTop: '14px', height: '36px', overflow: 'hidden' }}>
-              <div style={{ position: 'absolute', left: 0,  top: 0, bottom: 0, width: '32px', zIndex: 2, pointerEvents: 'none', background: 'linear-gradient(to right, #111827 0%, transparent 100%)' }} />
-              <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '32px', zIndex: 2, pointerEvents: 'none', background: 'linear-gradient(to left,  #111827 0%, transparent 100%)' }} />
+                strip scrolls cleanly after hero-right was changed to overflow:visible.
+                Width is pinned to the cover stack's footprint (covers span left
+                8px → 465px, i.e. 457px wide) instead of the full hero-right column.
+                Unpinned it ran from the hero's midpoint to the card border, so the
+                names read as escaping the artwork (founder review 2026-08-24).
+                maxWidth keeps it inside the column on narrower desktops, where
+                hero-right is under 465px. */}
+            <div aria-hidden="true" style={{ position: 'relative', marginTop: '14px', marginLeft: '8px', width: '457px', maxWidth: 'calc(100% - 8px)', height: '36px', overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', left: 0,  top: 0, bottom: 0, width: '52px', zIndex: 2, pointerEvents: 'none', background: 'linear-gradient(to right, #111827 0%, transparent 100%)' }} />
+              <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '52px', zIndex: 2, pointerEvents: 'none', background: 'linear-gradient(to left,  #111827 0%, transparent 100%)' }} />
               <div className="pub-track">
                 {[...publisherLogos, ...publisherLogos].map((logo, i) => (
                   /* No parent opacity — each logo SVG already encodes its target alpha
@@ -580,7 +608,7 @@ export default function Home() {
           <div style={{ flexShrink: 0 }}>
             <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#111', margin: 0 }}>Price finds today</h2>
             <p style={{ fontSize: '11px', color: '#6B7280', margin: '2px 0 0' }}>
-              {liveDeals ? 'Live prices from retailers' : 'Sample prices'}
+              {liveDeals ? RAIL_PRICE_NOTE : 'Sample prices'}
             </p>
           </div>
           {/* Right — popular search tags, low visual weight */}
@@ -600,7 +628,12 @@ export default function Home() {
 
         <div
           ref={carouselRef}
-          style={{ overflow: 'hidden', position: 'relative', cursor: hoverZone ? 'ew-resize' : 'default' }}
+          // flow-root establishes a block formatting context so the clip layer's
+          // negative top margin does NOT collapse through into this element. Left
+          // as plain `block`, the -56px margin moved the rail's own box up 56px,
+          // which put its (pointer-active) top edge over the "Popular:" tags and
+          // swallowed their clicks. Verified 2026-08-24: tags reachable again.
+          style={{ display: 'flow-root', position: 'relative', cursor: hoverZone ? 'ew-resize' : 'default' }}
           onMouseMove={handleMouseMove}
           onMouseLeave={() => { hoverZoneRef.current = null; setHoverZone(null); }}>
 
@@ -614,6 +647,8 @@ export default function Home() {
             onClick={() => scrollCarousel('left')}
             aria-label="Scroll left"
             style={{
+              // Centred within the card band (below the hover headroom), not the
+              // padded box — top/bottom + auto margins do that without a transform.
               position: 'absolute', left: '6px', top: '50%', transform: 'translateY(-50%)',
               zIndex: 4, width: '28px', height: '28px', borderRadius: '50%',
               background: '#fff', border: '1px solid #E5E7EB',
@@ -647,11 +682,22 @@ export default function Home() {
             </svg>
           </button>
 
+          {/* Clip layer. The rail must clip horizontally (it holds three copies of
+              the track for the infinite loop), but the 136×185 cover sits flush
+              with the rail's top edge and .cover-card-lg:hover scales it 1.53×
+              from its centre, which needs ≈49px above that edge — so the top of
+              every enlarged cover was sliced off (founder review 2026-08-24).
+              paddingTop grows the clip box upward and the matching negative margin
+              keeps the cards, the rail's own box, and everything below exactly
+              where they were. The band therefore hangs over the section header,
+              so it is pointer-transparent (the track re-enables events) — without
+              that it would swallow clicks on the "Popular:" tags above. */}
+          <div style={{ overflow: 'hidden', paddingTop: `${RAIL_HOVER_HEADROOM}px`, marginTop: `-${RAIL_HOVER_HEADROOM}px`, pointerEvents: 'none' }}>
           {/* 3 copies for seamless infinite loop. alignItems flex-start pins all
               cover boxes to the same top edge — the browser's native <button>
               vertical centering inside stretched flex items shifted cards with a
               missing publisher line ~8px lower (CC-008). */}
-          <div ref={trackRef} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', transform: 'translateX(0)', willChange: 'transform' }}>
+          <div ref={trackRef} style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', transform: 'translateX(0)', willChange: 'transform', pointerEvents: 'auto' }}>
             {[...activeDeals, ...activeDeals, ...activeDeals].map((deal, i) => {
               // Branch: live DB deal vs static fallback deal
               const isLive  = liveDeals !== null
@@ -753,6 +799,7 @@ export default function Home() {
               );
             })}
           </div>
+          </div>{/* end rail clip layer */}
         </div>
       </div>
 

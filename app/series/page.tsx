@@ -5,6 +5,7 @@ import { SERIES_REGISTRY }  from '@/lib/series/registry'
 import { getSeriesData }    from '@/lib/series/getSeriesData'
 import SeriesIndexCard      from './_components/SeriesIndexCard'
 import { jsonLdScriptString } from '@/lib/security/jsonLd'
+import { BASE_URL } from '@/lib/site-url'
 
 export const revalidate = 3600
 
@@ -12,7 +13,6 @@ export const revalidate = 3600
 
 export async function generateMetadata(): Promise<Metadata> {
   const count   = Object.keys(SERIES_REGISTRY).length
-  const BASE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://catchcomics.com').replace(/\/$/, '')
   const url      = `${BASE_URL}/series`
 
   return {
@@ -54,7 +54,6 @@ export default async function SeriesIndexPage() {
   )
 
   const count    = series.length
-  const BASE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://catchcomics.com').replace(/\/$/, '')
 
   // ── JSON-LD ────────────────────────────────────────────────────────────────
   const itemListLd = {
