@@ -1,118 +1,123 @@
 ﻿{
-    "pages":  {
-                  "series-index":  {
-                                       "shots":  0,
-                                       "checkpoints":  "0/0",
-                                       "lastSentAt":  null,
-                                       "lastReviewedAt":  null,
-                                       "title":  "series-index",
-                                       "status":  null
-                                   },
-                  "affiliate":  {
-                                    "shots":  0,
-                                    "checkpoints":  "0/0",
-                                    "lastSentAt":  null,
-                                    "lastReviewedAt":  null,
-                                    "title":  "affiliate",
-                                    "status":  null
-                                },
-                  "loading":  {
-                                  "shots":  0,
-                                  "checkpoints":  "0/0",
-                                  "lastSentAt":  null,
-                                  "lastReviewedAt":  null,
-                                  "title":  "loading",
-                                  "status":  null
-                              },
-                  "route":  {
-                                "shots":  0,
-                                "checkpoints":  "0/0",
-                                "lastSentAt":  null,
-                                "lastReviewedAt":  null,
-                                "title":  "route",
-                                "status":  null
-                            },
-                  "launch-readiness":  {
-                                           "shots":  0,
-                                           "checkpoints":  "0/0",
-                                           "lastSentAt":  null,
-                                           "lastReviewedAt":  null,
-                                           "title":  "launch-readiness",
-                                           "status":  null
-                                       },
-                  "offerstable":  {
-                                      "shots":  0,
-                                      "checkpoints":  "0/0",
-                                      "lastSentAt":  null,
-                                      "lastReviewedAt":  null,
-                                      "title":  "offerstable",
-                                      "status":  null
-                                  },
-                  "errors":  {
-                                 "shots":  0,
-                                 "checkpoints":  "0/0",
-                                 "lastSentAt":  null,
-                                 "lastReviewedAt":  null,
-                                 "title":  "errors",
-                                 "status":  null
-                             },
-                  "product":  {
-                                  "shots":  0,
-                                  "checkpoints":  "0/0",
-                                  "lastSentAt":  null,
-                                  "lastReviewedAt":  null,
-                                  "title":  "product",
-                                  "status":  null
-                              },
-                  "series-pages":  {
-                                       "shots":  0,
-                                       "checkpoints":  "0/0",
-                                       "lastSentAt":  null,
-                                       "lastReviewedAt":  null,
-                                       "title":  "series-pages",
-                                       "status":  null
-                                   },
-                  "mobile":  {
-                                 "shots":  0,
-                                 "checkpoints":  "0/0",
-                                 "lastSentAt":  null,
-                                 "lastReviewedAt":  null,
-                                 "title":  "mobile",
-                                 "status":  null
-                             },
-                  "homepage":  {
-                                   "shots":  0,
-                                   "checkpoints":  "0/0",
-                                   "lastSentAt":  null,
-                                   "lastReviewedAt":  null,
-                                   "title":  "homepage",
-                                   "status":  null
-                               },
-                  "recommendation":  {
-                                         "shots":  0,
-                                         "checkpoints":  "0/0",
-                                         "lastSentAt":  null,
-                                         "lastReviewedAt":  null,
-                                         "title":  "recommendation",
-                                         "status":  null
-                                     },
-                  "covers":  {
-                                 "shots":  0,
-                                 "checkpoints":  "0/0",
-                                 "lastSentAt":  null,
-                                 "lastReviewedAt":  null,
-                                 "title":  "covers",
-                                 "status":  null
-                             },
-                  "search":  {
-                                 "shots":  0,
-                                 "checkpoints":  "0/0",
-                                 "lastSentAt":  null,
-                                 "lastReviewedAt":  null,
-                                 "title":  "search",
-                                 "status":  null
-                             }
-              },
-    "tool":  "smoke-test-v4",
-    "updated":  "2026-07-03T22:53:08.0174562+01:00"
+  "pages": {
+    "series-index": {
+      "shots": 0,
+      "checkpoints": "0/0",
+      "lastSentAt": null,
+      "lastReviewedAt": null,
+      "title": "series-index",
+      "status": null
+    },
+    "affiliate": {
+      "shots": 0,
+      "checkpoints": "0/0",
+      "lastSentAt": null,
+      "lastReviewedAt": null,
+      "title": "affiliate",
+      "status": null
+    },
+    "loading": {
+      "shots": 0,
+      "checkpoints": "0/0",
+      "lastSentAt": null,
+      "lastReviewedAt": null,
+      "title": "loading",
+      "status": null
+    },
+    "route": {
+      "shots": 0,
+      "checkpoints": "0/0",
+      "lastSentAt": null,
+      "lastReviewedAt": null,
+      "title": "route",
+      "status": null
+    },
+    "launch-readiness": {
+      "shots": 0,
+      "checkpoints": "0/0",
+      "lastSentAt": null,
+      "lastReviewedAt": null,
+      "title": "launch-readiness",
+      "status": null
+    },
+    "offerstable": {
+      "shots": 0,
+      "checkpoints": "0/0",
+      "lastSentAt": null,
+      "lastReviewedAt": null,
+      "title": "offerstable",
+      "status": null
+    },
+    "errors": {
+      "shots": 0,
+      "checkpoints": "0/0",
+      "lastSentAt": null,
+      "lastReviewedAt": null,
+      "title": "errors",
+      "status": null
+    },
+    "product": {
+      "shots": 0,
+      "checkpoints": "0/0",
+      "lastSentAt": null,
+      "lastReviewedAt": null,
+      "title": "product",
+      "status": null
+    },
+    "series-pages": {
+      "shots": 0,
+      "checkpoints": "0/0",
+      "lastSentAt": null,
+      "lastReviewedAt": null,
+      "title": "series-pages",
+      "status": null
+    },
+    "mobile": {
+      "shots": 0,
+      "checkpoints": "0/0",
+      "lastSentAt": null,
+      "lastReviewedAt": null,
+      "title": "mobile",
+      "status": null
+    },
+    "homepage": {
+      "shots": 4,
+      "checkpoints": "11/13",
+      "lastSentAt": "2026-08-24T18:00:00.000Z",
+      "lastReviewedAt": "2026-08-24T18:00:00.000Z",
+      "title": "homepage",
+      "status": "fix",
+      "issues": 6,
+      "lastReviewId": "homepage-2026-08-24",
+      "resolvedAt": "2026-08-24T19:10:00.000Z",
+      "resolution": "All 6 defects fixed and production-verified (PR #38 merge fbc6408, PR #39 merge 0d8afd3). Hero right corners rounded (the edge-fade overlay had no border-radius); publisher marquee constrained to the cover stack; hover-enlarged rail cards no longer clipped (0px top/bottom); Series is real primary nav plus a footer link; mobile UK/US toggle removed - it blanked all 12 prices because every deal has lowestPriceUSD null; rail relabelled \"Cheapest tracked retailer - eBay may be lower\" because the rail MINs stored retailer_listings and eBay is live-only; canonical/og/sitemap moved to the www host that actually serves 200. Launch smoke 20/20, Browser Trust 13/0/3 against production. Awaiting founder re-review to move to good.",
+      "openFollowUp": "P0 raised, not built (founder chose plan-first): /api/ebay merges an unfiltered fuzzy title search whenever the ISBN lookup returns fewer than 3 hits, so /product/hellboy-omnibus-706665 lists Hellboy Omnibus Vol 2 and a B.P.R.D. book at the TOP of its price table at GBP 10.80 - a different book presented as the cheapest offer. Plan: launch/product-excellence/ebay-relevance-gate-plan.md"
+    },
+    "recommendation": {
+      "shots": 0,
+      "checkpoints": "0/0",
+      "lastSentAt": null,
+      "lastReviewedAt": null,
+      "title": "recommendation",
+      "status": null
+    },
+    "covers": {
+      "shots": 0,
+      "checkpoints": "0/0",
+      "lastSentAt": null,
+      "lastReviewedAt": null,
+      "title": "covers",
+      "status": null
+    },
+    "search": {
+      "shots": 0,
+      "checkpoints": "0/0",
+      "lastSentAt": null,
+      "lastReviewedAt": null,
+      "title": "search",
+      "status": null
+    }
+  },
+  "tool": "smoke-test-v4",
+  "updated": "2026-08-25T21:11:07.295Z"
 }
