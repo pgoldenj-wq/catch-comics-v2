@@ -21,7 +21,7 @@ param(
 
 $ErrorActionPreference = 'Continue'
 $Port = 8317
-$BridgePort = 8319          # Browser Trust local action bridge (127.0.0.1 only)
+$BridgePort = 8319          # Local action bridge (127.0.0.1 only)
 $BaseUrl = "http://localhost:$Port"
 
 function Say($msg, $color) { if ($color) { Write-Host $msg -ForegroundColor $color } else { Write-Host $msg } }
@@ -165,10 +165,13 @@ if (Test-McServer) {
   }
 }
 
-# -- Browser Trust bridge: gives the "Run Browser Trust" button a real action --
-# Local-only (127.0.0.1:8319), one fixed action, no command input. Without it
-# Mission Control degrades honestly to copying the command. Starting it never
-# runs any test - it only makes the button able to.
+# -- Local action bridge: gives the Command Centre's buttons real actions ------
+# Local-only (127.0.0.1:8319), fixed actions, no command input. It backs
+# "Run Browser Trust", "Refresh Retailer Prices", and the Smoke Test V4
+# "Send <page> to Claude" handoff - which is also how the Smoke Test knows
+# where the repo is without asking the founder to pick a folder.
+# Without it those buttons degrade honestly to a manual fallback. Starting it
+# never runs anything - it only makes the buttons able to.
 $bridgeStatus = ''
 function Test-Bridge {
   try {
@@ -178,18 +181,18 @@ function Test-Bridge {
 }
 if (Test-Bridge) {
   $bridgeStatus = "already running on port $BridgePort (reused)"
-  Say "  Browser Trust bridge $bridgeStatus" Green
+  Say "  Local action bridge $bridgeStatus" Green
 } else {
   Start-Process -FilePath 'node' `
     -ArgumentList (Join-Path $RepoRoot 'launch\operations\browser-trust-bridge.mjs') `
     -WorkingDirectory $RepoRoot -WindowStyle Minimized
   $bridgeUp = $false
   foreach ($i in 1..10) { Start-Sleep -Milliseconds 400; if (Test-Bridge) { $bridgeUp = $true; break } }
-  if ($bridgeUp) { $bridgeStatus = "started on port $BridgePort"; Say "  Browser Trust bridge $bridgeStatus" Green }
+  if ($bridgeUp) { $bridgeStatus = "started on port $BridgePort"; Say "  Local action bridge $bridgeStatus" Green }
   else {
-    # Not a failure: Mission Control falls back to copying the command.
-    $bridgeStatus = 'not available (Run Browser Trust will copy the command instead)'
-    Say "  Browser Trust bridge $bridgeStatus" DarkYellow
+    # Not a failure: every button that uses it falls back honestly.
+    $bridgeStatus = 'not available (buttons fall back to manual steps)'
+    Say "  Local action bridge $bridgeStatus" DarkYellow
   }
 }
 
@@ -210,7 +213,7 @@ $sc = 'Yellow'; if ($smokeStatus  -eq 'PASSED') { $sc = 'Green' } elseif ($smoke
 Say "  Data health   : $healthStatus" $hc
 Say "  Prod smoke    : $smokeStatus" $sc
 Say "  Server        : $serverStatus"
-Say "  Browser Trust : $bridgeStatus"
+Say "  Action bridge : $bridgeStatus"
 Say "  Mission Control: $targetUrl"
 Say ''
 

@@ -106,7 +106,8 @@
     "ingest:issue-covers": "dotenv -e .env.local -- tsx scripts/ingest-issue-covers.ts",
     "test:ebay-uk": "tsx scripts/test-ebay-uk-only.ts",
     "retailer:freshness": "dotenv -e .env.local -- tsx scripts/retailer-freshness.ts",
-    "test:retailer-card": "node scripts/test-retailer-refresh-card.mjs"
+    "test:retailer-card": "node scripts/test-retailer-refresh-card.mjs",
+    "test:founder-review": "node scripts/test-founder-review-handoff.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1055.0",

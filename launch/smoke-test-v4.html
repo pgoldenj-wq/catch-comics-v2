@@ -6,7 +6,7 @@
 <title>Catch Comics — Founder Review (Smoke Test V4)</title>
 <style>
 /* ═══ Founder Review System — Smoke Test V4 ═══════════════════════════
-   Philosophy: Notion/Linear, not Jira. One thoughts box. Two statuses.
+   Philosophy: Notion/Linear, not Jira. Issues you just write. Two statuses.
    Claude decides severity, grouping and priority. Joe decides feelings.
    ══════════════════════════════════════════════════════════════════ */
 :root {
@@ -79,7 +79,7 @@ main { padding:26px; max-width:880px; }
 .check label { cursor:pointer; }
 .check code { background:#F3F4F6; border-radius:4px; padding:1px 5px; font-size:13px; }
 
-/* thoughts / amends */
+/* issues */
 .thoughts textarea { width:100%; min-height:110px; resize:vertical; border:1px solid var(--line);
   border-radius:12px; padding:14px; font:inherit; color:var(--ink); background:#FDFDFC; }
 .thoughts textarea:focus { border-color:var(--focus); }
@@ -156,6 +156,13 @@ main { padding:26px; max-width:880px; }
 #annoWrap { max-width:96vw; max-height:70vh; overflow:auto; border-radius:8px; box-shadow:0 10px 50px rgba(0,0,0,.5); }
 #annoCanvas { display:block; cursor:crosshair; touch-action:none; }
 
+/* Repo/bridge chip — replaces the old per-handoff directory picker. The repo
+   is established once by the local bridge, so this only ever REPORTS. */
+.repochip { font-size:12px; padding:5px 10px; border-radius:999px; border:1px solid var(--line);
+  color:var(--ink2); background:#F9FAFB; white-space:nowrap; }
+.repochip.on  { border-color:#A7F3D0; background:#ECFDF5; color:#065F46; }
+.repochip.off { border-color:#FECACA; background:#FEF2F2; color:#991B1B; }
+
 .help { font-size:13px; color:var(--ink2); }
 kbd { background:#F3F4F6; border:1px solid var(--line); border-bottom-width:2px; border-radius:5px; padding:1px 6px; font-size:12px; }
 </style>
@@ -168,7 +175,9 @@ kbd { background:#F3F4F6; border:1px solid var(--line); border-bottom-width:2px;
       <div class="sub">Look at the page. Say how it feels. Paste screenshots. Send it to Claude. <span id="storageState"></span></div>
     </div>
     <div class="spacer"></div>
-    <button class="btn" id="connectBtn" title="Pick the repo's launch/ folder once — reviews are then written straight into the repo">🔌 Connect repo</button>
+    <span class="repochip" id="repoChip" title="Where reviews are written">Checking local bridge…</span>
+    <button class="btn" id="connectBtn" hidden
+      title="Fallback only — pick the repo's launch/ folder by hand if the local bridge is unavailable">🔌 Connect repo (fallback)</button>
     <button class="btn" id="importV3Btn" title="Pull checkpoints, notes and screenshots from Smoke Test V3">Import V3</button>
     <button class="btn" id="exportBtn" title="Download the whole session as JSON">Export</button>
   </header>
@@ -365,33 +374,53 @@ function blank(){ return { version:4, activePage:PAGES[0].id, pages:{} }; }
 function load(){ try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.version===4) return s; } catch(e){} return blank(); }
 let state = load();
 let saveT = null;
-// localStorage now holds only lightweight metadata (checklist, notes, amends,
+// localStorage now holds only lightweight metadata (checklist, notes, issues,
 // shot ids) — screenshot bytes live in IndexedDB (see image storage below), so
 // this basically never fills. If it ever does, notes are still on screen.
 function save(){ clearTimeout(saveT); saveT = setTimeout(()=>{ try { localStorage.setItem(KEY, JSON.stringify(state)); setStorageState(); } catch(e){ toast('Could not autosave metadata — your notes are still on screen. Export as a backup.','err'); } }, 250); }
+// Short stable id. Issues need one so a screenshot can point at an issue and
+// keep pointing at it after the issues above it are reordered or deleted —
+// an array index would silently re-attach the photo to the wrong problem.
+function uid(){ return Math.random().toString(36).slice(2,8) + Date.now().toString(36).slice(-4); }
+function blankIssue(){ return { id: uid(), problem:'', expected:'', ts: Date.now() }; }
+
 function P(id){
-  if(!state.pages[id]) state.pages[id] = { status:null, amends:[''], checks:{}, checkNotes:{}, shots:[], lastSentAt:null, lastReviewedAt:null };
+  if(!state.pages[id]) state.pages[id] = { status:null, issues:[blankIssue()], checks:{}, checkNotes:{}, shots:[], lastSentAt:null, lastReviewedAt:null, send:null };
   const ps = state.pages[id];
-  // Lazy migration from the v4.0 shape — existing progress is never wiped:
-  // the single thoughts box becomes Amend 1; shots/checkpoints gain note slots.
-  if (!Array.isArray(ps.amends)){
-    ps.amends = (typeof ps.thoughts === 'string' && ps.thoughts.trim()) ? [ps.thoughts] : [''];
-    delete ps.thoughts;
+  // Lazy migration, oldest shape first — existing progress is never wiped.
+  // v4.0: one `thoughts` box → v4.1: `amends` strings → v4.2: `issues` objects
+  // with stable ids, so screenshots can be attached to a specific issue.
+  if (!Array.isArray(ps.issues)){
+    let texts = [];
+    if (Array.isArray(ps.amends)) texts = ps.amends;
+    else if (typeof ps.thoughts === 'string' && ps.thoughts.trim()) texts = [ps.thoughts];
+    ps.issues = (texts.length ? texts : ['']).map(t => ({ id: uid(), problem: String(t || ''), expected:'', ts: Date.now() }));
+    delete ps.amends; delete ps.thoughts;
   }
+  if (!ps.issues.length) ps.issues = [blankIssue()];
+  ps.issues.forEach(it => { if (!it.id) it.id = uid(); if (typeof it.expected !== 'string') it.expected = ''; });
   if (!ps.checkNotes) ps.checkNotes = {};
-  (ps.shots || []).forEach(s => { if (typeof s.note !== 'string') s.note = ''; });
+  (ps.shots || []).forEach(s => {
+    if (typeof s.note !== 'string') s.note = '';
+    if (typeof s.issueId === 'undefined') s.issueId = null;   // older shots are page-level
+  });
   return ps;
 }
-// Append a non-duplicate amend (used by the V3 importer)
-function pushAmend(ps, text){
-  if (!text || ps.amends.some(a => a.includes(text))) return false;
-  if (ps.amends.length === 1 && !ps.amends[0].trim()) ps.amends[0] = text;
-  else ps.amends.push(text);
+// Append a non-duplicate issue (used by the V3 importer)
+function pushIssue(ps, text){
+  if (!text || ps.issues.some(it => it.problem.includes(text))) return false;
+  if (ps.issues.length === 1 && !ps.issues[0].problem.trim()) ps.issues[0].problem = text;
+  else ps.issues.push({ ...blankIssue(), problem: text });
   return true;
 }
+// Issues the founder actually wrote something in.
+function realIssues(ps){ return ps.issues.filter(it => it.problem.trim() || it.expected.trim()); }
 // Checkpoint-note editors stay open once toggled (until the note is emptied
 // and the page re-renders) — transient UI state, deliberately not persisted.
 const openCheckNotes = new Set();
+// Same for the optional "expected behaviour" box on an issue: shown once the
+// founder asks for it, hidden again only when it is emptied.
+const openExpected = new Set();
 function def(id){ return PAGES.find(p=>p.id===id); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 async function setStorageState(){
@@ -494,18 +523,26 @@ function render(){
   </div>
 
   <div class="card thoughts">
-    <p class="sectionlabel">Thoughts — what do you think?</p>
-    ${ps.amends.map((a,i)=>`
+    <p class="sectionlabel">Issues — what's wrong with this page?</p>
+    ${ps.issues.map((it,i)=>{
+      const attached = ps.shots.filter(s=>s.issueId===it.id).length;
+      const showExp = it.expected.trim() !== '' || openExpected.has(it.id);
+      return `
     <div class="amend">
-      <div class="amendhead"><span>Amend ${i+1}</span>
-        ${ps.amends.length > 1 ? `<button class="linkbtn" data-delamend="${i}">Delete</button>` : ''}
+      <div class="amendhead"><span>Issue ${i+1}${attached ? ` · ${attached} screenshot${attached===1?'':'s'}` : ''}</span>
+        ${ps.issues.length > 1 ? `<button class="linkbtn" data-delissue="${it.id}">Delete</button>` : ''}
       </div>
-      <textarea data-amend="${i}" aria-label="Amend ${i+1}"
+      <textarea data-issue="${it.id}" aria-label="Issue ${i+1} problem"
         placeholder="Describe one issue, improvement or thing that feels wrong…
 
-Claude decides severity, grouping and priority — just write.">${esc(a)}</textarea>
-    </div>`).join('')}
-    <button class="btn" id="addAmend">+ Add another amend</button>
+Claude decides severity, grouping and priority — just write.">${esc(it.problem)}</textarea>
+      ${showExp
+        ? `<label class="shotnotelabel" for="exp-${it.id}">Expected behaviour (optional)</label>
+           <textarea class="shotnote" id="exp-${it.id}" data-expected="${it.id}" aria-label="Expected behaviour for issue ${i+1}"
+             placeholder="What should happen instead?">${esc(it.expected)}</textarea>`
+        : `<button class="linkbtn" data-expandexp="${it.id}">+ Say what you expected instead</button>`}
+    </div>`;}).join('')}
+    <button class="btn" id="addIssue">+ Add another issue</button>
   </div>
 
   <div class="card">
@@ -523,6 +560,14 @@ Claude decides severity, grouping and priority — just write.">${esc(a)}</texta
           <button data-anno="${i}">✏️ Draw</button>
           <button class="del" data-del="${i}">Delete</button>
         </div>
+        <span class="shotnotelabel">Belongs to</span>
+        <select class="shotnote" data-shotissue="${i}" aria-label="Which issue screenshot ${i+1} belongs to" style="padding:8px">
+          <option value=""${s.issueId ? '' : ' selected'}>This page in general</option>
+          ${ps.issues.map((it,n)=>{
+            const label = it.problem.trim() ? it.problem.trim().slice(0,60) : '(empty)';
+            return `<option value="${it.id}"${s.issueId===it.id?' selected':''}>Issue ${n+1} — ${esc(label)}</option>`;
+          }).join('')}
+        </select>
         <span class="shotnotelabel">Screenshot note / annotation</span>
         <textarea class="shotnote" data-shotnote="${i}" aria-label="Note for screenshot ${i+1}"
           placeholder="Describe what you marked up or what feels wrong in this screenshot…">${esc(s.note || '')}</textarea>
@@ -544,12 +589,8 @@ Claude decides severity, grouping and priority — just write.">${esc(a)}</texta
 
   <div class="card sendcard">
     <button class="btn primary big" id="sendBtn">🚀 SEND ${esc(p.title.toUpperCase())} TO CLAUDE</button>
-    <div class="sendmeta" id="sendMeta">
-      ${dirHandle ? 'Writes the review package into the repo, then copies the kick-off command — paste it into Claude Code.'
-                  : 'Tip: press <strong>Connect repo</strong> (top right) once, and this button writes reviews straight into the repo. Without it, you get a download + the prompt on your clipboard.'}
-      ${ps.lastSentAt ? `<br>Last sent: ${new Date(ps.lastSentAt).toLocaleString()}` : ''}
-    </div>
-    <div class="sendmeta"><button class="btn" id="copyBtn" style="margin-top:10px">Copy prompt only</button></div>
+    <div class="sendmeta" id="sendMeta">${sendCardMeta(p, ps)}</div>
+    <div class="sendmeta" id="fallbackRow"></div>
   </div>`;
 
   // wire
@@ -560,14 +601,37 @@ Claude decides severity, grouping and priority — just write.">${esc(a)}</texta
     if (t) t.focus();
   });
   main.querySelectorAll('[data-cknote]').forEach(t => t.oninput = ()=>{ ps.checkNotes[t.dataset.cknote] = t.value; ps.lastReviewedAt = Date.now(); save(); });
-  main.querySelectorAll('[data-amend]').forEach(t => t.oninput = ()=>{ ps.amends[t.dataset.amend] = t.value; ps.lastReviewedAt = Date.now(); save(); });
-  main.querySelectorAll('[data-delamend]').forEach(b => b.onclick = ()=>{ ps.amends.splice(parseInt(b.dataset.delamend,10),1); if (!ps.amends.length) ps.amends = ['']; save(); render(); });
-  main.querySelector('#addAmend').onclick = ()=>{
-    ps.amends.push(''); save(); render();
-    const areas = document.querySelectorAll('[data-amend]');
+  main.querySelectorAll('[data-issue]').forEach(t => t.oninput = ()=>{
+    const it = ps.issues.find(x=>x.id===t.dataset.issue); if (it) it.problem = t.value;
+    ps.lastReviewedAt = Date.now(); save();
+  });
+  main.querySelectorAll('[data-expected]').forEach(t => t.oninput = ()=>{
+    const it = ps.issues.find(x=>x.id===t.dataset.expected); if (it) it.expected = t.value;
+    ps.lastReviewedAt = Date.now(); save();
+  });
+  main.querySelectorAll('[data-expandexp]').forEach(b => b.onclick = ()=>{
+    openExpected.add(b.dataset.expandexp); render();
+    const t = document.querySelector(`[data-expected="${b.dataset.expandexp}"]`); if (t) t.focus();
+  });
+  main.querySelectorAll('[data-delissue]').forEach(b => b.onclick = ()=>{
+    const id = b.dataset.delissue;
+    ps.issues = ps.issues.filter(x=>x.id!==id);
+    if (!ps.issues.length) ps.issues = [blankIssue()];
+    // Its screenshots are NOT deleted — they fall back to page-level, so
+    // evidence the founder captured is never thrown away by a text edit.
+    ps.shots.forEach(s=>{ if (s.issueId===id) s.issueId = null; });
+    save(); render();
+  });
+  main.querySelector('#addIssue').onclick = ()=>{
+    ps.issues.push(blankIssue()); save(); render();
+    const areas = document.querySelectorAll('[data-issue]');
     if (areas.length) areas[areas.length-1].focus();
   };
   main.querySelectorAll('[data-shotnote]').forEach(t => t.oninput = ()=>{ ps.shots[t.dataset.shotnote].note = t.value; ps.lastReviewedAt = Date.now(); save(); });
+  main.querySelectorAll('[data-shotissue]').forEach(sel => sel.onchange = ()=>{
+    ps.shots[sel.dataset.shotissue].issueId = sel.value || null;
+    ps.lastReviewedAt = Date.now(); save(); render();
+  });
   main.querySelector('#stGood').onclick = ()=>{ ps.status = ps.status==='good'?null:'good'; ps.lastReviewedAt = Date.now(); save(); render(); };
   main.querySelector('#stFix').onclick  = ()=>{ ps.status = ps.status==='fix' ?null:'fix';  ps.lastReviewedAt = Date.now(); save(); render(); };
   main.querySelector('#browseBtn').onclick = ()=> main.querySelector('#fileInput').click();
@@ -580,7 +644,7 @@ Claude decides severity, grouping and priority — just write.">${esc(a)}</texta
   main.querySelectorAll('[data-del]').forEach(el=> el.onclick = async ()=>{
     const idx = parseInt(el.dataset.del,10), shot = ps.shots[idx];
     if (shot){ imgCache.delete(shot.id); await idb.delImg(shot.id); }
-    ps.shots.splice(idx,1); save(); render();   // deletes ONLY the image; notes/amends/verdict untouched
+    ps.shots.splice(idx,1); save(); render();   // deletes ONLY the image; notes/issues/verdict untouched
   });
   // Hydrate screenshot thumbnails from IndexedDB (image bytes aren't in state)
   main.querySelectorAll('img[data-shotid]').forEach(async imgEl=>{
@@ -588,7 +652,7 @@ Claude decides severity, grouping and priority — just write.">${esc(a)}</texta
     if (src) imgEl.src = src;
   });
   main.querySelector('#sendBtn').onclick = sendToClaude;
-  main.querySelector('#copyBtn').onclick = async ()=>{ await navigator.clipboard.writeText(buildPrompt(p, ps)); toast('Prompt copied — paste into Claude Code'); };
+  paintSendCard(p, ps);
 }
 
 /* ═══ Screenshots ════════════════════════════════════════════════════ */
@@ -722,7 +786,7 @@ async function closeAnnotator(){
 
 /* ═══ Prompt generation ══════════════════════════════════════════════
    Evidence stays attached to its source: checkpoint notes sit under
-   their checkpoint, screenshot notes travel with their file, amends
+   their checkpoint, screenshot notes travel with their file, issues
    remain separate numbered items.                                     */
 function buildPrompt(p, ps, shotFiles){
   const plain = s => s.replace(/<[^>]+>/g,'');
@@ -733,18 +797,31 @@ function buildPrompt(p, ps, shotFiles){
     return `- [${ps.checks[i] ? 'x' : ' '}] ${plain(c)}${note ? `\n      NOTE: ${note}` : ''}`;
   }).join('\n');
 
-  const amends = ps.amends.map(a=>a.trim()).filter(Boolean);
-  const amendBlock = amends.length
-    ? amends.map((a,i)=>`AMEND ${i+1}:\n${a}`).join('\n\n')
-    : '(no written amends — rely on the screenshots and checkpoint notes)';
+  const issues = realIssues(ps);
+  const issueBlock = issues.length
+    ? issues.map((it,i)=>{
+        const n = i + 1;
+        const mine = ps.shots
+          .map((s,si)=>({ s, f: shotFiles && shotFiles[si] ? shotFiles[si] : `screenshot ${si+1}` }))
+          .filter(x=>x.s.issueId === it.id);
+        const lines = [`ISSUE ${n}:`, `Problem: ${it.problem.trim() || '(see screenshots)'}`];
+        if (it.expected.trim()) lines.push(`Expected: ${it.expected.trim()}`);
+        lines.push(mine.length
+          ? `Screenshots: ${mine.map(x=>x.f).join(', ')}`
+          : 'Screenshots: (none attached to this issue)');
+        for (const x of mine) if ((x.s.note||'').trim()) lines.push(`      ${x.f} NOTE: ${x.s.note.trim()}`);
+        return lines.join('\n');
+      }).join('\n\n')
+    : '(no written issues — rely on the screenshots and checkpoint notes)';
 
-  const shotLines = ps.shots.length
-    ? ps.shots.map((s,i)=>{
-        const f = shotFiles && shotFiles[i] ? shotFiles[i] : `screenshot ${i+1} (in review package)`;
-        const note = (s.note || '').trim();
-        return `- ${f}${s.ops && s.ops.length ? '  (founder annotations flattened in)' : ''}${note ? `\n      NOTE: ${note}` : ''}`;
+  const loose = ps.shots.map((s,i)=>({ s, f: shotFiles && shotFiles[i] ? shotFiles[i] : `screenshot ${i+1}` }))
+                        .filter(x=>!x.s.issueId);
+  const shotLines = loose.length
+    ? loose.map(x=>{
+        const note = (x.s.note || '').trim();
+        return `- ${x.f}${x.s.ops && x.s.ops.length ? '  (founder annotations flattened in)' : ''}${note ? `\n      NOTE: ${note}` : ''}`;
       }).join('\n')
-    : '(none)';
+    : '(none — every screenshot is attached to an issue above)';
 
   return `# CATCH COMICS — FOUNDER REVIEW
 
@@ -755,10 +832,11 @@ FOUNDER VERDICT: ${ps.status==='good' ? 'Looks good' : ps.status==='fix' ? 'NEED
 CHECKPOINTS (${checked}/${p.checks.length} confirmed — notes belong to the checkpoint above them):
 ${checkLines}
 
-FOUNDER AMENDS (separate items — do not merge them unless they share a root cause):
-${amendBlock}
+FOUNDER ISSUES (separate items — do not merge them unless they share a root cause.
+Each issue names the screenshots that belong to IT; do not mix them up):
+${issueBlock}
 
-SCREENSHOTS (each note describes the markup on THAT screenshot):
+PAGE-LEVEL SCREENSHOTS (not tied to one issue; each note describes the markup on THAT screenshot):
 ${shotLines}
 
 TASK:
@@ -842,39 +920,245 @@ async function writeFounderJson(){
   await writeFile(dirHandle, 'founder-review.json', JSON.stringify({ updated:new Date().toISOString(), tool:'smoke-test-v4', pages }, null, 2));
 }
 
-/* ═══ SEND TO CLAUDE ═════════════════════════════════════════════════ */
-async function sendToClaude(){
-  const p = def(state.activePage), ps = P(p.id);
-  const hasEvidence = ps.amends.some(a=>a.trim()) || ps.shots.length
-    || Object.values(ps.checkNotes).some(n=>String(n).trim()) || ps.status === 'fix';
-  if (!hasEvidence){
-    toast('Write an amend, add a screenshot or note, or mark “Needs fixing” first','err'); return;
+/* ═══ SEND TO CLAUDE ═════════════════════════════════════════════════
+   One button, one press, no clipboard. The page POSTs the review as DATA to
+   the local Catch Comics bridge (127.0.0.1:8319, the same one that runs
+   Browser Trust); the bridge owns every filesystem write and starts Claude
+   Code itself. The page cannot name a file, a folder or a command — see
+   launch/operations/founder-review-handler.mjs.
+
+   The repo is not chosen here. The bridge knows where it lives because it
+   lives inside it, which is what retired the per-handoff directory picker.  */
+const BRIDGE = 'http://127.0.0.1:8319';
+let bridgeHealth = null;          // null = not probed yet, false = unavailable
+let sendInFlight = false;         // guard 1: a click already being processed
+const pollers = new Map();        // pageId -> interval id
+
+function bridgeFetch(path, opts, ms){
+  return fetch(BRIDGE + path, { ...opts, mode:'cors', signal: AbortSignal.timeout(ms || 8000) });
+}
+async function probeBridge(){
+  try {
+    const r = await bridgeFetch('/review/health', {}, 4000);
+    bridgeHealth = r.ok ? await r.json() : false;
+  } catch(e){ bridgeHealth = false; }
+  return bridgeHealth;
+}
+
+/* ── Honest status text ──────────────────────────────────────────────
+   Every string below describes something that actually happened. A launched
+   process is never reported as a finished repair.                        */
+const STATE_TEXT = {
+  sending:   s => `Packaging ${s.issues} issue${s.issues===1?'':'s'} and ${s.shots} screenshot${s.shots===1?'':'s'}…`,
+  packaged:  s => `Saved · ${s.issues} issue${s.issues===1?'':'s'} · ${s.shots} screenshot${s.shots===1?'':'s'} · starting Claude…`,
+  launching: s => `Sent · ${s.issues} issue${s.issues===1?'':'s'} · ${s.shots} screenshot${s.shots===1?'':'s'} · starting Claude…`,
+  running:   s => `Sent · ${s.issues} issue${s.issues===1?'':'s'} · ${s.shots} screenshot${s.shots===1?'':'s'} · <strong>Claude repair running</strong>`,
+  completed: s => `<strong>Claude repair complete</strong> · ${s.issues} issue${s.issues===1?'':'s'} reviewed`,
+  failed:    s => `<strong>Claude repair did not finish.</strong> Your review is saved at <code>${esc(s.packagePath||'')}</code>`,
+  blocked:   s => `<strong>Review saved — Claude was not started.</strong>`,
+};
+
+function sendCardMeta(p, ps){
+  const s = ps.send;
+  if (!s){
+    const issues = realIssues(ps).length, shots = ps.shots.length;
+    if (bridgeHealth === false){
+      return `<strong>Command Centre is not running</strong>, so this button cannot start Claude.<br>` +
+             `Reopen this page through <code>open-command-centre</code> to send in one click, or use the fallback below.`;
+    }
+    if (bridgeHealth && !bridgeHealth.claude.available){
+      return `Sends ${issues} issue${issues===1?'':'s'} and ${shots} screenshot${shots===1?'':'s'} straight into the repo.<br>` +
+             `<strong>Claude Code was not found on this machine</strong> — the review will still be saved.`;
+    }
+    return `Writes the review and every screenshot into the repo and starts the Claude repair. Nothing to copy or paste.` +
+           (ps.lastSentAt ? `<br>Last sent: ${new Date(ps.lastSentAt).toLocaleString()}` : '');
   }
+  const line = (STATE_TEXT[s.state] || (x=>`State: ${esc(x.state)}`))(s);
+  const detail = s.reason ? `<br><span style="color:var(--bad)">${esc(s.reason)}</span>` : '';
+  const where  = s.packagePath && s.state !== 'failed' ? `<br>Package: <code>${esc(s.packagePath)}</code>` : '';
+  const resume = s.sessionId && (s.state==='completed'||s.state==='failed')
+    ? `<br>Read what Claude did: <code>claude --resume ${esc(s.sessionId)}</code>` : '';
+  const summary = s.summary ? `<br><span style="color:var(--ink2)">${esc(String(s.summary).slice(0,300))}</span>` : '';
+  return line + detail + where + resume + summary;
+}
+
+/** Repaint just the send card, without re-rendering (and losing focus in) the
+ *  textareas the founder may still be typing in. */
+function paintSendCard(p, ps){
+  const meta = document.getElementById('sendMeta');
+  const btn  = document.getElementById('sendBtn');
+  const fb   = document.getElementById('fallbackRow');
+  if (!meta || !btn) return;
+  meta.innerHTML = sendCardMeta(p, ps);
+
+  const st = ps.send?.state;
+  const busy = st === 'sending' || st === 'packaged' || st === 'launching' || st === 'running';
+  const label = st === 'running'   ? 'Claude repair running…'
+              : st === 'sending'   ? 'Packaging…'
+              : st === 'launching' || st === 'packaged' ? 'Starting Claude…'
+              : st === 'completed' ? `Send ${p.title} to Claude again`
+              : (st === 'blocked' || st === 'failed') ? 'Retry sending to Claude'
+              : `🚀 SEND ${p.title.toUpperCase()} TO CLAUDE`;
+  btn.textContent = label;
+  btn.disabled = busy;
+  btn.style.opacity = busy ? '.55' : '';
+  btn.style.cursor  = busy ? 'default' : '';
+
+  // The manual route stays available, but only ever as a fallback — it is
+  // never the normal journey and is labelled so it cannot be mistaken for it.
+  if (fb){
+    const offline = bridgeHealth === false;
+    fb.innerHTML = offline
+      ? `<button class="btn" id="fallbackBtn" style="margin-top:10px">Fallback: download the review + copy the prompt</button>`
+      : `<details style="margin-top:10px"><summary style="cursor:pointer;color:var(--ink2)">Fallback (only if the bridge is down)</summary>
+         <button class="btn" id="fallbackBtn" style="margin-top:8px">Download the review + copy the prompt</button></details>`;
+    const b = document.getElementById('fallbackBtn');
+    if (b) b.onclick = ()=> manualFallback(p, ps);
+  }
+}
+
+/** Build the bridge submission. Data only — no paths, no commands. */
+async function buildSubmission(p, ps, reviewId){
+  const issues = realIssues(ps).map(it => ({
+    uid: it.id, problem: it.problem.trim(), expected: it.expected.trim(), createdAt: it.ts || null,
+  }));
+  const screenshots = [];
+  for (const s of ps.shots){
+    const dataUrl = await shotImage(s);          // flattened annotations if any
+    if (!dataUrl) continue;                       // image bytes lost — skip, don't fake it
+    screenshots.push({
+      issueUid: s.issueId || null,
+      note: (s.note || '').trim(),
+      annotated: !!(s.ops && s.ops.length),
+      dataUrl,
+    });
+  }
+  return {
+    reviewId, tool:'smoke-test-v4',
+    page: { id:p.id, title:p.title, url:p.url },
+    verdict: ps.status,
+    issues, screenshots,
+    checkpoints: p.checks.map((c,i)=>({
+      label: String(c).replace(/<[^>]+>/g,''),
+      checked: !!ps.checks[i],
+      note: (ps.checkNotes[i] || '').trim(),
+    })),
+  };
+}
+
+/** Poll the bridge until the repair really finishes. */
+function watchRun(p){
+  clearInterval(pollers.get(p.id));
+  const iv = setInterval(async ()=>{
+    const ps = P(p.id);
+    if (!ps.send?.reviewId){ clearInterval(iv); pollers.delete(p.id); return; }
+    let rec = null;
+    try {
+      const r = await bridgeFetch(`/review/status?reviewId=${encodeURIComponent(ps.send.reviewId)}`, {}, 6000);
+      if (r.ok) rec = await r.json();
+    } catch(e){ return; }                        // a blip is not a verdict — keep polling
+    if (!rec) return;
+    Object.assign(ps.send, rec); save();
+    paintSendCard(def(state.activePage), P(state.activePage));
+    if (rec.state === 'running' || rec.state === 'launching' || rec.state === 'packaged') return;
+    clearInterval(iv); pollers.delete(p.id);
+    if (rec.state === 'completed')    toast(`Claude repair complete for ${p.title} — ${rec.counts?.issues ?? 0} issues reviewed`);
+    else if (rec.state === 'blocked') toast(`${p.title} review saved, but Claude was not started — ${rec.reason || 'see the card'}`, 'err');
+    else                              toast(`Claude repair did not finish for ${p.title} — your review is saved`, 'err');
+  }, 2500);
+  pollers.set(p.id, iv);
+}
+
+async function sendToClaude(){
+  if (sendInFlight) return;                       // guard 1: double-click
+  const p = def(state.activePage), ps = P(p.id);
+
+  const issues = realIssues(ps).length, shots = ps.shots.length;
+  const hasEvidence = issues || shots || Object.values(ps.checkNotes).some(n=>String(n).trim()) || ps.status === 'fix';
+  if (!hasEvidence){
+    toast('Write an issue, add a screenshot or note, or mark “Needs fixing” first','err'); return;
+  }
+  // guard 2: a run already in flight for this page
+  if (ps.send && ['sending','packaged','launching','running'].includes(ps.send.state)){
+    toast('This page has already been sent — Claude is still working on it'); return;
+  }
+
+  sendInFlight = true;
+  // guard 3: one stable id per submission, reused by every retry, so the
+  // bridge can recognise a repeat and refuse to package or launch twice.
+  const reviewId = ps.send?.reviewId && ['blocked','failed'].includes(ps.send.state)
+    ? ps.send.reviewId
+    : `${p.id}-${new Date().toISOString().slice(0,16).replace(/[T:]/g,'-')}-${uid().slice(0,6)}`;
+
+  ps.send = { reviewId, state:'sending', issues, shots, reason:null, packagePath:null };
+  save(); paintSendCard(p, ps);
+
+  try {
+    if (bridgeHealth === null) await probeBridge();
+    if (bridgeHealth === false){
+      ps.send = { ...ps.send, state:'blocked',
+        reason:'The local Catch Comics bridge is not running. Reopen this page through open-command-centre, then press Retry — nothing has been lost.' };
+      save(); paintSendCard(p, ps);
+      toast('Command Centre is not running — nothing was sent','err');
+      return;
+    }
+
+    const body = await buildSubmission(p, ps, reviewId);
+    const r = await bridgeFetch('/review/submit', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body),
+    }, 180000);                                   // screenshots can be large
+
+    let rec = null;
+    try { rec = await r.json(); } catch(e){}
+    if (!r.ok){
+      ps.send = { ...ps.send, state:'blocked', reason: rec?.error || `The bridge refused the review (HTTP ${r.status}).` };
+      save(); paintSendCard(p, ps);
+      toast(rec?.error || 'The bridge refused the review','err');
+      return;
+    }
+
+    ps.send = { ...ps.send, ...rec };
+    ps.lastSentAt = Date.now();
+    // launch/founder-review.json is updated by the bridge, not from here —
+    // it owns every write, so Mission Control stays current without a picker.
+    save(); paintSendCard(p, ps); renderRail();
+
+    if (rec.duplicate) toast('Already sent — showing the run that is already in progress');
+    else if (rec.state === 'blocked') toast(`Review saved to ${rec.packagePath} — Claude was not started`, 'err');
+    else toast(`Sent · ${rec.counts?.issues ?? issues} issues · ${rec.counts?.screenshots ?? shots} screenshots · Claude repair running`);
+
+    if (['packaged','launching','running'].includes(rec.state)) watchRun(p);
+  } catch(e){
+    console.error(e);
+    ps.send = { ...ps.send, state:'blocked', reason:`Could not reach the local bridge: ${e.message}. Your review is still here — press Retry.` };
+    save(); paintSendCard(p, ps);
+    toast('Could not reach the local bridge — nothing was lost','err');
+  } finally {
+    sendInFlight = false;
+    paintSendCard(def(state.activePage), P(state.activePage));
+  }
+}
+
+/* ── Fallback only ───────────────────────────────────────────────────
+   Kept for the case the bridge is genuinely unavailable. Never the normal
+   journey: it is behind a disclosure, and it says what it is.            */
+/** Same naming the bridge uses, so a fallback package reads identically to a
+ *  bridge-written one: grouped by issue, numbered within that issue. */
+function fallbackShotNames(ps){
+  const seq = {};
+  return ps.shots.map(s=>{
+    const n = ps.issues.findIndex(it=>it.id===s.issueId);
+    const key = n >= 0 ? `issue-${String(n+1).padStart(2,'0')}` : 'page';
+    seq[key] = (seq[key] || 0) + 1;
+    return `${key}-shot-${seq[key]}.jpg`;
+  });
+}
+
+async function manualFallback(p, ps){
   const stamp = new Date().toISOString().slice(0,16).replace(/[T:]/g,'-');
   const folder = `${p.id}-${stamp}`;
-  const shotFiles = ps.shots.map((_,i)=>`shot-${i+1}.jpg`);
+  const shotFiles = fallbackShotNames(ps);
   const prompt = buildPrompt(p, ps, shotFiles);
-
-  if (dirHandle){
-    try {
-      const reviews = await dirHandle.getDirectoryHandle('reviews', { create:true });
-      const dir = await reviews.getDirectoryHandle(folder, { create:true });
-      await writeFile(dir, 'review.md', prompt);
-      for (let i=0;i<ps.shots.length;i++){
-        const src = await shotImage(ps.shots[i]);
-        if (src) await writeFile(dir, `shot-${i+1}.jpg`, dataUrlToBytes(src));
-      }
-      await writeFounderJson();
-      ps.lastSentAt = Date.now(); save();
-      const kickoff = `/founder-review ${p.id}`;
-      await navigator.clipboard.writeText(kickoff);
-      toast(`✓ Review package written to launch/reviews/${folder}/ — “${kickoff}” copied. Paste it into Claude Code.`);
-      render();
-      return;
-    } catch(e){ console.error(e); toast('Repo write failed — falling back to download','err'); }
-  }
-
-  // Fallback: download package + copy full prompt
   const blob = new Blob([prompt], {type:'text/markdown'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = `${folder}-review.md`; a.click();
@@ -882,11 +1166,11 @@ async function sendToClaude(){
     const src = await shotImage(ps.shots[i]);
     if (!src) continue;
     const b = document.createElement('a');
-    b.href = src; b.download = `${folder}-shot-${i+1}.jpg`; b.click();
+    b.href = src; b.download = `${folder}-${shotFiles[i]}`; b.click();
   }
-  await navigator.clipboard.writeText(prompt);
+  try { await navigator.clipboard.writeText(prompt); } catch(e){}
   ps.lastSentAt = Date.now(); save(); render();
-  toast('Package downloaded + prompt copied. Paste into Claude Code and attach the shots.');
+  toast('Fallback: package downloaded + prompt copied. Paste into Claude Code and attach the shots.');
 }
 
 /* ═══ Import from V3 ═════════════════════════════════════════════════ */
@@ -902,7 +1186,7 @@ async function importV3(){
     const pid = V3MAP[sid]; if (!pid) return;
     const ps = P(pid);
     Object.entries(sec.checks||{}).forEach(([i,v])=>{ if (v===true || v==='pass' || v==='checked'){ ps.checks[i]=true; checks++; } });
-    if (sec.notes && pushAmend(ps, '[V3 notes] ' + sec.notes)) notes++;
+    if (sec.notes && pushIssue(ps, '[V3 notes] ' + sec.notes)) notes++;
     if (sec.status==='passed' && !ps.status) ps.status = 'good';
     if (sec.status==='failed' && !ps.status) ps.status = 'fix';
   });
@@ -912,7 +1196,7 @@ async function importV3(){
     if (!open) return;
     const ps = P(pid);
     const line = `[V3 ${iss.id||'issue'}] ${String(iss.desc).slice(0,400)}`;
-    if (pushAmend(ps, line)) issues++;
+    if (pushIssue(ps, line)) issues++;
   });
   for (const sh of Object.values(v3.screenshots||{})){
     const pid = V3MAP[sh.section]; if (!pid) continue;
@@ -926,7 +1210,7 @@ async function importV3(){
     shots++;
   }
   save(); render();
-  toast(`Imported from V3 — ${checks} checkpoints, ${notes} notes, ${issues} open issues → thoughts, ${shots} screenshots`);
+  toast(`Imported from V3 — ${checks} checkpoints, ${notes} notes, ${issues} open issues → issues, ${shots} screenshots`);
 }
 
 /* ═══ Export session ═════════════════════════════════════════════════ */
@@ -983,14 +1267,70 @@ async function migrateInlineShots(){
   return moved;
 }
 
+/* Report where reviews go. The founder does not choose it: the bridge lives
+   inside the repo, so it already knows. This only ever reads. */
+function paintRepoChip(){
+  const chip = document.getElementById('repoChip');
+  const connect = document.getElementById('connectBtn');
+  if (!chip) return;
+  if (bridgeHealth === null){ chip.textContent = 'Checking local bridge…'; chip.className = 'repochip'; return; }
+  if (bridgeHealth === false){
+    chip.textContent = '⚠ Command Centre not running';
+    chip.title = 'Reopen this page through open-command-centre to send in one click. Until then, only the manual fallback is available.';
+    chip.className = 'repochip off';
+    if (connect) connect.hidden = false;      // fallback surfaces only when needed
+    return;
+  }
+  const repo = String(bridgeHealth.repoRoot || '').split(/[\\/]/).pop() || 'repo';
+  const cli = bridgeHealth.claude.available;
+  chip.textContent = cli ? `✓ ${repo} · Claude ready` : `✓ ${repo} · Claude not installed`;
+  chip.title = `Reviews are written to ${bridgeHealth.repoRoot}\\launch\\reviews — established by the local bridge, not picked here.`
+             + (cli ? `\nClaude Code ${bridgeHealth.claude.version}` : '\nClaude Code was not found: reviews will be saved but not repaired.');
+  chip.className = 'repochip ' + (cli ? 'on' : 'off');
+  if (connect) connect.hidden = true;
+}
+
+/* Pick up a repair that is still running from a previous page load, so a
+   reload never loses track of a real process. */
+async function resumeRuns(){
+  for (const p of PAGES){
+    const ps = state.pages[p.id];
+    const s = ps && ps.send;
+    if (!s || !s.reviewId) continue;
+    if (!['sending','packaged','launching','running'].includes(s.state)) continue;
+    try {
+      const r = await bridgeFetch(`/review/status?reviewId=${encodeURIComponent(s.reviewId)}`, {}, 5000);
+      if (r.ok){
+        Object.assign(s, await r.json());
+        if (['packaged','launching','running'].includes(s.state)) watchRun(p);
+      } else {
+        // The bridge restarted and no longer knows this run. Say that rather
+        // than leaving a spinner that will never resolve.
+        s.state = 'blocked';
+        s.reason = 'The bridge was restarted, so this run can no longer be tracked. The review package is still on disk — press Retry to hand it to Claude again.';
+      }
+    } catch(e){
+      s.state = 'blocked';
+      s.reason = 'The bridge is not reachable, so this run cannot be tracked. Your review is saved.';
+    }
+  }
+  save();
+}
+
 async function boot(){
   try { await idb.open(); } catch(e){}
   await migrateInlineShots();
   // Deep link from Mission Control: smoke-test-v4.html#mobile opens that page
   if (location.hash && PAGES.some(p => p.id === location.hash.slice(1))) state.activePage = location.hash.slice(1);
-  await restoreRepo();
   render();
   setStorageState();
+  // Probe after the first render so the page is usable immediately; nothing
+  // here starts a run, it only reads state.
+  await probeBridge();
+  paintRepoChip();
+  if (bridgeHealth === false) await restoreRepo();   // fallback path only
+  await resumeRuns();
+  render();
   if (navigator.storage && navigator.storage.persist) { try { navigator.storage.persist(); } catch(e){} }
 }
 boot();

@@ -10,19 +10,28 @@
  *
  * WHAT IT IS NOT
  * This is NOT a command runner. There is no way to tell it what to execute.
- * It accepts no request body, no query string, no arguments, no shell input
- * and no environment overrides. It exposes exactly TWO actions, both
- * hard-coded, each with its own independent single-flight lock:
+ * It exposes exactly THREE actions, all hard-coded, each with its own
+ * independent single-flight lock:
  *
  *     node scripts/run-e2e.mjs               (i.e. `npm run test:e2e`, LOCAL)
  *     node scripts/run-retailer-refresh.mjs  (bounded retailer price refresh)
+ *     claude -p <fixed repair prompt>        (Smoke Test V4 founder handoff)
  *
- * The second one writes to production data, so it is worth being explicit
- * about what the bridge does and does not decide: it decides nothing. Every
- * bound, ceiling, identity rule and circuit breaker lives in
- * scripts/price-verify-dryrun.ts, which run-retailer-refresh.mjs invokes with
- * a fixed argv. The bridge cannot pass a row count, a retailer, a flag, or
- * anything else — there is no code path from an HTTP request to an argument.
+ * The first two accept no input of any kind: no request body, no query string,
+ * no arguments, no shell input, no environment overrides. The retailer one
+ * writes to production data, so it is worth being explicit about what the
+ * bridge does and does not decide: it decides nothing. Every bound, ceiling,
+ * identity rule and circuit breaker lives in scripts/price-verify-dryrun.ts,
+ * which run-retailer-refresh.mjs invokes with a fixed argv. The bridge cannot
+ * pass a row count, a retailer, a flag, or anything else — there is no code
+ * path from an HTTP request to an argument.
+ *
+ * The THIRD action does take a request body, because the founder's review is
+ * data that has to get here somehow. That single exception is fenced off in
+ * founder-review-handler.mjs, and the fence is worth stating here: the body
+ * carries review text and screenshot bytes only. It cannot name a file, name a
+ * directory, choose the prompt, or reach the argv. Read the header of that
+ * module before changing anything about this route.
  *
  * SAFETY PROPERTIES (all enforced below, in this order)
  *   1. Binds to 127.0.0.1 only — never 0.0.0.0, so it is unreachable off-box.
@@ -44,6 +53,7 @@ import { createServer } from 'node:http'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { LIMITS, ReviewRunner, ValidationError } from './founder-review-handler.mjs'
 
 const HOST = '127.0.0.1'
 const PORT = 8319
@@ -170,6 +180,34 @@ function startRetailerRun() {
   console.log('[retailer-refresh] run started')
 }
 
+/* ── Action 3: Smoke Test V4 founder review handoff ──────────────────────────
+   The only route that accepts a body. Everything it is allowed to do lives in
+   founder-review-handler.mjs; this file just moves bytes to it.
+*/
+const reviewRunner = new ReviewRunner(REPO_ROOT)
+
+/** Read a JSON body with a hard ceiling, destroying the socket if exceeded. */
+function readJsonBody(req) {
+  return new Promise((resolve, reject) => {
+    let size = 0
+    const chunks = []
+    req.on('data', c => {
+      size += c.length
+      if (size > LIMITS.BODY_BYTES) {
+        reject(new ValidationError(`The submission is larger than ${Math.round(LIMITS.BODY_BYTES / 1048576)} MB — delete a screenshot and send again`))
+        req.destroy()
+        return
+      }
+      chunks.push(c)
+    })
+    req.on('end', () => {
+      try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8'))) }
+      catch { reject(new ValidationError('The submission was not valid JSON')) }
+    })
+    req.on('error', reject)
+  })
+}
+
 const server = createServer((req, res) => {
   const origin = req.headers.origin
   const originOk = origin === undefined || ALLOWED_ORIGINS.has(origin)
@@ -189,6 +227,11 @@ const server = createServer((req, res) => {
     res.writeHead(204, {
       'Access-Control-Allow-Origin': origin ?? '',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      // Required for /review/submit: a POST carrying application/JSON is not a
+      // "simple" request, so the browser preflights it and drops the real
+      // request unless Content-Type is named here. The first two actions sent
+      // no body and no headers, which is why this was never needed before.
+      'Access-Control-Allow-Headers': 'Content-Type',
       'Access-Control-Max-Age': '600',
       'Vary': 'Origin',
     })
@@ -226,6 +269,36 @@ const server = createServer((req, res) => {
     return send(202, { ...retailerRun })
   }
 
+  // ── Founder review handoff ────────────────────────────────────────────────
+  // /review/health tells the Smoke Test what it can rely on right now, so the
+  // page never advertises a capability the machine does not have.
+  if (req.method === 'GET' && path === '/review/health') {
+    return send(200, { ...reviewRunner.health(), port: PORT })
+  }
+
+  if (req.method === 'GET' && path === '/review/status') {
+    const id = new URL(req.url ?? '', `http://${HOST}`).searchParams.get('reviewId')
+    const rec = id ? reviewRunner.get(id) : null
+    if (!rec) return send(404, { error: 'unknown reviewId' })
+    return send(200, ReviewRunner.view(rec))
+  }
+
+  if (req.method === 'POST' && path === '/review/submit') {
+    readJsonBody(req)
+      .then(body => {
+        const rec = reviewRunner.submit(body)
+        // 200 for a duplicate, 202 for something newly started. Either way the
+        // body says exactly which, so the page never has to guess.
+        return send(rec.duplicate ? 200 : 202, ReviewRunner.view(rec))
+      })
+      .catch(err => {
+        if (err instanceof ValidationError) return send(400, { error: err.message })
+        console.error('[founder-review] submit failed:', err)
+        return send(500, { error: 'The bridge could not process the review. See the bridge window for details.' })
+      })
+    return
+  }
+
   return send(404, { error: 'not found' })
 })
 
@@ -243,6 +316,10 @@ server.on('error', err => {
 server.listen(PORT, HOST, () => {
   console.log(`Browser Trust bridge listening on http://${HOST}:${PORT} (local only)`)
   console.log(`Repo: ${REPO_ROOT}`)
+  // The repo is established HERE, once, from this file's own location. That is
+  // what replaced the Smoke Test's per-handoff directory picker.
+  const h = reviewRunner.health()
+  console.log(`Founder review handoff: ready — Claude Code ${h.claude.available ? h.claude.version : 'NOT FOUND (reviews will still be saved)'}`)
 })
 
 // Do not leave a TEST suite running if the bridge is closed — nothing is lost
@@ -250,10 +327,16 @@ server.listen(PORT, HOST, () => {
 // verified production rows one at a time, so aborting half way through would
 // throw away real work to no benefit. It finishes and writes its own status
 // file; the card picks the result up next time it is opened.
+//
+// A Claude repair is left to finish for the same reason: it is editing the
+// working tree, and killing it mid-edit is how you get a half-applied change.
+// Its record is on disk in the package, so the Smoke Test can pick the outcome
+// up again after a restart.
 for (const sig of ['SIGINT', 'SIGTERM']) {
   process.on(sig, () => {
     if (child) child.kill()
     if (retailerChild) console.log('[retailer-refresh] still running — left to finish; it will write its own result')
+    if (reviewRunner.activeId) console.log(`[founder-review] ${reviewRunner.activeId} still running — left to finish; it will write its own run.json`)
     server.close(() => process.exit(0))
   })
 }
