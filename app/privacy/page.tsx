@@ -1,6 +1,10 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
+  // Self-referencing canonical. Without it this page inherits the root
+  // layout's `canonical: '/'`, which tells Google it is a duplicate of the
+  // homepage and should not be indexed on its own (verified live 2026-08-24).
+  alternates: { canonical: '/privacy' },
   title: 'Privacy Policy',
   description: 'How Catch Comics collects, uses, and protects your data.',
 }
