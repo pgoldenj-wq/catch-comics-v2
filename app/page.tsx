@@ -176,10 +176,16 @@ export default function Home() {
   };
 
   // Hero book covers — rotation lives in CSS class (not inline style) so animation works
+  // Positions are the original design values in px against a 465px-wide stack
+  // (COVER_STACK_W). They render as percentages of that stack so the artwork
+  // shrinks with the column instead of spilling past the card's right edge on
+  // narrower desktops — at ≥978px the stack is a full 465px and the percentages
+  // resolve back to exactly these px values, so the desktop composition is
+  // unchanged. Heights come from aspectRatio for the same reason.
   const covers = [
-    { title: 'Absolute Batman',     searchQuery: 'absolute batman',     src: 'https://comicvine.gamespot.com/a/uploads/scale_large/14/149814/9881791-absbm_v1_zoo%28cover%29copy.jpg', left: '8px',   top: '22px', width: '170px', height: '248px', zIndex: 3, animClass: 'cover-sway-1' },
-    { title: 'Ultimate Spider-Man', searchQuery: 'ultimate spider-man', src: 'https://comicvine.gamespot.com/a/uploads/scale_large/11/110017/9226620-wwww.jpg',                        left: '148px', top: '0px',  width: '184px', height: '267px', zIndex: 5, animClass: 'cover-sway-2' },
-    { title: 'Jujutsu Kaisen',      searchQuery: 'jujutsu kaisen',      src: 'https://comicvine.gamespot.com/a/uploads/scale_large/6/67663/6491809-01.jpg',                            left: '300px', top: '30px', width: '165px', height: '238px', zIndex: 3, animClass: 'cover-sway-3' },
+    { title: 'Absolute Batman',     searchQuery: 'absolute batman',     src: 'https://comicvine.gamespot.com/a/uploads/scale_large/14/149814/9881791-absbm_v1_zoo%28cover%29copy.jpg', left: 8,   top: 22, width: 170, height: 248, zIndex: 3, animClass: 'cover-sway-1' },
+    { title: 'Ultimate Spider-Man', searchQuery: 'ultimate spider-man', src: 'https://comicvine.gamespot.com/a/uploads/scale_large/11/110017/9226620-wwww.jpg',                        left: 148, top: 0,  width: 184, height: 267, zIndex: 5, animClass: 'cover-sway-2' },
+    { title: 'Jujutsu Kaisen',      searchQuery: 'jujutsu kaisen',      src: 'https://comicvine.gamespot.com/a/uploads/scale_large/6/67663/6491809-01.jpg',                            left: 300, top: 30, width: 165, height: 238, zIndex: 3, animClass: 'cover-sway-3' },
   ];
 
   // Publisher logo strip — fills normalised to rgba(255,255,255,0.7) so each logo
@@ -204,6 +210,9 @@ export default function Home() {
     <svg key="sevenseas" viewBox="0 0 90 28"  width="90"  height="28"><text x="45" y="19" textAnchor="middle" fontSize="8.5" fontWeight="700" fontFamily="Arial,sans-serif" fill="rgba(255,255,255,0.7)" letterSpacing="1.5">SEVEN SEAS</text></svg>,
     <svg key="dynamite"  viewBox="0 0 80 28"  width="80"  height="28"><text x="40" y="19" textAnchor="middle" fontSize="9"  fontWeight="700" fontFamily="Arial,sans-serif" fill="rgba(255,255,255,0.7)" letterSpacing="1.5">DYNAMITE</text></svg>,
   ];
+
+  // Design width of the hero cover stack — covers span left 8px → 465px.
+  const COVER_STACK_W = 465;
 
   // Popular search terms — clicking always navigates to a fresh search page
   const trending = ['Batman', 'Spider-Man', 'One Piece', 'Saga', 'Watchmen', 'Naruto', 'X-Men', 'Invincible', 'Demon Slayer', 'Hellboy'];
@@ -517,6 +526,14 @@ export default function Home() {
               overflow:visible so covers can scale beyond container bounds on hover. */}
           <div className="hero-right" style={{ position: 'relative', flex: 1, minWidth: 0, overflow: 'visible', display: 'flex', flexDirection: 'column', justifyContent: 'center', borderRadius: '0 28px 28px 0' }}>
             {/* Right-edge fade so covers dissolve naturally into the card border.
+                z-index 20 here is NOT contained by the card (it is position:relative
+                with z-index auto), so this opaque band competes in the root stacking
+                context. It used to tie with the sticky Navbar's z-index 20 and win on
+                DOM order, painting #111827 over the header and the "United Kingdom"
+                pill while scrolling (founder review 2026-08-26). The Navbar now sits
+                at z-index 30, above this band and above a hovered cover (also 20).
+                Do not isolate the card to fix this — it would also drop the hero
+                search dropdown below the Top Deals rail.
                 borderRadius is REQUIRED: this band is opaque #111827 at its right
                 edge and sits above everything (z-index 20), so without the radius
                 it squares off the card's top-right and bottom-right corners while
@@ -527,16 +544,16 @@ export default function Home() {
                 Each cover has a wrapper div that handles hover-scale so the whole frame
                 (including border-radius) enlarges by 15%. The inner button retains its
                 CSS sway animation independently — scale on the wrapper does not conflict. */}
-            <div style={{ position: 'relative', height: '280px' }}>
+            <div style={{ position: 'relative', height: '280px', width: `min(${COVER_STACK_W}px, 100%)` }}>
               {covers.map((cover, i) => (
                 <div
                   key={i}
                   style={{
                     position: 'absolute',
-                    left: cover.left,
-                    top: cover.top,
-                    width: cover.width,
-                    height: cover.height,
+                    left: `${(cover.left / COVER_STACK_W) * 100}%`,
+                    top: `${cover.top}px`,
+                    width: `${(cover.width / COVER_STACK_W) * 100}%`,
+                    aspectRatio: `${cover.width} / ${cover.height}`,
                     zIndex: cover.zIndex,
                     transformOrigin: 'center center',
                     transition: 'transform 0.25s ease-out, z-index 0s',

@@ -80,7 +80,14 @@ export default function Navbar({ initialQuery, region: controlledRegion, onRegio
   const isSeries  = pathname.startsWith('/series')
 
   return (
-    <header style={{ background: '#fff', borderBottom: '1px solid #F0F0F0', position: 'sticky', top: 0, zIndex: 20 }}>
+    /* zIndex 30: the homepage hero card is overflow:visible and holds descendants
+       at z-index 20 (right-edge fade band, hovered cover) that are NOT contained by
+       the card, so at 20 the header tied with them and lost on DOM order — the dark
+       hero painted over the header and the country selector while scrolling
+       (founder review 2026-08-26). 30 clears the hero band with headroom and
+       stays under the search/product filter drawer's backdrop (z-index 40), which
+       must keep dimming the header while that drawer is open. */
+    <header style={{ background: '#fff', borderBottom: '1px solid #F0F0F0', position: 'sticky', top: 0, zIndex: 30 }}>
       <div className="max-w-6xl mx-auto px-8 h-20 flex items-center gap-4">
 
         {/* Logo */}
