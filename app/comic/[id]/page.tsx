@@ -3,6 +3,7 @@
 
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import PricingPanel, { type PriceSnapshot } from '@/components/PricingPanel'
 import SearchBar from '@/components/SearchBar'
 import MobileHeader from '@/components/MobileHeader'
@@ -669,10 +670,14 @@ function ComicPage() {
                   const label = issue.issue_number ? `#${issue.issue_number}` : (issue.name || 'Issue')
                   const sub   = issue.cover_year || ''
                   return (
-                    <button
+                    <Link
                       key={issue.id}
-                      onClick={() => router.push(`/comic/i${issue.id}?region=${market}`)}
-                      style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', textAlign: 'left' }}
+                      href={`/comic/i${issue.id}?region=${market}`}
+                      // Volumes list 100+ issues; prefetching every visible
+                      // card would fan out into dozens of RSC requests per
+                      // page view. Same call as IssueListGrid.
+                      prefetch={false}
+                      style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', textAlign: 'left', display: 'block', textDecoration: 'none', color: 'inherit' }}
                     >
                       {/* Cover — 3× zoom on hover, blooms outward from centre,
                           z-50 + shadow keep the enlarged cover floating above siblings. */}
@@ -695,7 +700,7 @@ function ComicPage() {
                       </div>
                       <div style={{ marginTop: '4px', fontSize: '11px', fontWeight: 500, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
                       {sub && <div style={{ fontSize: '10px', color: '#9CA3AF' }}>{sub}</div>}
-                    </button>
+                    </Link>
                   )
                 })}
               </div>
@@ -731,10 +736,11 @@ function ComicPage() {
                 const label = issue.issue_number ? `#${issue.issue_number}` : (issue.name || 'Issue')
                 const sub   = issue.cover_year || ''
                 return (
-                  <button
+                  <Link
                     key={issue.id}
-                    onClick={() => router.push(`/comic/i${issue.id}?region=${market}`)}
-                    style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', textAlign: 'left' }}>
+                    href={`/comic/i${issue.id}?region=${market}`}
+                    prefetch={false}
+                    style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', textAlign: 'left', display: 'block', textDecoration: 'none', color: 'inherit' }}>
                     <div style={{ aspectRatio: '2/3', borderRadius: '6px', background: '#F3F4F6', border: '1px solid #EBEBEB', position: 'relative' }}>
                       <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9CA3AF', fontSize: '9px', fontWeight: 500 }}>
                         {label}
@@ -751,7 +757,7 @@ function ComicPage() {
                     </div>
                     <div style={{ marginTop: '4px', fontSize: '10px', fontWeight: 500, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</div>
                     {sub && <div style={{ fontSize: '9px', color: '#9CA3AF' }}>{sub}</div>}
-                  </button>
+                  </Link>
                 )
               })}
             </div>

@@ -23,10 +23,10 @@ test.describe('Search', () => {
     await input.click()
     await input.pressSequentially(FLAGSHIP_QUERY, { delay: 40 })
 
-    const suggestions = page.getByRole('listbox', { name: 'Search suggestions' })
+    const suggestions = page.getByRole('navigation', { name: 'Search suggestions' })
     await expect(suggestions, 'autocomplete panel should open for a known title').toBeVisible({ timeout: 15_000 })
 
-    const options = suggestions.getByRole('option')
+    const options = suggestions.getByRole('link')
     await expect(options.first()).toBeVisible()
     expect(await options.count(), 'at least one suggestion').toBeGreaterThan(0)
 

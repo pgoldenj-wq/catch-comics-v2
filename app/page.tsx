@@ -2,7 +2,7 @@
 // ⚠ DESIGN FREEZE — do not change layout, spacing, colours, or typography without explicit instruction
 
 import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import SearchBar            from '../components/SearchBar';
 import MobileHeader          from '../components/MobileHeader';
 import Navbar                from '../components/Navbar';
@@ -96,7 +96,6 @@ export default function Home() {
   const trackRef      = useRef<HTMLDivElement>(null);
   const offsetRef     = useRef(0);
   const hoverZoneRef  = useRef<HoverZone>(null);
-  const router = useRouter();
 
   const CARD_W      = 148; // card width (136px) + gap (12px)
   const activeDeals = liveDeals ?? TOP_DEALS
@@ -395,14 +394,17 @@ export default function Home() {
               : (staticDeal ? (dealCovers[staticDeal.id] || DEAL_FALLBACKS[staticDeal.id] || '') : '')
             // Strip provider placeholder URLs — parity with the desktop carousel.
             const coverSrc   = rawCover && !isPlaceholderCoverUrl(rawCover) ? rawCover : ''
-            const handleClick = () => isLive
-              ? router.push(`/product/${liveDeal!.slug}`)
-              : router.push(`/comic/${staticDeal!.id}?region=${region}`)
+            // Real href, not a click handler — Ctrl/⌘+click, middle-click and
+            // right-click → "Open in new tab" all work natively.
+            const href = isLive
+              ? `/product/${liveDeal!.slug}`
+              : `/comic/${staticDeal!.id}?region=${region}`
             return (
-              <button
+              <Link
                 key={idx}
-                onClick={handleClick}
-                style={{ background: '#fff', border: '1px solid #F0F0F0', borderRadius: '12px', padding: '10px', textAlign: 'left', cursor: 'pointer', display: 'block', width: '100%', fontFamily: 'inherit', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                href={href}
+                prefetch={false}
+                style={{ background: '#fff', border: '1px solid #F0F0F0', borderRadius: '12px', padding: '10px', textAlign: 'left', cursor: 'pointer', display: 'block', width: '100%', fontFamily: 'inherit', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', textDecoration: 'none', color: 'inherit' }}>
                 <div style={{ width: '100%', aspectRatio: '2/3', borderRadius: '8px', overflow: 'hidden', background: '#1a1a2e', marginBottom: '8px', position: 'relative' }}>
                   {coverSrc && (
                     <img
@@ -444,7 +446,7 @@ export default function Home() {
                     </span>
                   </div>
                 )}
-              </button>
+              </Link>
             );
           })}
         </div>
@@ -455,14 +457,14 @@ export default function Home() {
         <span style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#6B7280' }}>Popular:</span>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px', marginTop: '8px' }}>
           {trending.map(term => (
-            <button
+            <Link
               key={term}
-              onClick={() => router.push(`/search?q=${encodeURIComponent(term)}&region=${region}`)}
-              style={{ padding: '6px 14px', fontSize: '12px', borderRadius: '999px', border: '1px solid #EAECEF', color: '#6B7280', background: '#fff', cursor: 'pointer', fontFamily: 'inherit', minHeight: '36px', display: 'flex', alignItems: 'center', transition: 'border-color 0.15s, color 0.15s' }}
+              href={`/search?q=${encodeURIComponent(term)}&region=${region}`}
+              style={{ padding: '6px 14px', fontSize: '12px', borderRadius: '999px', border: '1px solid #EAECEF', color: '#6B7280', background: '#fff', cursor: 'pointer', fontFamily: 'inherit', minHeight: '36px', display: 'flex', alignItems: 'center', transition: 'border-color 0.15s, color 0.15s', textDecoration: 'none' }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = '#E8272A'; e.currentTarget.style.color = '#E8272A'; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = '#EAECEF'; e.currentTarget.style.color = '#6B7280'; }}>
               {term}
-            </button>
+            </Link>
           ))}
         </div>
       </div>
@@ -567,9 +569,9 @@ export default function Home() {
                     e.currentTarget.style.zIndex = String(cover.zIndex)
                   }}
                 >
-                  <button
+                  <Link
                     className={cover.animClass}
-                    onClick={() => router.push(`/search?q=${encodeURIComponent(cover.searchQuery)}&region=${region}`)}
+                    href={`/search?q=${encodeURIComponent(cover.searchQuery)}&region=${region}`}
                     aria-label={`Search for ${cover.title}`}
                     style={{
                       width: '100%',
@@ -589,7 +591,7 @@ export default function Home() {
                       style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                       onError={(e) => { (e.target as HTMLImageElement).style.opacity = '0'; }}
                     />
-                  </button>
+                  </Link>
                 </div>
               ))}
             </div>
@@ -632,13 +634,13 @@ export default function Home() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#6B7280', flexShrink: 0 }}>Popular:</span>
             {trending.map((term) => (
-              <button key={term}
-                onClick={() => router.push(`/search?q=${encodeURIComponent(term)}&region=${region}`)}
-                style={{ padding: '3px 11px', fontSize: '11px', border: '1px solid #EAECEF', borderRadius: '999px', color: '#6B7280', background: '#fff', cursor: 'pointer', transition: 'border-color 0.15s, color 0.15s', fontFamily: 'inherit', flexShrink: 0 }}
+              <Link key={term}
+                href={`/search?q=${encodeURIComponent(term)}&region=${region}`}
+                style={{ padding: '3px 11px', fontSize: '11px', border: '1px solid #EAECEF', borderRadius: '999px', color: '#6B7280', background: '#fff', cursor: 'pointer', transition: 'border-color 0.15s, color 0.15s', fontFamily: 'inherit', flexShrink: 0, textDecoration: 'none' }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = '#E8272A'; e.currentTarget.style.color = '#E8272A'; }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = '#EAECEF'; e.currentTarget.style.color = '#6B7280'; }}>
                 {term}
-              </button>
+              </Link>
             ))}
           </div>
         </div>
@@ -732,14 +734,18 @@ export default function Home() {
               // Strip Comic Vine / other provider placeholder images — fall through to designed fallback
               const coverSrc  = rawCover && !isPlaceholderCoverUrl(rawCover) ? rawCover : ''
 
-              const handleClick = () => isLive
-                ? router.push(`/product/${liveDeal!.slug}`)
-                : router.push(`/comic/${staticDeal!.id}?region=${region}`)
+              // Real href, not a click handler — see the mobile grid above.
+              const href = isLive
+                ? `/product/${liveDeal!.slug}`
+                : `/comic/${staticDeal!.id}?region=${region}`
 
               return (
-                <button key={i} className="deal-card"
-                  onClick={handleClick}
-                  style={{ flexShrink: 0, width: '136px', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                <Link key={i} className="deal-card"
+                  href={href}
+                  // The rail renders 3 copies of the deal set for the seamless
+                  // loop, so prefetch would triple-fetch every product page.
+                  prefetch={false}
+                  style={{ flexShrink: 0, width: '136px', textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'block', textDecoration: 'none', color: 'inherit' }}>
 
                   {/* Cover */}
                   <div className="cover-card-lg" style={{ width: '136px', height: '185px', borderRadius: '10px', overflow: 'hidden', background: '#1e1b2e', position: 'relative', boxShadow: '0 4px 16px rgba(0,0,0,0.1)', marginBottom: '8px' }}>
@@ -812,7 +818,7 @@ export default function Home() {
                           were removed for launch honesty (LB-7). */}
                     </div>
                   )}
-                </button>
+                </Link>
               );
             })}
           </div>

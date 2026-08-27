@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 
 interface SuggestionTerm {
@@ -114,19 +115,48 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
     abortRef.current?.abort();
   }, [pathname]);
 
-  const doSearch = (term: string, newTab = false) => {
-    // Reset BEFORE navigation so the dropdown disappears in the same render
-    // cycle as the route change — not after, when a stale dropdown can flash
-    // visible against the new page.
+  const searchUrl = (term: string) =>
+    `/search?q=${encodeURIComponent(term)}&region=${region}`;
+
+  /** Collapse the dropdown and cancel in-flight suggestion work. Called both
+   *  before a programmatic navigation (the typed-query path) and on a
+   *  suggestion link's click, so a stale dropdown never flashes against the
+   *  new page. */
+  const closeDropdown = () => {
     setShowSuggestions(false);
     setSuggestions([]);
+    setIsFocused(false);
     userTypedRef.current = false;
     abortRef.current?.abort();
     clearTimeout(debounceRef.current);
+  };
 
-    const url = `/search?q=${encodeURIComponent(term)}&region=${region}`;
-    if (newTab) window.open(url, '_blank');
-    else router.push(url);
+  /**
+   * A dropdown row's click handler must NOT tear the dropdown down when the
+   * gesture is a new-tab gesture.
+   *
+   * PROVEN 2026-08-27 (Playwright, reduced-motion, local): with an
+   * unconditional `closeDropdown()` here, Ctrl+click on a suggestion opened no
+   * tab AND did not navigate — nothing happened at all. React flushes a
+   * discrete-event state update synchronously at the end of event dispatch,
+   * so the <a> was unmounted before the browser ran the link's default
+   * action, and Chromium cancels navigation for a detached anchor. A plain
+   * click survives it only because the router.push-free same-document path
+   * had already been handed to Next's Link.
+   *
+   * So: leave modified and non-primary clicks completely alone. The browser
+   * owns them. Only a plain primary click — the one that really does leave
+   * this page — closes the dropdown and syncs the input text.
+   */
+  const isNewTabGesture = (e: React.MouseEvent) =>
+    e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || e.button !== 0
+
+  /** Typed-query submit only. Suggestion rows are real <Link>s — they never
+   *  come through here, so there is no `newTab` flag to emulate: the browser
+   *  handles Ctrl/⌘+click and middle-click on those natively. */
+  const doSearch = (term: string) => {
+    closeDropdown();
+    router.push(searchUrl(term));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -134,14 +164,14 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
     if (query.trim()) doSearch(query.trim());
   };
 
-  const handleButtonClick = (e: React.MouseEvent) => {
-    if (query.trim()) doSearch(query.trim(), e.ctrlKey || e.metaKey);
+  const handleButtonClick = () => {
+    if (query.trim()) doSearch(query.trim());
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      if (query.trim()) doSearch(query.trim(), e.ctrlKey || e.metaKey);
+      if (query.trim()) doSearch(query.trim());
     } else if (e.key === 'Escape') {
       setShowSuggestions(false);
     }
@@ -171,12 +201,27 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
             onChange={e => { userTypedRef.current = true; setQuery(e.target.value); }}
             onKeyDown={handleKeyDown}
             onFocus={() => { setIsFocused(true); if (suggestions.length > 0) setShowSuggestions(true); }}
-            onBlur={() => setIsFocused(false)}
+            // Focus moving to a row INSIDE this widget is not "leaving the
+            // search box". PROVEN 2026-08-27: the unconditional version closed
+            // the popular panel the instant a row took focus, which unmounted
+            // the <a> before the browser ran its default action — Ctrl+click
+            // and middle-click on a popular search opened nothing, 6 times out
+            // of 6. relatedTarget is the correct test, and it removes the need
+            // for the mousedown preventDefault hack that used to paper over it
+            // (and which broke middle-click in its own right).
+            onBlur={e => {
+              if (wrapperRef.current?.contains(e.relatedTarget as Node | null)) return
+              setIsFocused(false)
+            }}
             placeholder="Search any title, character or ISBN..."
             aria-label="Search comics, characters, or ISBN"
-            aria-autocomplete="list"
-            aria-expanded={showSuggestions && suggestions.length > 0}
-            role="combobox"
+            // No role="combobox"/aria-expanded here any more. This component
+            // never implemented the ARIA combobox keyboard model (no
+            // aria-controls, no aria-activedescendant, no arrow-key
+            // traversal), and the matching role="option" rows below it
+            // suppressed Chromium's middle-click-opens-link — see the
+            // dropdown comment. A plain text input above a list of real links
+            // is what this actually is, and it behaves natively.
             style={{
               flex: 1,
               // minWidth:0 is load-bearing. A flex item defaults to
@@ -221,9 +266,16 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
           </button>
         </form>
 
-      {/* Popular searches — hero variant, empty query, focused */}
+      {/* Popular searches — hero variant, empty query, focused.
+          <nav> of real links, NOT role="listbox"/role="option". PROVEN
+          2026-08-27 by DOM A/B in Chromium: with role="option" on the anchor
+          (inside role="listbox") a middle-click opened nothing; removing
+          either role restored the native new-tab open, with every other
+          attribute, handler and style identical. The ARIA pattern was never
+          backed by a real listbox keyboard model anyway, so honest link
+          markup costs nothing and is what the browser can act on. */}
       {showPopular && (
-        <div role="listbox" aria-label="Popular searches" style={{
+        <nav aria-label="Popular searches" style={{
           position: 'absolute',
           top: '100%',
           left: 0,
@@ -239,19 +291,12 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
             Popular searches
           </div>
           {POPULAR_SEARCHES.map((term, i) => (
-            <button key={term}
-              type="button"
-              role="option"
-              aria-selected={false}
-              // mouseDown fires before blur so we can navigate before the blur hides the dropdown
-              onMouseDown={e => {
-                e.preventDefault()
-                setSuggestions([])
-                setShowSuggestions(false)
-                setIsFocused(false)
-                setQuery(term)
-                doSearch(term)
-              }}
+            <Link key={term}
+              href={searchUrl(term)}
+              // Dropdown rows are transient and mostly not taken; prefetching
+              // 7 search routes on every focus would run 7 catalogue queries.
+              prefetch={false}
+              onClick={e => { if (isNewTabGesture(e)) return; setQuery(term); closeDropdown() }}
               style={{
                 display: 'flex', alignItems: 'center', gap: '10px',
                 padding: '10px 18px', cursor: 'pointer',
@@ -259,6 +304,7 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
                 borderBottom: i < POPULAR_SEARCHES.length - 1 ? '1px solid #F9F9F9' : 'none',
                 background: '#fff', width: '100%',
                 textAlign: 'left', font: 'inherit', color: 'inherit',
+                textDecoration: 'none',
               }}
               onMouseEnter={e => (e.currentTarget.style.background = '#F3F4F6')}
               onMouseLeave={e => (e.currentTarget.style.background = '#fff')}
@@ -271,13 +317,13 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
               <svg width="13" height="13" fill="none" viewBox="0 0 24 24" style={{ color: '#D1D5DB', flexShrink: 0 }} aria-hidden="true">
                 <path d="M7 17L17 7M17 7H7M17 7v10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
               </svg>
-            </button>
+            </Link>
           ))}
-        </div>
+        </nav>
       )}
 
       {showSuggestions && suggestions.length > 0 && (
-        <div role="listbox" aria-label="Search suggestions" style={{
+        <nav aria-label="Search suggestions" style={{
           position: 'absolute',
           top: '100%',
           left: 0,
@@ -292,19 +338,10 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
           {suggestions.map((s, i) => {
             const badge = s.type ? TYPE_BADGE[s.type] : undefined
             return (
-              <button key={i}
-                type="button"
-                role="option"
-                aria-selected={false}
-                onClick={() => {
-                  // Explicit reset before doSearch (which also resets) so the
-                  // intent is clear at the call site too — dropdown closes
-                  // synchronously with the click, never after navigation.
-                  setSuggestions([]);
-                  setShowSuggestions(false);
-                  setQuery(s.term);
-                  doSearch(s.term);
-                }}
+              <Link key={i}
+                href={searchUrl(s.term)}
+                prefetch={false}
+                onClick={e => { if (isNewTabGesture(e)) return; setQuery(s.term); closeDropdown() }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '10px',
                   padding: '11px 18px', cursor: 'pointer',
@@ -315,6 +352,7 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
                   textAlign: 'left',
                   font: 'inherit',
                   color: 'inherit',
+                  textDecoration: 'none',
                 }}
                 onMouseEnter={e => (e.currentTarget.style.background = '#F3F4F6')}
                 onMouseLeave={e => (e.currentTarget.style.background = '#fff')}
@@ -336,10 +374,10 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
                 <svg width="13" height="13" fill="none" viewBox="0 0 24 24" style={{ color: '#D1D5DB', flexShrink: 0 }} aria-hidden="true">
                   <path d="M7 17L17 7M17 7H7M17 7v10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
                 </svg>
-              </button>
+              </Link>
             )
           })}
-        </div>
+        </nav>
       )}
     </div>
   );

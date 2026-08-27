@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { isBadCoverUrl } from '@/lib/images/url-filters'
 import { useIssueList } from './useIssueList'
 
@@ -41,7 +41,6 @@ export default function CVIssuesGrid({
   columns = 3,
   onLoaded,
 }: Props) {
-  const router = useRouter()
   const { issues } = useIssueList(comicvineId, searchTitle, productSlug)
 
   // Forward count to onLoaded — ref-isolated so callers can pass inline arrows
@@ -92,10 +91,13 @@ export default function CVIssuesGrid({
           const cover    = rawCover && !isBadCoverUrl(rawCover) ? rawCover : ''
           const cardLabel = issue.issue_number ? `#${issue.issue_number}` : (issue.name || 'Issue')
           return (
-            <button
+            <Link
               key={issue.id}
-              onClick={() => router.push(`/comic/i${issue.id}`)}
-              style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', textAlign: 'left' }}
+              href={`/comic/i${issue.id}`}
+              // Matches IssueListGrid — a volume's issue list is long enough
+              // that per-card prefetch would fan out badly.
+              prefetch={false}
+              style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', textAlign: 'left', display: 'block', textDecoration: 'none', color: 'inherit' }}
             >
               <div
                 className="cover-card-md relative bg-gray-100 border border-gray-200 rounded-md"
@@ -134,7 +136,7 @@ export default function CVIssuesGrid({
               {issue.cover_year && (
                 <div style={{ fontSize: '10px', color: '#9CA3AF' }}>{issue.cover_year}</div>
               )}
-            </button>
+            </Link>
           )
         })}
       </div>

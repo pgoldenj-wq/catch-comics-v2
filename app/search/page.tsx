@@ -4,6 +4,7 @@
 import { useSearchParams } from 'next/navigation'
 import { useEffect, useState, useMemo, useRef, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import MobileHeader from '@/components/MobileHeader'
 import Navbar       from '@/components/Navbar'
 import { isBadCoverUrl, adjustImgSrc } from '@/lib/images/url-filters'
@@ -898,10 +899,10 @@ function SearchResults() {
           {didYouMean && !loading && (
             <div style={{ padding: '12px 16px', borderRadius: '12px', background: '#fff', border: '1px solid #F0F0F0', fontSize: '14px', color: '#6B7280', marginBottom: '16px' }}>
               Did you mean{' '}
-              <button onClick={() => router.push(buildUrl({ q: didYouMean }))}
-                style={{ fontWeight: 600, color: '#C41F22', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' }}>
+              <Link href={buildUrl({ q: didYouMean })}
+                style={{ fontWeight: 600, color: '#C41F22', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit', textDecoration: 'none' }}>
                 {didYouMean}
-              </button>?
+              </Link>?
             </div>
           )}
 
@@ -939,31 +940,29 @@ function SearchResults() {
                   ? [comic.authors?.join(', '), comic.start_year].filter(Boolean).join(' · ')
                   : [comic.start_year, issueCount].filter(Boolean).join(' · ')
 
+                // The row is a real <Link>, not a div+onClick. A native anchor
+                // gives us Ctrl/⌘+click and middle-click → new tab, right-click
+                // → "Open in new tab", Enter activation and keyboard focus for
+                // free — the hand-rolled role="link" + onKeyDown emulation that
+                // used to live here could not.
                 return (
-                  <div
+                  <Link
                     key={comic.id}
-                    role="link"
-                    tabIndex={0}
-                    aria-label={`View details for ${comic.name}`}
-                    onClick={() => router.push(
+                    href={
                       comic.canonicalSlug
                         ? `/product/${comic.canonicalSlug}`
                         : `/comic/${comic.id}?region=${region}`
-                    )}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault()
-                        router.push(
-                          comic.canonicalSlug
-                            ? `/product/${comic.canonicalSlug}`
-                            : `/comic/${comic.id}?region=${region}`
-                        )
-                      }
-                    }}
+                    }
+                    // A result page carries ~20 rows; prefetching each product
+                    // page on scroll is a lot of RSC traffic for a list the
+                    // user mostly scans. Matches IssueListGrid's call.
+                    prefetch={false}
+                    aria-label={`View details for ${comic.name}`}
                     style={{
                       display: 'flex', alignItems: 'flex-start', gap: '14px',
                       padding: '14px 0', cursor: 'pointer',
                       borderBottom: '1px solid #F0F0F0',
+                      textDecoration: 'none', color: 'inherit',
                       // No transform here — transform creates a stacking context that
                       // traps the cover's hover:z-50 inside it, causing underlap.
                       transition: 'background 0.12s',
@@ -1068,7 +1067,7 @@ function SearchResults() {
                         setPriceMap(prev => { const m = new Map(prev); m.set(k, price); return m })
                       }
                     />
-                  </div>
+                  </Link>
                 )
               })}
             </div>
