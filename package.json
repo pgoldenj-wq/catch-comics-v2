@@ -107,7 +107,11 @@
     "test:ebay-uk": "tsx scripts/test-ebay-uk-only.ts",
     "retailer:freshness": "dotenv -e .env.local -- tsx scripts/retailer-freshness.ts",
     "test:retailer-card": "node scripts/test-retailer-refresh-card.mjs",
-    "test:founder-review": "node scripts/test-founder-review-handoff.mjs"
+    "test:founder-review": "node scripts/test-founder-review-handoff.mjs",
+    "test:isbn": "tsx scripts/test-isbn-truth.ts",
+    "audit:isbn": "dotenv -e .env.local -- tsx scripts/audit-isbn-truth.ts",
+    "repair:isbn:dry": "dotenv -e .env.local -- tsx scripts/repair-isbn-invalid.ts",
+    "repair:isbn:write": "dotenv -e .env.local -- tsx scripts/repair-isbn-invalid.ts --write"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1055.0",

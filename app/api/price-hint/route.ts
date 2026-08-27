@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { searchListings, type Marketplace } from '@/lib/ebay'
 import { pricesCache } from '@/lib/cache'
 import { enforceRateLimit } from '@/lib/security/rateLimit'
+import { normalizeAnyIsbn } from '@/lib/identity/isbn'
 
 /**
  * GET /api/price-hint?isbn={isbn13|isbn10}&region={uk|us}
@@ -28,12 +29,18 @@ export async function GET(request: NextRequest) {
   if (limited) return limited
 
   const { searchParams } = request.nextUrl
-  const isbnRaw = (searchParams.get('isbn') || '').trim().replace(/[-\s]/g, '')
-  const region  = (searchParams.get('region') || 'uk').toLowerCase()
+  const isbnParam = (searchParams.get('isbn') || '').trim()
+  const region    = (searchParams.get('region') || 'uk').toLowerCase()
 
-  // ISBN-10 or ISBN-13 only (last char of ISBN-10 may be X). Anything else —
-  // including the legacy `q` title param — gets an honest empty hint.
-  if (!/^(\d{13}|\d{9}[\dXx])$/.test(isbnRaw)) {
+  // A trusted ISBN-13, or an ISBN-10 converted deterministically to one.
+  // The previous test was shape-only (`\d{13}` or `\d{9}[\dXx]`), which let a
+  // checksum-invalid identifier drive a price labelled as that edition's. The
+  // whole point of this route is that a wrong low price is worse than no hint
+  // (LB-3 above), and an ISBN that fails its own check digit cannot anchor a
+  // price to an edition. Anything untrusted gets the same honest empty hint
+  // the legacy `q` title param gets, and costs zero eBay calls.
+  const isbnRaw = normalizeAnyIsbn(isbnParam)
+  if (!isbnRaw) {
     return NextResponse.json({ lowestPrice: null, currency: null })
   }
 

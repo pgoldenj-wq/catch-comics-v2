@@ -38,6 +38,7 @@ import { isBadCoverUrl, canUseNextImage } from '@/lib/images/url-filters'
 import { seriesNameToSlug, getSeriesEntry } from '@/lib/series/registry'
 import { jsonLdScriptString }               from '@/lib/security/jsonLd'
 import { displayPublisher }                 from '@/lib/identity/publisher'
+import { normalizeIsbn13 }                  from '@/lib/identity/isbn'
 import { suppressDuplicateRetailerListings } from '@/lib/listings/dedupeListings'
 import { BASE_URL } from '@/lib/site-url'
 
@@ -479,6 +480,13 @@ export default async function ProductPage(
     && IN_STOCK_STATUSES.has(bestListing.stockStatus)
     && (Date.now() - new Date(bestListing.lastSeenAt).getTime()) < STALE_MS
 
+  // The ISBN we are willing to stand behind: shape + 978/979 + checksum.
+  // Everything downstream (spec row, description footnote, JSON-LD, the
+  // ISBN-keyed eBay lookup in OffersTable) keys off THIS, never the raw column,
+  // so an untrusted identifier degrades to honest absence on every surface at
+  // once instead of leaking into one of them.
+  const trustedIsbn13 = normalizeIsbn13(product.isbn13)
+
   // ── JSON-LD ──────────────────────────────────────────────────────────────
   // Using @type: Book (not Product) because:
   //   1. Comics/graphic novels/manga are ISBNed books — semantically correct
@@ -493,7 +501,10 @@ export default async function ProductPage(
     name:       product.title,
     ...(product.description  ? { description: product.description }  : {}),
     ...(product.coverImageUrl ? { image: product.coverImageUrl }     : {}),
-    ...(product.isbn13        ? { isbn: product.isbn13 }             : {}),
+    // Only a validated ISBN is published as book identity. Emitting a
+    // checksum-invalid one tells Google this page is a book that does not
+    // exist, which damages the record more than emitting nothing.
+    ...(trustedIsbn13         ? { isbn: trustedIsbn13 }              : {}),
     ...(displayPublisher(product.publisher)
       ? { publisher: { '@type': 'Organization', name: displayPublisher(product.publisher) } }
       : {}),
@@ -696,6 +707,21 @@ export default async function ProductPage(
                     </div>
                   )}
                   <LabeledRow label="Status" value={statusLabel(bestListing)} />
+                  {/* ISBN belongs in the spec block, not orphaned at the foot of
+                      the description aside where it used to be the only home for
+                      it — ~2,000px down the page, below the issue grid, at 11px
+                      in gray-400. The catalogue is 99.93% ISBN-populated, so
+                      "ISBNs aren't showing up" was always a placement problem
+                      rather than a data one (audit 2026-08-26).
+                      Rendered only when the value is a TRUSTED ISBN: showing a
+                      checksum-invalid identifier is worse than showing none. */}
+                  {trustedIsbn13 && (
+                    <div className="hidden sm:block">
+                      <LabeledRow label="ISBN">
+                        <span className="font-mono text-white/70">{trustedIsbn13}</span>
+                      </LabeledRow>
+                    </div>
+                  )}
                   {/* T1-B + T1-I: Character Tags hidden on mobile (async chips
                       add scroll debt). withRow — the component owns the labeled
                       row so no orphaned "Character Tags:" label renders on issues
@@ -801,7 +827,7 @@ export default async function ProductPage(
                 <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6">
                   <OffersTable
                     offers={offers}
-                    isbn13={product.isbn13 ?? null}
+                    isbn13={trustedIsbn13}
                     productTitle={product.title}
                     canonicalProductId={product.id}
                   />
@@ -872,9 +898,11 @@ export default async function ProductPage(
                       No description available.
                     </p>
                   )}
-                  {product.isbn13 && (
-                    <p className="mt-3 text-[11px] text-gray-400">
-                      ISBN <span className="font-mono text-gray-600">{product.isbn13}</span>
+                  {/* Mobile-only now: on sm+ the ISBN lives in the spec block
+                      beside Format/Publisher, where readers actually look. */}
+                  {trustedIsbn13 && (
+                    <p className="mt-3 text-[11px] text-gray-400 sm:hidden">
+                      ISBN <span className="font-mono text-gray-600">{trustedIsbn13}</span>
                     </p>
                   )}
                 </div>

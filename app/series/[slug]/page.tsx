@@ -9,6 +9,7 @@ import VolumeGrid           from './_components/VolumeGrid'
 import EditionComparison    from './_components/EditionComparison'
 import { jsonLdScriptString } from '@/lib/security/jsonLd'
 import { BASE_URL } from '@/lib/site-url'
+import { normalizeIsbn13 } from '@/lib/identity/isbn'
 
 // ISR: same cadence as product pages
 export const revalidate = 3600
@@ -97,7 +98,9 @@ export default async function SeriesPage(
         '@type': 'Book',
         name:    v.title,
         url:     `${BASE_URL}/product/${v.slug}`,
-        ...(v.isbn13 ? { isbn: v.isbn13 } : {}),
+        // Validated before publication — an invalid ISBN in structured data
+        // asserts a book identity that does not exist.
+        ...(normalizeIsbn13(v.isbn13) ? { isbn: normalizeIsbn13(v.isbn13) } : {}),
       },
     })),
   }

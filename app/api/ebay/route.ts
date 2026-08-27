@@ -27,6 +27,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { searchListings, EbayListing } from '@/lib/ebay'
 import { TTLCache } from '@/lib/cache'
 import { enforceRateLimit } from '@/lib/security/rateLimit'
+import { normalizeIsbn13 } from '@/lib/identity/isbn'
 
 // Module-level 1-hour cache — shared across warm serverless instances
 const ebayProductCache = new TTLCache<EbayListing[]>(60 * 60 * 1000)
@@ -64,14 +65,24 @@ export async function GET(req: NextRequest) {
   if (limited) return limited
 
   const { searchParams } = new URL(req.url)
-  const isbn  = (searchParams.get('isbn')  || '').trim()
-  const title = (searchParams.get('title') || '').trim()
+  const isbnRaw = (searchParams.get('isbn')  || '').trim()
+  const title   = (searchParams.get('title') || '').trim()
+
+  // An ISBN-keyed price claim is only as trustworthy as the ISBN. This route
+  // used to pass the raw param straight to eBay as a keyword, so a mistyped or
+  // fabricated identifier produced a price attributed to a specific edition.
+  // Untrusted input is treated as no ISBN at all: it never keys the cache and
+  // never keys a search. Behaviour is strictly narrower than before — an
+  // invalid ISBN previously still reached the title path via the <3 merge
+  // below, so nothing that used to work stops working.
+  const isbn = normalizeIsbn13(isbnRaw)
 
   if (!isbn && !title) {
     return NextResponse.json({ error: 'isbn or title required' }, { status: 400 })
   }
 
-  // Cache key: prefer ISBN (deterministic), fall back to normalised title
+  // Cache key: prefer the NORMALISED ISBN (deterministic — hyphenated and bare
+  // forms of one identifier share an entry), fall back to normalised title.
   const cacheKey = isbn
     ? `ebay:isbn:${isbn}`
     : `ebay:title:${title.toLowerCase().replace(/\s+/g, ' ')}`

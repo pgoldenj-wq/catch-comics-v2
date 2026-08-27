@@ -16,33 +16,16 @@
  */
 
 // ── ISBN normalisation ────────────────────────────────────────────────────────
+//
+// Re-exported from lib/identity/isbn.ts so there is exactly ONE implementation
+// of "is this a trusted ISBN?" in the codebase. This file used to carry its own
+// copy that validated the checksum but not the 978/979 Bookland prefix, which
+// let any checksum-valid EAN-13 pass as an ISBN. Importers keep working
+// unchanged; the semantics are now strictly stricter.
 
-/** Strip separators; return a checksum-valid ISBN-13 or null. */
-export function normalizeIsbn13(raw: string | null | undefined): string | null {
-  if (!raw) return null
-  const s = raw.replace(/[-\s]/g, '')
-  if (!/^\d{13}$/.test(s)) return null
-  const sum = [...s].slice(0, 12).reduce((acc, ch, i) => acc + Number(ch) * (i % 2 === 0 ? 1 : 3), 0)
-  const check = (10 - (sum % 10)) % 10
-  return check === Number(s[12]) ? s : null
-}
+export { normalizeIsbn13, isbn10To13, normalizeAnyIsbn } from './isbn'
 
-/** Convert a checksum-valid ISBN-10 to ISBN-13 (978 prefix); null if invalid. */
-export function isbn10To13(raw: string | null | undefined): string | null {
-  if (!raw) return null
-  const s = raw.replace(/[-\s]/g, '').toUpperCase()
-  if (!/^\d{9}[\dX]$/.test(s)) return null
-  const sum = [...s].reduce((acc, ch, i) => acc + (ch === 'X' ? 10 : Number(ch)) * (10 - i), 0)
-  if (sum % 11 !== 0) return null
-  const core = '978' + s.slice(0, 9)
-  const csum = [...core].reduce((acc, ch, i) => acc + Number(ch) * (i % 2 === 0 ? 1 : 3), 0)
-  return core + String((10 - (csum % 10)) % 10)
-}
-
-/** Best-effort ISBN-13 from any ISBN-shaped input. */
-export function normalizeAnyIsbn(raw: string | null | undefined): string | null {
-  return normalizeIsbn13(raw) ?? isbn10To13(raw)
-}
+import { normalizeAnyIsbn } from './isbn'
 
 // ── Edition signals from titles ───────────────────────────────────────────────
 

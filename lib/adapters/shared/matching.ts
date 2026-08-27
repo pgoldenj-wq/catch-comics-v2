@@ -15,6 +15,7 @@ import { inferFormat, enrichByIsbn, applyEnrichment } from '@/lib/enrichment/isb
 import { ListingCondition, MatchMethod, Prisma, StockStatus } from '@prisma/client'
 import { inngest }                                   from '@/lib/inngest/client'
 import { claimFanoutSlot }                           from './fanout'
+import { classifyBarcode, normalizeIsbn13 }          from '@/lib/identity/isbn'
 
 // ── Shared public types ───────────────────────────────────────────────────────
 
@@ -137,24 +138,34 @@ export interface SyncError {
 // ── Barcode / identifier extraction ──────────────────────────────────────────
 
 /**
- * Parse a barcode string into ISBN-13 or EAN.
+ * Parse a retailer barcode / SKU into ISBN-13 or EAN.
  *
- * Rules:
- *   13 digits, prefix 978/979 → ISBN-13
- *   13 digits, any other prefix → EAN
- *   Anything else → { isbn13: null, ean: null }
+ * Delegates to the single canonical validator in lib/identity/isbn.ts.
+ *
+ * This function used to accept any 13-digit string beginning 978/979 WITHOUT
+ * checking the check digit, and every adapter routes through it. Because
+ * `matchCanonical` treats a returned isbn13 as identity worth confidence 95 —
+ * and mints a brand-new canonical product from it on a miss — a single
+ * mistyped digit in a retailer's barcode field became a permanent product
+ * record carrying an ISBN that identifies nothing. The 2026-08-26 audit found
+ * four such rows, all traceable to Travelling Man Shopify `barcode` values and
+ * LetsBuyBooks SKUs (scripts/audit-isbn-truth.ts).
+ *
+ * Now: a value is only ever reported as an ISBN when it passes shape, Bookland
+ * prefix AND checksum. A corrupt 978… barcode returns { null, null } and the
+ * listing stays UNMATCHED, which is the honest outcome — a listing we cannot
+ * identify must not silently become a product we claim to know.
+ *
+ * Also handles checksum-valid ISBN-10 SKUs, which the digits-only path
+ * previously discarded (the `X` check character was stripped as a non-digit,
+ * leaving 9 digits). Measured impact at the time of the change: 0 live
+ * listings, so this closes a latent gap rather than moving existing rows.
  */
 export function extractIdentifiers(barcode: string | null | undefined): {
   isbn13: string | null
   ean:    string | null
 } {
-  if (!barcode) return { isbn13: null, ean: null }
-  const digits = barcode.replace(/\D/g, '')
-  if (digits.length !== 13) return { isbn13: null, ean: null }
-  if (digits.startsWith('978') || digits.startsWith('979')) {
-    return { isbn13: digits, ean: null }
-  }
-  return { isbn13: null, ean: digits }
+  return classifyBarcode(barcode)
 }
 
 // ── Canonical slug generation ─────────────────────────────────────────────────
@@ -211,6 +222,20 @@ export async function matchCanonical(
   adapterTag = '[adapter]',
   allowCreate = true,
 ): Promise<Pick<BaseListing, 'canonicalProductId' | 'matchMethod' | 'matchConfidence'>> {
+
+  // Defence in depth. extractIdentifiers already validates, but this function
+  // is also called directly by ~a dozen operational scripts that assemble an
+  // ISBN themselves. An ISBN that cannot be trusted must never reach the
+  // lookup (it would join to a wrong product) nor the create path (it would
+  // mint a product whose identity is a typo). Untrusted → treated as absent.
+  const trustedIsbn = normalizeIsbn13(isbn13)
+  if (isbn13 && !trustedIsbn) {
+    console.warn(
+      `${adapterTag} rejected untrusted ISBN "${isbn13}" for "${title}" — ` +
+      `failed shape/prefix/checksum validation; listing left unidentified`,
+    )
+  }
+  isbn13 = trustedIsbn
 
   if (isbn13) {
     // ── 1. Look up existing canonical product by ISBN ─────────────────────
