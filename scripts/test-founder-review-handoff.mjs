@@ -99,9 +99,16 @@ function fakeClaude({ initDelay = 0, exitCode = 0, result = null, throwOnSpawn =
 const OK_RESULT = { is_error: false, result: 'Repaired 4 issues.', total_cost_usd: 1.23, session_id: 'sess-fake-0001' }
 const settle = () => new Promise(r => setTimeout(r, 60))
 
+/* A machine whose Claude Code readiness we control. The handler asks this
+   before launching, so the tests can drive a signed-out machine without going
+   anywhere near the founder's real account. */
+const READY = { state: 'connected', claude: { installed: true, version: '2.1.251 (Claude Code)' } }
+const SIGNED_OUT = { state: 'signin-required', claude: { installed: true, version: '2.1.251 (Claude Code)' } }
+
 const runner = (opts = {}) => new ReviewRunner(REPO, {
   spawnFn: opts.spawnFn ?? fakeClaude(opts.claude),
   findClaudeFn: opts.findClaudeFn ?? (() => 'C:\\fake\\claude.exe'),
+  readinessFn: opts.readinessFn ?? (() => READY),
 })
 
 /* ═══ 1. Validation and path safety ═════════════════════════════════════════ */
@@ -286,7 +293,59 @@ const rAuth = runner({ claude: { exitCode: 1, result: { is_error: true, result: 
 const recAuth = rAuth.submit(homepageReview('homepage-2026-08-24-1934-auth01'))
 await settle()
 check('an auth failure is BLOCKED, not a product failure', rAuth.get(recAuth.reviewId).state === 'blocked', rAuth.get(recAuth.reviewId).state)
-check('the auth message tells the founder to run claude login', /claude login/.test(rAuth.get(recAuth.reviewId).reason))
+check('the auth message names the one-click sign-in, not a command to remember',
+  /Sign in to Claude Code/.test(rAuth.get(recAuth.reviewId).reason))
+check('the manual fallback is still there for anyone who wants it',
+  /claude auth login/.test(rAuth.get(recAuth.reviewId).reason))
+check('the auth message promises the review is safe',
+  /review is saved/i.test(rAuth.get(recAuth.reviewId).reason))
+
+/* ── A signed-out machine is caught BEFORE Claude is launched ───────────────
+   This is the founder's actual complaint: an expired sign-in used to be
+   discovered by starting a session that then failed. Now readiness is asked
+   first, and the answer costs nothing but a Retry.                          */
+console.log('\nAn expired sign-in never costs the founder their review')
+const spawnSignedOut = fakeClaude({ result: OK_RESULT })
+const rOut = runner({ spawnFn: spawnSignedOut, readinessFn: () => SIGNED_OUT })
+const recOut = rOut.submit(homepageReview('homepage-2026-08-24-1941-signout'))
+const dirOut = packageDir(REPO, 'homepage-2026-08-24-1941-signout')
+check('a signed-out machine is BLOCKED, not failed', recOut.state === 'blocked', recOut.state)
+check('no Claude process is started at all', spawnSignedOut.calls.length === 0, `got ${spawnSignedOut.calls.length}`)
+check('the reason names the sign-in button', /Sign in to Claude Code/.test(recOut.reason))
+check('the review package was still written', existsSync(join(dirOut, 'review.json')))
+check('every screenshot survived',
+  JSON.parse(readFileSync(join(dirOut, 'review.json'), 'utf8')).counts.screenshots === 4)
+check('the screenshot FILES survived, not just the count',
+  JSON.parse(readFileSync(join(dirOut, 'review.json'), 'utf8')).screenshots
+    .every(s => existsSync(join(dirOut, ...s.file.split('/'))) && statSync(join(dirOut, ...s.file.split('/'))).size > 0))
+check('the founder text survived', /hover enlargement is clipped/.test(readFileSync(join(dirOut, 'review.md'), 'utf8')))
+
+console.log('\nAfter signing in, Retry uses the review that is already saved')
+let signedIn = false
+const spawnAfter = fakeClaude({ result: OK_RESULT })
+const rAfter = new ReviewRunner(REPO, {
+  spawnFn: spawnAfter,
+  findClaudeFn: () => 'C:\\fake\\claude.exe',
+  readinessFn: () => (signedIn ? READY : SIGNED_OUT),
+})
+const afterBody = homepageReview('homepage-2026-08-24-1942-after1')
+const blockedOut = rAfter.submit(afterBody)
+const dirAfter = packageDir(REPO, 'homepage-2026-08-24-1942-after1')
+const shotsBefore = JSON.parse(readFileSync(join(dirAfter, 'review.json'), 'utf8')).screenshots.map(s => s.file)
+check('the first attempt is blocked on the sign-in', blockedOut.state === 'blocked')
+signedIn = true                                    // the founder signs in
+const retriedOut = rAfter.submit(afterBody)
+check('the retry launches exactly one Claude repair', spawnAfter.calls.length === 1, `got ${spawnAfter.calls.length}`)
+check('the retry is not treated as a duplicate', retriedOut.duplicate === false)
+check('the retry reuses the already-saved package', retriedOut.packagePath === blockedOut.packagePath)
+check('the retry did not re-write a second package',
+  JSON.parse(readFileSync(join(dirAfter, 'review.json'), 'utf8')).screenshots.map(s => s.file).join() === shotsBefore.join())
+check('the screenshots are still attached after the retry',
+  shotsBefore.length === 4 && shotsBefore.every(f => existsSync(join(dirAfter, ...f.split('/')))))
+check('the retry points Claude at the same package',
+  spawnAfter.calls[0].argv[spawnAfter.calls[0].argv.indexOf('-p') + 1].includes('launch/reviews/homepage-2026-08-24-1942-after1/review.md'))
+await settle()
+check('the retry completed', rAfter.get(afterBody.reviewId).state === 'completed')
 
 const rCrash = runner({ claude: { exitCode: 2, result: { is_error: true, result: 'something broke' } } })
 const recCrash = rCrash.submit(homepageReview('homepage-2026-08-24-1935-crash1'))
@@ -374,6 +433,11 @@ check('health names the repo root', h.repoRoot === REPO)
 check('health names where reviews go', h.reviewsPath === 'launch/reviews')
 check('health reports whether Claude is available', h.claude.available === true)
 check('health reports honestly when Claude is missing', runner({ findClaudeFn: () => null }).health().claude.available === false)
+// The Smoke Test reads readiness from here rather than checking authentication
+// itself, which is what stops the two surfaces disagreeing.
+check('health carries the SAME readiness object the Claude card reads', h.readiness?.state === 'connected')
+check('health reports a signed-out machine to the Smoke Test',
+  runner({ readinessFn: () => SIGNED_OUT }).health().readiness.state === 'signin-required')
 check('the public view hides the absolute transcript path', ReviewRunner.view(rec2).logPath === undefined)
 
 /* ═══ Cleanup ═══════════════════════════════════════════════════════════════ */

@@ -10,12 +10,19 @@
  *
  * WHAT IT IS NOT
  * This is NOT a command runner. There is no way to tell it what to execute.
- * It exposes exactly THREE actions, all hard-coded, each with its own
- * independent single-flight lock:
+ * It exposes a fixed set of actions, all hard-coded, each with its own
+ * independent single-flight lock or relaunch guard:
  *
  *     node scripts/run-e2e.mjs               (i.e. `npm run test:e2e`, LOCAL)
  *     node scripts/run-retailer-refresh.mjs  (bounded retailer price refresh)
  *     claude -p <fixed repair prompt>        (Smoke Test V4 founder handoff)
+ *     claude auth status --json              (read Claude Code readiness)
+ *     claude auth login, in a new console    (the supported sign-in flow)
+ *     claude, in a new console at the repo   ("Open Claude Code")
+ *
+ * The last three are the readiness capability both Command Centre and the Smoke
+ * Test consume; the argv for each is a literal inside claude-readiness.mjs, and
+ * the page chooses only WHICH fixed action to ask for, never what it runs.
  *
  * The first two accept no input of any kind: no request body, no query string,
  * no arguments, no shell input, no environment overrides. The retailer one
@@ -36,11 +43,14 @@
  * SAFETY PROPERTIES (all enforced below, in this order)
  *   1. Binds to 127.0.0.1 only — never 0.0.0.0, so it is unreachable off-box.
  *   2. Rejects any Origin that is not the local Command Centre.
- *   3. Serves exactly two routes; everything else is 404.
- *   4. Single-flight: a second /run while a run is in progress is refused.
+ *   3. Serves a closed list of routes; everything else is 404.
+ *   4. Single-flight: a second /run while a run is in progress is refused, and
+ *      the Claude sign-in and open actions carry their own relaunch guards.
  *   5. Spawns a fixed argv with shell:false — no interpolation of any input.
- *   6. Reports only state, timing, exit code and the suite verdict. It never
- *      echoes environment values, paths outside the repo, or process output.
+ *   6. Reports only state, timing, exit code and the suite verdict; for Claude
+ *      readiness, only the signed-in boolean, method, account label and plan.
+ *      It never echoes a token, a credential, an environment value, a path
+ *      outside the repo, or process output.
  *   7. Never deployed: launch/ is not part of the Next.js app and is not
  *      served by Vercel. This file must never be imported by app code.
  *
@@ -54,6 +64,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { LIMITS, ReviewRunner, ValidationError } from './founder-review-handler.mjs'
+import { launchClaudeInRepo, launchSignin, readiness } from './claude-readiness.mjs'
 
 const HOST = '127.0.0.1'
 const PORT = 8319
@@ -186,6 +197,27 @@ function startRetailerRun() {
 */
 const reviewRunner = new ReviewRunner(REPO_ROOT)
 
+/* ── Actions 4-6: Claude Code readiness ──────────────────────────────────────
+   Three more fixed actions, and they are the reason the founder no longer
+   discovers an expired sign-in at the moment they press Send:
+
+     GET  /claude/status   read whether Claude Code is installed, signed in and
+                           pointed at this repo (claude-readiness.mjs)
+     POST /claude/signin   open a console window running the supported sign-in
+     POST /claude/open     open Claude Code, already rooted in this repo
+
+   Same guarantees as every other action here: no request body, no query
+   parameter that becomes an argument, no path from an HTTP request to an argv.
+   The bridge decides the executable, the arguments and the directory; the page
+   decides only WHICH of the three fixed things to ask for. `?fresh=1` on the
+   status route is a cache hint and nothing else — claude-readiness.mjs still
+   refuses to spawn the CLI more than once every 2.5 seconds.
+*/
+let signinLastLaunchedAt = 0
+let openLastLaunchedAt = 0
+const RELAUNCH_GUARD_MS = 20_000   // a second sign-in window helps nobody
+const OPEN_GUARD_MS = 3_000        // a double-click must not open two sessions
+
 /** Read a JSON body with a hard ceiling, destroying the socket if exceeded. */
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
@@ -269,11 +301,69 @@ const server = createServer((req, res) => {
     return send(202, { ...retailerRun })
   }
 
+  // ── Claude Code readiness ─────────────────────────────────────────────────
+  if (req.method === 'GET' && path === '/claude/status') {
+    const fresh = /(?:^|[?&])fresh=1(?:&|$)/.test(req.url ?? '')
+    return send(200, { ...readiness({ fresh }), port: PORT })
+  }
+
+  if (req.method === 'POST' && path === '/claude/signin') {
+    const now = Date.now()
+    const state = readiness({ fresh: true })
+    if (state.state === 'connected') {
+      // Nothing to do, and saying so is better than opening a window that would
+      // only tell the founder the same thing.
+      return send(200, { launched: false, alreadyConnected: true, readiness: state })
+    }
+    if (state.state === 'not-installed') {
+      return send(409, { launched: false, reason: 'not-installed', readiness: state })
+    }
+    if (now - signinLastLaunchedAt < RELAUNCH_GUARD_MS) {
+      return send(200, { launched: false, reason: 'already-open', readiness: state })
+    }
+    let result
+    try { result = launchSignin({ now }) }
+    catch (err) {
+      console.error('[claude-signin] could not open the sign-in window:', err.message)
+      return send(500, { launched: false, reason: 'launch-failed', message: err.message, readiness: state })
+    }
+    if (!result.launched) return send(409, { ...result, readiness: state })
+    signinLastLaunchedAt = now
+    console.log('[claude-signin] sign-in window opened')
+    return send(202, { launched: true, readiness: readiness({ fresh: true }) })
+  }
+
+  if (req.method === 'POST' && path === '/claude/open') {
+    const now = Date.now()
+    const state = readiness({ fresh: true })
+    if (state.state !== 'connected') {
+      // Never open a session that is about to fail, and never blame the wrong
+      // thing: the state says exactly which of the three problems it is.
+      return send(409, { launched: false, reason: state.state, readiness: state })
+    }
+    if (now - openLastLaunchedAt < OPEN_GUARD_MS) {
+      return send(200, { launched: false, reason: 'just-opened', readiness: state })
+    }
+    let result
+    try { result = launchClaudeInRepo() }
+    catch (err) {
+      console.error('[claude-open] could not open Claude Code:', err.message)
+      return send(500, { launched: false, reason: 'launch-failed', message: err.message, readiness: state })
+    }
+    if (!result.launched) return send(409, { ...result, readiness: state })
+    openLastLaunchedAt = now
+    console.log(`[claude-open] Claude Code opened in ${state.repo.root}`)
+    return send(202, { launched: true, repo: state.repo.root, readiness: state })
+  }
+
   // ── Founder review handoff ────────────────────────────────────────────────
   // /review/health tells the Smoke Test what it can rely on right now, so the
-  // page never advertises a capability the machine does not have.
+  // page never advertises a capability the machine does not have. It carries
+  // the SAME readiness object the Claude card reads, so the two surfaces cannot
+  // disagree about whether Send-to-Claude will work.
   if (req.method === 'GET' && path === '/review/health') {
-    return send(200, { ...reviewRunner.health(), port: PORT })
+    const fresh = /(?:^|[?&])fresh=1(?:&|$)/.test(req.url ?? '')
+    return send(200, { ...reviewRunner.health({ fresh }), port: PORT })
   }
 
   if (req.method === 'GET' && path === '/review/status') {
@@ -320,6 +410,10 @@ server.listen(PORT, HOST, () => {
   // what replaced the Smoke Test's per-handoff directory picker.
   const h = reviewRunner.health()
   console.log(`Founder review handoff: ready — Claude Code ${h.claude.available ? h.claude.version : 'NOT FOUND (reviews will still be saved)'}`)
+  // State only. The account label is what the CLI prints for the founder
+  // anyway; no token or credential is ever read, let alone logged.
+  const r = h.readiness
+  console.log(`Claude Code readiness: ${r.state.toUpperCase()} — ${r.detail}`)
 })
 
 // Do not leave a TEST suite running if the bridge is closed — nothing is lost

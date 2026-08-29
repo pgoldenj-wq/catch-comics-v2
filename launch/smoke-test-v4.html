@@ -160,8 +160,13 @@ main { padding:26px; max-width:880px; }
    is established once by the local bridge, so this only ever REPORTS. */
 .repochip { font-size:12px; padding:5px 10px; border-radius:999px; border:1px solid var(--line);
   color:var(--ink2); background:#F9FAFB; white-space:nowrap; }
-.repochip.on  { border-color:#A7F3D0; background:#ECFDF5; color:#065F46; }
-.repochip.off { border-color:#FECACA; background:#FEF2F2; color:#991B1B; }
+.repochip.on   { border-color:#A7F3D0; background:#ECFDF5; color:#065F46; }
+.repochip.off  { border-color:#FECACA; background:#FEF2F2; color:#991B1B; }
+/* Signed out is amber, not red: nothing is broken and nothing is lost — one
+   button fixes it. Red is reserved for "this machine cannot do it at all". */
+.repochip.warn { border-color:#FDE68A; background:var(--fix-bg); color:var(--fix); }
+.btn.signin { background:var(--fix); border-color:var(--fix); color:#fff; font-weight:700; }
+.btn.signin:hover { background:#92400E; }
 
 .help { font-size:13px; color:var(--ink2); }
 kbd { background:#F3F4F6; border:1px solid var(--line); border-bottom-width:2px; border-radius:5px; padding:1px 6px; font-size:12px; }
@@ -176,6 +181,11 @@ kbd { background:#F3F4F6; border:1px solid var(--line); border-bottom-width:2px;
     </div>
     <div class="spacer"></div>
     <span class="repochip" id="repoChip" title="Where reviews are written">Checking local bridge…</span>
+    <!-- Appears only when Claude Code is actually signed out. Same one-button
+         sign-in Command Centre offers, reading the same readiness state, so the
+         founder never has to go and find the other page. -->
+    <button class="btn signin" id="signinBtn" hidden
+      title="Opens a Claude Code window in the repo and runs the supported sign-in">Sign in to Claude Code</button>
     <button class="btn" id="connectBtn" hidden
       title="Fallback only — pick the repo's launch/ folder by hand if the local bridge is unavailable">🔌 Connect repo (fallback)</button>
     <button class="btn" id="importV3Btn" title="Pull checkpoints, notes and screenshots from Smoke Test V3">Import V3</button>
@@ -590,6 +600,7 @@ Claude decides severity, grouping and priority — just write.">${esc(it.problem
   <div class="card sendcard">
     <button class="btn primary big" id="sendBtn">🚀 SEND ${esc(p.title.toUpperCase())} TO CLAUDE</button>
     <div class="sendmeta" id="sendMeta">${sendCardMeta(p, ps)}</div>
+    <div id="readinessRow"></div>
     <div class="sendmeta" id="fallbackRow"></div>
   </div>`;
 
@@ -937,12 +948,74 @@ const pollers = new Map();        // pageId -> interval id
 function bridgeFetch(path, opts, ms){
   return fetch(BRIDGE + path, { ...opts, mode:'cors', signal: AbortSignal.timeout(ms || 8000) });
 }
-async function probeBridge(){
+async function probeBridge(fresh){
   try {
-    const r = await bridgeFetch('/review/health', {}, 4000);
+    const r = await bridgeFetch('/review/health' + (fresh ? '?fresh=1' : ''), {}, 6000);
     bridgeHealth = r.ok ? await r.json() : false;
   } catch(e){ bridgeHealth = false; }
   return bridgeHealth;
+}
+
+/* ═══ CLAUDE CODE READINESS ══════════════════════════════════════════
+   Read, never re-implemented. /review/health carries the very same object
+   Command Centre's Claude card shows (launch/operations/claude-readiness.mjs),
+   so this page cannot disagree with that one about whether Send-to-Claude will
+   work. The point is that the founder learns this BEFORE spending twenty
+   minutes on a page review, not at the moment they press Send.
+
+   Four states, kept apart: connected · signin-required · not-installed ·
+   repo-unavailable. The bridge being down is a FIFTH, separate condition —
+   `bridgeHealth === false` — and is never described as a sign-in problem. */
+let signinPoll = null, signinPollUntil = 0, signinBusy = false;
+const SIGNIN_POLL_MS = 3000, SIGNIN_POLL_LIMIT_MS = 10*60_000;
+
+function readinessOf(){ return (bridgeHealth && bridgeHealth.readiness) || null; }
+function claudeReady(){ const r = readinessOf(); return !!r && r.state === 'connected'; }
+
+/** Poll only while a sign-in is actually underway, and stop as soon as it
+ *  works or the ten-minute ceiling is reached. Nothing polls while idle. */
+function watchSignin(){
+  clearInterval(signinPoll);
+  signinPollUntil = Date.now() + SIGNIN_POLL_LIMIT_MS;
+  signinPoll = setInterval(async () => {
+    if (Date.now() > signinPollUntil){ clearInterval(signinPoll); signinPoll = null; return; }
+    const was = claudeReady();
+    await probeBridge(true);
+    paintRepoChip();
+    paintSendCard(def(state.activePage), P(state.activePage));
+    if (claudeReady()){
+      clearInterval(signinPoll); signinPoll = null;
+      if (!was) toast('Claude Code connected — press Retry to send your saved review');
+    }
+  }, SIGNIN_POLL_MS);
+}
+
+/** The one button. Opens the sign-in window through the bridge; the founder
+ *  approves it in the browser as Anthropic requires; this page notices. */
+async function signInToClaude(){
+  if (signinBusy) return;
+  signinBusy = true;
+  try {
+    const r = await bridgeFetch('/claude/signin', { method:'POST' }, 10000);
+    const body = await r.json().catch(()=>null);
+    if (body && body.readiness && bridgeHealth) bridgeHealth.readiness = body.readiness;
+    if (r.status === 409 && body && body.reason === 'not-installed'){
+      toast('Claude Code is not installed on this machine','err');
+    } else if (!r.ok){
+      toast('Could not open the sign-in window — see the bridge window','err');
+    } else if (body && body.alreadyConnected){
+      toast('Already signed in — Claude Code is connected');
+    } else {
+      toast('A Claude Code window has been opened. Complete the sign-in there, then return here.');
+      watchSignin();
+    }
+  } catch(e){
+    toast('Could not reach the local bridge','err');
+  } finally {
+    signinBusy = false;
+    paintRepoChip();
+    paintSendCard(def(state.activePage), P(state.activePage));
+  }
 }
 
 /* ── Honest status text ──────────────────────────────────────────────
@@ -960,17 +1033,34 @@ const STATE_TEXT = {
 
 function sendCardMeta(p, ps){
   const s = ps.send;
+  const r = readinessOf();
   if (!s){
     const issues = realIssues(ps).length, shots = ps.shots.length;
     if (bridgeHealth === false){
       return `<strong>Command Centre is not running</strong>, so this button cannot start Claude.<br>` +
-             `Reopen this page through <code>open-command-centre</code> to send in one click, or use the fallback below.`;
+             `Reopen this page through <code>open-command-centre</code> to send in one click, or use the fallback below. ` +
+             `This is not a sign-in problem.`;
     }
-    if (bridgeHealth && !bridgeHealth.claude.available){
+    // Said BEFORE the review is written, which is the whole point of the
+    // change: no more discovering an expired sign-in at the final step.
+    if (r && r.state === 'signin-required'){
+      return `<strong>Claude Code is signed out.</strong> Press “Sign in to Claude Code” below — it takes one browser approval.<br>` +
+             `You can send anyway: the review and all ${shots} screenshot${shots===1?'':'s'} are saved into the repo either way, ` +
+             `and Retry starts the repair once you are signed in.`;
+    }
+    if (r && r.state === 'not-installed'){
+      return `Sends ${issues} issue${issues===1?'':'s'} and ${shots} screenshot${shots===1?'':'s'} straight into the repo.<br>` +
+             `<strong>Claude Code was not found on this machine</strong> — the review will still be saved.`;
+    }
+    if (r && r.state === 'repo-unavailable'){
+      return `<strong>${esc(r.detail)}</strong><br>Claude Code is signed in — this is not a sign-in problem.`;
+    }
+    if (bridgeHealth && bridgeHealth.claude && !bridgeHealth.claude.available){
       return `Sends ${issues} issue${issues===1?'':'s'} and ${shots} screenshot${shots===1?'':'s'} straight into the repo.<br>` +
              `<strong>Claude Code was not found on this machine</strong> — the review will still be saved.`;
     }
     return `Writes the review and every screenshot into the repo and starts the Claude repair. Nothing to copy or paste.` +
+           (r ? `<br><span style="color:var(--good)">Claude Code connected${r.claude && r.claude.version ? ` · ${esc(r.claude.version)}` : ''}</span>` : '') +
            (ps.lastSentAt ? `<br>Last sent: ${new Date(ps.lastSentAt).toLocaleString()}` : '');
   }
   const line = (STATE_TEXT[s.state] || (x=>`State: ${esc(x.state)}`))(s);
@@ -988,8 +1078,34 @@ function paintSendCard(p, ps){
   const meta = document.getElementById('sendMeta');
   const btn  = document.getElementById('sendBtn');
   const fb   = document.getElementById('fallbackRow');
+  const rr   = document.getElementById('readinessRow');
   if (!meta || !btn) return;
   meta.innerHTML = sendCardMeta(p, ps);
+
+  // The sign-in control lives here as well as in the header, because this is
+  // where the founder is standing when it matters. It appears only when Claude
+  // Code is genuinely signed out — never when the bridge is simply not running.
+  if (rr){
+    const r = readinessOf();
+    const st0 = ps.send?.state;
+    const needsSignin = r && r.state === 'signin-required';
+    rr.innerHTML = '';
+    if (needsSignin){
+      const b = document.createElement('button');
+      b.className = 'btn signin';
+      b.style.marginTop = '10px';
+      b.textContent = 'Sign in to Claude Code';
+      b.onclick = signInToClaude;
+      rr.appendChild(b);
+      const note = document.createElement('div');
+      note.className = 'sendmeta';
+      note.style.marginTop = '6px';
+      note.textContent = (st0 === 'blocked' || st0 === 'failed')
+        ? 'Your review is already saved in the repo. Sign in, then press Retry — nothing is re-typed and no screenshot is re-taken.'
+        : 'A window opens in the repo and runs the sign-in. You only approve it in the browser.';
+      rr.appendChild(note);
+    }
+  }
 
   const st = ps.send?.state;
   const busy = st === 'sending' || st === 'packaged' || st === 'launching' || st === 'running';
@@ -1126,6 +1242,15 @@ async function sendToClaude(){
     if (rec.duplicate) toast('Already sent — showing the run that is already in progress');
     else if (rec.state === 'blocked') toast(`Review saved to ${rec.packagePath} — Claude was not started`, 'err');
     else toast(`Sent · ${rec.counts?.issues ?? issues} issues · ${rec.counts?.screenshots ?? shots} screenshots · Claude repair running`);
+
+    // A blocked send is the moment the founder most needs to know WHY. Re-read
+    // readiness so a sign-out surfaces its own button right here, next to the
+    // review that has already been saved, instead of a generic failure.
+    if (rec.state === 'blocked'){
+      await probeBridge(true);
+      paintRepoChip();
+      if (readinessOf()?.state === 'signin-required') watchSignin();
+    }
 
     if (['packaged','launching','running'].includes(rec.state)) watchRun(p);
   } catch(e){
@@ -1272,21 +1397,64 @@ async function migrateInlineShots(){
 function paintRepoChip(){
   const chip = document.getElementById('repoChip');
   const connect = document.getElementById('connectBtn');
+  const signin = document.getElementById('signinBtn');
   if (!chip) return;
-  if (bridgeHealth === null){ chip.textContent = 'Checking local bridge…'; chip.className = 'repochip'; return; }
+  const showSignin = on => { if (signin){ signin.hidden = !on; signin.onclick = signInToClaude; } };
+
+  if (bridgeHealth === null){
+    chip.textContent = 'Checking local bridge…'; chip.className = 'repochip'; showSignin(false); return;
+  }
+  // The bridge being down is its own condition. It is NOT a sign-in problem,
+  // and offering a sign-in button here would send the founder after the wrong
+  // thing — the button could not work anyway, because it runs through the
+  // bridge that is missing.
   if (bridgeHealth === false){
     chip.textContent = '⚠ Command Centre not running';
-    chip.title = 'Reopen this page through open-command-centre to send in one click. Until then, only the manual fallback is available.';
+    chip.title = 'Reopen this page through open-command-centre to send in one click. Until then, only the manual fallback is available.\nThis is not a sign-in problem.';
     chip.className = 'repochip off';
+    showSignin(false);
     if (connect) connect.hidden = false;      // fallback surfaces only when needed
     return;
   }
+
   const repo = String(bridgeHealth.repoRoot || '').split(/[\\/]/).pop() || 'repo';
-  const cli = bridgeHealth.claude.available;
-  chip.textContent = cli ? `✓ ${repo} · Claude ready` : `✓ ${repo} · Claude not installed`;
-  chip.title = `Reviews are written to ${bridgeHealth.repoRoot}\\launch\\reviews — established by the local bridge, not picked here.`
-             + (cli ? `\nClaude Code ${bridgeHealth.claude.version}` : '\nClaude Code was not found: reviews will be saved but not repaired.');
-  chip.className = 'repochip ' + (cli ? 'on' : 'off');
+  const r = readinessOf();
+  const version = (r && r.claude && r.claude.version) || (bridgeHealth.claude && bridgeHealth.claude.version) || null;
+  const where = `Reviews are written to ${bridgeHealth.repoRoot}\\launch\\reviews — established by the local bridge, not picked here.`;
+
+  // Older bridge with no readiness in its health payload: fall back to what
+  // that version does report rather than inventing a state.
+  if (!r){
+    const cli = bridgeHealth.claude && bridgeHealth.claude.available;
+    chip.textContent = cli ? `✓ ${repo} · Claude ready` : `✓ ${repo} · Claude not installed`;
+    chip.className = 'repochip ' + (cli ? 'on' : 'off');
+    chip.title = where + (cli ? `\nClaude Code ${version}` : '\nClaude Code was not found: reviews will be saved but not repaired.');
+    showSignin(false);
+    if (connect) connect.hidden = true;
+    return;
+  }
+
+  if (r.state === 'connected'){
+    chip.textContent = `✓ ${repo} · Claude Code connected`;
+    chip.className = 'repochip on';
+    chip.title = `${where}\nClaude Code ${version}\n${r.detail}`;
+    showSignin(false);
+  } else if (r.state === 'signin-required'){
+    chip.textContent = `⚠ ${repo} · Claude Code sign-in required`;
+    chip.className = 'repochip warn';
+    chip.title = `${where}\nClaude Code ${version} is installed but signed out.\nPress “Sign in to Claude Code” — your review is never lost either way.`;
+    showSignin(true);
+  } else if (r.state === 'not-installed'){
+    chip.textContent = `⚠ ${repo} · Claude Code not installed`;
+    chip.className = 'repochip off';
+    chip.title = `${where}\nClaude Code was not found on this machine: reviews will be saved but not repaired.\nInstall once with ${r.installCommand}`;
+    showSignin(false);
+  } else {
+    chip.textContent = `⚠ ${repo} · repo not found`;
+    chip.className = 'repochip off';
+    chip.title = `${where}\n${r.detail}\nClaude Code is signed in — this is not a sign-in problem.`;
+    showSignin(false);
+  }
   if (connect) connect.hidden = true;
 }
 
@@ -1317,9 +1485,29 @@ async function resumeRuns(){
   save();
 }
 
+/* A blocked send from before the readiness work has its reason stored in
+   localStorage, and that stored sentence still tells the founder to open a
+   terminal and run `claude login` — the exact instruction this change exists to
+   delete. Rewrite it once, in place, so an old card cannot send them back to
+   PowerShell. Only that one sentence is touched; every other stored reason
+   (concurrent repair, package failure) is left exactly as it was. */
+function migrateStaleAuthReasons(){
+  let changed = false;
+  for (const id of Object.keys(state.pages || {})){
+    const s = state.pages[id] && state.pages[id].send;
+    if (!s || typeof s.reason !== 'string') continue;
+    if (/run `?claude login`? once/i.test(s.reason)){
+      s.reason = 'Claude Code is signed out. Your review is saved — press “Sign in to Claude Code” below, then press Retry.';
+      changed = true;
+    }
+  }
+  if (changed) save();
+}
+
 async function boot(){
   try { await idb.open(); } catch(e){}
   await migrateInlineShots();
+  migrateStaleAuthReasons();
   // Deep link from Mission Control: smoke-test-v4.html#mobile opens that page
   if (location.hash && PAGES.some(p => p.id === location.hash.slice(1))) state.activePage = location.hash.slice(1);
   render();
@@ -1329,6 +1517,10 @@ async function boot(){
   await probeBridge();
   paintRepoChip();
   if (bridgeHealth === false) await restoreRepo();   // fallback path only
+  // If a sign-in is already underway (started from Command Centre, or from a
+  // previous load of this page), pick the watch back up so this page flips to
+  // connected on its own. Otherwise nothing polls at all.
+  if (readinessOf()?.signin?.active && !claudeReady()) watchSignin();
   await resumeRuns();
   render();
   if (navigator.storage && navigator.storage.persist) { try { navigator.storage.persist(); } catch(e){} }

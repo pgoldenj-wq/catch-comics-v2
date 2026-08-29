@@ -77,16 +77,18 @@ a second one.
 This mirrors the PASS / FAIL / BLOCKED model the Browser Trust runner uses, for
 the same reason: a run that never started is not evidence of anything.
 
-## If it says "Claude Code is not signed in"
+## If it says "Claude Code is signed out"
 
-Open a terminal and run:
+Press **Sign in to Claude Code** — in the Smoke Test header, on the send card,
+or on the Claude Code card in Mission Control. A window opens in the repo and
+runs the sign-in; you approve it in the browser; the page notices by itself.
+Then press **Retry sending to Claude**: the saved review is handed over
+unchanged, screenshots and all, and nothing needs re-typing.
 
-```bash
-claude login
-```
+You are told this **before** you start a review, not at the moment you press
+Send — see [CLAUDE-READINESS.md](CLAUDE-READINESS.md).
 
-Then press **Retry sending to Claude**. The saved review is handed over
-unchanged; nothing needs re-typing.
+The manual fallback, if you ever want it, is `claude auth login`.
 
 ## Retry safety
 
@@ -102,10 +104,14 @@ retry. The bridge keys its run registry on it, so:
 ## Tests
 
 ```bash
-npm run test:founder-review
+npm run test:founder-review      # the handoff itself
+npm run test:claude-readiness    # the readiness capability behind the buttons
 ```
 
-Drives the real handler with a deterministic four-issue, four-screenshot review
-and a fake Claude binary: no money spent, no repo edits, no sign-in needed. It
-covers path traversal, MIME smuggling, issue↔screenshot mapping, the launch
-argv, every state, and the duplicate/retry rules.
+`test:founder-review` drives the real handler with a deterministic four-issue,
+four-screenshot review and a fake Claude binary: no money spent, no repo edits,
+no sign-in needed. It covers path traversal, MIME smuggling, issue↔screenshot
+mapping, the launch argv, every state, the duplicate/retry rules, and the
+signed-out path — that a signed-out machine is caught *before* Claude is
+launched, that the package and every screenshot survive it, and that Retry
+after signing in reuses that same package.

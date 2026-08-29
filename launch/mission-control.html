@@ -70,6 +70,32 @@ a { color:var(--ink); }
   padding:10px 16px; font-weight:600; min-height:44px; }
 .ghostbtn:hover { background:var(--panel2); }
 
+/* ── Claude Code readiness card ──
+   Compact by design: one dot, one headline, one line of detail, and only the
+   buttons that make sense in the state it is actually in. */
+.claudecard { border-color:var(--line); }
+.claudecard.state-connected { border-color:#166534; }
+.claudecard.state-signin    { border-color:#92660D; }
+.claudecard.state-problem   { border-color:#7F1D1D; }
+.cc-row { display:flex; align-items:flex-start; gap:14px; }
+.cc-dot { width:14px; height:14px; border-radius:50%; background:var(--ink3); flex-shrink:0; margin-top:6px; }
+.claudecard.state-connected .cc-dot { background:var(--green); }
+.claudecard.state-signin    .cc-dot { background:var(--amber); }
+.claudecard.state-problem   .cc-dot { background:var(--red); }
+.cc-text { flex:1 1 240px; min-width:0; }
+.cc-headline { font-size:19px; font-weight:800; letter-spacing:.01em; }
+.claudecard.state-connected .cc-headline { color:var(--green); }
+.claudecard.state-signin    .cc-headline { color:var(--amber); }
+.claudecard.state-problem   .cc-headline { color:var(--red); }
+.cc-detail { color:var(--ink2); font-size:13px; margin-top:4px; overflow-wrap:anywhere; }
+.cc-detail code { background:var(--panel2); border-radius:5px; padding:1px 6px; font-size:12px; }
+/* Scoped, not global: `.muted` is used unstyled all over this page already and
+   giving it a colour everywhere would restyle cards this change never touched. */
+.cc-detail .muted { color:var(--ink3); font-size:12px; }
+.cc-primary { background:var(--accent); border:none; color:#fff; font-weight:800;
+  border-radius:12px; padding:11px 20px; min-height:44px; }
+.cc-primary:hover { background:#c41f22; }
+
 /* what next list */
 .todo { display:flex; align-items:center; gap:14px; padding:13px 10px; border-radius:12px; }
 .todo:hover { background:var(--panel2); }
@@ -131,6 +157,20 @@ footer button { color:var(--ink3); background:none; border:none; text-decoration
       <div class="na-title" id="naTitle">…</div>
     </div>
     <button class="bigbtn" id="naBtn">…</button>
+  </div>
+
+  <!-- Claude Code readiness. Sits high on the page on purpose: knowing this
+       BEFORE a review starts is the whole point — the founder used to find out
+       at the moment they pressed Send. -->
+  <div class="card claudecard" id="claudeCard">
+    <div class="cc-row">
+      <span class="cc-dot" id="ccDot"></span>
+      <div class="cc-text">
+        <div class="cc-headline" id="ccHeadline">Claude Code · Checking…</div>
+        <div class="cc-detail" id="ccDetail">Asking the local bridge.</div>
+      </div>
+    </div>
+    <div class="links" id="ccActions" style="margin-top:14px"></div>
   </div>
 
   <div class="card">
@@ -203,6 +243,7 @@ footer button { color:var(--ink3); background:none; border:none; text-decoration
       <a class="ghostbtn" href="operations/rollback-guide.md">Rollback guide</a>
       <a class="ghostbtn" href="operations/launch-health-latest.md">Latest health report</a>
       <a class="ghostbtn" href="operations/BROWSER-TRUST.md">Browser Trust guide</a>
+      <a class="ghostbtn" href="operations/CLAUDE-READINESS.md">Claude Code readiness</a>
       <a class="ghostbtn" href="product-excellence/product-excellence-audit.md">Product-excellence audit</a>
       <a class="ghostbtn" href="dashboard.html">Full dashboard (deep dive)</a>
       <a class="ghostbtn" href="war-room-2026-07-03.md">War-room report</a>
@@ -1115,8 +1156,195 @@ async function startRetailerRefresh(){
 }
 document.getElementById('rrRunBtn').onclick = startRetailerRefresh;
 
+/* ═══ Claude Code readiness ══════════════════════════════════════════
+   The founder used to learn that Claude Code had signed itself out at the very
+   moment they pressed "Send to Claude" — after finishing a whole page review.
+   This card moves that discovery to the start of the session and gives it one
+   button.
+
+   Everything here READS from the bridge's /claude/status, which is the same
+   claude-readiness.mjs the Smoke Test consumes, so the two can never disagree.
+   The page never chooses a command: it asks for one of three fixed actions.
+
+   Four states, kept apart on purpose. "The bridge is not running" is NOT an
+   authentication problem, and this card refuses to tell you to sign in when the
+   real problem is that Command Centre was never started.                    */
+let CC = null;                 // last readiness object, or null
+let ccBridgeUp = false;
+let ccPolling = null, ccPollUntil = 0, ccBusy = false;
+
+const CC_POLL_MS = 3000;            // while a sign-in is underway
+const CC_POLL_LIMIT_MS = 10*60_000; // and never longer than ten minutes
+
+async function probeClaude(fresh){
+  try {
+    const r = await btFetch('/claude/status' + (fresh ? '?fresh=1' : ''), {});
+    if (!r.ok){ ccBridgeUp = false; CC = null; return null; }
+    ccBridgeUp = true; CC = await r.json();
+    return CC;
+  } catch(e){ ccBridgeUp = false; CC = null; return null; }
+}
+
+function ccButton(label, primary, onclick){
+  const b = document.createElement('button');
+  b.className = primary ? 'cc-primary' : 'ghostbtn';
+  b.textContent = label;
+  b.onclick = onclick;
+  return b;
+}
+
+function paintClaudeCard(){
+  const card = document.getElementById('claudeCard');
+  const dot  = document.getElementById('ccHeadline');
+  const det  = document.getElementById('ccDetail');
+  const acts = document.getElementById('ccActions');
+  if (!card || !dot || !det || !acts) return;
+  acts.innerHTML = '';
+
+  // Bridge offline is its own condition, described as itself. No sign-in advice
+  // here: the sign-in state is genuinely unknown when nothing can be asked.
+  if (!ccBridgeUp || !CC){
+    card.className = 'card claudecard state-problem';
+    dot.textContent = 'Claude Code · Command Centre bridge offline';
+    det.innerHTML = 'The local bridge is not running, so Claude Code readiness cannot be checked ' +
+      'and the one-click buttons are unavailable. Reopen this page with <code>open-command-centre</code>. ' +
+      '<strong>This is not a sign-in problem.</strong>';
+    acts.appendChild(ccButton('Re-check', false, async ()=>{ await probeClaude(true); paintClaudeCard(); }));
+    acts.appendChild(ccButton('Copy launcher command', false, async ()=>{
+      await navigator.clipboard.writeText('launch\\operations\\open-command-centre.cmd');
+      toast('Launcher path copied — run it from the repo, or use the desktop shortcut');
+    }));
+    return;
+  }
+
+  const s = CC.state;
+  const checked = CC.checkedAt ? new Date(CC.checkedAt).toLocaleTimeString() : '';
+  card.className = 'card claudecard state-' +
+    (s === 'connected' ? 'connected' : s === 'signin-required' ? 'signin' : 'problem');
+  dot.textContent = CC.headline || 'Claude Code';
+
+  if (s === 'connected'){
+    det.innerHTML = `${esc(CC.detail)}<br>` +
+      `<span class="muted">Claude Code ${esc(CC.claude.version || 'version unknown')} · ` +
+      `${esc(CC.repo.root)} · checked ${esc(checked)}</span>`;
+    acts.appendChild(ccButton('Open Claude Code', true, openClaudeCode));
+    acts.appendChild(ccButton('Re-check', false, async ()=>{ await probeClaude(true); paintClaudeCard(); }));
+    return;
+  }
+
+  if (s === 'signin-required'){
+    det.innerHTML = 'Claude Code is installed but signed out, so Send-to-Claude would fail. ' +
+      'Press the button: a window opens in the repo and runs the sign-in for you. ' +
+      'You only approve it in the browser.<br>' +
+      `<span class="muted">Claude Code ${esc(CC.claude.version || 'version unknown')} · checked ${esc(checked)}</span>`;
+    acts.appendChild(ccButton('Sign in to Claude Code', true, signInToClaude));
+    acts.appendChild(ccButton('Re-check', false, async ()=>{ await probeClaude(true); paintClaudeCard(); }));
+    acts.appendChild(ccButton('Copy login command (fallback)', false, async ()=>{
+      await navigator.clipboard.writeText(CC.signin.command);
+      toast('Open PowerShell and paste this: ' + CC.signin.command);
+    }));
+    return;
+  }
+
+  if (s === 'not-installed'){
+    det.innerHTML = 'Claude Code could not be found on this machine, so nothing here can start it. ' +
+      'Install it once, then press Re-check. Nothing is installed for you.<br>' +
+      `<code>${esc(CC.installCommand)}</code>`;
+    acts.appendChild(ccButton('Copy install command', true, async ()=>{
+      await navigator.clipboard.writeText(CC.installCommand);
+      toast('Open PowerShell and paste this: ' + CC.installCommand);
+    }));
+    acts.appendChild(ccButton('Re-check', false, async ()=>{ await probeClaude(true); paintClaudeCard(); }));
+    return;
+  }
+
+  // repo-unavailable — signed in, but not where we thought the repo was.
+  det.innerHTML = `${esc(CC.detail)}<br>` +
+    `<span class="muted">Expected at ${esc(CC.repo.root)}. This is not a sign-in problem — ` +
+    `Claude Code is signed in.</span>`;
+  acts.appendChild(ccButton('Re-check', false, async ()=>{ await probeClaude(true); paintClaudeCard(); }));
+}
+
+/** Poll after a sign-in is launched, and stop: on success, on the ten-minute
+ *  ceiling, or when the founder abandons it. Nothing polls while idle. */
+function watchClaudeSignin(){
+  clearInterval(ccPolling);
+  ccPollUntil = Date.now() + CC_POLL_LIMIT_MS;
+  ccPolling = setInterval(async () => {
+    if (Date.now() > ccPollUntil){
+      clearInterval(ccPolling); ccPolling = null;
+      paintClaudeCard();
+      if (CC && CC.state === 'signin-required') toast('Still signed out — press “Sign in to Claude Code” again when you are ready');
+      return;
+    }
+    const before = CC && CC.state;
+    await probeClaude(true);
+    paintClaudeCard();
+    if (CC && CC.state === 'connected'){
+      clearInterval(ccPolling); ccPolling = null;
+      if (before !== 'connected') toast('Claude Code is CONNECTED — Send-to-Claude will work now');
+    }
+  }, CC_POLL_MS);
+}
+
+async function signInToClaude(){
+  if (ccBusy) return;
+  ccBusy = true;
+  try {
+    const r = await btFetch('/claude/signin', { method:'POST' });
+    const body = await r.json().catch(()=>null);
+    if (body && body.readiness){ CC = body.readiness; ccBridgeUp = true; }
+    if (r.status === 409 && body && body.reason === 'not-installed'){
+      paintClaudeCard(); toast('Claude Code is not installed — install it first'); return;
+    }
+    if (!r.ok){ paintClaudeCard(); toast('Could not open the sign-in window — see the bridge window'); return; }
+    if (body && body.alreadyConnected){ paintClaudeCard(); toast('Already signed in — Claude Code is connected'); return; }
+    if (body && body.reason === 'already-open'){
+      paintClaudeCard(); watchClaudeSignin();
+      toast('A Claude Code sign-in window is already open — finish it there');
+      return;
+    }
+    paintClaudeCard();
+    watchClaudeSignin();
+    toast('A Claude Code window has been opened. Complete the sign-in there, then return here.');
+  } catch(e){
+    ccBridgeUp = false; paintClaudeCard();
+    toast('Could not reach the local bridge');
+  } finally { ccBusy = false; }
+}
+
+async function openClaudeCode(){
+  if (ccBusy) return;
+  ccBusy = true;
+  try {
+    const r = await btFetch('/claude/open', { method:'POST' });
+    const body = await r.json().catch(()=>null);
+    if (body && body.readiness){ CC = body.readiness; ccBridgeUp = true; }
+    paintClaudeCard();
+    if (r.status === 409 && body){
+      if (body.reason === 'signin-required'){ watchClaudeSignin(); toast('Claude Code has signed out — press “Sign in to Claude Code”'); }
+      else if (body.reason === 'not-installed') toast('Claude Code is not installed on this machine');
+      else toast('Could not open Claude Code: ' + esc(body.reason || 'unknown'));
+      return;
+    }
+    if (!r.ok){ toast('Could not open Claude Code — see the bridge window'); return; }
+    if (body && body.reason === 'just-opened'){ toast('Already opening — check for the new window'); return; }
+    toast('Claude Code opened in ' + (body && body.repo ? body.repo : 'the Catch Comics repo'));
+  } catch(e){
+    ccBridgeUp = false; paintClaudeCard();
+    toast('Could not reach the local bridge');
+  } finally { ccBusy = false; }
+}
+
 async function boot(){
   await restoreRepo(); await loadData(); render();
+
+  // Readiness is read ONCE on open. It never polls while idle — polling only
+  // starts after a sign-in is actually launched, and stops as soon as it works.
+  await probeClaude(false);
+  paintClaudeCard();
+  if (CC && CC.signin && CC.signin.active && CC.state !== 'connected') watchClaudeSignin();
+
   // Reflect reality: label the button honestly when there is no bridge, and
   // pick up a run already in flight. Starts nothing.
   const s = await probeBridge();

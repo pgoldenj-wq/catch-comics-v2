@@ -196,6 +196,30 @@ if (Test-Bridge) {
   }
 }
 
+# -- Claude Code readiness -----------------------------------------------------
+# Read-only. Asks the bridge, which asks the CLI's own `claude auth status`.
+# Printed here as well as in Mission Control so the founder learns about an
+# expired sign-in at the START of the session, not at the moment they press
+# "Send to Claude" after finishing a whole page review.
+$claudeStatus = 'not checked (bridge unavailable)'
+if ($bridgeStatus -notlike '*not available*') {
+  try {
+    $cr = Invoke-WebRequest -Uri "http://127.0.0.1:$BridgePort/claude/status" -UseBasicParsing -TimeoutSec 20
+    $cj = $cr.Content | ConvertFrom-Json
+    switch ($cj.state) {
+      'connected'        { $claudeStatus = "CONNECTED - $($cj.claude.version)"; Say "  Claude Code CONNECTED ($($cj.claude.version))" Green }
+      'signin-required'  { $claudeStatus = 'SIGN-IN REQUIRED'; Say '  Claude Code SIGN-IN REQUIRED - press "Sign in to Claude Code" in Mission Control' Yellow }
+      'not-installed'    { $claudeStatus = 'NOT INSTALLED'; Say "  Claude Code NOT INSTALLED - install with $($cj.installCommand)" Red }
+      'repo-unavailable' { $claudeStatus = 'REPO NOT FOUND'; Say "  Claude Code is signed in, but $($cj.repo.reason)" Red }
+      default            { $claudeStatus = "unknown ($($cj.state))"; Say "  Claude Code state unknown: $($cj.state)" DarkYellow }
+    }
+  } catch {
+    # Not a launcher failure: the card in Mission Control reports it honestly.
+    $claudeStatus = 'not checked (status call failed)'
+    Say '  Claude Code readiness could not be read - Mission Control will show why' DarkYellow
+  }
+}
+
 # -- Open the browser only once the server actually responds ----------------
 $targetUrl = "$BaseUrl/$Page"
 if (-not $NoBrowser -and (Test-McServer)) {
@@ -214,6 +238,8 @@ Say "  Data health   : $healthStatus" $hc
 Say "  Prod smoke    : $smokeStatus" $sc
 Say "  Server        : $serverStatus"
 Say "  Action bridge : $bridgeStatus"
+$cc = 'Yellow'; if ($claudeStatus -like 'CONNECTED*') { $cc = 'Green' } elseif ($claudeStatus -like 'NOT INSTALLED*' -or $claudeStatus -like 'REPO*') { $cc = 'Red' }
+Say "  Claude Code   : $claudeStatus" $cc
 Say "  Mission Control: $targetUrl"
 Say ''
 

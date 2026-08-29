@@ -35,9 +35,10 @@
  * Browser Trust runner uses. The review package survives every one of these.
  */
 
-import { execFileSync, spawn } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
+import { SIGNIN_COMMAND, claudeVersion, findClaude, readiness } from './claude-readiness.mjs'
 
 /* ── Bounds ──────────────────────────────────────────────────────────────── */
 export const LIMITS = {
@@ -368,28 +369,11 @@ export function updateFounderReviewJson(repoRoot, review, json) {
 
 /* ── Claude Code launch ──────────────────────────────────────────────────── */
 
-/**
- * Find the Claude Code executable. The npm shim is a .cmd, which Node refuses
- * to spawn without a shell — and a shell is exactly what must not be involved
- * here — so the real binary inside the package is used instead.
- */
-export function findClaude() {
-  const home = process.env.USERPROFILE || process.env.HOME || ''
-  const candidates = [
-    join(process.env.APPDATA || join(home, 'AppData', 'Roaming'), 'npm', 'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe'),
-    join(home, '.claude', 'local', 'claude.exe'),
-    join(home, '.local', 'bin', 'claude'),
-    '/usr/local/bin/claude',
-  ]
-  for (const p of candidates) if (p && existsSync(p)) return p
-  return null
-}
-
-export function claudeVersion(exe) {
-  try {
-    return execFileSync(exe, ['--version'], { timeout: 15_000, windowsHide: true }).toString().trim()
-  } catch { return null }
-}
+// Finding the CLI, reading its version and reading its authentication state all
+// live in claude-readiness.mjs — the same module Command Centre's status card
+// uses. Re-exported here so the handoff has one definition of "ready" rather
+// than a second opinion of its own.
+export { findClaude, claudeVersion }
 
 /**
  * The entire instruction handed to the repair session. The browser cannot
@@ -436,12 +420,18 @@ export function claudeArgv(relPackagePath) {
   ]
 }
 
+/** The one sentence the founder is given when Claude Code is signed out. It
+ *  names the button, not a command, because the button is now the journey. */
+export const SIGNED_OUT_REASON =
+  'Claude Code is signed out. Your review is saved — press “Sign in to Claude Code”, '
+  + `finish the browser approval, then press Retry. (Manual fallback: ${SIGNIN_COMMAND})`
+
 /** Classify a finished run. `blocked` is an environment problem, not a failure. */
 export function classifyRun({ exitCode, result, spawnError }) {
   if (spawnError) return { state: 'blocked', reason: spawnError }
   const text = String(result?.result ?? '')
   if (/authenticat|OAuth session expired|Invalid API key|credit balance/i.test(text)) {
-    return { state: 'blocked', reason: 'Claude Code is not signed in on this machine. Open a terminal, run `claude login` once, then press Retry.' }
+    return { state: 'blocked', reason: SIGNED_OUT_REASON }
   }
   if (exitCode === 0 && result && result.is_error !== true) return { state: 'completed', reason: null }
   return { state: 'failed', reason: text.slice(0, 400) || `Claude Code exited with code ${exitCode}` }
@@ -456,10 +446,13 @@ export function classifyRun({ exitCode, result, spawnError }) {
  * known is never re-packaged and never re-launched.
  */
 export class ReviewRunner {
-  constructor(repoRoot, { spawnFn = spawn, findClaudeFn = findClaude } = {}) {
+  constructor(repoRoot, { spawnFn = spawn, findClaudeFn = findClaude, readinessFn = readiness } = {}) {
     this.repoRoot = repoRoot
     this.spawnFn = spawnFn
     this.findClaudeFn = findClaudeFn
+    // The shared readiness check. Injected so the tests can drive a signed-out
+    // machine without touching the founder's real account.
+    this.readinessFn = readinessFn
     this.runs = new Map()
     this.activeId = null     // single-flight: one repair session at a time
     this.children = new Map()
@@ -572,6 +565,20 @@ export class ReviewRunner {
       return rec
     }
 
+    // Ask BEFORE launching. Starting a session that is only going to fail on an
+    // expired token wastes the founder's time and buries the real cause in
+    // Claude's own output. The package is already written and verified by the
+    // time we get here, so a signed-out machine costs nothing but a retry.
+    const ready = this.readinessFn({ fresh: true })
+    if (ready && ready.state === 'signin-required') {
+      rec.state = 'blocked'
+      rec.reason = SIGNED_OUT_REASON
+      rec.readinessState = ready.state
+      this.persist(rec)
+      console.log(`[founder-review] ${rec.reviewId} — not launched: Claude Code is signed out. Review saved.`)
+      return rec
+    }
+
     rec.state = 'launching'
     rec.launchedAt = new Date().toISOString()
     rec.finishedAt = null
@@ -657,14 +664,25 @@ export class ReviewRunner {
     return rec
   }
 
-  /** Health for the Smoke Test: what the founder can rely on right now. */
-  health() {
+  /**
+   * Health for the Smoke Test: what the founder can rely on right now.
+   *
+   * `readiness` is the SAME object Command Centre's Claude card reads — the
+   * Smoke Test does not run its own authentication check, so the two surfaces
+   * can never disagree about whether Send-to-Claude will work. `claude` is kept
+   * alongside it because the page has always read that shape.
+   */
+  health({ fresh = false } = {}) {
+    const ready = this.readinessFn({ fresh })
     const exe = this.findClaudeFn()
     return {
       ok: true,
       repoRoot: this.repoRoot,
       reviewsPath: 'launch/reviews',
-      claude: exe ? { available: true, version: claudeVersion(exe) } : { available: false, version: null },
+      claude: exe
+        ? { available: true, version: ready?.claude?.version ?? claudeVersion(exe) }
+        : { available: false, version: null },
+      readiness: ready,
       active: this.activeId,
     }
   }
