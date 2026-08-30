@@ -1021,14 +1021,39 @@ async function signInToClaude(){
 /* ── Honest status text ──────────────────────────────────────────────
    Every string below describes something that actually happened. A launched
    process is never reported as a finished repair.                        */
+/* What the founder actually sent, named the way they would recognise it. A
+   defect typed onto a screenshot is a reported defect, so notes are counted
+   out loud — "0 issues" on a review full of written evidence reads as though
+   nothing arrived. */
+function evidenceOf(s){
+  const c = s.counts || {};
+  const issues = c.issues ?? s.issues ?? 0;
+  const shots  = c.screenshots ?? s.shots ?? 0;
+  const notes  = c.notes ?? 0;
+  const parts = [];
+  if (issues) parts.push(`${issues} issue${issues===1?'':'s'}`);
+  if (notes)  parts.push(`${notes} note${notes===1?'':'s'}`);
+  if (!parts.length) parts.push('no written issues');
+  parts.push(`${shots} screenshot${shots===1?'':'s'}`);
+  return parts.join(' · ');
+}
+
 const STATE_TEXT = {
-  sending:   s => `Packaging ${s.issues} issue${s.issues===1?'':'s'} and ${s.shots} screenshot${s.shots===1?'':'s'}…`,
-  packaged:  s => `Saved · ${s.issues} issue${s.issues===1?'':'s'} · ${s.shots} screenshot${s.shots===1?'':'s'} · starting Claude…`,
-  launching: s => `Sent · ${s.issues} issue${s.issues===1?'':'s'} · ${s.shots} screenshot${s.shots===1?'':'s'} · starting Claude…`,
-  running:   s => `Sent · ${s.issues} issue${s.issues===1?'':'s'} · ${s.shots} screenshot${s.shots===1?'':'s'} · <strong>Claude repair running</strong>`,
-  completed: s => `<strong>Claude repair complete</strong> · ${s.issues} issue${s.issues===1?'':'s'} reviewed`,
+  sending:   s => `Packaging ${evidenceOf(s)}…`,
+  packaged:  s => `Saved · ${evidenceOf(s)} · starting Claude…`,
+  launching: s => `Sent · ${evidenceOf(s)} · <strong>starting Claude…</strong>`,
+  // The pid is printed because it is the whole claim: this line means a
+  // process, and the founder can go and look at it.
+  running:   s => `Sent · ${evidenceOf(s)} · <strong>Claude repair running</strong>${s.pid ? ` · process ${s.pid}` : ''}`,
+  completed: s => `<strong>Claude repair complete</strong> · ${evidenceOf(s)} reviewed`,
   failed:    s => `<strong>Claude repair did not finish.</strong> Your review is saved at <code>${esc(s.packagePath||'')}</code>`,
-  blocked:   s => `<strong>Review saved — Claude was not started.</strong>`,
+  // Two sentences that used to appear together — "Claude was not started" and
+  // "a repair is already running" — read as a contradiction. When one repair
+  // is holding the other up, that is the whole message, said once.
+  blocked:   s => s.blockedBy
+    ? `<strong>Not started yet — a Claude repair is already running for ${esc(s.blockedBy)}.</strong> This review is saved.`
+    : `<strong>Review saved — Claude was not started.</strong>`,
+  stale:     s => `<strong>Previous repair stopped unexpectedly — ready to retry.</strong> Your review is saved at <code>${esc(s.packagePath||'')}</code>`,
 };
 
 function sendCardMeta(p, ps){
@@ -1064,7 +1089,9 @@ function sendCardMeta(p, ps){
            (ps.lastSentAt ? `<br>Last sent: ${new Date(ps.lastSentAt).toLocaleString()}` : '');
   }
   const line = (STATE_TEXT[s.state] || (x=>`State: ${esc(x.state)}`))(s);
-  const detail = s.reason ? `<br><span style="color:var(--bad)">${esc(s.reason)}</span>` : '';
+  // When one repair is holding another up the headline already says so; the
+  // reason would only repeat it back in red.
+  const detail = s.reason && !s.blockedBy ? `<br><span style="color:var(--bad)">${esc(s.reason)}</span>` : '';
   const where  = s.packagePath && s.state !== 'failed' ? `<br>Package: <code>${esc(s.packagePath)}</code>` : '';
   const resume = s.sessionId && (s.state==='completed'||s.state==='failed')
     ? `<br>Read what Claude did: <code>claude --resume ${esc(s.sessionId)}</code>` : '';
@@ -1113,7 +1140,7 @@ function paintSendCard(p, ps){
               : st === 'sending'   ? 'Packaging…'
               : st === 'launching' || st === 'packaged' ? 'Starting Claude…'
               : st === 'completed' ? `Send ${p.title} to Claude again`
-              : (st === 'blocked' || st === 'failed') ? 'Retry sending to Claude'
+              : (st === 'blocked' || st === 'failed' || st === 'stale') ? 'Retry sending to Claude'
               : `🚀 SEND ${p.title.toUpperCase()} TO CLAUDE`;
   btn.textContent = label;
   btn.disabled = busy;
@@ -1162,24 +1189,50 @@ async function buildSubmission(p, ps, reviewId){
   };
 }
 
+/* A poll the bridge cannot answer is not evidence that Claude is working.
+   Tolerating a blip is right; tolerating them forever is how this card came to
+   show "Claude repair running" for a process that had already exited — the
+   bridge had gone, every poll threw, and the spinner outlived the run it was
+   describing. After this many unanswered polls (~20s) the card says what is
+   actually known, and Retry becomes available again. */
+const POLL_GRACE = 8;
+
 /** Poll the bridge until the repair really finishes. */
 function watchRun(p){
   clearInterval(pollers.get(p.id));
+  let misses = 0;
+  const stopWatching = reason => {
+    clearInterval(iv); pollers.delete(p.id);
+    const ps = P(p.id);
+    if (!ps.send || !['sending','packaged','launching','running'].includes(ps.send.state)) return;
+    ps.send.state = 'stale';
+    ps.send.reason = reason;
+    save();
+    paintSendCard(def(state.activePage), P(state.activePage));
+    toast(`Lost track of the Claude repair for ${p.title} — your review is saved`, 'err');
+  };
   const iv = setInterval(async ()=>{
     const ps = P(p.id);
     if (!ps.send?.reviewId){ clearInterval(iv); pollers.delete(p.id); return; }
-    let rec = null;
+    let rec = null, forgotten = false;
     try {
       const r = await bridgeFetch(`/review/status?reviewId=${encodeURIComponent(ps.send.reviewId)}`, {}, 6000);
       if (r.ok) rec = await r.json();
-    } catch(e){ return; }                        // a blip is not a verdict — keep polling
-    if (!rec) return;
+      else if (r.status === 404) forgotten = true;
+    } catch(e){ /* unreachable — counted below, not treated as a verdict */ }
+    if (forgotten) return stopWatching('The bridge no longer knows about this run, so it cannot be tracked. The review package is still on disk — press Retry to hand it to Claude again.');
+    if (!rec){
+      if (++misses >= POLL_GRACE) return stopWatching('The bridge stopped answering, so whether Claude is still running is unknown. Your review is saved — press Retry, or reopen Command Centre if it has closed.');
+      return;                                    // a blip is not a verdict
+    }
+    misses = 0;
     Object.assign(ps.send, rec); save();
     paintSendCard(def(state.activePage), P(state.activePage));
     if (rec.state === 'running' || rec.state === 'launching' || rec.state === 'packaged') return;
     clearInterval(iv); pollers.delete(p.id);
-    if (rec.state === 'completed')    toast(`Claude repair complete for ${p.title} — ${rec.counts?.issues ?? 0} issues reviewed`);
+    if (rec.state === 'completed')    toast(`Claude repair complete for ${p.title} — ${rec.counts?.evidence ?? rec.counts?.issues ?? 0} items reviewed`);
     else if (rec.state === 'blocked') toast(`${p.title} review saved, but Claude was not started — ${rec.reason || 'see the card'}`, 'err');
+    else if (rec.state === 'stale')   toast(`The repair for ${p.title} stopped unexpectedly — your review is saved, press Retry`, 'err');
     else                              toast(`Claude repair did not finish for ${p.title} — your review is saved`, 'err');
   }, 2500);
   pollers.set(p.id, iv);
@@ -1202,7 +1255,7 @@ async function sendToClaude(){
   sendInFlight = true;
   // guard 3: one stable id per submission, reused by every retry, so the
   // bridge can recognise a repeat and refuse to package or launch twice.
-  const reviewId = ps.send?.reviewId && ['blocked','failed'].includes(ps.send.state)
+  const reviewId = ps.send?.reviewId && ['blocked','failed','stale'].includes(ps.send.state)
     ? ps.send.reviewId
     : `${p.id}-${new Date().toISOString().slice(0,16).replace(/[T:]/g,'-')}-${uid().slice(0,6)}`;
 
@@ -1473,13 +1526,15 @@ async function resumeRuns(){
         if (['packaged','launching','running'].includes(s.state)) watchRun(p);
       } else {
         // The bridge restarted and no longer knows this run. Say that rather
-        // than leaving a spinner that will never resolve.
-        s.state = 'blocked';
+        // than leaving a spinner that will never resolve. `stale`, not
+        // `blocked`: nothing in the environment refused this review — a run
+        // was started and its outcome is simply unknown.
+        s.state = 'stale';
         s.reason = 'The bridge was restarted, so this run can no longer be tracked. The review package is still on disk — press Retry to hand it to Claude again.';
       }
     } catch(e){
-      s.state = 'blocked';
-      s.reason = 'The bridge is not reachable, so this run cannot be tracked. Your review is saved.';
+      s.state = 'stale';
+      s.reason = 'The bridge is not reachable, so this run cannot be tracked. Your review is saved — press Retry once Command Centre is open again.';
     }
   }
   save();

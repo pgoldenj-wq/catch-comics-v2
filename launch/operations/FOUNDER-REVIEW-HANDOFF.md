@@ -63,16 +63,35 @@ name a file, name a directory, or reach the command line — see the header of
 | `sending` / `packaging` | The browser is encoding the review |
 | `packaged` | Every file is on disk and verified non-empty |
 | `launching` | Claude Code has been spawned |
-| `running` | Claude Code emitted its init event — it really started |
+| `running` | Claude Code emitted its init event **and** the process it announced itself from is alive |
 | `completed` | Claude exited 0 and did not report an error |
 | `failed` | Claude ran and something went wrong |
 | `blocked` | The *environment* stopped Claude starting |
+| `stale` | A repair was started and nobody can say how it ended |
 
 `blocked` covers "Claude Code is not installed", "not signed in", and "another
 repair is already running". None of those are a product failure and none of
 them lose the review: the package is already written, and the button becomes
 **Retry sending to Claude**, which reuses the same package rather than writing
 a second one.
+
+`stale` exists because the card once showed **Claude repair running** for a
+repair that had already exited. Two things caused it and both are fixed: the
+page kept polling a bridge that was no longer answering and treated silence as
+"still working", and the bridge kept its run registry only in memory, so a
+restart answered 404 for the very run the founder was watching and the spinner
+had nothing left to resolve against.
+
+Now the bridge reads every `run.json` back at startup, and any run left
+mid-flight by a previous session is settled to `stale` rather than re-claimed as
+running — this process did not start it and cannot prove what became of it. The
+page does the same from its side: after ~20 seconds of unanswered polls it stops
+claiming a repair it can no longer see. `stale` is retryable exactly like
+`blocked` and `failed`, against the package already on disk.
+
+`running` is never inferred from a launch request, a saved package, a stored
+status or a 200 from the bridge. It means a child process was spawned, has a
+pid, and that pid is alive — which is why the card prints the pid next to it.
 
 This mirrors the PASS / FAIL / BLOCKED model the Browser Trust runner uses, for
 the same reason: a run that never started is not evidence of anything.
@@ -96,10 +115,18 @@ A submission carries a stable `reviewId`, generated once and reused by every
 retry. The bridge keys its run registry on it, so:
 
 - a double- or triple-click produces **one** package and **one** Claude process;
-- a retry after `blocked` or `failed` relaunches against the package already on
-  disk instead of writing a second copy;
+- a retry after `blocked`, `failed` or `stale` relaunches against the package
+  already on disk instead of writing a second copy;
 - two different pages cannot repair at the same time — the second is `blocked`
   with "a repair is already running", and its review is still saved.
+
+That last refusal is now checked against reality before it is made: a lock held
+by a child that has since exited is released rather than enforced, so a dead run
+can never lock the founder out of the next one. The check is deliberately
+limited to what can be proven — a live child *this* bridge is holding. A pid
+recovered from a previous bridge's `run.json` is recorded but never used to
+refuse a launch, because pids are reused and refusing on one would block a
+founder on a guess.
 
 ## Tests
 

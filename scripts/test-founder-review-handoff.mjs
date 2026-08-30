@@ -19,8 +19,8 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
-  LIMITS, PAGE_IDS, ReviewRunner, ValidationError,
-  classifyRun, decodeImage, packageDir, validateSubmission,
+  LIMITS, PAGE_IDS, ReviewRunner, STALE_REASON, ValidationError,
+  classifyRun, countEvidence, decodeImage, packageDir, pidAlive, validateSubmission,
 } from '../launch/operations/founder-review-handler.mjs'
 
 let pass = 0, fail = 0
@@ -75,16 +75,25 @@ function homepageReview(reviewId = 'homepage-2026-08-24-1930-abc123') {
 /* ── A fake Claude Code ──────────────────────────────────────────────────────
    Same stdout shape the real binary emits with --output-format stream-json, so
    the runner's parsing is exercised for real. */
-function fakeClaude({ initDelay = 0, exitCode = 0, result = null, throwOnSpawn = null } = {}) {
+function fakeClaude({ initDelay = 0, exitCode = 0, result = null, throwOnSpawn = null, pid = process.pid, neverExit = false } = {}) {
   const calls = []
   const fn = (exe, argv, opts) => {
     calls.push({ exe, argv, opts })
     if (throwOnSpawn) throw new Error(throwOnSpawn)
     const child = new EventEmitter()
+    // A real spawned child always has a pid, and the runner now refuses to
+    // call anything `running` without one. Using this process's own pid keeps
+    // the liveness check genuinely exercised rather than stubbed past:
+    // it is a number that really is alive.
+    child.pid = pid
     child.stdout = new EventEmitter()
     child.stderr = new EventEmitter()
     setTimeout(() => {
       child.stdout.emit('data', JSON.stringify({ type: 'system', subtype: 'init', session_id: 'sess-fake-0001' }) + '\n')
+      // A child that announces itself and then never exits — the shape a repair
+      // has while it is genuinely working, and the one a bridge that dies
+      // leaves behind with nobody to hear its exit.
+      if (neverExit) return
       setTimeout(() => {
         if (result) child.stdout.emit('data', JSON.stringify({ type: 'result', ...result }) + '\n')
         child.emit('exit', exitCode)
@@ -439,6 +448,99 @@ check('health carries the SAME readiness object the Claude card reads', h.readin
 check('health reports a signed-out machine to the Smoke Test',
   runner({ readinessFn: () => SIGNED_OUT }).health().readiness.state === 'signin-required')
 check('the public view hides the absolute transcript path', ReviewRunner.view(rec2).logPath === undefined)
+
+/* ═══ 9. RUNNING means a process ════════════════════════════════════════════
+   The bug this section exists for: the Smoke Test said "Claude repair running"
+   for a repair that had already exited. Nothing here checks a status string
+   against another status string — every assertion is about whether a process
+   is actually there. */
+console.log('\nRUNNING is only ever claimed for a live process')
+
+// A pid no process can plausibly own. Liveness must come back false for it.
+const DEAD_PID = 2147483646
+check('a dead pid is reported dead', pidAlive(DEAD_PID) === false)
+check('a live pid is reported live', pidAlive(process.pid) === true)
+
+// spawn() can return without producing a process. That must never read as running.
+const rNoPid = runner({ spawnFn: fakeClaude({ pid: 0, result: OK_RESULT }) })
+const noPid = rNoPid.submit(homepageReview('homepage-2026-08-24-1950-nopid'))
+await settle()
+check('a spawn that produced no process is never running', noPid.state !== 'running')
+check('it is reported honestly instead', noPid.state === 'blocked' && /review is saved/i.test(noPid.reason))
+check('the review survived the failed launch',
+  existsSync(join(packageDir(REPO, 'homepage-2026-08-24-1950-nopid'), 'review.json')))
+check('all four screenshots survived it too',
+  JSON.parse(readFileSync(join(packageDir(REPO, 'homepage-2026-08-24-1950-nopid'), 'review.json'), 'utf8'))
+    .screenshots.every(s => existsSync(join(packageDir(REPO, 'homepage-2026-08-24-1950-nopid'), ...s.file.split('/')))))
+check('and it is retryable', ['blocked', 'failed', 'stale'].includes(noPid.state))
+
+// A child that says "init" from a pid that is already gone is a message, not a run.
+const rDead = runner({ spawnFn: fakeClaude({ pid: DEAD_PID, neverExit: true }) })
+const deadRec = rDead.submit(homepageReview('homepage-2026-08-24-1951-deadpid'))
+await settle()
+check('an init line from a dead process does not make it running', deadRec.state !== 'running')
+check('reconciling releases the lock that dead run was holding', rDead.reconcile() === null)
+check('the dead run is reported stale, not running', rDead.get(deadRec.reviewId).state === 'stale')
+check('stale says what is actually known', rDead.get(deadRec.reviewId).reason === STALE_REASON)
+// The whole point of releasing it: the next review is not held hostage.
+const afterDead = rDead.submit({ ...homepageReview('search-2026-08-24-1951-afterdead'), page: { id: 'search', title: 'Search', url: '/search' } })
+check('a stale lock does not block the next review', afterDead.state !== 'blocked')
+
+console.log('\nA restarted bridge reconciles what the previous one left behind')
+const spawnLive = fakeClaude({ neverExit: true, result: OK_RESULT })
+const rBefore = runner({ spawnFn: spawnLive })
+const liveRec = rBefore.submit(homepageReview('homepage-2026-08-24-1952-restart'))
+await settle()
+check('the run really was running before the restart', liveRec.state === 'running')
+check('and it recorded the process it was running as', liveRec.pid === process.pid)
+check('run.json on disk says running', JSON.parse(readFileSync(join(packageDir(REPO, liveRec.reviewId), 'run.json'), 'utf8')).state === 'running')
+
+// The restart. A brand new runner over the same repo is exactly what the
+// founder gets when Command Centre is closed and reopened.
+const spawnAfterRestart = fakeClaude({ result: OK_RESULT })
+const rRestarted = new ReviewRunner(REPO, {
+  spawnFn: spawnAfterRestart, findClaudeFn: () => 'C:\\fake\\claude.exe', readinessFn: () => READY,
+})
+const recovered = rRestarted.get(liveRec.reviewId)
+check('the restarted bridge still knows the run', recovered !== null)   // not a 404 dead end
+check('it does not re-claim it as running', recovered.state === 'stale')
+check('it does not hold a lock it cannot prove', rRestarted.activeId === null)
+check('the package survived the restart intact',
+  existsSync(join(packageDir(REPO, liveRec.reviewId), 'review.json'))
+  && existsSync(join(packageDir(REPO, liveRec.reviewId), 'screenshots', 'issue-01-shot-1.jpg')))
+
+// Retry after the restart: one relaunch, same package, nothing re-typed.
+const retryStale = rRestarted.submit(homepageReview(liveRec.reviewId))
+check('a stale run can be retried', retryStale.duplicate === false)
+check('the retry reused the package already on disk', retryStale.packagePath === liveRec.packagePath)
+check('the retry started exactly one process', spawnAfterRestart.calls.length === 1)
+await settle()
+check('the retry completed', rRestarted.get(liveRec.reviewId).state === 'completed')
+// Pressing Retry again on a finished run must not start a second Claude.
+rRestarted.submit(homepageReview(liveRec.reviewId))
+rRestarted.submit(homepageReview(liveRec.reviewId))
+check('repeated retries after completion start nothing more', spawnAfterRestart.calls.length === 1)
+
+console.log('\nThe evidence count is what the founder actually wrote')
+// The founder review that exposed this: no issue rows at all, both defects
+// typed into screenshot notes. "0 issues" made a real review look empty.
+const notesOnly = {
+  ...homepageReview('homepage-2026-08-24-1953-notes'),
+  issues: [],
+  screenshots: [
+    { issueUid: null, note: 'Formats are all labelled Hardcover.', annotated: false, dataUrl: JPEG_1PX },
+    { issueUid: null, note: 'The Under £X filter does not filter.', annotated: false, dataUrl: PNG_1PX },
+  ],
+}
+const rNotes = runner({ claude: { result: OK_RESULT } })
+const notesRec = rNotes.submit(notesOnly)
+check('no issue rows is still counted as none', notesRec.counts.issues === 0)
+check('both screenshots are counted', notesRec.counts.screenshots === 2)
+check('the written notes are counted', notesRec.counts.notes === 3)   // 2 shots + 1 checkpoint
+check('evidence is what the founder would recognise', notesRec.counts.evidence === 3)
+const notesMd = readFileSync(join(packageDir(REPO, notesOnly.reviewId), 'review.md'), 'utf8')
+check('and every note still reaches Claude', /all labelled Hardcover/.test(notesMd) && /does not filter/.test(notesMd))
+check('counting is a pure function of the review', countEvidence([], [{ note: 'x' }, { note: '' }], [{ note: 'y' }]).evidence === 2)
 
 /* ═══ Cleanup ═══════════════════════════════════════════════════════════════ */
 rmSync(REPO, { recursive: true, force: true })

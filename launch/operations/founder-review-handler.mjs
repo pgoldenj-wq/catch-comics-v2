@@ -36,7 +36,7 @@
  */
 
 import { spawn } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, writeFileSync, statSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
 import { SIGNIN_COMMAND, claudeVersion, findClaude, readiness } from './claude-readiness.mjs'
 
@@ -246,7 +246,24 @@ function buildReviewJson(review, shots, createdAt) {
       annotated: s.annotated,
       bytes: s.bytes.length,
     })),
-    counts: { issues: issues.length, screenshots: shots.length },
+    // `issues` counts written issue rows only. A founder who photographs a
+    // defect and types the problem into the screenshot's note has reported a
+    // defect just as much as one who filled an issue row, so those notes are
+    // counted too — otherwise a real review reads as "0 issues" and looks like
+    // nothing was sent. `evidence` is the number the founder should recognise.
+    counts: countEvidence(issues, shots, review.checkpoints),
+  }
+}
+
+/** Issues, screenshots, and the notes that are issues in everything but shape. */
+export function countEvidence(issues, shots, checkpoints) {
+  const written = s => !!(s && s.note && s.note.trim())
+  const notes = shots.filter(written).length + checkpoints.filter(written).length
+  return {
+    issues: issues.length,
+    screenshots: shots.length,
+    notes,
+    evidence: issues.length + notes,
   }
 }
 
@@ -437,6 +454,38 @@ export function classifyRun({ exitCode, result, spawnError }) {
   return { state: 'failed', reason: text.slice(0, 400) || `Claude Code exited with code ${exitCode}` }
 }
 
+/* ── Process truth ───────────────────────────────────────────────────────────
+   The states below are only worth anything if `running` means a process. Two
+   rules make that true, and they are deliberately different from each other:
+
+   WITHIN one bridge lifetime the child is in `this.children` and its `exit`
+   event is authoritative. Liveness needs no guessing.
+
+   ACROSS a restart the bridge has lost every handle it had. A pid read back
+   out of run.json cannot be trusted to still be the same process — pids are
+   reused — so a restarted bridge never re-claims a run as `running`. It marks
+   it `stale`, which says exactly what is known: this run was started, and
+   nobody can tell you how it ended.                                          */
+
+/** Does a process with this pid exist? Signal 0 tests, it does not signal. */
+export function pidAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false
+  try { process.kill(pid, 0); return true }
+  catch (err) { return err.code === 'EPERM' }   // exists, but not ours to signal
+}
+
+/** A run whose pid may still be editing the repo blocks new launches, but not
+ *  forever: past this window a live pid is far more likely to be a reused
+ *  number than a four-hour-old repair, and refusing on it would be a lie. */
+export const ORPHAN_WINDOW_MS = 6 * 60 * 60 * 1000
+
+/** States that mean "started, outcome unknown" — the ones a restart invalidates. */
+const UNFINISHED = ['sending', 'packaging', 'packaged', 'launching', 'running']
+
+export const STALE_REASON =
+  'The bridge stopped before this repair reported back, so its outcome is unknown. '
+  + 'The review and every screenshot are still on disk — press Retry to hand it to Claude again.'
+
 /* ── Run registry ────────────────────────────────────────────────────────── */
 
 /**
@@ -456,11 +505,97 @@ export class ReviewRunner {
     this.runs = new Map()
     this.activeId = null     // single-flight: one repair session at a time
     this.children = new Map()
+    this.hydrate()
   }
 
-  get(reviewId) { return this.runs.get(reviewId) ?? null }
+  /**
+   * Read every run.json back into the registry at startup and settle what the
+   * previous bridge left behind. Without this the registry is empty after a
+   * restart, `/review/status` answers 404 for a review the founder is watching,
+   * and the page is left holding a `running` it can never resolve.
+   */
+  hydrate() {
+    const root = resolve(this.repoRoot, 'launch', 'reviews')
+    let entries = []
+    try { entries = readdirSync(root, { withFileTypes: true }) } catch { return }
+    for (const e of entries) {
+      if (!e.isDirectory()) continue
+      let rec
+      try { rec = JSON.parse(readFileSync(join(root, e.name, 'run.json'), 'utf8')) }
+      catch { continue }
+      if (!rec || rec.reviewId !== e.name) continue
+      // Packages written before evidence counting existed still deserve an
+      // honest count, so recompute rather than showing the founder a stale 0.
+      if (rec.counts && rec.counts.notes === undefined) {
+        try {
+          const r = JSON.parse(readFileSync(join(root, e.name, 'review.json'), 'utf8'))
+          rec.counts = countEvidence(r.issues ?? [], r.screenshots ?? [], r.checkpoints?.items ?? [])
+        } catch { /* an unreadable review.json is not worth failing hydration for */ }
+      }
+      if (UNFINISHED.includes(rec.state)) {
+        // Never re-claim it as running: this process did not start it and
+        // cannot prove what happened to it.
+        rec.state = 'stale'
+        rec.reason = STALE_REASON
+        rec.finishedAt = rec.finishedAt ?? new Date().toISOString()
+        // A pid that is still alive is the one case worth acting on: something
+        // may still be editing this repo, so it holds the single-flight lock.
+        rec.orphanPid = this.#orphanPid(rec) ?? null
+        this.persist(rec)
+      }
+      this.runs.set(rec.reviewId, rec)
+    }
+  }
 
-  list() { return [...this.runs.values()] }
+  /** The pid of a possibly-surviving repair from a previous bridge, or null. */
+  #orphanPid(rec) {
+    const started = Date.parse(rec.launchedAt ?? '')
+    if (!Number.isFinite(started) || Date.now() - started > ORPHAN_WINDOW_MS) return null
+    return pidAlive(rec.pid) ? rec.pid : null
+  }
+
+  /**
+   * Settle the single-flight lock against reality before anyone reads or is
+   * refused by it. A lock held by a child that has gone is not a lock.
+   */
+  reconcile() {
+    if (this.activeId) {
+      // `children` is emptied by the exit and error handlers, so membership
+      // already means "has not reported an exit". The pid check is what
+      // catches the case those handlers can never fire for: the child died
+      // with the bridge, or with the console it was started from.
+      const child = this.children.get(this.activeId)
+      const alive = !!child && !child.killed && pidAlive(child.pid)
+      if (!alive) {
+        const rec = this.runs.get(this.activeId)
+        if (rec && UNFINISHED.includes(rec.state)) {
+          rec.state = 'stale'
+          rec.reason = STALE_REASON
+          rec.finishedAt = new Date().toISOString()
+          this.persist(rec)
+        }
+        this.children.delete(this.activeId)
+        this.activeId = null
+      }
+    }
+    // An orphan from a previous bridge that has since exited stops blocking.
+    for (const rec of this.runs.values()) {
+      if (rec.orphanPid && !pidAlive(rec.orphanPid)) {
+        rec.orphanPid = null
+        this.persist(rec)
+      }
+    }
+    return this.activeId
+  }
+
+  /** The record, settled first — a status read must never report a dead run
+   *  as running just because nothing has looked at it since. */
+  get(reviewId) {
+    this.reconcile()
+    return this.runs.get(reviewId) ?? null
+  }
+
+  list() { this.reconcile(); return [...this.runs.values()] }
 
   persist(rec) {
     try {
@@ -489,7 +624,7 @@ export class ReviewRunner {
     const existing = this.runs.get(review.reviewId)
 
     if (existing) {
-      const retryable = existing.state === 'blocked' || existing.state === 'failed'
+      const retryable = ['blocked', 'failed', 'stale'].includes(existing.state)
       if (!retryable) return { ...existing, duplicate: true }
       // Retry: the package is already written and verified. Only relaunch.
       existing.duplicate = false
@@ -547,15 +682,29 @@ export class ReviewRunner {
     // retry look like it never happened.
     rec.attempts += 1
 
+    // Settle the lock against reality first. Refusing a launch because of a
+    // repair that has already exited is how a dead run becomes a permanent
+    // blocker, and it is the founder who pays for that in lost reviews.
+    this.reconcile()
+
     // Single-flight across reviews: two repair sessions editing the same repo
     // at once would fight over the working tree.
     if (this.activeId && this.activeId !== rec.reviewId) {
       const other = this.runs.get(this.activeId)
       rec.state = 'blocked'
-      rec.reason = `A Claude repair is already running for ${other?.page?.title ?? this.activeId}. The review is saved — press Retry when it finishes.`
+      rec.blockedBy = other?.page?.title ?? this.activeId
+      rec.reason = `A Claude repair is already running for ${rec.blockedBy}. This review is saved — press Retry when that one finishes.`
       this.persist(rec)
       return rec
     }
+
+    // Deliberately NOT a refusal. A pid recovered from a previous bridge's
+    // run.json cannot be shown to still BE that repair — pids are reused — so
+    // refusing on it would block a founder on a guess, which is the exact
+    // failure this whole change exists to remove. Single-flight is enforced
+    // where it can be proven: against a live child this bridge is holding.
+    // The observation is still worth surfacing, so it is recorded, not acted on.
+    rec.blockedBy = null
 
     const exe = this.findClaudeFn()
     if (!exe) {
@@ -584,6 +733,8 @@ export class ReviewRunner {
     rec.finishedAt = null
     rec.exitCode = null
     rec.reason = null
+    rec.pid = null
+    rec.orphanPid = null
 
     const dir = packageDir(this.repoRoot, rec.reviewId)
     const logPath = join(dir, 'claude-run.jsonl')
@@ -604,6 +755,16 @@ export class ReviewRunner {
       return rec
     }
 
+    // spawn() resolved without throwing, but only a pid proves a process was
+    // actually created. Without one there is nothing to call running later.
+    if (!child.pid) {
+      const c = classifyRun({ spawnError: 'Claude Code was started but no process appeared. Your review is saved — press Retry.' })
+      Object.assign(rec, c, { finishedAt: new Date().toISOString() })
+      this.persist(rec)
+      return rec
+    }
+
+    rec.pid = child.pid
     this.activeId = rec.reviewId
     this.children.set(rec.reviewId, child)
 
@@ -624,8 +785,12 @@ export class ReviewRunner {
         // The init event is the honest signal that Claude really started —
         // the process being alive is not the same thing.
         if (ev.type === 'system' && ev.subtype === 'init') {
-          rec.state = 'running'
           rec.sessionId = ev.session_id ?? null
+          // Claude announced itself. Confirm the process it announced itself
+          // from is still there before anyone is told a repair is running:
+          // an init line that arrives from a child already gone is a message,
+          // not a running session.
+          if (this.children.has(rec.reviewId) && !child.killed && pidAlive(child.pid)) rec.state = 'running'
           this.persist(rec)
         }
         if (ev.type === 'result') result = ev
@@ -660,7 +825,7 @@ export class ReviewRunner {
     })
 
     this.persist(rec)
-    console.log(`[founder-review] ${rec.reviewId} — launched Claude repair (${rec.counts.issues} issues, ${rec.counts.screenshots} screenshots)`)
+    console.log(`[founder-review] ${rec.reviewId} — launched Claude repair as process ${rec.pid} (${rec.counts.issues} issues, ${rec.counts.notes ?? 0} notes, ${rec.counts.screenshots} screenshots)`)
     return rec
   }
 
@@ -673,6 +838,7 @@ export class ReviewRunner {
    * alongside it because the page has always read that shape.
    */
   health({ fresh = false } = {}) {
+    this.reconcile()
     const ready = this.readinessFn({ fresh })
     const exe = this.findClaudeFn()
     return {

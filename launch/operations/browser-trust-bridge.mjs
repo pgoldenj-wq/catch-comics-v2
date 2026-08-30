@@ -410,6 +410,11 @@ server.listen(PORT, HOST, () => {
   // what replaced the Smoke Test's per-handoff directory picker.
   const h = reviewRunner.health()
   console.log(`Founder review handoff: ready — Claude Code ${h.claude.available ? h.claude.version : 'NOT FOUND (reviews will still be saved)'}`)
+  // Say what the previous bridge left behind. A run this process did not start
+  // is never re-claimed as running: it is settled to `stale`, which is what
+  // makes Retry available instead of a spinner nobody can clear.
+  const settled = reviewRunner.list().filter(r => r.state === 'stale')
+  console.log(`Saved reviews: ${reviewRunner.list().length} known${settled.length ? ` — ${settled.length} left unfinished by a previous session, now retryable (${settled.map(r => r.reviewId).join(', ')})` : ''}`)
   // State only. The account label is what the CLI prints for the founder
   // anyway; no token or credential is ever read, let alone logged.
   const r = h.readiness
