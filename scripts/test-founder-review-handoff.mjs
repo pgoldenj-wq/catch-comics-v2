@@ -20,7 +20,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   LIMITS, PAGE_IDS, ReviewRunner, STALE_REASON, ValidationError,
-  classifyRun, countEvidence, decodeImage, packageDir, pidAlive, validateSubmission,
+  classifyRun, countEvidence, decodeImage, describeActivity, packageDir, pidAlive, validateSubmission,
 } from '../launch/operations/founder-review-handler.mjs'
 
 let pass = 0, fail = 0
@@ -75,7 +75,7 @@ function homepageReview(reviewId = 'homepage-2026-08-24-1930-abc123') {
 /* ── A fake Claude Code ──────────────────────────────────────────────────────
    Same stdout shape the real binary emits with --output-format stream-json, so
    the runner's parsing is exercised for real. */
-function fakeClaude({ initDelay = 0, exitCode = 0, result = null, throwOnSpawn = null, pid = process.pid, neverExit = false } = {}) {
+function fakeClaude({ initDelay = 0, exitCode = 0, result = null, throwOnSpawn = null, pid = process.pid, neverExit = false, turns = [] } = {}) {
   const calls = []
   const fn = (exe, argv, opts) => {
     calls.push({ exe, argv, opts })
@@ -90,6 +90,10 @@ function fakeClaude({ initDelay = 0, exitCode = 0, result = null, throwOnSpawn =
     child.stderr = new EventEmitter()
     setTimeout(() => {
       child.stdout.emit('data', JSON.stringify({ type: 'system', subtype: 'init', session_id: 'sess-fake-0001' }) + '\n')
+      // The turns a real repair emits while it works. They are what the card
+      // shows instead of a spinner, so the parsing that lifts them out has to
+      // be exercised here rather than assumed.
+      for (const t of turns) child.stdout.emit('data', JSON.stringify(t) + '\n')
       // A child that announces itself and then never exits — the shape a repair
       // has while it is genuinely working, and the one a bridge that dies
       // leaves behind with nobody to hear its exit.
@@ -541,6 +545,51 @@ check('evidence is what the founder would recognise', notesRec.counts.evidence =
 const notesMd = readFileSync(join(packageDir(REPO, notesOnly.reviewId), 'review.md'), 'utf8')
 check('and every note still reaches Claude', /all labelled Hardcover/.test(notesMd) && /does not filter/.test(notesMd))
 check('counting is a pure function of the review', countEvidence([], [{ note: 'x' }, { note: '' }], [{ note: 'y' }]).evidence === 2)
+
+console.log('\nA running repair says what it is doing')
+// The founder's report was "it says running and nothing happens". The repair
+// is headless, so "running" has to carry its own evidence or it is
+// indistinguishable from a hang. These are that evidence.
+const asstTool = (name, input) => ({ type: 'assistant', message: { content: [{ type: 'tool_use', name, input }] } })
+const asstText = text => ({ type: 'assistant', message: { content: [{ type: 'text', text }] } })
+
+check('a windows path is named the way the founder would recognise it',
+  describeActivity(asstTool('Edit', { file_path: 'C:\\repo\\app\\search\\page.tsx' })) === 'Editing search/page.tsx')
+check('a posix path works the same',
+  describeActivity(asstTool('Read', { file_path: '/repo/lib/identity/format.ts' })) === 'Reading identity/format.ts')
+check('a command is described, not dumped',
+  describeActivity(asstTool('Bash', { description: 'Run typecheck', command: 'npm run check' })) === 'Run typecheck')
+check('a command with no description still says something true',
+  describeActivity(asstTool('Bash', { command: 'npm run check' })) === 'Running npm run check')
+check('an unknown tool degrades instead of vanishing',
+  describeActivity(asstTool('Frobnicate', {})) === 'Using Frobnicate')
+check('thinking aloud counts as progress too',
+  describeActivity(asstText('## Tracing where format is set\nthen more')) === 'Tracing where format is set')
+check('a turn with nothing in it claims nothing',
+  describeActivity({ type: 'assistant', message: { content: [] } }) === null)
+check('a non-assistant event is not activity',
+  describeActivity({ type: 'result', result: 'done' }) === null)
+
+const rProg = runner({
+  spawnFn: fakeClaude({
+    neverExit: true,
+    turns: [asstText('Starting on the format labels'), asstTool('Read', { file_path: '/r/lib/identity/format.ts' }), asstTool('Edit', { file_path: '/r/app/search/page.tsx' })],
+  }),
+})
+const progRec = rProg.submit(homepageReview('homepage-2026-08-24-1954-progress'))
+await settle()
+check('the repair is running', progRec.state === 'running')
+check('every turn is counted', progRec.progress?.turns === 3)
+check('the card can say what it is doing right now', progRec.progress?.activity === 'Editing search/page.tsx')
+check('and when it last did anything', Number.isFinite(Date.parse(progRec.progress?.lastEventAt ?? '')))
+check('progress reaches the page through the same view the status endpoint uses',
+  ReviewRunner.view(progRec).progress?.activity === 'Editing search/page.tsx')
+
+// A turn that describes nothing must not blank out the last thing that did —
+// the card would flicker back to a bare spinner for no reason.
+rProg.children.get(progRec.reviewId).stdout.emit('data', JSON.stringify({ type: 'assistant', message: { content: [] } }) + '\n')
+check('a turn with no describable action keeps the last one', progRec.progress.activity === 'Editing search/page.tsx')
+check('but it still counts as a turn', progRec.progress.turns === 4)
 
 /* ═══ Cleanup ═══════════════════════════════════════════════════════════════ */
 rmSync(REPO, { recursive: true, force: true })

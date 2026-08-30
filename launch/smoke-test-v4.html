@@ -1038,13 +1038,35 @@ function evidenceOf(s){
   return parts.join(' · ');
 }
 
+/* The repair is headless by design — no window, no console. That is fine right
+   up until "running" has to stand alone for eight minutes, at which point it is
+   indistinguishable from a hang, which is exactly what was reported. So the
+   card carries the two things a terminal would have shown: how long it has been
+   going, and what it is doing this second. */
+function since(iso){
+  const t = Date.parse(iso || '');
+  if (!Number.isFinite(t)) return null;
+  const s = Math.max(0, Math.round((Date.now() - t) / 1000));
+  return s < 60 ? `${s}s` : `${Math.floor(s/60)}m ${String(s%60).padStart(2,'0')}s`;
+}
+
+function runProgress(s){
+  const bits = [];
+  const el = since(s.launchedAt);
+  if (el) bits.push(el);
+  if (s.progress?.turns) bits.push(`step ${s.progress.turns}`);
+  if (s.progress?.activity) bits.push(esc(s.progress.activity));
+  if (!bits.length) return '';
+  return `<br><span style="color:var(--ink2)">${bits.join(' · ')}</span>`;
+}
+
 const STATE_TEXT = {
   sending:   s => `Packaging ${evidenceOf(s)}…`,
   packaged:  s => `Saved · ${evidenceOf(s)} · starting Claude…`,
   launching: s => `Sent · ${evidenceOf(s)} · <strong>starting Claude…</strong>`,
   // The pid is printed because it is the whole claim: this line means a
   // process, and the founder can go and look at it.
-  running:   s => `Sent · ${evidenceOf(s)} · <strong>Claude repair running</strong>${s.pid ? ` · process ${s.pid}` : ''}`,
+  running:   s => `Sent · ${evidenceOf(s)} · <strong>Claude repair running</strong>${s.pid ? ` · process ${s.pid}` : ''}${runProgress(s)}`,
   completed: s => `<strong>Claude repair complete</strong> · ${evidenceOf(s)} reviewed`,
   failed:    s => `<strong>Claude repair did not finish.</strong> Your review is saved at <code>${esc(s.packagePath||'')}</code>`,
   // Two sentences that used to appear together — "Claude was not started" and
@@ -1294,7 +1316,13 @@ async function sendToClaude(){
 
     if (rec.duplicate) toast('Already sent — showing the run that is already in progress');
     else if (rec.state === 'blocked') toast(`Review saved to ${rec.packagePath} — Claude was not started`, 'err');
-    else toast(`Sent · ${rec.counts?.issues ?? issues} issues · ${rec.counts?.screenshots ?? shots} screenshots · Claude repair running`);
+    // Two lies lived in this one line. It counted only issue rows, so a review
+    // whose evidence was typed onto screenshots announced itself as "0 issues";
+    // and it asserted "Claude repair running" the instant the POST returned,
+    // before any process had been confirmed — the submit reply is at best
+    // `launching`. Both now come from the record the bridge actually sent back.
+    else if (rec.state === 'running') toast(`Sent · ${evidenceOf(rec)} · Claude repair running${rec.pid ? ` (process ${rec.pid})` : ''}`);
+    else toast(`Sent · ${evidenceOf(rec)} · starting Claude…`);
 
     // A blocked send is the moment the founder most needs to know WHY. Re-read
     // readiness so a sign-out surfaces its own button right here, next to the

@@ -454,6 +454,51 @@ export function classifyRun({ exitCode, result, spawnError }) {
   return { state: 'failed', reason: text.slice(0, 400) || `Claude Code exited with code ${exitCode}` }
 }
 
+/* ── What the repair is doing ────────────────────────────────────────────────
+   A headless repair gives the founder nothing to look at, so "running" has to
+   carry its own evidence. These turn one stream event into one short phrase —
+   the same phrase Claude Code would print to a terminal, which is exactly what
+   the founder said they were missing.                                        */
+
+/** File paths are the useful half of a tool call; the repo prefix is not. */
+function shortPath(v) {
+  if (typeof v !== 'string' || !v) return null
+  return v.split(/[\\/]/).slice(-2).join('/')
+}
+
+/** One tool call, said the way a person would say it. */
+function phraseFor(name, input = {}) {
+  switch (name) {
+    case 'Edit':
+    case 'Write':
+    case 'NotebookEdit': return `Editing ${shortPath(input.file_path) ?? 'a file'}`
+    case 'Read':         return `Reading ${shortPath(input.file_path) ?? 'a file'}`
+    case 'Bash':         return input.description || `Running ${String(input.command ?? '').slice(0, 60)}`
+    case 'Grep':         return `Searching for ${String(input.pattern ?? '').slice(0, 40)}`
+    case 'Glob':         return `Looking for ${String(input.pattern ?? '').slice(0, 40)}`
+    case 'Task':         return input.description ? `Delegating: ${input.description}` : 'Delegating a sub-task'
+    case 'TodoWrite':    return 'Planning the repair'
+    default:             return name ? `Using ${name}` : null
+  }
+}
+
+/**
+ * The headline for one assistant turn: what it is about to DO if it is doing
+ * something, otherwise what it just said. Thinking aloud is real progress too —
+ * a founder watching an eight-minute repair would rather read a sentence of it
+ * than watch a spinner that never changes.
+ */
+export function describeActivity(ev) {
+  const content = ev?.message?.content
+  if (!Array.isArray(content)) return null
+  const tool = content.find(b => b?.type === 'tool_use')
+  if (tool) return phraseFor(tool.name, tool.input ?? {})
+  const text = content.find(b => b?.type === 'text' && typeof b.text === 'string' && b.text.trim())
+  if (!text) return null
+  const line = text.text.trim().split(/\r?\n/).find(l => l.trim()) ?? ''
+  return line.replace(/[*_`#]/g, '').trim().slice(0, 90) || null
+}
+
 /* ── Process truth ───────────────────────────────────────────────────────────
    The states below are only worth anything if `running` means a process. Two
    rules make that true, and they are deliberately different from each other:
@@ -771,6 +816,7 @@ export class ReviewRunner {
     let tail = ''
     let result = null
     let stderr = ''
+    let lastProgressWrite = 0
     const lines = []
 
     child.stdout.on('data', chunk => {
@@ -792,6 +838,22 @@ export class ReviewRunner {
           // not a running session.
           if (this.children.has(rec.reviewId) && !child.killed && pidAlive(child.pid)) rec.state = 'running'
           this.persist(rec)
+        }
+        // A repair runs headless for minutes at a time. Without this the card
+        // can only say "running", which is indistinguishable from the hang the
+        // founder reported. Every assistant turn carries what Claude just
+        // decided to do, so that is what the card gets to show.
+        if (ev.type === 'assistant') {
+          rec.progress = {
+            turns: (rec.progress?.turns ?? 0) + 1,
+            activity: describeActivity(ev) ?? rec.progress?.activity ?? null,
+            lastEventAt: new Date().toISOString(),
+          }
+          // The page reads the live record, so the founder sees this without a
+          // disk write. Persisting every turn would be churn for nothing, so it
+          // is throttled to the rate a bridge restart could actually use.
+          const now = Date.now()
+          if (now - lastProgressWrite > 5000) { lastProgressWrite = now; this.persist(rec) }
         }
         if (ev.type === 'result') result = ev
       }
