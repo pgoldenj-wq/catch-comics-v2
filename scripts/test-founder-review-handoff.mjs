@@ -658,6 +658,9 @@ check('the approved local test scripts are allowed', allAllowed([
   'npm run test:identity', 'npm run test:url-filters',
   'npm run test:search-ranking', 'npm run test:price-check', 'npm run test:isbn',
   'npm run test:founder-review',
+  // Dropped while it existed only as an uncommitted edit, restored once the
+  // Search repair committed the script. Asserted so the round trip is covered.
+  'npm run test:format-price',
 ]))
 check('a test script can take arguments', allowed('npm run test:identity -- --verbose'))
 
