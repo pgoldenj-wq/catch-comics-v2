@@ -328,3 +328,28 @@ repair worktree on 2026-08-31: `npm run check` and a focused `git add` +
 second run with the mechanism deliberately tampered, `npm run check` (redefined)
 and `npm run test:identity` (rewritten runner) were both refused by the gate
 while untouched `npm run lint` still ran.
+
+### Independent re-verification, 2026-08-31 (second session, CLI 2.1.251)
+
+The claims above were re-tested from scratch by a session that had not written
+them, using throwaway git repos and a **filesystem side effect** as the marker.
+A transcript can quote a string; only execution can create a file, so
+`existsSync()` is the evidence rather than grepping output — the first attempt
+at this probe was misleading precisely because the model quoted a refusal that
+contained the marker text.
+
+| Probe | Gate | Side effect on disk | CLI denial |
+|---|---|---|---|
+| `package.json` "check" redefined | off | **file created** | none |
+| same | **on** | none | `npm run check` |
+| runner `scripts/verify.mjs` rewritten | off | **file created** | none |
+| same | **on** | none | `npm run check` |
+| only `lib/` (subject) edited | on | reviewed runner ran | none |
+
+Both bypasses are real on this CLI, and both are closed. The positive control
+matters as much as the refusals: with the gate on and application code edited,
+the approved script still ran — a repair can still repair.
+
+Reproduce: throwaway repo whose `check` is `node scripts/verify.mjs`, commit as
+base, mutate one of the two, then run the CLI with `--allowedTools
+'Bash(npm run check:*)'` with and without `--settings` carrying the hook.

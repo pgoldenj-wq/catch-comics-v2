@@ -435,6 +435,7 @@ export const VERIFY_SCRIPTS = [
   // Missing script`. The script is committed now, and the handoff test asserts
   // against HEAD's package.json so it cannot silently go missing again.
   'test:format-price',
+  'test:listing-trust',
   'test:url-filters',
   'test:search-ranking',
   'test:price-check',
