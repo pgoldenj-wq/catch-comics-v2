@@ -20,7 +20,9 @@ Smoke Test V4  ──POST /review/submit──▶  local bridge (127.0.0.1:8319)
                     review + images                │
                                                    ├─▶ launch/reviews/<reviewId>/
                                                    ├─▶ launch/founder-review.json
+                                                   ├─▶ git worktree add  ../catch-comics-repairs/<reviewId>
                                                    └─▶ claude -p "<fixed repair prompt>"
+                                                         cwd = the worktree, never your checkout
 ```
 
 The bridge is `browser-trust-bridge.mjs` — the same one behind "Run Browser
@@ -55,6 +57,107 @@ name a file, name a directory, or reach the command line — see the header of
 `founder-review-handler.mjs` for the full boundary.
 
 `launch/reviews/` is gitignored. Packages are local evidence and stay local.
+
+`run.json` also records `worktreePath`, `branch` and `baseCommit` — where the
+repair worked, what it committed on, and what it started from.
+
+## Where the repair works — its own worktree, not yours
+
+A repair never runs in your checkout. Before Claude is spawned the bridge makes
+it a git worktree of its own:
+
+```
+Documents/CatchComics/
+  catch-comics/                         ← yours. Untouched.
+  catch-comics-repairs/
+    <reviewId>/                         ← branch repair/<reviewId>, cut from HEAD
+      node_modules   → junction to yours, so tsc/eslint/tsx actually run
+      launch/reviews/<reviewId>/        ← the package, copied in (it is gitignored)
+```
+
+**Why.** The repair needs to commit — a repair that cannot commit leaves
+unverified edits lying loose, which is exactly how `lib/identity/format.ts`,
+`lib/search/priceFilter.ts` and `scripts/test-format-and-price-filter.ts` ended
+up in the tree with no commit behind them. But your checkout is not a safe place
+to hand an unattended session git-write rights: other Claude sessions edit this
+repo live, the dev server runs against it, and it routinely carries two dozen
+dirty files that are none of the repair's business. So the repair gets rights in
+a tree where the only things present are HEAD and its own edits.
+
+**Consequences worth knowing.**
+
+- The branch is cut from **HEAD**, so the repair does not see your uncommitted
+  work. If you have already half-fixed the thing you are reporting, the repair
+  will fix it again from the committed state. That is deliberate: its diff is
+  reproducible, and nothing it does can collide with your edits.
+- The repair's commits are **local, on `repair/<reviewId>`**, in the shared
+  object store. They are not pushed and not merged — see below.
+- A retry **reuses** the same worktree and branch, so it continues the same
+  repair rather than forking a second one.
+- Worktrees are **not cleaned up automatically**, because the commit inside one
+  is the deliverable. When you are done with it:
+
+```bash
+git worktree remove ../catch-comics-repairs/<reviewId>
+```
+
+If the worktree cannot be made, the run is `blocked` — never a silent fallback
+into your checkout.
+
+## What the repair may run — the permission boundary
+
+Founder decision, 2026-08-31. Before it, the session ran with `acceptEdits` and
+four deny rules, and **every** Bash command was refused: the 2026-08-29 repair
+could not typecheck, could not run a test and could not commit. It burned nine
+turns retrying spellings of "typecheck" and gave up.
+
+`bypassPermissions` was offered and **declined**. What shipped is an allowlist,
+and the session is **default-deny**: a command not named below is refused.
+
+**Allowed — verification** (`npm run …`, arguments and `2>&1 | tail -n` fine):
+
+```
+check   lint
+test:identity  test:format-price  test:url-filters  test:search-ranking
+test:price-check  test:sync-backoff  test:traversal-safety  test:containment
+test:ebay-uk  test:secrets  test:isbn  test:browser-trust
+test:retailer-card  test:founder-review  test:claude-readiness
+```
+
+Every one is a pure local check — no database client, no network, no
+`.env.local`, no paid API.
+
+**Allowed — git, inside the repair worktree:**
+
+```
+git status / diff / log / show / rev-parse
+git branch --show-current / --list          (inspection only)
+git checkout -b / git switch -c
+git add <path>                               path-scoped
+git commit
+```
+
+**Denied, permanently:** `git push`, `vercel`, `npx vercel`, `gh pr merge` (and
+`gh` altogether); `git stash`, `reset`, `clean`, `restore`, `checkout -- .`,
+`rebase`, `merge`, `cherry-pick`, `revert`, `worktree`, `tag`, branch delete and
+rename; `git add -A` / `.` / `-u` and `git commit -a` / `-am`; `git -C`,
+`--git-dir`, `--work-tree`; `npx` and `npm install/ci/exec/publish`; and every
+`db:`, `purge:`, `cleanup:`, `backfill:`, `enrich:`, `seed:`, `ingest:`,
+`sync:` and `test:e2e*` script in `package.json`.
+
+**Why each script is named in full.** The CLI's matcher, measured on 2.1.251,
+stops at a token boundary: `Bash(npm run check:*)` matches `npm run check` and
+`npm run check 2>&1 | tail -30`, but **not** `npm run check:cost-hazards`. A
+`test:*`-style wildcard would not even grant the `test:xyz` scripts — and a
+script added tomorrow cannot inherit an existing rule. That is what keeps this
+list bounded as `package.json` grows, and the handoff test asserts it.
+
+The repair prompt lists these commands verbatim, generated from the same
+constants, so it cannot drift from what the session is actually permitted to do
+— and so a repair stops and reports instead of hunting for another spelling.
+
+Deny rules beat allow rules, and beat `bypassPermissions` too, so the four
+shipping refusals hold no matter what a future change does to the allow list.
 
 ## The states, and why `blocked` is not `failed`
 
@@ -142,3 +245,25 @@ mapping, the launch argv, every state, the duplicate/retry rules, and the
 signed-out path — that a signed-out machine is caught *before* Claude is
 launched, that the package and every screenshot survive it, and that Retry
 after signing in reuses that same package.
+
+Two of its sections cover the permission boundary specifically:
+
+- **What an unattended repair is allowed to run** asserts on real command
+  strings, not on argv spelling: that `npm run check` (piped form included),
+  lint, the approved tests, path-scoped `git add` and `git commit` are allowed;
+  that `git push`, vercel, `gh pr merge`, destructive git, broad staging,
+  database and catalogue writes, production E2E, `npx`, unapproved scripts and
+  colon-suffixed siblings of approved scripts are all refused; that every
+  dangerous script actually present in `package.json` is refused (79 of them
+  today, re-read from disk each run, so new ones are covered); and that the
+  argv never becomes `bypassPermissions`.
+- **The repair worktree leaves the founder's tree alone** builds a real git
+  repository with a dirty tracked file, a staged change and untracked files,
+  makes a real worktree, commits in it, and asserts the founder's branch, HEAD,
+  index, dirty files, untracked files and full `git status` are byte-for-byte
+  unchanged.
+
+The rules were also proven end to end against the real CLI (2.1.251) in a real
+repair worktree on 2026-08-31: `npm run check` and a focused `git add` +
+`git commit` ran; `git push --dry-run`, `git add -A`, `npm run check:cost-hazards`,
+`npx tsc --version` and `git stash` were all refused by the CLI itself.

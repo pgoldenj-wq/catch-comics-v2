@@ -39,6 +39,7 @@ import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
 import { SIGNIN_COMMAND, claudeVersion, findClaude, readiness } from './claude-readiness.mjs'
+import { WorktreeError, ensureRepairWorktree } from './repair-worktree.mjs'
 
 /* ── Bounds ──────────────────────────────────────────────────────────────── */
 export const LIMITS = {
@@ -392,37 +393,322 @@ export function updateFounderReviewJson(repoRoot, review, json) {
 // than a second opinion of its own.
 export { findClaude, claudeVersion }
 
+/* ── What an unattended repair is allowed to run ─────────────────────────────
+   Founder decision, 2026-08-31. Two real runs proved the old setting was
+   unworkable: with `acceptEdits` and four deny rules, every Bash command was
+   refused, so the 2026-08-29 repair could not typecheck, could not run a test
+   and could not commit — it burned nine turns retrying typecheck variants and
+   left unverified edits loose in the founder's tree.
+
+   The fix is an ALLOWLIST, not a broader mode. bypassPermissions was offered
+   and explicitly declined. Everything below is default-deny: a command that is
+   not named here is refused, which is what makes this list the whole story.
+
+   Two properties of the CLI's matcher were measured on 2.1.251 before this was
+   written, because the design depends on them:
+
+     1. `Bash(npm run check:*)` matches `npm run check` and
+        `npm run check 2>&1 | tail -30`, but NOT `npm run check:cost-hazards`.
+        The wildcard stops at a token boundary, so a colon-suffixed script
+        cannot inherit a rule. This is why each script is named in full, and
+        why a future `test:something:destructive` is refused rather than
+        silently authorised by a `test:*` wildcard.
+     2. Deny beats allow, and deny beats bypassPermissions.                    */
+
+/**
+ * The npm scripts a repair may run to verify its own work. Every one is a pure
+ * local check: no database client, no network call, no .env.local, no paid API.
+ * Checked against each script's source, and the handoff test asserts that
+ * nothing matching the dangerous families is reachable.
+ *
+ * Deliberately NOT here: test:e2e* (Playwright, and :prod drives the live
+ * site), test:shopify / test:awin-feed / test:unified-search / test:amazon
+ * (live retailer APIs and the database), and every db:, purge:, cleanup:,
+ * backfill:, enrich:, seed:, ingest: and sync: script in the repo.
+ */
+export const VERIFY_SCRIPTS = [
+  'check',                 // tsc --noEmit
+  'lint',                  // eslint
+  'test:identity',
+  'test:format-price',
+  'test:url-filters',
+  'test:search-ranking',
+  'test:price-check',
+  'test:sync-backoff',
+  'test:traversal-safety',
+  'test:containment',
+  'test:ebay-uk',
+  'test:secrets',
+  'test:isbn',
+  'test:browser-trust',
+  'test:retailer-card',
+  'test:founder-review',
+  'test:claude-readiness',
+]
+
+/**
+ * Git the repair may read. This half is here because the CLI's own
+ * auto-approval of read-only commands is not reliable — the 2026-08-29 run had
+ * `git diff <file>` succeed and `git diff -U2 <files>` refused in the same
+ * session — and a repair that cannot read its own diff cannot report honestly.
+ *
+ * Branch inspection is spelled out flag by flag rather than as `git branch:*`,
+ * because `git branch -D` deletes a ref out of the object store that the
+ * founder's checkout and this worktree share.
+ */
+const GIT_READ = [
+  'Bash(git status:*)',
+  'Bash(git diff:*)',
+  'Bash(git log:*)',
+  'Bash(git show:*)',
+  'Bash(git rev-parse:*)',
+  'Bash(git branch --show-current:*)',
+  'Bash(git branch --list:*)',
+]
+
+/**
+ * Git the repair may write with. This is safe only because of WHERE it runs:
+ * the session's cwd is a dedicated worktree (repair-worktree.mjs), so staging
+ * and committing cannot reach the founder's checkout or the two dozen dirty
+ * files other sessions have in it.
+ */
+const GIT_WRITE_IN_WORKTREE = [
+  'Bash(git checkout -b:*)',   // NOT `git checkout:*` — that would allow `git checkout -- .`
+  'Bash(git switch -c:*)',
+  'Bash(git add:*)',           // broad forms are denied below
+  'Bash(git commit:*)',
+]
+
+export const ALLOWED_TOOLS = [
+  ...VERIFY_SCRIPTS.map(s => `Bash(npm run ${s}:*)`),
+  ...GIT_READ,
+  ...GIT_WRITE_IN_WORKTREE,
+]
+
+/**
+ * Named refusals. Everything here is already refused by default-deny; it is
+ * written out anyway so that a future widening of the allow list cannot
+ * silently re-open it, and so the boundary can be read rather than inferred
+ * from what is absent.
+ */
+const DENY_SHIP = [
+  'Bash(git push:*)',
+  'Bash(vercel:*)',
+  'Bash(npx vercel:*)',
+  'Bash(gh pr merge:*)',
+  'Bash(gh:*)',                // an unattended repair has no business on GitHub at all
+]
+
+const DENY_DESTRUCTIVE_GIT = [
+  'Bash(git stash:*)',         // other sessions edit this repo live; stashing has cost work before
+  'Bash(git reset:*)',
+  'Bash(git clean:*)',
+  'Bash(git restore:*)',
+  'Bash(git checkout --:*)',
+  'Bash(git checkout .:*)',
+  'Bash(git switch --discard-changes:*)',
+  'Bash(git rebase:*)',
+  'Bash(git merge:*)',
+  'Bash(git cherry-pick:*)',
+  'Bash(git revert:*)',
+  'Bash(git worktree:*)',      // the repair does not get to unmake its own isolation
+  'Bash(git update-ref:*)',
+  'Bash(git filter-branch:*)',
+  'Bash(git tag:*)',           // rollback tags live in the shared object store
+  'Bash(git branch -d:*)',
+  'Bash(git branch -D:*)',
+  'Bash(git branch --delete:*)',
+  'Bash(git branch -m:*)',
+  'Bash(git branch -M:*)',
+  'Bash(git branch --move:*)',
+]
+
+/** Staging that sweeps up whatever happens to be lying around. */
+const DENY_BROAD_STAGING = [
+  'Bash(git add -A:*)',
+  'Bash(git add --all:*)',
+  'Bash(git add .:*)',
+  'Bash(git add -u:*)',
+  'Bash(git add --update:*)',
+  'Bash(git add :/:*)',
+  'Bash(git commit -a:*)',
+  'Bash(git commit -am:*)',
+  'Bash(git commit --all:*)',
+]
+
+/** Ways to aim git at a tree that is not the repair's own. */
+const DENY_TREE_ESCAPE = [
+  'Bash(git -C:*)',
+  'Bash(git --git-dir:*)',
+  'Bash(git --work-tree:*)',
+]
+
+/** Arbitrary execution and dependency changes. */
+const DENY_EXEC = [
+  'Bash(npx:*)',
+  'Bash(npm install:*)',
+  'Bash(npm i:*)',
+  'Bash(npm ci:*)',
+  'Bash(npm exec:*)',
+  'Bash(npm publish:*)',
+  'Bash(npm run dev:*)',
+  'Bash(npm run build:*)',
+  'Bash(npm run start:*)',
+]
+
+/**
+ * The catalogue and the database. Every one of these writes to production data,
+ * spends money on a live API, or drives the deployed site. Named individually
+ * because the CLI's matcher stops at a token boundary: a family rule like
+ * `Bash(npm run enrich:*)` would match nothing at all.
+ */
+const DENIED_SCRIPTS = [
+  // schema and database
+  'db:generate', 'db:migrate:dev', 'db:migrate:deploy', 'db:studio', 'db:push',
+  // catalogue destruction
+  'purge:noncomic', 'purge:noncomic:dry', 'purge:noncomic:write',
+  'cleanup:noncomics:dry', 'cleanup:noncomics:dry-c',
+  'cleanup:noncomics:execute-a', 'cleanup:noncomics:execute-b-plus', 'cleanup:noncomics:execute-c',
+  // backfills
+  'backfill:covers', 'backfill:covers:dry', 'backfill:isbns', 'backfill:wob-isbns',
+  'backfill:bookshop', 'backfill:wordery',
+  // enrichment and live/paid APIs
+  'enrich:isbn', 'enrich:catalogue', 'enrich:catalogue:full', 'enrich:cv:covers',
+  'enrich:wordery', 'enrich:bookshop', 'enrich:amazon',
+  // ingestion, sync and seeding
+  'sync:awin', 'ingest:awin-local', 'ingest:cv-series', 'ingest:issue-covers',
+  'import:retailers', 'seed:canonical', 'migrate:covers', 'reclassify:formats',
+  // browser suites, including the one that drives production
+  'test:e2e', 'test:e2e:ui', 'test:e2e:prod', 'test:e2e:report',
+  // tests that are really live-API jobs
+  'test:shopify', 'test:awin-feed', 'test:unified-search', 'test:amazon',
+]
+
+export const DISALLOWED_TOOLS = [
+  ...DENY_SHIP,
+  ...DENY_DESTRUCTIVE_GIT,
+  ...DENY_BROAD_STAGING,
+  ...DENY_TREE_ESCAPE,
+  ...DENY_EXEC,
+  ...DENIED_SCRIPTS.map(s => `Bash(npm run ${s}:*)`),
+]
+
+/* ── A readable model of the CLI's matcher ───────────────────────────────────
+   This decides NOTHING at runtime. The Claude Code CLI is the enforcer; this
+   exists so the handoff test can assert on real command strings ("is `npm run
+   db:push` refused?") instead of on the spelling of an argv entry, which is
+   what a permission test is actually supposed to prove.
+
+   Semantics measured against CLI 2.1.251 on 2026-08-31:
+     - `Bash(<prefix>:*)` matches <prefix> exactly, or <prefix> followed by
+       whitespace. It does NOT match <prefix> followed by any other character.
+     - A compound command is judged segment by segment.
+     - deny wins over allow.                                                   */
+
+/** Does one rule match one single (non-compound) command? */
+export function ruleMatches(rule, command) {
+  const m = /^Bash\((.*)\)$/.exec(rule)
+  if (!m) return false
+  const body = m[1]
+  const wildcard = body.endsWith(':*')
+  const prefix = wildcard ? body.slice(0, -2) : body
+  const cmd = String(command).trim()
+  if (!wildcard) return cmd === prefix
+  if (cmd === prefix) return true
+  return cmd.startsWith(prefix) && /\s/.test(cmd.charAt(prefix.length))
+}
+
+/**
+ * Filters the CLI approves on its own because they only read. Our rules
+ * neither grant these nor need to: `npm run check 2>&1 | tail -30` was run
+ * end to end against 2.1.251 with only `Bash(npm run check:*)` allowed. They
+ * are modelled here because that piped form is what a repair actually types,
+ * and a model that called it refused would be wrong about the real thing.
+ */
+const READ_ONLY_FILTERS = /^(tail|head|grep|wc|sort|uniq|cat)\b/
+
+/**
+ * What the repair session would get for one command: 'allow', 'deny' or 'ask'.
+ * In a headless `-p` run there is nobody to ask, so 'ask' is a refusal — which
+ * is exactly how the two failed runs behaved.
+ */
+export function permissionFor(command, { allow = ALLOWED_TOOLS, deny = DISALLOWED_TOOLS } = {}) {
+  const segments = String(command).split(/\s*(?:&&|\|\||[;|])\s*/).map(s => s.trim()).filter(Boolean)
+  if (segments.length === 0) return 'ask'
+  // Deny is checked over every segment first, and beats everything else.
+  if (segments.some(s => deny.some(r => ruleMatches(r, s)))) return 'deny'
+  const ok = s => READ_ONLY_FILTERS.test(s) || allow.some(r => ruleMatches(r, s))
+  return segments.every(ok) ? 'allow' : 'ask'
+}
+
+/** The one question worth asking in a test: can the repair run this at all? */
+export const isRefused = command => permissionFor(command) !== 'allow'
+
 /**
  * The entire instruction handed to the repair session. The browser cannot
- * change a word of it; the only substitution is the package path, which is
- * built from a reviewId that has already been pattern-checked.
+ * change a word of it; the only substitutions are the package path, which is
+ * built from a reviewId that has already been pattern-checked, and the repair's
+ * own branch and worktree, which this process created.
+ *
+ * The command lists are generated from the rules above rather than retyped, so
+ * the prompt cannot drift from what the session is actually permitted to do.
+ * They are in the prompt at all because a refusal is expensive: told nothing,
+ * the 2026-08-29 run tried five spellings of "typecheck" and then gave up.
  */
-export function repairPrompt(relPackagePath) {
+export function repairPrompt(relPackagePath, { branch = null, worktreePath = null } = {}) {
+  const verify = VERIFY_SCRIPTS.map(s => `npm run ${s}`).join('\n  ')
+  const where = worktreePath
+    ? `You are running in an ISOLATED git worktree at ${worktreePath}, on branch ${branch}, created from the last commit on the founder's branch.`
+    : `You are running in an ISOLATED git worktree created from the last commit on the founder's branch.`
+
   return `Read the Founder Smoke Test review package at ${relPackagePath}/review.md, and its structured form at ${relPackagePath}/review.json.
 
 Open every screenshot the package references, under ${relPackagePath}/screenshots/. Use the Read tool on each image file so you actually SEE it — the founder drew annotations onto these images and those marks are part of what the issue means. Do not work from the filenames or the written descriptions alone.
 
 Treat each issue and its attached screenshots as founder evidence of a real defect. review.json maps every screenshot to the issue it belongs to; respect that mapping and do not attribute a screenshot to the wrong issue.
 
+WHERE YOU ARE
+${where} The founder's own checkout is a DIFFERENT directory, other Claude sessions are editing it right now, and it is out of bounds: do not cd into it, do not use \`git -C\`, and do not act on anything you find there. Everything you need is here.
+
 For each issue:
 1. Inspect the actual implementation responsible for it before changing anything.
 2. Repair it with the smallest correct change.
 3. Do not weaken, skip or delete tests, and do not hide a defect behind a workaround.
-4. Preserve unrelated work — this working tree may already contain changes that are none of your business. Never revert, stash or discard them.
-5. Run focused verification for what you touched (typecheck, lint, the relevant test) — not a full audit.
+4. Preserve unrelated work. A retry reuses this worktree, so it may already carry an earlier attempt's edits — never revert, stash or discard them.
+5. Run focused verification for what you touched — not a full audit.
 
-Work on a focused git branch and make focused commits. Do not push, do not deploy, and do not run broad production operations.
+WHAT YOU MAY RUN
+These are the only shell commands available to you. Anything else is refused, including every other npm script, npx, and anything that writes to the database or the catalogue.
 
-Finish with an issue-by-issue report: diagnosis, fix, verification, and anything left unresolved with the reason. Do not perform unrelated audits or propose a redesign.`
+Verification (arguments and \`2>&1 | tail -n\` are fine):
+  ${verify}
+
+Git, in this worktree only:
+  git status / git diff / git log / git show / git rev-parse
+  git branch --show-current / git branch --list
+  git checkout -b <name> / git switch -c <name>
+  git add <explicit path>        ← by path only; \`git add -A\`, \`git add .\` and \`git add -u\` are refused
+  git commit -m "..."            ← \`git commit -a\` and \`git commit -am\` are refused
+
+If a command is refused, do NOT hunt for another spelling of it and do not try to work around it — that is what wasted the last run. Note it, move on, and say in your report what you could not verify and why.
+
+FINISH ON A COMMIT
+You are already on ${branch ?? 'the repair branch'}. Stage the files you changed, by path, and make one focused commit per issue — or a single commit if the issues are genuinely one change. Do not push, do not deploy, do not merge and do not open a pull request: those are refused, and they are the founder's to do after reading your report.
+
+Finish with an issue-by-issue report: diagnosis, fix, verification (name the command you ran and its result), the commit you made, and anything left unresolved with the reason. Do not perform unrelated audits or propose a redesign.`
 }
 
 /**
  * Fixed argv. Nothing the browser sent appears here except the package path,
  * inside the prompt, and that path is derived from a validated reviewId.
+ *
+ * The permission mode stays `acceptEdits` — it is what lets the repair edit
+ * files without asking. It is NOT bypassPermissions, which was offered and
+ * declined, and the handoff test asserts it never becomes that by accident.
  */
-export function claudeArgv(relPackagePath) {
+export function claudeArgv(relPackagePath, ctx = {}) {
   return [
-    '-p', repairPrompt(relPackagePath),
+    '-p', repairPrompt(relPackagePath, ctx),
     '--output-format', 'stream-json',
     '--verbose',
     '--permission-mode', 'acceptEdits',
@@ -431,9 +717,10 @@ export function claudeArgv(relPackagePath) {
     // the id is stated outright rather than left to an alias to decide.
     '--model', 'claude-opus-5',
     '--max-budget-usd', '15',
-    // Deny rules for the actions this workflow must never take unattended.
-    '--disallowedTools',
-    'Bash(git push:*)', 'Bash(vercel:*)', 'Bash(npx vercel:*)', 'Bash(gh pr merge:*)',
+    // Default-deny: only these run without a human to ask.
+    '--allowedTools', ...ALLOWED_TOOLS,
+    // Named refusals, which beat the allow list and would beat a bypass too.
+    '--disallowedTools', ...DISALLOWED_TOOLS,
   ]
 }
 
@@ -540,10 +827,16 @@ export const STALE_REASON =
  * known is never re-packaged and never re-launched.
  */
 export class ReviewRunner {
-  constructor(repoRoot, { spawnFn = spawn, findClaudeFn = findClaude, readinessFn = readiness } = {}) {
+  constructor(repoRoot, {
+    spawnFn = spawn, findClaudeFn = findClaude, readinessFn = readiness,
+    worktreeFn = ensureRepairWorktree,
+  } = {}) {
     this.repoRoot = repoRoot
     this.spawnFn = spawnFn
     this.findClaudeFn = findClaudeFn
+    // Makes the isolated tree the repair runs in. Injected so the tests can
+    // drive both a working worktree and a broken one without needing git.
+    this.worktreeFn = worktreeFn
     // The shared readiness check. Injected so the tests can drive a signed-out
     // machine without touching the founder's real account.
     this.readinessFn = readinessFn
@@ -682,6 +975,11 @@ export class ReviewRunner {
       state: 'packaging',
       reason: null,
       packagePath: `launch/reviews/${review.reviewId}`,
+      // Filled in at launch. The founder needs the path and the branch: the
+      // repair's commit lands there, not in the tree they are looking at.
+      worktreePath: null,
+      branch: null,
+      baseCommit: null,
       counts: { issues: 0, screenshots: 0 },
       submittedAt: new Date().toISOString(),
       launchedAt: null,
@@ -785,10 +1083,32 @@ export class ReviewRunner {
     const logPath = join(dir, 'claude-run.jsonl')
     rec.logPath = logPath
 
+    // The repair does not run in the founder's checkout. It gets its own
+    // worktree on its own branch, which is the only reason it is allowed to
+    // stage and commit at all: other Claude sessions are editing the shared
+    // tree while this runs. A worktree that cannot be made is an environment
+    // problem, so it BLOCKS — the review survives and Retry is honest.
+    let tree
+    try {
+      tree = this.worktreeFn(this.repoRoot, rec.reviewId, { packageRelPath: rec.packagePath })
+    } catch (err) {
+      rec.state = 'blocked'
+      rec.reason = err instanceof WorktreeError
+        ? `The isolated repair worktree could not be created: ${err.message} Your review is saved — press Retry.`
+        : `The isolated repair worktree could not be created: ${err.message}`
+      rec.finishedAt = new Date().toISOString()
+      this.persist(rec)
+      console.log(`[founder-review] ${rec.reviewId} — not launched: ${rec.reason}`)
+      return rec
+    }
+    rec.worktreePath = tree.path
+    rec.branch = tree.branch
+    rec.baseCommit = tree.base
+
     let child
     try {
-      child = this.spawnFn(exe, claudeArgv(rec.packagePath), {
-        cwd: this.repoRoot,
+      child = this.spawnFn(exe, claudeArgv(rec.packagePath, { branch: tree.branch, worktreePath: tree.path }), {
+        cwd: tree.path,
         shell: false,
         stdio: ['ignore', 'pipe', 'pipe'],
         windowsHide: true,
