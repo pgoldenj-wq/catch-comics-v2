@@ -39,6 +39,7 @@ import { seriesNameToSlug, getSeriesEntry } from '@/lib/series/registry'
 import { jsonLdScriptString }               from '@/lib/security/jsonLd'
 import { displayPublisher }                 from '@/lib/identity/publisher'
 import { normalizeIsbn13 }                  from '@/lib/identity/isbn'
+import { formatLabel }                      from '@/lib/identity/format'
 import { suppressDuplicateRetailerListings } from '@/lib/listings/dedupeListings'
 import { BASE_URL } from '@/lib/site-url'
 
@@ -50,18 +51,6 @@ import { BASE_URL } from '@/lib/site-url'
 export const revalidate = 3600
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-const FORMAT_LABELS: Record<string, string> = {
-  SINGLE_ISSUE:  'Single Issue',
-  TPB:           'Trade Paperback',
-  HARDCOVER:     'Hardcover',
-  OMNIBUS:       'Omnibus',
-  DELUXE:        'Deluxe Edition',
-  COMPENDIUM:    'Compendium',
-  MANGA_VOLUME:  'Manga Volume',
-  ABSOLUTE:      'Absolute Edition',
-  OTHER:         'Comic',
-}
 
 function fmtPrice(amount: number, currency: string) {
   return new Intl.NumberFormat('en-GB', {
@@ -683,7 +672,12 @@ export default async function ProductPage(
                       )}
                     </LabeledRow>
                   )}
-                  <LabeledRow label="Format" value={FORMAT_LABELS[product.format] ?? product.format} />
+                  {/* Omitted when the format is unknown (OTHER) — the row used
+                      to fall back to the generic "Comic", which reads as a
+                      stated format for a record that has none. */}
+                  {formatLabel(product.format) && (
+                    <LabeledRow label="Format" value={formatLabel(product.format)} />
+                  )}
                   {/* T1-B: Publisher hidden on mobile — Format + Status are the
                       decision-critical signals; Publisher is supplementary.
                       W4 Phase 6: displayPublisher omits distributor/retailer
@@ -1011,7 +1005,9 @@ function statusLabel(bestListing: { stockStatus: string } | null | undefined): s
 function RelatedCard({ r }: {
   r: { id: string; title: string; coverImageUrl: string | null; canonicalSlug: string; format: string; publisher: string | null }
 }) {
-  const fmt = FORMAT_LABELS[r.format] ?? r.format
+  // null when the format is unknown — the line then carries publisher alone
+  // rather than naming a format this record does not have.
+  const fmt = formatLabel(r.format)
   return (
     <Link
       href={`/product/${r.canonicalSlug}`}
@@ -1054,7 +1050,7 @@ function RelatedCard({ r }: {
         </p>
         <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-[0.1em] font-medium">
           {fmt}
-          {displayPublisher(r.publisher) && <span> · {displayPublisher(r.publisher)}</span>}
+          {displayPublisher(r.publisher) && <span>{fmt ? ' · ' : ''}{displayPublisher(r.publisher)}</span>}
         </p>
       </div>
     </Link>
@@ -1154,7 +1150,7 @@ function CollectedInModule({ editions }: {
         {editions.map(e => {
           const listing   = e.listings[0] ?? null
           const price     = listing ? Number(listing.priceAmount) : null
-          const fmtLabel  = FORMAT_LABELS[e.format] ?? e.format
+          const fmtLabel  = formatLabel(e.format)
           const priceText = price !== null
             ? new Intl.NumberFormat('en-GB', { style: 'currency', currency: listing!.priceCurrency, maximumFractionDigits: 2 }).format(price)
             : null
@@ -1185,9 +1181,11 @@ function CollectedInModule({ editions }: {
                 <p className="text-[13px] font-semibold text-gray-900 group-hover:text-[#E8272A] transition-colors leading-snug line-clamp-2">
                   {e.title}
                 </p>
-                <p className="text-[10px] text-gray-400 uppercase tracking-[0.08em] font-medium mt-0.5">
-                  {fmtLabel}
-                </p>
+                {fmtLabel && (
+                  <p className="text-[10px] text-gray-400 uppercase tracking-[0.08em] font-medium mt-0.5">
+                    {fmtLabel}
+                  </p>
+                )}
               </div>
 
               {/* Price — shown always; omit stock status to avoid negative signals */}

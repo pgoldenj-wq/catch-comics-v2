@@ -9,6 +9,8 @@ import MobileHeader from '@/components/MobileHeader'
 import Navbar       from '@/components/Navbar'
 import { isBadCoverUrl, adjustImgSrc } from '@/lib/images/url-filters'
 import { displayPublisher } from '@/lib/identity/publisher'
+import { formatLabel } from '@/lib/identity/format'
+import { parsePriceCap, withinPriceCap } from '@/lib/search/priceFilter'
 
 // ─── PriceTag — live "From £X.XX" badge per result card ──────────────────────
 // LB-3: hints are ISBN-keyed only. Title-string eBay searches produced
@@ -195,11 +197,16 @@ const VALID_FORMATS: string[] = [
   'all', 'single-issue', 'graphic-novel', 'hardcover', 'omnibus', 'manga', 'compact', 'one-shot',
 ]
 
-// LB-2: DB format → UI format. For canonical results the database format is
-// authoritative — title heuristics mislabelled e.g. Absolute Batman single
-// issues as 'hardcover' (the word "absolute" in the title). OTHER is genuinely
-// unknown and deliberately absent from this map: those results fall back to
-// heuristics for FILTERING only, and show no format label (see the eyebrow).
+// LB-2: DB format → UI *filter bucket*. For canonical results the database
+// format is authoritative — title heuristics mislabelled e.g. Absolute Batman
+// single issues as 'hardcover' (the word "absolute" in the title). OTHER is
+// genuinely unknown and deliberately absent from this map: those results fall
+// back to heuristics for FILTERING only.
+//
+// These buckets are for the format pills alone. They are intentionally coarse
+// (ABSOLUTE and DELUXE both live under 'hardcover' so they surface under the
+// Graphic Novels pill) and must never be used to LABEL a card — that comes
+// from lib/identity/format, which keeps every edition distinct.
 const DB_FORMAT_TO_UI: Record<string, Format> = {
   SINGLE_ISSUE:  'single-issue',
   TPB:           'graphic-novel',
@@ -210,6 +217,12 @@ const DB_FORMAT_TO_UI: Record<string, Format> = {
   COMPENDIUM:    'omnibus',
   MANGA_VOLUME:  'manga',
 }
+
+/** Key a result's loaded price by. The product id, not its title: two distinct
+ *  editions can share a title (e.g. an Absolute and its reprint), and keying by
+ *  name made them share one price — which the "Under £X" cap then applied to
+ *  the wrong product. */
+const priceKeyOf = (comic: ComicResult) => String(comic.id)
 
 /** UI format for a result when the DB knows it; undefined when unknown. */
 function knownDbFormat(comic: ComicResult): Format | undefined {
@@ -308,26 +321,6 @@ function detectCategory(comic: ComicResult): Category {
   if (MANGA_PUBLISHERS.some(p => pub.includes(p))) return 'manga'
   if (INDIE_PUBLISHERS.some(p => pub.includes(p))) return 'indie'
   return 'comics'
-}
-
-const FORMAT_LABELS: Record<Format, string> = {
-  'single-issue':  'Single Issue',
-  'graphic-novel': 'Graphic Novel / TPB',
-  'hardcover':     'Hardcover Edition',
-  'omnibus':       'Omnibus / Deluxe',
-  'manga':         'Manga',
-  'compact':       'Compact / Pocket',
-  'one-shot':      'One-Shot / Annual',
-}
-
-const FORMAT_STYLES: Record<Format, { bg: string; color: string }> = {
-  'single-issue':  { bg: '#FFE4E6', color: '#9F1239' },
-  'graphic-novel': { bg: '#DBEAFE', color: '#1E40AF' },
-  'hardcover':     { bg: '#EDE9FE', color: '#5B21B6' },
-  'omnibus':       { bg: '#FCE7F3', color: '#9D174D' },
-  'manga':         { bg: '#FEF3C7', color: '#92400E' },
-  'compact':       { bg: '#D1FAE5', color: '#065F46' },
-  'one-shot':      { bg: '#FEF9C3', color: '#854D0E' },
 }
 
 // ─── Flag SVGs ────────────────────────────────────────────────────────────────
@@ -478,9 +471,10 @@ function FilterPanel({ category, publisher, publishers, priceMax, currency, onCh
       )}
 
       {/* PRICE RANGE — region-aware "Under £X / Under $X" thresholds.
-          Filter logic in SearchResults treats results without a price as a
-          pass-through, so this is effectively a no-op until /api/prices
-          populates a `price` field on individual results. */}
+          Applied in SearchResults via lib/search/priceFilter against the price
+          each row actually shows. A product with no trusted price is excluded
+          by a cap rather than passed through: showing it would imply a price
+          we do not have. */}
       <div style={{ borderTop: '1px solid #F0F0F0' }}>
         {sectionHeader('price', `Price Range (${currency})`)}
         {openSections.has('price') && (
@@ -685,30 +679,43 @@ function SearchResults() {
     return Array.from(seen).sort()
   }, [results])
 
+  // The "Under £X" cap, shared by every list on the page. Memoised rather than
+  // computed inline so the React Compiler can still preserve the memoisation of
+  // the three hooks that depend on it: a bare `const` recomputed each render is
+  // a dependency it cannot reason about, and it bails out of optimising the
+  // whole component when it meets one.
+  const priceCap = useMemo(() => parsePriceCap(priceMax), [priceMax])
+
+  // Stagger position for each card's price fetch. Keyed off the *unfiltered*
+  // results, not the rendered index: a card's index shifts whenever an earlier
+  // card drops out, which re-runs PriceTag's effect, aborts its in-flight
+  // request and re-queues it. Now that the cap actually removes cards, that
+  // happened on every resolved price — the whole tail of the list restarted
+  // its fetches (and fell back to shimmer) instead of settling once.
+  const fetchOrder = useMemo(() => {
+    const m = new Map<string, number>()
+    results.forEach((r, i) => m.set(priceKeyOf(r), i))
+    return m
+  }, [results])
+
   // Client-side filter + sort — instant, no re-fetch
   const filteredResults = useMemo(() => {
     let res = [...results]
     if (format !== 'all') res = res.filter(r => matchesFormat(r, format))
     if (category  !== 'all') res = res.filter(r => detectCategory(r) === category)
     if (publisher !== 'all') res = res.filter(r => r.publisher?.name === publisher)
-    if (priceMax  !== 'all') {
-      const max = parseFloat(priceMax)
-      if (!isNaN(max)) {
-        res = res.filter(r => {
-          // Activates once results carry a `price.value` (eBay integration to follow);
-          // until then this is a pass-through so the UI state is preserved without
-          // hiding all results.
-          const price = (r as { price?: { value?: number } }).price?.value
-          return price == null || price < max
-        })
-      }
+    // Price cap — applied to the same price the card shows (the ISBN-keyed
+    // eBay hint in priceMap). The old code read `price.value`, a field no
+    // result carries, so the cap was a silent pass-through.
+    if (priceCap !== null) {
+      res = res.filter(r => withinPriceCap(priceMap.get(priceKeyOf(r)), priceCap))
     }
     if (sort === 'newest') {
       res.sort((a, b) => parseInt(b.start_year || '0') - parseInt(a.start_year || '0'))
     } else if (sort === 'price') {
       res.sort((a, b) => {
-        const pa = priceMap.get(a.name) ?? null
-        const pb = priceMap.get(b.name) ?? null
+        const pa = priceMap.get(priceKeyOf(a)) ?? null
+        const pb = priceMap.get(priceKeyOf(b)) ?? null
         // Items without a price go last
         if (pa === null && pb === null) return 0
         if (pa === null) return 1
@@ -717,7 +724,21 @@ function SearchResults() {
       })
     }
     return res
-  }, [results, format, category, publisher, priceMax, sort, priceMap])
+  }, [results, format, category, publisher, priceCap, sort, priceMap])
+
+  // The two rails below the canonical results carry a real, already-resolved
+  // price, so the cap applies to them directly. They render outside
+  // filteredResults and so ignored it completely — a £42 eBay row stayed on
+  // screen under "Under £15", which is the same defect the founder reported,
+  // one list further down the page.
+  const filteredUnmatched = useMemo(
+    () => unmatchedListings.filter(l => withinPriceCap(l.priceAmount, priceCap)),
+    [unmatchedListings, priceCap],
+  )
+  const filteredLooseEbay = useMemo(
+    () => looseEbayResults.filter(i => withinPriceCap(i.price, priceCap)),
+    [looseEbayResults, priceCap],
+  )
 
   const hasActiveFilters = format !== 'all' || category !== 'all' || publisher !== 'all' || priceMax !== 'all'
 
@@ -930,8 +951,6 @@ function SearchResults() {
             <div style={{ borderTop: '1px solid #F0F0F0', position: 'relative' }}>
               {filteredResults.map((comic, index) => {
                 const isIsbnResult = comic.source === 'open_library'
-                const fmt = isIsbnResult ? 'graphic-novel' as Format : detectFormat(comic)
-                const fmtStyle = FORMAT_STYLES[fmt]
                 const isbn = comic.isbn13 || comic.isbn10 || ''
                 const issueCount = comic.count_of_issues && comic.count_of_issues > 1 ? `${comic.count_of_issues} issues` : ''
                 // meta line no longer duplicates publisher — it moved to the
@@ -1023,19 +1042,22 @@ function SearchResults() {
                           treatment matching the product-page hero, with publisher
                           dot-separated. Publisher is no longer also shown in the
                           meta line above (moved here to avoid duplication).
-                          LB-2: canonical results whose DB format is OTHER show
-                          publisher only — an unknown format is omitted, never
-                          guessed from the title. */}
+                          LB-2 / founder review u3pppa: the label is the stored
+                          format's own name (Absolute Edition stays an Absolute
+                          Edition, never "Hardcover"), and a format we do not
+                          know — OTHER, or any non-canonical result — shows
+                          publisher only. Never defaulted, never inferred from
+                          the title: detectFormat() drives the pills, not this. */}
                       {(() => {
-                        const formatUnknown = comic.source === 'canonical' && comic.dbFormat === 'OTHER'
                         // W4 Phase 6: omit distributor/retailer names from the
                         // publisher slot — don't present a distributor as publisher.
                         const pub = displayPublisher(comic.publisher?.name)
+                        const label = formatLabel(comic.dbFormat)
                         const eyebrow = isIsbnResult
                           ? 'ISBN MATCH'
-                          : formatUnknown
-                            ? (pub ?? '')
-                            : `${FORMAT_LABELS[fmt]}${pub ? ` · ${pub}` : ''}`
+                          : label
+                            ? `${label}${pub ? ` · ${pub}` : ''}`
+                            : (pub ?? '')
                         if (!eyebrow) return null
                         return (
                           <span style={{
@@ -1060,9 +1082,9 @@ function SearchResults() {
                         Results without an ISBN show "Find prices →" instead. */}
                     <PriceTag
                       isbn={comic.isbn13 ?? comic.isbn10 ?? null}
-                      priceKey={comic.name}
+                      priceKey={priceKeyOf(comic)}
                       region={region}
-                      index={index}
+                      index={fetchOrder.get(priceKeyOf(comic)) ?? index}
                       onPriceLoaded={(k, price) =>
                         setPriceMap(prev => { const m = new Map(prev); m.set(k, price); return m })
                       }
@@ -1074,13 +1096,13 @@ function SearchResults() {
           )}
 
           {/* ── OTHER LISTINGS (unmatched retailer listings) ─────────────── */}
-          {!loading && !error && unmatchedListings.length > 0 && (
+          {!loading && !error && filteredUnmatched.length > 0 && (
             <div style={{ marginTop: '24px' }}>
               <p style={{ fontSize: '11px', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>
                 Other listings
               </p>
               <div style={{ borderTop: '1px solid #F0F0F0' }}>
-                {unmatchedListings.map(listing => {
+                {filteredUnmatched.map(listing => {
                   const sym = listing.currency === 'GBP' ? '£' : listing.currency === 'USD' ? '$' : listing.currency + ' '
                   return (
                     <a
@@ -1114,13 +1136,13 @@ function SearchResults() {
           )}
 
           {/* ── FROM EBAY (loose eBay results) ───────────────────────────── */}
-          {!loading && !error && looseEbayResults.length > 0 && (
+          {!loading && !error && filteredLooseEbay.length > 0 && (
             <div style={{ marginTop: '24px' }}>
               <p style={{ fontSize: '11px', fontWeight: 600, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '8px' }}>
                 From eBay
               </p>
               <div style={{ borderTop: '1px solid #F0F0F0' }}>
-                {looseEbayResults.map(item => {
+                {filteredLooseEbay.map(item => {
                   const sym = item.currency === 'GBP' ? '£' : item.currency === 'USD' ? '$' : item.currency + ' '
                   return (
                     <a
@@ -1153,8 +1175,13 @@ function SearchResults() {
             </div>
           )}
 
-          {/* Filters removed all results */}
-          {!loading && !error && results.length > 0 && filteredResults.length === 0 && (
+          {/* Filters removed all results — every list on the page, including
+              the two listing rails, now that the price cap reaches them. */}
+          {!loading && !error
+            && (results.length > 0 || unmatchedListings.length > 0 || looseEbayResults.length > 0)
+            && filteredResults.length === 0
+            && filteredUnmatched.length === 0
+            && filteredLooseEbay.length === 0 && (
             <div style={{ textAlign: 'center', padding: '64px 0' }}>
               <p style={{ fontWeight: 500, color: '#0A0A0A', marginBottom: '8px', fontSize: '15px' }}>
                 No results match your filters

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { FORMAT_LABELS } from '@/lib/series/types'
+import { formatLabel } from '@/lib/series/types'
 import type { VolumeCardData } from '@/lib/series/types'
 
 interface Props {
@@ -18,7 +18,9 @@ export default function VolumeCard({ volume }: Props) {
 
   const sym       = CURRENCY[currency] ?? currency
   const priceText = lowestPrice !== null ? `${sym}${lowestPrice.toFixed(2)}` : null
-  const fmtLabel  = FORMAT_LABELS[format] ?? format
+  // null when the format is unknown — the line then carries the price state
+  // alone rather than naming a format this edition does not have.
+  const fmtLabel  = formatLabel(format)
 
   const volLabel = volumeNumber !== null ? `Vol. ${volumeNumber}` : null
 
@@ -146,7 +148,7 @@ export default function VolumeCard({ volume }: Props) {
           {/* W2-4: honest missing-price state — we don't have a live price,
               say so; the card still links through to the product page. */}
           {!priceText && (
-            <span style={{ color: '#6B7280', marginLeft: '6px' }}>No live price yet →</span>
+            <span style={{ color: '#6B7280', marginLeft: fmtLabel ? '6px' : 0 }}>No live price yet →</span>
           )}
         </p>
       </div>

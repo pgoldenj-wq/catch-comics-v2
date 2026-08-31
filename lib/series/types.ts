@@ -22,7 +22,8 @@ export interface EditionGroup {
   editions: Array<{
     slug:         string
     format:       string
-    formatLabel:  string
+    /** null when the format is unknown — the card must not name one. */
+    formatLabel:  string | null
     lowestPrice:  number | null
     currency:     string
     inStock:      boolean
@@ -40,17 +41,9 @@ export interface SeriesPageData {
   editionGroups: EditionGroup[]
 }
 
-export const FORMAT_LABELS: Record<string, string> = {
-  SINGLE_ISSUE: 'Single Issue',
-  TPB:          'Trade Paperback',
-  HARDCOVER:    'Hardcover',
-  OMNIBUS:      'Omnibus',
-  DELUXE:       'Deluxe Edition',
-  COMPENDIUM:   'Compendium',
-  MANGA_VOLUME: 'Manga Volume',
-  ABSOLUTE:     'Absolute Edition',
-  OTHER:        'Comic',
-}
+// Format labels live in lib/identity/format — one map for the whole site, so a
+// format can never read one way in search and another way on a series page.
+export { FORMAT_LABELS, formatLabel } from '@/lib/identity/format'
 
 export const FORMAT_DESCRIPTORS: Record<string, string> = {
   TPB:          'Standard softcover collected edition',

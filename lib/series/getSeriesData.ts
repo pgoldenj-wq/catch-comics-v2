@@ -2,7 +2,7 @@ import { cache }         from 'react'
 import { prisma }        from '@/lib/prisma'
 import { isBadCoverUrl } from '@/lib/images/url-filters'
 import { stripHtml }     from '@/lib/utils/text'
-import { FORMAT_LABELS } from './types'
+import { formatLabel }   from './types'
 import type { SeriesEntry, SeriesPageData, VolumeCardData, EditionGroup } from './types'
 import { ProductFormat } from '@prisma/client'
 
@@ -159,8 +159,11 @@ export const getSeriesData = cache(async (entry: SeriesEntry): Promise<SeriesPag
   })
 
   // ── Edition groups: same volumeNumber, 2+ formats ─────────────────────────
+  // Editions whose format we don't know are left out: the comparison exists to
+  // tell formats apart, and an unnamed tile can only mislead.
   const byVolNum = new Map<string, VolumeCardData[]>()
   for (const v of volumes) {
+    if (formatLabel(v.format) === null) continue
     const key   = v.volumeNumber !== null ? String(v.volumeNumber) : '__null__'
     const group = byVolNum.get(key) ?? []
     group.push(v)
@@ -176,7 +179,7 @@ export const getSeriesData = cache(async (entry: SeriesEntry): Promise<SeriesPag
         editions: group.map(v => ({
           slug:        v.slug,
           format:      v.format,
-          formatLabel: FORMAT_LABELS[v.format] ?? v.format,
+          formatLabel: formatLabel(v.format),
           lowestPrice: v.lowestPrice,
           currency:    v.currency,
           inStock:     v.inStock,
