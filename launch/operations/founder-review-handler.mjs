@@ -430,6 +430,11 @@ export const VERIFY_SCRIPTS = [
   'check',                 // tsc --noEmit
   'lint',                  // eslint
   'test:identity',
+  // Dropped from this list while the script existed only as an uncommitted
+  // edit: a repair worktree is branched from HEAD, so it met `npm error
+  // Missing script`. The script is committed now, and the handoff test asserts
+  // against HEAD's package.json so it cannot silently go missing again.
+  'test:format-price',
   'test:url-filters',
   'test:search-ranking',
   'test:price-check',
