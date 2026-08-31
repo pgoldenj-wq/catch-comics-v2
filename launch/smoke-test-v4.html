@@ -1252,7 +1252,7 @@ function watchRun(p){
     paintSendCard(def(state.activePage), P(state.activePage));
     if (rec.state === 'running' || rec.state === 'launching' || rec.state === 'packaged') return;
     clearInterval(iv); pollers.delete(p.id);
-    if (rec.state === 'completed')    toast(`Claude repair complete for ${p.title} — ${rec.counts?.evidence ?? rec.counts?.issues ?? 0} items reviewed`);
+    if (rec.state === 'completed')    toast(`Claude repair complete for ${p.title} — ${evidenceOf(rec)} reviewed`);
     else if (rec.state === 'blocked') toast(`${p.title} review saved, but Claude was not started — ${rec.reason || 'see the card'}`, 'err');
     else if (rec.state === 'stale')   toast(`The repair for ${p.title} stopped unexpectedly — your review is saved, press Retry`, 'err');
     else                              toast(`Claude repair did not finish for ${p.title} — your review is saved`, 'err');
