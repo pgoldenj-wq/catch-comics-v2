@@ -24,7 +24,7 @@ import {
   VERIFY_SCRIPTS, ValidationError, classifyRun, countEvidence, decodeImage,
   describeActivity, packageDir, permissionFor, pidAlive, validateSubmission,
 } from '../launch/operations/founder-review-handler.mjs'
-import { WorktreeError, ensureRepairWorktree } from '../launch/operations/repair-worktree.mjs'
+import { WorktreeError, ensureRepairWorktree, removeRepairWorktree } from '../launch/operations/repair-worktree.mjs'
 
 let pass = 0, fail = 0
 const check = (name, ok, extra = '') => {
@@ -129,7 +129,7 @@ const READY = { state: 'connected', claude: { installed: true, version: '2.1.251
 const SIGNED_OUT = { state: 'signin-required', claude: { installed: true, version: '2.1.251 (Claude Code)' } }
 
 /* A stand-in for the isolated repair worktree. The real one needs git and a
-   real repository; that is proven for real in section 9, against an actual
+   real repository; that is proven for real in section 11, against an actual
    repo with dirty files in it. Everywhere else the point under test is the
    launch contract, not git, so this keeps those tests hermetic. */
 const FAKE_TREE = reviewId => ({
@@ -886,6 +886,24 @@ check('a retry does not lose the repair\'s commit',
   gitOut(['log', '--oneline', '-1'], again.path).includes('the repair commit'))
 check('a retry still leaves the founder\'s tree alone',
   gitOut(['status', '--porcelain', '-uall']) === before.status)
+
+/* Cleanup, once the founder has taken the commit. `git worktree remove` alone
+   does not finish this: it leaves the node_modules junction standing, and the
+   obvious recursive delete would follow that link into the real toolchain. */
+const realModules = readFileSync(join(GITREPO, 'node_modules', 'marker.txt'), 'utf8')
+const removed = removeRepairWorktree(GITREPO, 'search-2026-08-31-1200-wtree')
+check('the worktree directory is really gone', removed.removed === true && !existsSync(tree.path))
+check('the founder\'s node_modules survived the junction removal',
+  readFileSync(join(GITREPO, 'node_modules', 'marker.txt'), 'utf8') === realModules)
+check('git no longer lists it as a worktree',
+  !gitOut(['worktree', 'list']).includes('search-2026-08-31-1200-wtree'))
+check('the repair\'s commit is NOT thrown away with the directory',
+  gitOut(['log', '--oneline', '-1', 'repair/search-2026-08-31-1200-wtree']).includes('the repair commit'))
+check('removing it left the founder\'s tree alone as well',
+  gitOut(['status', '--porcelain', '-uall']) === before.status)
+check('and the same review can be started over afterwards',
+  ensureRepairWorktree(GITREPO, 'search-2026-08-31-1200-wtree', {}).reused === false)
+removeRepairWorktree(GITREPO, 'search-2026-08-31-1200-wtree')
 
 /* Refusals that must not be silent. */
 throwsWorktree('a reviewId that could escape the path is refused',

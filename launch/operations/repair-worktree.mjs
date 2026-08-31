@@ -30,7 +30,7 @@
  */
 
 import { spawnSync } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, symlinkSync } from 'node:fs'
+import { cpSync, existsSync, lstatSync, mkdirSync, rmdirSync, symlinkSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 
 /** Same shape the handler validates a reviewId with. Re-checked here because
@@ -153,4 +153,42 @@ export function ensureRepairWorktree(repoRoot, reviewId, {
   }
 
   return { path, branch, base, reused, linkedModules, copiedPackage }
+}
+
+/**
+ * Take a finished repair worktree away, once its commit has been used.
+ *
+ * This exists because `git worktree remove` alone does NOT finish the job: it
+ * removes the tracked files but leaves the node_modules junction standing, so
+ * the directory survives and the next `worktree add` refuses. Worse, the
+ * obvious cleanup — deleting the directory recursively — FOLLOWS that junction
+ * into the founder's real node_modules. So the link is unlinked first, by
+ * itself, and only after lstat has confirmed it is a link.
+ *
+ * The BRANCH is deliberately left alone: it is where the repair's commit lives,
+ * and this function's job is to remove a directory, not to throw work away.
+ */
+export function removeRepairWorktree(repoRoot, reviewId, { gitFn = runGit } = {}) {
+  const path = worktreePath(repoRoot, reviewId)
+  const modules = join(path, 'node_modules')
+
+  if (existsSync(modules)) {
+    // Never recurse into it. A junction removed with rmdir takes the link and
+    // leaves the target — which is the founder's whole toolchain — untouched.
+    if (!lstatSync(modules).isSymbolicLink()) {
+      throw new WorktreeError(`${modules} is a real directory, not the expected junction — refusing to delete it.`)
+    }
+    rmdirSync(modules)
+  }
+
+  const r = gitFn(repoRoot, ['worktree', 'remove', '--force', path])
+  if (r.status !== 0 && existsSync(path)) {
+    throw new WorktreeError(`git worktree remove failed: ${r.stderr || r.stdout || 'unknown error'}`)
+  }
+  gitFn(repoRoot, ['worktree', 'prune'])
+
+  // Tidy the parent away too, but only when this was the last repair in it.
+  try { rmdirSync(worktreesRoot(repoRoot)) } catch { /* other repairs still there */ }
+
+  return { path, branch: repairBranch(reviewId), removed: !existsSync(path) }
 }

@@ -95,11 +95,19 @@ a tree where the only things present are HEAD and its own edits.
 - A retry **reuses** the same worktree and branch, so it continues the same
   repair rather than forking a second one.
 - Worktrees are **not cleaned up automatically**, because the commit inside one
-  is the deliverable. When you are done with it:
+  is the deliverable. When you have taken what you need from it:
 
 ```bash
-git worktree remove ../catch-comics-repairs/<reviewId>
+node -e "import('./launch/operations/repair-worktree.mjs').then(m=>m.removeRepairWorktree(process.cwd(),'<reviewId>'))"
 ```
+
+  Use that rather than `git worktree remove` on its own, which leaves the
+  `node_modules` junction standing so the directory survives and the next
+  attempt at the same review cannot recreate it. **Never** delete a worktree
+  with a recursive delete: it follows that junction into your real
+  `node_modules`. `removeRepairWorktree` unlinks it first, after checking it
+  really is a link, and leaves the `repair/<reviewId>` branch — and therefore
+  the commit — alone.
 
 If the worktree cannot be made, the run is `blocked` — never a silent fallback
 into your checkout.
