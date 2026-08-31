@@ -10,6 +10,7 @@
 
 import { prisma } from '@/lib/prisma'
 import type { SearchQuery, CanonicalSearchResult, SearchOffer } from './types'
+import { MIN_TRUSTED_PRICE } from '@/lib/listings/trustedPrice'
 
 // Raw row returned by the $queryRaw FTS query
 interface FtsRow {
@@ -148,6 +149,10 @@ export async function queryCanonical(
         AND rl.stock_status IN ('IN_STOCK', 'LOW_STOCK', 'PREORDER')
         AND rl.deleted_at IS NULL
         AND ret.is_active = true
+        -- Offers are ranked by price ASC, so a 0.00 stub would sort FIRST and
+        -- become the "From £..." a shopper is quoted. 47,302 such offers hang
+        -- off 22,858 products; none of them is a real price.
+        AND rl.price_amount >= ${MIN_TRUSTED_PRICE}
     )
     SELECT
       id,

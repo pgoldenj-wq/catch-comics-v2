@@ -15,6 +15,8 @@
 import { prisma } from '@/lib/prisma'
 import type { SearchQuery, UnmatchedListing } from './types'
 import { isLikelyComic } from './isLikelyComic'
+import { listingMatchesQuery } from './listingRelevance'
+import { MIN_TRUSTED_PRICE, isTrustedPrice } from '@/lib/listings/trustedPrice'
 
 interface UnmatchedRow {
   id:             string
@@ -57,6 +59,9 @@ export async function queryUnmatched(
       rl.canonical_product_id IS NULL
       AND rl.deleted_at IS NULL
       AND ret.is_active = true
+      -- A £0.00 stub is missing data, not a free comic. 25,816 of the 26,591
+      -- live unmatched listings are in that state; none may reach a shopper.
+      AND rl.price_amount >= ${MIN_TRUSTED_PRICE}
       AND (
         to_tsvector('english', rl.title) @@ websearch_to_tsquery('english', ${q})
         OR similarity(rl.title, ${q}) > 0.2
@@ -67,7 +72,13 @@ export async function queryUnmatched(
   `
 
   return rows
+    // Trigram similarity said these LOOK alike. Relevance asks whether the
+    // listing is about what was searched for, which is a different question and
+    // the one that matters: it is what removes "Sewing for Absolute Beginners"
+    // from a search for "absolute batman".
+    .filter(r => listingMatchesQuery(r.title, q))
     .filter(r => isLikelyComic(r.title))
+    .filter(r => isTrustedPrice(r.price_amount))
     .slice(0, 20)
     .map(r => ({
       type:         'unmatched' as const,

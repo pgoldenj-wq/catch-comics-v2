@@ -97,6 +97,7 @@
     "launch:health": "dotenv -e .env.local -- tsx scripts/launch-health.ts",
     "test:secrets": "tsx scripts/test-secret-hygiene.ts",
     "test:identity": "tsx scripts/test-edition-identity.ts",
+    "test:listing-trust": "tsx scripts/test-listing-trust.ts",
     "test:format-price": "tsx scripts/test-format-and-price-filter.ts",
     "test:containment": "tsx scripts/test-lbb-containment.ts",
     "test:sync-backoff": "tsx scripts/test-sync-backoff.ts",

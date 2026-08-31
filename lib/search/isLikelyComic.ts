@@ -82,6 +82,17 @@ const NON_COMIC_FLAGS: readonly string[] = [
   'selected works of', 'selected essays', 'collected poems',
   // Pure prose / poetry markers
   'novellas', 'short stories', 'sonnets',
+  // Added 2026-08-31 (founder review): NON-BOOK MEDIA. General retailers list
+  // films, music and games under the same character names, so "Batman vs.
+  // Two-Face (DVD)" carried the 'batman' comic signal and reached the search
+  // UI as a comic listing. A disc is not an edition of a comic.
+  'dvd', 'blu-ray', 'bluray', 'blu ray', '4k uhd', 'boxset dvd',
+  'vhs', 'cd-rom', 'cd rom', 'audio cd', 'audiobook', 'audio book',
+  'vinyl', 'soundtrack', 'original score',
+  'video game', 'playstation', 'nintendo', 'xbox', 'ps4', 'ps5',
+  'board game', 'jigsaw', 'puzzle', 'trading cards', 'action figure',
+  'funko', 'statue', 'plush', 'costume', 'fancy dress',
+  'calendar', 'diary 20', 'poster print', 'wall art', 'mug', 't-shirt',
 ]
 
 // ── Classifier ────────────────────────────────────────────────────────────────
