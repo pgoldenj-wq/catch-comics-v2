@@ -1,4 +1,4 @@
-﻿{
+{
   "pages": {
     "series-index": {
       "shots": 0,
@@ -82,13 +82,13 @@
     },
     "homepage": {
       "shots": 4,
-      "checkpoints": "11/13",
-      "lastSentAt": "2026-08-24T18:00:00.000Z",
-      "lastReviewedAt": "2026-08-24T18:00:00.000Z",
-      "title": "homepage",
-      "status": "fix",
-      "issues": 6,
-      "lastReviewId": "homepage-2026-08-24",
+      "checkpoints": "0/13",
+      "lastSentAt": "2026-08-29T13:53:47.445Z",
+      "lastReviewedAt": "2026-08-29T13:53:47.445Z",
+      "title": "Homepage",
+      "status": null,
+      "issues": 0,
+      "lastReviewId": "homepage-2026-08-29-13-10-ca77u5",
       "resolvedAt": "2026-08-24T19:10:00.000Z",
       "resolution": "All 6 defects fixed and production-verified (PR #38 merge fbc6408, PR #39 merge 0d8afd3). Hero right corners rounded (the edge-fade overlay had no border-radius); publisher marquee constrained to the cover stack; hover-enlarged rail cards no longer clipped (0px top/bottom); Series is real primary nav plus a footer link; mobile UK/US toggle removed - it blanked all 12 prices because every deal has lowestPriceUSD null; rail relabelled \"Cheapest tracked retailer - eBay may be lower\" because the rail MINs stored retailer_listings and eBay is live-only; canonical/og/sitemap moved to the www host that actually serves 200. Launch smoke 20/20, Browser Trust 13/0/3 against production. Awaiting founder re-review to move to good.",
       "openFollowUp": "P0 raised, not built (founder chose plan-first): /api/ebay merges an unfiltered fuzzy title search whenever the ISBN lookup returns fewer than 3 hits, so /product/hellboy-omnibus-706665 lists Hellboy Omnibus Vol 2 and a B.P.R.D. book at the TOP of its price table at GBP 10.80 - a different book presented as the cheapest offer. Plan: launch/product-excellence/ebay-relevance-gate-plan.md"
@@ -110,14 +110,20 @@
       "status": null
     },
     "search": {
-      "shots": 0,
-      "checkpoints": "0/0",
-      "lastSentAt": null,
-      "lastReviewedAt": null,
-      "title": "search",
-      "status": null
+      "shots": 2,
+      "checkpoints": "8/8",
+      "lastSentAt": "2026-08-30T15:37:29.287Z",
+      "lastReviewedAt": "2026-08-30T15:37:29.287Z",
+      "title": "Search",
+      "status": null,
+      "issues": 0,
+      "lastReviewId": "search-2026-08-29-14-11-o4rzqw",
+      "notes": 3,
+      "resolvedAt": "2026-08-31T19:36:37.944Z",
+      "resolution": "Both defects fixed and production-verified on 2026-08-31 (commit 7ba705a, origin/main 8cf8912). FORMAT: the search page carried its own lossy label map (ABSOLUTE/DELUXE/HARDCOVER all collapsed to \"Hardcover Edition\") and chose the label from detectFormat(), a TITLE heuristic, so any record without a stored format whose title said \"absolute\" became a hardcover. lib/identity/format.ts is now the single map used by search, product, series and volume cards: one enum value, one distinct label; an unknown format (OTHER or missing) is OMITTED, never defaulted - the product page had been calling it \"Comic\". Production now shows ABSOLUTE EDITION and SINGLE ISSUE side by side on /search?q=absolute+batman, zero \"Hardcover Edition\", and unknown-format rows show publisher only. PRICE: the cap read price.value, a field no search result has ever carried, so every row passed. It now applies to the price the card actually shows, keyed by product id rather than title, and reaches the \"Other listings\" and \"From eBay\" rails, which had rendered outside the filter entirely. Production: 52 results, Under £25 -> 19 (max £24.76), Under £15 -> 16 (max £14.96), Under £10 -> 5, Under £5 -> 0 of 52, All prices -> 52. Zero rows above threshold at any setting; count line and list agree; clearing restores. Awaiting founder re-review to move to good.",
+      "openFollowUp": "Pre-existing, NOT caused by this repair and not in its scope: the \"Other listings\" rail on /search?q=absolute+batman shows World of Books rows priced £0.00 (the price-0.00 stub listings) and non-comic titles (\"Sewing for Absolute Beginners\", a Batman DVD), because that rail is an unfiltered fuzzy title search. A £0.00 stub therefore passes any \"Under £X\" cap."
     }
   },
   "tool": "smoke-test-v4",
-  "updated": "2026-08-25T21:11:07.295Z"
+  "updated": "2026-08-31T19:36:37.953Z"
 }
