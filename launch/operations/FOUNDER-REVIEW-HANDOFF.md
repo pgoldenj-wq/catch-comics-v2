@@ -126,24 +126,30 @@ and the session is **default-deny**: a command not named below is refused.
 
 ```
 check   lint
-test:identity  test:format-price  test:url-filters  test:search-ranking
-test:price-check  test:sync-backoff  test:traversal-safety  test:containment
-test:ebay-uk  test:secrets  test:isbn  test:browser-trust
-test:retailer-card  test:founder-review  test:claude-readiness
+test:identity  test:url-filters  test:search-ranking  test:price-check
+test:sync-backoff  test:traversal-safety  test:containment  test:ebay-uk
+test:secrets  test:isbn  test:browser-trust  test:retailer-card
+test:founder-review  test:claude-readiness
 ```
 
 Every one is a pure local check — no database client, no network, no
-`.env.local`, no paid API.
+`.env.local`, no paid API. A script is listed here only once it exists at HEAD:
+an advertised permission that cannot run from a clean worktree is a lie, and
+the gate below refuses it at runtime anyway.
 
 **Allowed — git, inside the repair worktree:**
 
 ```
 git status / diff / log / show / rev-parse
 git branch --show-current / --list          (inspection only)
-git checkout -b / git switch -c
 git add <path>                               path-scoped
 git commit
 ```
+
+Branch creation is **not** granted. The bridge checks the worktree out on
+`repair/<reviewId>` before Claude starts, so `git checkout -b` and
+`git switch -c` were permission surface with nothing behind them. `git checkout`
+and `git switch` are now denied outright in both directions.
 
 **Denied, permanently:** `git push`, `vercel`, `npx vercel`, `gh pr merge` (and
 `gh` altogether); `git stash`, `reset`, `clean`, `restore`, `checkout -- .`,
@@ -166,6 +172,42 @@ constants, so it cannot drift from what the session is actually permitted to do
 
 Deny rules beat allow rules, and beat `bypassPermissions` too, so the four
 shipping refusals hold no matter what a future change does to the allow list.
+
+## The hole an allowlist alone leaves, and the gate that closes it
+
+An allowlist authorises command **strings**. The repair can edit **files**. So
+`npm run check` meant "run whatever `check` has been redefined to mean".
+
+That was measured, not theorised. On 2026-08-31, against the real CLI in a
+throwaway repo, a session rewrote `package.json` so `check` was
+`echo PWNED-VIA-PACKAGE-JSON`, ran `npm run check`, and it executed — **zero
+permission denials**. The sibling case worked too: leave the script definition
+innocent and rewrite the runner it invokes.
+
+`verification-integrity.mjs` closes both. It is a **PreToolUse hook**, wired on
+the argv and addressed in the *founder's* checkout — not the worktree copy — so
+the repair can neither edit the gate nor find a settings file to rewrite. Before
+any gated `npm run <script>` executes, it compares against the repair's base
+commit:
+
+- the script's definition in `package.json`, and
+- every repo file that definition names as its entrypoint.
+
+Unchanged → it runs. Changed, or **not present at base** → refused, with the
+reason stated plainly to the session.
+
+**What is deliberately not checked:** the application and library code *under*
+test. A repair exists to edit `lib/` and `app/` and then run the approved suite
+over its changes. Only the mechanism is frozen; never the subject.
+
+**A consequence worth knowing:** a repair cannot write a new test and then run
+it — a runner that did not exist at base is not a reviewed mechanism. The prompt
+tells it to write the test, say so, and leave it for a human. That is the
+property working.
+
+Proven end to end in a real repair worktree with the shipped argv: with
+`check` redefined and `test-edition-identity.ts` tampered, both were refused by
+the gate, the marker never executed, and untouched `npm run lint` still ran.
 
 ## The states, and why `blocked` is not `failed`
 
@@ -271,7 +313,18 @@ Two of its sections cover the permission boundary specifically:
   index, dirty files, untracked files and full `git status` are byte-for-byte
   unchanged.
 
+- **A verification command runs the reviewed mechanism** covers the integrity
+  gate: an approved unchanged script and its committed runner are permitted;
+  application code under test can change freely and still be tested; a redefined
+  script definition and a tampered runner are both refused, with the refusal
+  naming which one; a script absent at the base commit is refused; and the gate
+  is proven to be addressed in the founder's checkout with no settings file on
+  disk to rewrite.
+
 The rules were also proven end to end against the real CLI (2.1.251) in a real
 repair worktree on 2026-08-31: `npm run check` and a focused `git add` +
 `git commit` ran; `git push --dry-run`, `git add -A`, `npm run check:cost-hazards`,
-`npx tsc --version` and `git stash` were all refused by the CLI itself.
+`npx tsc --version` and `git stash` were all refused by the CLI itself. In a
+second run with the mechanism deliberately tampered, `npm run check` (redefined)
+and `npm run test:identity` (rewritten runner) were both refused by the gate
+while untouched `npm run lint` still ran.

@@ -430,7 +430,6 @@ export const VERIFY_SCRIPTS = [
   'check',                 // tsc --noEmit
   'lint',                  // eslint
   'test:identity',
-  'test:format-price',
   'test:url-filters',
   'test:search-ranking',
   'test:price-check',
@@ -471,10 +470,15 @@ const GIT_READ = [
  * the session's cwd is a dedicated worktree (repair-worktree.mjs), so staging
  * and committing cannot reach the founder's checkout or the two dozen dirty
  * files other sessions have in it.
+ *
+ * Branch creation is NOT here. The bridge creates `repair/<reviewId>` and
+ * checks the worktree out on it before Claude starts, so the session arrives
+ * already on its branch — `git checkout -b` and `git switch -c` were surface
+ * with nothing behind them, and were removed rather than kept for having been
+ * in the first draft. A repair needs exactly enough to make a focused local
+ * commit where it already stands.
  */
 const GIT_WRITE_IN_WORKTREE = [
-  'Bash(git checkout -b:*)',   // NOT `git checkout:*` — that would allow `git checkout -- .`
-  'Bash(git switch -c:*)',
   'Bash(git add:*)',           // broad forms are denied below
   'Bash(git commit:*)',
 ]
@@ -504,6 +508,11 @@ const DENY_DESTRUCTIVE_GIT = [
   'Bash(git reset:*)',
   'Bash(git clean:*)',
   'Bash(git restore:*)',
+  // Blanket now that branch creation is gone: nothing the repair legitimately
+  // does involves changing what is checked out, and `git checkout -- <path>`
+  // silently discards work.
+  'Bash(git checkout:*)',
+  'Bash(git switch:*)',
   'Bash(git checkout --:*)',
   'Bash(git checkout .:*)',
   'Bash(git switch --discard-changes:*)',
@@ -686,9 +695,13 @@ Verification (arguments and \`2>&1 | tail -n\` are fine):
 Git, in this worktree only:
   git status / git diff / git log / git show / git rev-parse
   git branch --show-current / git branch --list
-  git checkout -b <name> / git switch -c <name>
   git add <explicit path>        ← by path only; \`git add -A\`, \`git add .\` and \`git add -u\` are refused
   git commit -m "..."            ← \`git commit -a\` and \`git commit -am\` are refused
+
+You are already on your branch and you cannot change branches — \`git checkout\`
+and \`git switch\` are refused in both directions. Commit where you stand.
+
+These commands run the REVIEWED version of themselves. Their definitions in package.json, and the runner files those definitions invoke, are checked against the base commit before each run — if you change one, that command is refused. This is deliberate. Change the code being TESTED as much as the repair needs; do not change the thing that does the testing. If you believe a test itself is wrong, or you need a new one, write it and say so in your report — you will not be able to run it, and a human will.
 
 If a command is refused, do NOT hunt for another spelling of it and do not try to work around it — that is what wasted the last run. Note it, move on, and say in your report what you could not verify and why.
 
@@ -706,12 +719,38 @@ Finish with an issue-by-issue report: diagnosis, fix, verification (name the com
  * files without asking. It is NOT bypassPermissions, which was offered and
  * declined, and the handoff test asserts it never becomes that by accident.
  */
+/**
+ * The PreToolUse gate that keeps an allowlisted command meaning what it meant
+ * when it was reviewed. See verification-integrity.mjs for the hole it closes.
+ *
+ * Two details carry the whole security value:
+ *   - the gate script is addressed in the FOUNDER'S checkout, never the
+ *     worktree copy, so a repair editing its own tree cannot edit the gate;
+ *   - it is passed on the argv, so there is no settings file on disk for a
+ *     repair to rewrite either.
+ */
+export function integritySettings({ repoRoot, worktreePath, base }) {
+  if (!repoRoot || !base) return null
+  const fwd = p => String(p).replace(/\\/g, '/')
+  const gate = `${fwd(repoRoot)}/launch/operations/verification-integrity.mjs`
+  // --worktree is passed explicitly rather than left to the hook's cwd. The
+  // cwd would usually be right, and "usually" is not a thing to rest a
+  // security boundary on.
+  const command = `node "${gate}" --hook --repo "${fwd(repoRoot)}" --base ${base}`
+    + (worktreePath ? ` --worktree "${fwd(worktreePath)}"` : '')
+  return JSON.stringify({
+    hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command }] }] },
+  })
+}
+
 export function claudeArgv(relPackagePath, ctx = {}) {
+  const settings = integritySettings(ctx)
   return [
     '-p', repairPrompt(relPackagePath, ctx),
     '--output-format', 'stream-json',
     '--verbose',
     '--permission-mode', 'acceptEdits',
+    ...(settings ? ['--settings', settings] : []),
     // Pinned, not aliased: on CLI 2.1.218 the `opus` alias still resolves to
     // claude-opus-4-8. A founder repair should get the current best model, so
     // the id is stated outright rather than left to an alias to decide.
@@ -1107,7 +1146,15 @@ export class ReviewRunner {
 
     let child
     try {
-      child = this.spawnFn(exe, claudeArgv(rec.packagePath, { branch: tree.branch, worktreePath: tree.path }), {
+      child = this.spawnFn(exe, claudeArgv(rec.packagePath, {
+        branch: tree.branch,
+        worktreePath: tree.path,
+        // The integrity gate needs both: the founder's checkout is where the
+        // gate itself lives and where base blobs are read from; the base commit
+        // is what "reviewed" means for this run.
+        repoRoot: this.repoRoot,
+        base: tree.base,
+      }), {
         cwd: tree.path,
         shell: false,
         stdio: ['ignore', 'pipe', 'pipe'],

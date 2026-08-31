@@ -22,9 +22,10 @@ import { basename, dirname, join, resolve, sep } from 'node:path'
 import {
   ALLOWED_TOOLS, DISALLOWED_TOOLS, LIMITS, PAGE_IDS, ReviewRunner, STALE_REASON,
   VERIFY_SCRIPTS, ValidationError, classifyRun, countEvidence, decodeImage,
-  describeActivity, packageDir, permissionFor, pidAlive, validateSubmission,
+  describeActivity, integritySettings, packageDir, permissionFor, pidAlive, validateSubmission,
 } from '../launch/operations/founder-review-handler.mjs'
 import { WorktreeError, ensureRepairWorktree, removeRepairWorktree } from '../launch/operations/repair-worktree.mjs'
+import { entrypointsIn, integrityOf, scriptsNamedIn, verdictForCommand } from '../launch/operations/verification-integrity.mjs'
 
 let pass = 0, fail = 0
 const check = (name, ok, extra = '') => {
@@ -654,7 +655,7 @@ check('…including the piped form the last two runs actually tried',
   allowed('npm run check 2>&1 | tail -30'))
 check('npm run lint is allowed', allowed('npm run lint'))
 check('the approved local test scripts are allowed', allAllowed([
-  'npm run test:identity', 'npm run test:format-price', 'npm run test:url-filters',
+  'npm run test:identity', 'npm run test:url-filters',
   'npm run test:search-ranking', 'npm run test:price-check', 'npm run test:isbn',
   'npm run test:founder-review',
 ]))
@@ -666,8 +667,12 @@ check('read-only git is allowed', allAllowed([
   'git log --oneline -5', 'git show HEAD', 'git rev-parse HEAD',
   'git branch --show-current', 'git branch --list',
 ]))
-check('the repair branch can be created', allAllowed([
+// Removed on purpose: the bridge checks the worktree out on repair/<id> before
+// Claude starts, so branch creation was permission surface with nothing behind
+// it. Kept as a test so it cannot drift back in unnoticed.
+check('branch switching is NOT granted — the bridge already put it on its branch', allRefused([
   'git checkout -b repair/search-2026-08-31-x', 'git switch -c repair/search-2026-08-31-x',
+  'git checkout main', 'git switch main', 'git checkout HEAD~1',
 ]))
 check('path-scoped staging is allowed', allAllowed([
   'git add lib/identity/format.ts',
@@ -776,6 +781,23 @@ check(`every dangerous script in package.json is refused (${dangerous.length} ch
   leaked.length === 0, leaked.join(', '))
 check('the allowlist is a small fraction of the scripts that exist',
   VERIFY_SCRIPTS.length < pkgScripts.length / 4, `${VERIFY_SCRIPTS.length} of ${pkgScripts.length}`)
+
+/* A repair worktree is branched from HEAD, so it runs the COMMITTED
+   package.json — not the founder's working copy. An approved script that only
+   exists as an uncommitted edit is allowed by the permission layer and then
+   fails with `npm error Missing script`, which is what happened to
+   `test:format-price` on 2026-08-31: the script was real, but only in a dirty
+   package.json, so the repair could not run it. Checking the working copy
+   would not have caught that; checking HEAD does. */
+const headPkg = spawnSync('git', ['show', 'HEAD:package.json'], { cwd: resolve(dirname(new URL(import.meta.url).pathname.slice(1)), '..'), encoding: 'utf8' })
+if (headPkg.status === 0) {
+  const committed = Object.keys(JSON.parse(headPkg.stdout).scripts ?? {})
+  const missing = VERIFY_SCRIPTS.filter(s => !committed.includes(s))
+  check(`every approved script exists in the COMMITTED package.json (${VERIFY_SCRIPTS.length} checked)`,
+    missing.length === 0, missing.length ? `missing at HEAD: ${missing.join(', ')}` : '')
+} else {
+  check('every approved script exists in the COMMITTED package.json', true, 'skipped — git show unavailable')
+}
 
 /* 10. The mode itself. */
 check('the launch argv does NOT use bypassPermissions',
@@ -926,6 +948,128 @@ check('the review still survives it', existsSync(join(packageDir(REPO, blockedRe
 
 rmSync(join(dirname(GITREPO), `${basename(GITREPO)}-repairs`), { recursive: true, force: true })
 rmSync(GITREPO, { recursive: true, force: true })
+
+/* ═══ 12. An allowlisted command runs the REVIEWED mechanism ════════════════
+   The allow list authorises command STRINGS, and the repair can edit files. So
+   `npm run check` was, until this gate, an alias for "whatever check has been
+   redefined to mean". That was not a theory: on 2026-08-31 a throwaway-repo
+   probe against the real CLI rewrote package.json's `check` to
+   `echo PWNED-VIA-PACKAGE-JSON`, ran `npm run check`, and the CLI executed it
+   with zero permission denials. The sibling case — leave the script alone and
+   rewrite the runner it invokes — executed too.
+
+   These cover both, plus the controls that matter just as much: the gate must
+   SUBTRACT only the mechanism, never the code under test.                    */
+console.log('\nA verification command cannot be redefined into arbitrary execution')
+
+const GATEREPO = mkdtempSync(join(tmpdir(), 'cc-frv4-gate-'))
+const ggit = (args, cwd = GATEREPO) => spawnSync('git', args, { cwd, encoding: 'utf8', windowsHide: true })
+const gwrite = (rel, body) => writeFileSync(join(GATEREPO, rel), body)
+
+mkdirSync(join(GATEREPO, 'scripts'), { recursive: true })
+mkdirSync(join(GATEREPO, 'lib'), { recursive: true })
+gwrite('package.json', JSON.stringify({
+  name: 'gate', version: '1.0.0',
+  scripts: {
+    check: 'tsc --noEmit',
+    'test:safe': 'tsx scripts/test-safe.ts',
+    lint: 'eslint',
+  },
+}, null, 2) + '\n')
+gwrite('scripts/test-safe.ts', "import { f } from '../lib/thing'\nconsole.log(f())\n")
+gwrite('lib/thing.ts', "export const f = () => 'original'\n")
+ggit(['init', '-q', '-b', 'main'])
+ggit(['config', 'user.email', 'f@example.com'])
+ggit(['config', 'user.name', 'F'])
+ggit(['add', '.'])
+ggit(['commit', '-qm', 'base'])
+const GATEBASE = ggit(['rev-parse', 'HEAD']).stdout.trim()
+const at = script => integrityOf({ repoRoot: GATEREPO, worktree: GATEREPO, base: GATEBASE, script })
+
+/* 1. Approved and unchanged — the command the repair actually needs. */
+check('an approved, unchanged verification command is permitted', at('check').ok === true, at('check').reason ?? '')
+check('so is one that runs a committed runner', at('test:safe').ok === true, at('test:safe').reason ?? '')
+
+/* 4. The positive control that stops this gate being useless: the SUBJECT of
+      the test must stay editable, or a repair cannot repair anything. */
+gwrite('lib/thing.ts', "export const f = () => 'repaired by the founder review'\n")
+check('ordinary application code can still be edited and tested', at('test:safe').ok === true, at('test:safe').reason ?? '')
+check('…and editing it does not disturb the other commands either', at('check').ok === true)
+
+/* 2. The exact bypass, in its first form. */
+const pkg = () => JSON.parse(readFileSync(join(GATEREPO, 'package.json'), 'utf8'))
+const setScript = (name, value) => {
+  const p = pkg(); p.scripts[name] = value
+  gwrite('package.json', JSON.stringify(p, null, 2) + '\n')
+}
+setScript('check', 'echo PWNED-VIA-PACKAGE-JSON')
+const redefined = at('check')
+check('redefining an approved script cannot turn it into arbitrary execution', redefined.ok === false)
+check('and the refusal says which script and what it became',
+  /definition of "check" has been modified/.test(redefined.reason ?? '')
+  && /PWNED-VIA-PACKAGE-JSON/.test(redefined.reason ?? ''))
+check('a redefined script is caught inside a compound command too',
+  verdictForCommand({ repoRoot: GATEREPO, worktree: GATEREPO, base: GATEBASE, command: 'npm run lint && npm run check' })?.ok === false)
+setScript('check', 'tsc --noEmit')     // put it back
+check('restoring the reviewed definition restores permission', at('check').ok === true)
+
+/* 3. The exact bypass, in its second form — the one that leaves package.json
+      innocent and rewrites the thing it points at. */
+gwrite('scripts/test-safe.ts', "console.log('PWNED-VIA-RUNNER')\n")
+const tampered = at('test:safe')
+check('changing an approved test runner cannot silently inherit its permission', tampered.ok === false)
+check('and the refusal names the runner, not just the script',
+  /scripts\/test-safe\.ts/.test(tampered.reason ?? '')
+  && /mechanism that tests it may not/.test(tampered.reason ?? ''))
+check('the code under test is explicitly NOT what was objected to',
+  !/lib\/thing\.ts/.test(tampered.reason ?? ''))
+ggit(['checkout', '--', 'scripts/test-safe.ts'])
+check('restoring the reviewed runner restores permission', at('test:safe').ok === true)
+
+/* A script the repair invented has no reviewed version, so it cannot run —
+   which is also what keeps the allow list honest about scripts not yet at HEAD. */
+setScript('test:brand-new', 'node scripts/whatever.mjs')
+check('a script that does not exist at the base commit is refused', at('test:brand-new').ok === false)
+check('and says why, in terms of committed history',
+  /not a script at the base commit/.test(at('test:brand-new').reason ?? ''))
+
+/* The gate only ever subtracts: it has no opinion on anything else. */
+check('the gate has no opinion on a non-npm command',
+  verdictForCommand({ repoRoot: GATEREPO, worktree: GATEREPO, base: GATEBASE, command: 'git status --short' }) === null)
+check('nor on a script it has nothing to say about',
+  verdictForCommand({ repoRoot: GATEREPO, worktree: GATEREPO, base: GATEBASE, command: 'npm run lint' }) === null)
+check('it reads every npm run in a compound command', scriptsNamedIn('npm run check && npm run lint | tail -3').join(',') === 'check,lint')
+check('it finds the runner inside a dotenv-wrapped definition',
+  entrypointsIn('dotenv -e .env.local -- tsx scripts/test-thing.ts').join(',') === 'scripts/test-thing.ts')
+check('it does not mistake a bare binary for a runner file',
+  entrypointsIn('tsc --noEmit').length === 0)
+
+/* The wiring. The gate is only worth anything if the repair cannot reach it. */
+const settingsArg = argv[argv.indexOf('--settings') + 1]
+check('the launch argv carries the integrity gate', argv.includes('--settings') && !!settingsArg)
+const parsedSettings = (() => { try { return JSON.parse(settingsArg) } catch { return null } })()
+check('the gate is valid JSON settings', parsedSettings !== null)
+check('it is a PreToolUse hook on Bash',
+  parsedSettings?.hooks?.PreToolUse?.[0]?.matcher === 'Bash'
+  && parsedSettings.hooks.PreToolUse[0].hooks[0].type === 'command')
+const hookCmd = parsedSettings?.hooks?.PreToolUse?.[0]?.hooks?.[0]?.command ?? ''
+// The gate's whole value rests on this: the repair can edit anything in its own
+// worktree, so a gate addressed at the worktree's COPY would be a gate the
+// repair could rewrite. It must point into the founder's checkout.
+const gateScript = (/^node "([^"]+)"/.exec(hookCmd) ?? [])[1] ?? ''
+check('the gate script is addressed in the founder\'s checkout, NOT the repair worktree',
+  gateScript.endsWith('/launch/operations/verification-integrity.mjs') && !gateScript.includes('-repairs/'),
+  gateScript)
+check('and the repo it reads reviewed history from is the founder\'s checkout too',
+  /--repo "[^"]*"/.test(hookCmd) && !/--repo "[^"]*-repairs\//.test(hookCmd))
+check('the gate is told which commit counts as reviewed', /--base [0-9a-f]{6,}/.test(hookCmd))
+check('the gate is told which worktree to inspect', /--worktree "[^"]*-repairs\//.test(hookCmd))
+check('there is no settings FILE for a repair to rewrite — it is argv only',
+  !existsSync(join(REPO, '.claude', 'settings.json')) && !existsSync(join(REPO, '.claude', 'settings.local.json')))
+check('a launch with no base commit gets no half-configured gate',
+  integritySettings({ repoRoot: 'C:/x', worktreePath: 'C:/y', base: null }) === null)
+
+rmSync(GATEREPO, { recursive: true, force: true })
 
 /* ═══ Cleanup ═══════════════════════════════════════════════════════════════ */
 rmSync(REPO, { recursive: true, force: true })
