@@ -40,6 +40,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, statSy
 import { join, resolve, sep } from 'node:path'
 import { SIGNIN_COMMAND, claudeVersion, findClaude, readiness } from './claude-readiness.mjs'
 import { WorktreeError, ensureRepairWorktree } from './repair-worktree.mjs'
+import { deriveReport, renderReportMd } from './repair-outcome.mjs'
 
 /* ── Bounds ──────────────────────────────────────────────────────────────── */
 export const LIMITS = {
@@ -381,6 +382,51 @@ export function updateFounderReviewJson(repoRoot, review, json) {
   }
   doc.updated = new Date().toISOString()
   doc.tool = 'smoke-test-v4'
+  writeFileSync(file, JSON.stringify(doc, null, 2))
+  return file
+}
+
+/**
+ * Record what a repair achieved against the page it repaired.
+ *
+ * THE THING THIS MUST NOT DO
+ * It must not resolve the founder's review. `status` is the founder's own
+ * verdict on what they saw on production; `resolution`, `resolvedAt` and
+ * `openFollowUp` are written by a human after production has been re-checked.
+ * A repair cannot push, merge or deploy — so nothing it does is evidence about
+ * production, and a bridge that marked a page fixed because a local commit
+ * exists would be inventing the one fact the founder actually needs.
+ *
+ * So this writes exactly one new key, `repair`, and leaves every other key on
+ * the page as it found it. A founder reading Mission Control sees "a repair ran
+ * and committed" sitting NEXT TO their own unchanged "needs fixing", which is
+ * the true state of affairs until they deploy and look.
+ */
+export function recordRepairOutcome(repoRoot, rec, report) {
+  const pageId = rec?.page?.id
+  if (!pageId || !report) return null
+  const file = resolve(repoRoot, 'launch', 'founder-review.json')
+  let doc
+  try { doc = JSON.parse(readFileSync(file, 'utf8').replace(/^﻿/, '')) }
+  catch { return null }        // no file yet means no page to annotate
+  if (!doc?.pages?.[pageId]) return null
+
+  doc.pages[pageId].repair = {
+    reviewId: rec.reviewId,
+    outcome: report.outcome,
+    label: report.label,
+    finishedAt: rec.finishedAt ?? null,
+    branch: rec.branch ?? null,
+    commits: report.commits.map(c => c.sha),
+    changedFiles: report.changedFiles.slice(0, 20),
+    verification: report.verification.map(v => ({ command: v.command, ok: v.ok })),
+    missing: report.missing,
+    // Never inferred from the outcome — stated, every time, so no reader has to
+    // work out whether "verified" meant the live site.
+    productionVerified: false,
+    founderSteps: report.founderSteps,
+  }
+  doc.updated = new Date().toISOString()
   writeFileSync(file, JSON.stringify(doc, null, 2))
   return file
 }
@@ -859,6 +905,26 @@ export const ORPHAN_WINDOW_MS = 6 * 60 * 60 * 1000
 /** States that mean "started, outcome unknown" — the ones a restart invalidates. */
 const UNFINISHED = ['sending', 'packaging', 'packaged', 'launching', 'running']
 
+/**
+ * Can this run be handed to Claude again?
+ *
+ * The three process-level cases were always retryable: nothing ran, so running
+ * it is the obvious answer. The fourth is new and is the point of the outcome
+ * work — a run whose PROCESS finished cleanly but whose REPAIR did not. Before
+ * reports existed that run was indistinguishable from a success, so the button
+ * read "Send again" and the founder had no reason to press it.
+ *
+ * Continuing is safe because a retry reuses the same worktree on the same
+ * branch: the earlier attempt's commits and edits are still there, and the
+ * prompt tells the session not to revert them. So "Continue repair" genuinely
+ * continues rather than starting the work over.
+ */
+export function isRetryable(rec) {
+  if (!rec) return false
+  if (['blocked', 'failed', 'stale'].includes(rec.state)) return true
+  return rec.state === 'completed' && ['incomplete', 'no-change'].includes(rec.report?.outcome)
+}
+
 export const STALE_REASON =
   'The bridge stopped before this repair reported back, so its outcome is unknown. '
   + 'The review and every screenshot are still on disk — press Retry to hand it to Claude again.'
@@ -926,6 +992,12 @@ export class ReviewRunner {
         rec.orphanPid = this.#orphanPid(rec) ?? null
         this.persist(rec)
       }
+      // Runs that finished before reports existed still have their transcript
+      // and their branch on disk, so the report is recoverable. Derived once,
+      // here, rather than on every status read: it shells out to git.
+      if (!rec.report && ['completed', 'failed'].includes(rec.state)) {
+        if (this.deriveOutcome(rec)) this.persist(rec)
+      }
       this.runs.set(rec.reviewId, rec)
     }
   }
@@ -986,6 +1058,46 @@ export class ReviewRunner {
     } catch { /* the run record is a convenience; never fail a run over it */ }
   }
 
+  /**
+   * Work out what the finished repair actually achieved, and attach it to the
+   * record. Called once at exit, and again on hydrate for packages written
+   * before reports existed, so the founder's older runs are not left mute.
+   *
+   * `state` and `report.outcome` answer different questions and are kept apart
+   * on purpose: `completed` means the process ended cleanly, `verified-local`
+   * means the change was made, checked and committed. A run can be the first
+   * without being the second, and that gap is the whole reason this exists.
+   */
+  deriveOutcome(rec) {
+    if (!rec || !['completed', 'failed'].includes(rec.state)) return null
+    let report
+    try {
+      report = deriveReport({
+        state: rec.state,
+        logPath: rec.logPath ?? join(packageDir(this.repoRoot, rec.reviewId), 'claude-run.jsonl'),
+        summary: rec.summary,
+        repoRoot: this.repoRoot,
+        branch: rec.branch,
+        baseCommit: rec.baseCommit,
+        worktreePath: rec.worktreePath,
+        verifyScripts: VERIFY_SCRIPTS,
+      })
+    } catch (err) {
+      console.error(`[founder-review] could not derive the repair report for ${rec.reviewId}:`, err.message)
+      return null
+    }
+    rec.report = report
+    // A file a person can open with no tooling, next to the review it repairs.
+    try {
+      writeFileSync(join(packageDir(this.repoRoot, rec.reviewId), 'report.md'), renderReportMd(rec, report))
+    } catch { /* the markdown is a courtesy; the record is the source of truth */ }
+    // Mission Control's row learns what the repair achieved — and nothing else.
+    // The founder's own verdict, resolution and evidence are never touched.
+    try { recordRepairOutcome(this.repoRoot, rec, report) }
+    catch (err) { console.error('[founder-review] could not record the repair outcome:', err.message) }
+    return report
+  }
+
   /** Public view of a record — no absolute paths beyond the repo, no argv. */
   static view(rec) {
     if (!rec) return null
@@ -1007,8 +1119,7 @@ export class ReviewRunner {
     const existing = this.runs.get(review.reviewId)
 
     if (existing) {
-      const retryable = ['blocked', 'failed', 'stale'].includes(existing.state)
-      if (!retryable) return { ...existing, duplicate: true }
+      if (!isRetryable(existing)) return { ...existing, duplicate: true }
       // Retry: the package is already written and verified. Only relaunch.
       existing.duplicate = false
       return this.#launch(existing)
@@ -1123,6 +1234,14 @@ export class ReviewRunner {
     rec.reason = null
     rec.pid = null
     rec.orphanPid = null
+    // The previous attempt's report describes a run that is over. Leaving it on
+    // the record would put a finished verdict on a card that says "running".
+    // Nothing is lost: the retry reuses the same branch and base commit, so the
+    // next report counts the earlier attempt's commits too, and report.md on
+    // disk still holds the old one until it is rewritten.
+    rec.report = null
+    rec.summary = null
+    rec.progress = null
 
     const dir = packageDir(this.repoRoot, rec.reviewId)
     const logPath = join(dir, 'claude-run.jsonl')
@@ -1246,9 +1365,19 @@ export class ReviewRunner {
       const c = classifyRun({ exitCode: code, result })
       rec.state = c.state
       rec.reason = c.reason || (c.state === 'failed' && stderr ? stderr.slice(0, 400) : c.reason)
-      rec.summary = typeof result?.result === 'string' && c.state === 'completed' ? result.result.slice(0, 2000) : null
+      // The full final message, not a 2000-char stub. It is the one part of
+      // the report Claude wrote itself, the founder is meant to read it instead
+      // of a transcript, and truncating it mid-sentence is how "I could not
+      // commit, and here is why" became invisible.
+      rec.summary = typeof result?.result === 'string' && c.state === 'completed' ? result.result : null
+      // An exit code says a process ended. It does not say a defect was
+      // repaired, so the two are recorded separately and the card leads with
+      // this one.
+      this.deriveOutcome(rec)
       this.persist(rec)
-      console.log(`[founder-review] ${rec.reviewId} — ${rec.state}${rec.reason ? ` (${rec.reason.slice(0, 120)})` : ''}`)
+      console.log(`[founder-review] ${rec.reviewId} — ${rec.state}`
+        + `${rec.report ? ` · ${rec.report.outcome}` : ''}`
+        + `${rec.reason ? ` (${rec.reason.slice(0, 120)})` : ''}`)
     })
 
     child.on('error', err => {

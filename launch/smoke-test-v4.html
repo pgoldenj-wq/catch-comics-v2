@@ -13,6 +13,10 @@
   --bg:#F8F8F6; --panel:#FFFFFF; --ink:#111111; --ink2:#4B5563; --ink3:#9CA3AF;
   --line:#E5E7EB; --accent:#C41F22; --accent-ink:#FFFFFF;
   --good:#15803D; --good-bg:#DCFCE7; --fix:#B45309; --fix-bg:#FEF3C7;
+  /* Referenced by the send card since the handoff landed, and never defined —
+     so every "your review is saved, here is why Claude did not start" sentence
+     rendered in ordinary body text. The one line a founder must not skim. */
+  --bad:#B91C1C; --bad-bg:#FEE2E2;
   --focus:#2563EB;
 }
 * { box-sizing:border-box; }
@@ -135,6 +139,27 @@ main { padding:26px; max-width:880px; }
 .sendcard { border:2px solid #111827; }
 .sendmeta { font-size:13px; color:var(--ink2); margin-top:10px; }
 .sendmeta code { background:#F3F4F6; padding:2px 6px; border-radius:6px; }
+
+/* The repair report. A headless repair leaves the founder nothing to look at,
+   so this is the window into it: the verdict as a banner they cannot misread,
+   and the receipts folded away underneath for when they want them. */
+.verdict { display:block; margin-top:12px; padding:10px 12px; border-radius:8px;
+           border:1px solid var(--line); font-size:14px; font-weight:700; color:var(--ink); }
+.verdict.ok   { border-color:var(--good); background:var(--good-bg); color:var(--good); }
+.verdict.part { border-color:var(--fix);  background:var(--fix-bg);  color:var(--fix); }
+.verdict.no   { border-color:var(--bad);  background:var(--bad-bg);  color:var(--bad); }
+.verdict .sub { display:block; margin-top:4px; font-weight:400; font-size:12.5px; color:var(--ink2); }
+.report { margin-top:10px; font-size:13px; }
+.report > summary { cursor:pointer; color:var(--ink2); font-weight:600; }
+.report h4 { margin:12px 0 4px; font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:var(--ink3); }
+.report ul { margin:0; padding-left:18px; }
+.report li { margin:2px 0; line-height:1.45; }
+.report li.ok::marker { color:var(--good); }
+.report li.no::marker { color:var(--bad); }
+.report code { background:#F3F4F6; padding:1px 5px; border-radius:5px; font-size:12px; }
+.report .claude { white-space:pre-wrap; margin:6px 0 0; padding:10px; background:#F9FAFB;
+                  border:1px solid var(--line); border-radius:8px; max-height:340px; overflow:auto;
+                  font-size:12.5px; line-height:1.5; color:var(--ink2); }
 
 /* toast */
 #toast { position:fixed; bottom:22px; left:50%; transform:translateX(-50%);
@@ -1057,7 +1082,100 @@ function runProgress(s){
   if (s.progress?.turns) bits.push(`step ${s.progress.turns}`);
   if (s.progress?.activity) bits.push(esc(s.progress.activity));
   if (!bits.length) return '';
-  return `<br><span style="color:var(--ink2)">${bits.join(' · ')}</span>`;
+  // Silence is information too. A repair that has said nothing for a minute is
+  // not necessarily stuck — a long typecheck or a big file read looks exactly
+  // like this — but the founder is entitled to know which of the two lines they
+  // are reading, rather than being shown a frozen phrase as if it were live.
+  const quiet = Math.round((Date.now() - Date.parse(s.progress?.lastEventAt || 0)) / 1000);
+  const idle = Number.isFinite(quiet) && quiet >= 45
+    ? `<br><span style="color:var(--ink3)">No new activity for ${quiet < 120 ? `${quiet}s` : `${Math.floor(quiet/60)} min`} — still running.</span>`
+    : '';
+  return `<br><span style="color:var(--ink2)">${bits.join(' · ')}</span>${idle}`;
+}
+
+/* ── The finished repair ─────────────────────────────────────────────────────
+   A process exiting is not a defect being fixed, so the card leads with what
+   the repair ACHIEVED, and everything under the banner is derived from commits
+   that exist and commands whose results were recorded — never from Claude's
+   prose about them. Claude's own words are kept, verbatim and complete, at the
+   bottom where they belong: as the author's account, not as the verdict. */
+const VERDICT_TONE = { 'verified-local':'ok', incomplete:'part', 'no-change':'part', failed:'no', unknown:'part' };
+
+const VERDICT_SUB = {
+  'verified-local': 'Changed, checked and committed on its own branch. Production has NOT been touched — nothing here proves the page is fixed for a customer yet.',
+  incomplete:       'Claude made changes but did not finish. Nothing here should be read as fixed.',
+  'no-change':      'Claude changed no code. The review is untouched on disk — read the report, then Continue.',
+  failed:           'The repair did not complete.',
+  unknown:          'The outcome of this run could not be established.',
+};
+
+function li(ok, text){ return `<li class="${ok?'ok':'no'}">${ok?'✓':'✗'} ${text}</li>`; }
+
+function reportPanel(s){
+  const r = s.report;
+  if (!r) return '';
+  const L = [];
+
+  if (r.changedFiles?.length){
+    L.push('<h4>Files changed</h4><ul>');
+    for (const f of r.changedFiles) L.push(`<li><code>${esc(f)}</code></li>`);
+    if (r.changedFileCount > r.changedFiles.length) L.push(`<li>…and ${r.changedFileCount - r.changedFiles.length} more</li>`);
+    L.push('</ul>');
+  }
+
+  L.push('<h4>Verification</h4><ul>');
+  if (r.verification?.length){
+    for (const v of r.verification) L.push(li(v.ok, `<code>${esc(v.command)}</code>${v.detail ? ` — ${esc(v.detail)}` : ''}`));
+  } else L.push(li(false, 'Nothing was run.'));
+  L.push('</ul>');
+
+  L.push('<h4>Commits</h4><ul>');
+  if (r.commits?.length){
+    for (const c of r.commits) L.push(li(true, `<code>${esc(c.sha)}</code> ${esc(c.subject)}`));
+  } else L.push(li(false, 'None.'));
+  L.push('</ul>');
+
+  if (r.uncommitted?.length){
+    L.push('<h4>Left uncommitted in the repair worktree</h4><ul>');
+    for (const f of r.uncommitted.slice(0,20)) L.push(`<li><code>${esc(f)}</code></li>`);
+    L.push('</ul>');
+  }
+
+  if (r.missing?.length){
+    L.push('<h4>Not completed</h4><ul>');
+    for (const m of r.missing) L.push(li(false, esc(m)));
+    L.push('</ul>');
+  }
+
+  if (r.refusals?.length){
+    L.push('<h4>Commands the repair was refused</h4><ul>');
+    for (const x of r.refusals) L.push(`<li>${esc(x.message)}${x.times > 1 ? ` (×${x.times})` : ''}</li>`);
+    L.push('</ul>');
+  }
+
+  if (r.founderSteps?.length){
+    L.push('<h4>Still yours to do</h4><ul>');
+    for (const step of r.founderSteps) L.push(`<li>☐ ${esc(step)}</li>`);
+    L.push('</ul>');
+  }
+
+  if (s.branch) L.push(`<h4>Where the work is</h4><ul><li>Branch <code>${esc(s.branch)}</code></li>`
+    + `<li>Report file <code>${esc((s.packagePath||'') + '/report.md')}</code></li></ul>`);
+
+  if (r.summary) L.push(`<h4>Claude's own report</h4><div class="claude">${esc(r.summary)}</div>`);
+
+  return `<details class="report"><summary>View full repair report</summary>${L.join('')}</details>`;
+}
+
+/** The banner. Falls back to the process state only when no report could be
+ *  derived at all — which is itself said plainly rather than dressed up. */
+function verdictBanner(s){
+  const r = s.report;
+  if (!r) return `<span class="verdict part">Repair finished — outcome not established`
+    + `<span class="sub">The run ended but its report could not be derived, so nothing here says the issue is fixed.</span></span>`;
+  const tone = VERDICT_TONE[r.outcome] ?? 'part';
+  return `<span class="verdict ${tone}">${esc(r.label)}`
+    + `<span class="sub">${esc(VERDICT_SUB[r.outcome] ?? '')}</span></span>`;
 }
 
 const STATE_TEXT = {
@@ -1067,7 +1185,12 @@ const STATE_TEXT = {
   // The pid is printed because it is the whole claim: this line means a
   // process, and the founder can go and look at it.
   running:   s => `Sent · ${evidenceOf(s)} · <strong>Claude repair running</strong>${s.pid ? ` · process ${s.pid}` : ''}${runProgress(s)}`,
-  completed: s => `<strong>Claude repair complete</strong> · ${evidenceOf(s)} reviewed`,
+  // "Complete" used to be said here on the strength of exit code 0 alone. The
+  // 2026-08-30 Search run proves what that cost: it exited 0 having committed
+  // nothing and failed both its checks, and this line called it complete. The
+  // process ending is now stated as what it is — the repair's own verdict is
+  // the banner underneath, and it is the one the founder acts on.
+  completed: s => `Claude finished · ${evidenceOf(s)} reviewed`,
   failed:    s => `<strong>Claude repair did not finish.</strong> Your review is saved at <code>${esc(s.packagePath||'')}</code>`,
   // Two sentences that used to appear together — "Claude was not started" and
   // "a repair is already running" — read as a contradiction. When one repair
@@ -1115,10 +1238,16 @@ function sendCardMeta(p, ps){
   // reason would only repeat it back in red.
   const detail = s.reason && !s.blockedBy ? `<br><span style="color:var(--bad)">${esc(s.reason)}</span>` : '';
   const where  = s.packagePath && s.state !== 'failed' ? `<br>Package: <code>${esc(s.packagePath)}</code>` : '';
-  const resume = s.sessionId && (s.state==='completed'||s.state==='failed')
-    ? `<br>Read what Claude did: <code>claude --resume ${esc(s.sessionId)}</code>` : '';
-  const summary = s.summary ? `<br><span style="color:var(--ink2)">${esc(String(s.summary).slice(0,300))}</span>` : '';
-  return line + detail + where + resume + summary;
+  // The verdict and the report replace what used to be here: a 300-character
+  // slice of Claude's prose, cut mid-sentence, doing the work of a conclusion.
+  const finished = s.state === 'completed' || s.state === 'failed';
+  const verdict = finished ? verdictBanner(s) : '';
+  const report  = finished ? reportPanel(s) : '';
+  // Kept, but demoted below the report it used to stand in for — a founder who
+  // wants the whole session can still open it, and now never has to.
+  const resume = s.sessionId && finished
+    ? `<div class="sendmeta" style="margin-top:8px;color:var(--ink3)">Full session: <code>claude --resume ${esc(s.sessionId)}</code></div>` : '';
+  return line + detail + where + verdict + report + resume;
 }
 
 /** Repaint just the send card, without re-rendering (and losing focus in) the
@@ -1158,9 +1287,15 @@ function paintSendCard(p, ps){
 
   const st = ps.send?.state;
   const busy = st === 'sending' || st === 'packaged' || st === 'launching' || st === 'running';
+  // A repair that stopped short must not offer the same button as one that
+  // finished the job. "Continue" is the honest word: the bridge reuses the same
+  // package, branch and worktree, so the next session picks up where this one
+  // left off rather than starting the review again from nothing.
+  const unfinished = st === 'completed' && ['incomplete','no-change'].includes(ps.send?.report?.outcome);
   const label = st === 'running'   ? 'Claude repair running…'
               : st === 'sending'   ? 'Packaging…'
               : st === 'launching' || st === 'packaged' ? 'Starting Claude…'
+              : unfinished         ? 'Continue this repair'
               : st === 'completed' ? `Send ${p.title} to Claude again`
               : (st === 'blocked' || st === 'failed' || st === 'stale') ? 'Retry sending to Claude'
               : `🚀 SEND ${p.title.toUpperCase()} TO CLAUDE`;
@@ -1252,7 +1387,16 @@ function watchRun(p){
     paintSendCard(def(state.activePage), P(state.activePage));
     if (rec.state === 'running' || rec.state === 'launching' || rec.state === 'packaged') return;
     clearInterval(iv); pollers.delete(p.id);
-    if (rec.state === 'completed')    toast(`Claude repair complete for ${p.title} — ${evidenceOf(rec)} reviewed`);
+    // The toast said "complete" for every clean exit, including the run that
+    // committed nothing. It now says what the repair achieved, and an
+    // unfinished one is announced as a problem, because it is one.
+    if (rec.state === 'completed'){
+      const o = rec.report?.outcome;
+      if (o === 'verified-local') toast(`${p.title}: repair verified locally — review the commit, then deploy`);
+      else if (o === 'no-change') toast(`${p.title}: Claude changed nothing — open the report`, 'err');
+      else if (o === 'incomplete') toast(`${p.title}: repair INCOMPLETE — not fixed. Open the report, then Continue`, 'err');
+      else toast(`Claude finished for ${p.title} — ${evidenceOf(rec)} reviewed`);
+    }
     else if (rec.state === 'blocked') toast(`${p.title} review saved, but Claude was not started — ${rec.reason || 'see the card'}`, 'err');
     else if (rec.state === 'stale')   toast(`The repair for ${p.title} stopped unexpectedly — your review is saved, press Retry`, 'err');
     else                              toast(`Claude repair did not finish for ${p.title} — your review is saved`, 'err');
@@ -1277,7 +1421,13 @@ async function sendToClaude(){
   sendInFlight = true;
   // guard 3: one stable id per submission, reused by every retry, so the
   // bridge can recognise a repeat and refuse to package or launch twice.
-  const reviewId = ps.send?.reviewId && ['blocked','failed','stale'].includes(ps.send.state)
+  // A continued repair MUST carry the same reviewId. That id is what the bridge
+  // recognises: same id means reuse the package that is already on disk, the
+  // branch that already holds the first attempt's commits and the worktree that
+  // already holds its edits. A fresh id would silently start over and lose them.
+  const continuable = ps.send?.state === 'completed'
+    && ['incomplete','no-change'].includes(ps.send?.report?.outcome);
+  const reviewId = ps.send?.reviewId && (continuable || ['blocked','failed','stale'].includes(ps.send.state))
     ? ps.send.reviewId
     : `${p.id}-${new Date().toISOString().slice(0,16).replace(/[T:]/g,'-')}-${uid().slice(0,6)}`;
 
@@ -1546,12 +1696,21 @@ async function resumeRuns(){
     const ps = state.pages[p.id];
     const s = ps && ps.send;
     if (!s || !s.reviewId) continue;
-    if (!['sending','packaged','launching','running'].includes(s.state)) continue;
+    const live = ['sending','packaged','launching','running'].includes(s.state);
+    // A finished run held in localStorage from before reports existed — or from
+    // a browser that was closed before the run ended — shows a verdict it never
+    // received. One read settles it, and the report is durable from then on.
+    const missingReport = !live && ['completed','failed'].includes(s.state) && !s.report;
+    if (!live && !missingReport) continue;
     try {
       const r = await bridgeFetch(`/review/status?reviewId=${encodeURIComponent(s.reviewId)}`, {}, 5000);
       if (r.ok){
         Object.assign(s, await r.json());
         if (['packaged','launching','running'].includes(s.state)) watchRun(p);
+      } else if (missingReport){
+        // The bridge has forgotten a run that already ENDED. Nothing is in
+        // doubt except the report, so the state it ended in is left alone.
+        continue;
       } else {
         // The bridge restarted and no longer knows this run. Say that rather
         // than leaving a spinner that will never resolve. `stale`, not
@@ -1561,6 +1720,9 @@ async function resumeRuns(){
         s.reason = 'The bridge was restarted, so this run can no longer be tracked. The review package is still on disk — press Retry to hand it to Claude again.';
       }
     } catch(e){
+      // Same rule: an unreachable bridge tells you nothing about a run that has
+      // already ended, so a finished run keeps the outcome it earned.
+      if (missingReport) continue;
       s.state = 'stale';
       s.reason = 'The bridge is not reachable, so this run cannot be tracked. Your review is saved — press Retry once Command Centre is open again.';
     }

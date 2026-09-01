@@ -22,8 +22,12 @@ import { basename, dirname, join, resolve, sep } from 'node:path'
 import {
   ALLOWED_TOOLS, DISALLOWED_TOOLS, LIMITS, PAGE_IDS, ReviewRunner, STALE_REASON,
   VERIFY_SCRIPTS, ValidationError, classifyRun, countEvidence, decodeImage,
-  describeActivity, integritySettings, packageDir, permissionFor, pidAlive, validateSubmission,
+  describeActivity, integritySettings, isRetryable, packageDir, permissionFor, pidAlive,
+  recordRepairOutcome, validateSubmission,
 } from '../launch/operations/founder-review-handler.mjs'
+import {
+  classifyOutcome, deriveReport, relativise, renderReportMd, verifyScriptIn,
+} from '../launch/operations/repair-outcome.mjs'
 import { WorktreeError, ensureRepairWorktree, removeRepairWorktree } from '../launch/operations/repair-worktree.mjs'
 import { entrypointsIn, integrityOf, scriptsNamedIn, verdictForCommand } from '../launch/operations/verification-integrity.mjs'
 
@@ -429,8 +433,24 @@ check('the duplicate did not create a second package',
   JSON.parse(readFileSync(join(packageDir(REPO, 'homepage-2026-08-24-1937-double'), 'review.json'), 'utf8')).counts.screenshots === 4)
 check('exactly one attempt was recorded', rDbl.get(first.reviewId).attempts === 1)
 await settle()
+
+/* What happens after a run finishes now depends on what the run ACHIEVED, not
+   on the fact that it ended. The fake Claude edits nothing and commits nothing,
+   so this record is a real `no-change`: pressing the button again is the
+   founder asking for the repair they did not get, and refusing them would be
+   the old dishonesty wearing a different hat. */
 const afterDone = rDbl.submit(body)
-check('a click after completion still does not relaunch', afterDone.duplicate === true && spawnDbl.calls.length === 1)
+check('a run that finished having done nothing can be continued', afterDone.duplicate === false)
+check('and continuing it starts exactly one more process', spawnDbl.calls.length === 2)
+check('reusing the package already on disk rather than writing a second one',
+  afterDone.packagePath === first.packagePath
+  && JSON.parse(readFileSync(join(packageDir(REPO, 'homepage-2026-08-24-1937-double'), 'review.json'), 'utf8')).counts.screenshots === 4)
+check('the continued attempt is counted as an attempt', rDbl.get(first.reviewId).attempts === 2)
+// The other half of the same rule, and the one that stops a founder paying
+// twice for work that is already done.
+check('a repair that WAS finished is refused instead',
+  !isRetryable({ state: 'completed', report: { outcome: 'verified-local' } }))
+await settle()
 
 console.log('\nA retry after a blocked launch reuses the saved package')
 let cliPresent = false
@@ -563,10 +583,13 @@ check('the retry reused the package already on disk', retryStale.packagePath ===
 check('the retry started exactly one process', spawnAfterRestart.calls.length === 1)
 await settle()
 check('the retry completed', rRestarted.get(liveRec.reviewId).state === 'completed')
-// Pressing Retry again on a finished run must not start a second Claude.
+// Pressing Continue again is one relaunch per press — never a fan-out, and
+// never a second package. (This fake run changes nothing, so it stays
+// continuable; a verified one would be refused, which is asserted above.)
 rRestarted.submit(homepageReview(liveRec.reviewId))
-rRestarted.submit(homepageReview(liveRec.reviewId))
-check('repeated retries after completion start nothing more', spawnAfterRestart.calls.length === 1)
+check('a repeated Continue starts exactly one more process', spawnAfterRestart.calls.length === 2)
+check('and never a second package',
+  rRestarted.get(liveRec.reviewId).packagePath === liveRec.packagePath)
 
 console.log('\nThe evidence count is what the founder actually wrote')
 // The founder review that exposed this: no issue rows at all, both defects
@@ -1073,6 +1096,209 @@ check('a launch with no base commit gets no half-configured gate',
   integritySettings({ repoRoot: 'C:/x', worktreePath: 'C:/y', base: null }) === null)
 
 rmSync(GATEREPO, { recursive: true, force: true })
+
+
+/* ═══ The repair OUTCOME, which is not the process exit ═════════════════════
+   The gap this closes was real and is on disk: search-2026-08-29-14-11-o4rzqw
+   exited 0 having committed nothing and failed both of its checks, and the card
+   read "Claude repair complete". Everything below exists so that run can never
+   be described that way again.
+
+   Git is faked here, not driven. What each assertion is about is the RULE —
+   a failing check outranks a commit, an uncommitted change is not a repair —
+   and a fake gitFn states the facts those rules are applied to far more
+   precisely than a temp repo would. The real git path is exercised by the live
+   bridge every time a repair finishes. */
+console.log('\n▸ Repair outcome — what actually got done')
+
+/** One assistant turn carrying one tool_use. */
+const toolEv = (id, name, input) => ({ type: 'assistant', message: { content: [{ type: 'tool_use', id, name, input }] } })
+/** The result that came back for it. */
+const resEv = (id, text, isError = false) =>
+  ({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: id, content: text, is_error: isError }] } })
+
+const WT = 'C:/repairs/search-x'
+const gitNone = () => null
+const gitWith = ({ log = '', names = '', status = '' }) => (cwd, args) => {
+  if (args[0] === 'log') return log
+  if (args[0] === 'show') return names
+  if (args[0] === 'status') return status
+  return null
+}
+
+/* ── The transcript half ─────────────────────────────────────────────────── */
+
+const VS = ['check', 'test:format-price', 'test:listing-trust']
+
+check('a verification script is recognised through a cd prefix',
+  verifyScriptIn('cd "C:/x" && npm run check', VS)?.script === 'check')
+check('and reported as clean, so its output line may be quoted',
+  verifyScriptIn('cd "C:/x" && npm run check', VS)?.clean === true)
+// The bug this catches shipped in the first draft: `npm run lint && git commit`
+// had the commit's output printed under the linter's name.
+check('a chained command is NOT clean, so no line is quoted for it',
+  verifyScriptIn('npm run check && git commit -m "x"', VS)?.clean === false)
+check('a script we do not verify with is not verification',
+  verifyScriptIn('npm run dev', VS) === null)
+check('and neither is a bare tool invocation',
+  verifyScriptIn('tsc --noEmit', VS) === null)
+
+check('a worktree path is stripped from an edited file',
+  relativise(`${WT}/lib/search/priceFilter.ts`, WT) === 'lib/search/priceFilter.ts')
+check('and so is the founder checkout, for runs from before worktrees existed',
+  relativise('C:/repo/app/search/page.tsx', null, 'C:/repo') === 'app/search/page.tsx')
+
+/* ── The verdict ─────────────────────────────────────────────────────────── */
+
+/** The real shape of the run that was mislabelled: edits, refusedRun checks,
+ *  no commit. */
+const REFUSED_RUN = [
+  toolEv('e1', 'Edit', { file_path: `${WT}/lib/search/priceFilter.ts` }),
+  resEv('e1', 'ok'),
+  toolEv('b1', 'Bash', { command: 'npm run check' }),
+  resEv('b1', 'This command requires approval', true),
+  { type: 'system', subtype: 'permission_denied', tool_name: 'Bash', message: 'This command requires approval' },
+  { type: 'system', subtype: 'permission_denied', tool_name: 'Bash', message: 'This command requires approval' },
+]
+
+const refusedRun = deriveReport({
+  state: 'completed', events: REFUSED_RUN, summary: 'I could not run anything that writes.',
+  repoRoot: 'C:/repo', branch: 'repair/x', baseCommit: 'abc1234', worktreePath: WT,
+  verifyScripts: VS, gitFn: gitNone,
+})
+check('a clean exit with a refused check and no commit is INCOMPLETE, not complete',
+  refusedRun.outcome === 'incomplete', refusedRun.outcome)
+check('and it names both things that did not happen',
+  refusedRun.missing.some(m => /Verification/.test(m)) && refusedRun.missing.some(m => /Commit/.test(m)),
+  JSON.stringify(refusedRun.missing))
+check('the edit it did make is still credited',
+  refusedRun.changedFiles.includes('lib/search/priceFilter.ts'))
+check('identical refusals are counted, not repeated',
+  refusedRun.refusals.length === 1 && refusedRun.refusals[0].times === 2)
+check('an incomplete repair offers no founder next-steps — there is nothing to ship',
+  refusedRun.founderSteps.length === 0)
+check('and it is retryable, so Continue is offered',
+  isRetryable({ state: 'completed', report: refusedRun }))
+
+/* A commit exists, but a check failed. This is the ordering that matters: a
+   repair can commit a broken change, and every other signal would look green. */
+const brokenCommit = deriveReport({
+  state: 'completed',
+  events: [
+    toolEv('e1', 'Edit', { file_path: `${WT}/lib/a.ts` }), resEv('e1', 'ok'),
+    toolEv('b1', 'Bash', { command: 'npm run check' }), resEv('b1', 'error TS2322', true),
+  ],
+  repoRoot: 'C:/repo', branch: 'repair/x', baseCommit: 'abc1234', worktreePath: WT,
+  verifyScripts: VS,
+  gitFn: gitWith({ log: 'deadbeefcafe\u001ffix(search): something\u001f2026-09-01T10:00:00Z', names: 'lib/a.ts' }),
+})
+check('a commit does NOT outrank a failing check',
+  brokenCommit.outcome === 'incomplete', brokenCommit.outcome)
+check('the commit is still shown, read from git rather than from the transcript',
+  brokenCommit.commits.length === 1 && brokenCommit.commits[0].sha === 'deadbee')
+
+/* A check that was re-run pageAfter being fixed must not be held against the run. */
+const rerun = deriveReport({
+  state: 'completed',
+  events: [
+    toolEv('e1', 'Edit', { file_path: `${WT}/lib/a.ts` }), resEv('e1', 'ok'),
+    toolEv('b1', 'Bash', { command: 'npm run check' }), resEv('b1', 'error TS2322', true),
+    toolEv('b2', 'Bash', { command: 'npm run check' }), resEv('b2', 'Types clean'),
+  ],
+  repoRoot: 'C:/repo', branch: 'repair/x', baseCommit: 'abc1234', worktreePath: WT,
+  verifyScripts: VS,
+  gitFn: gitWith({ log: 'deadbeefcafe\u001ffix: x\u001f2026-09-01T10:00:00Z', names: 'lib/a.ts' }),
+})
+check('a check that failed and was then re-run and passed counts as passed',
+  rerun.outcome === 'verified-local', rerun.outcome)
+check('and it is listed once, at its final result',
+  rerun.verification.length === 1 && rerun.verification[0].ok === true)
+
+/* The good case — and the limit on how good it is allowed to sound. */
+const good = deriveReport({
+  state: 'completed',
+  events: [
+    toolEv('e1', 'Edit', { file_path: `${WT}/lib/a.ts` }), resEv('e1', 'ok'),
+    toolEv('b1', 'Bash', { command: 'npm run check' }), resEv('b1', 'Types clean'),
+    toolEv('b2', 'Bash', { command: 'npm run test:listing-trust' }), resEv('b2', 'PASS - 37 passed'),
+  ],
+  repoRoot: 'C:/repo', branch: 'repair/x', baseCommit: 'abc1234', worktreePath: WT,
+  verifyScripts: VS, summary: 'Fixed it.',
+  gitFn: gitWith({ log: 'deadbeefcafe\u001ffix: x\u001f2026-09-01T10:00:00Z', names: 'lib/a.ts' }),
+})
+check('changed + checked + committed is verified LOCALLY', good.outcome === 'verified-local')
+check('and never claims production — the repair cannot deploy',
+  good.productionVerified === false && /not on production/i.test(good.label))
+check('so the founder is handed the steps that are still theirs',
+  good.founderSteps.length === 3 && good.founderSteps.some(s => /production/i.test(s)))
+check('a verified repair is NOT retryable — there is nothing left to continue',
+  !isRetryable({ state: 'completed', report: good }))
+
+/* Edits with nothing committed anywhere: the founder must see the loose work. */
+const loose = deriveReport({
+  state: 'completed',
+  events: [toolEv('e1', 'Edit', { file_path: `${WT}/lib/a.ts` }), resEv('e1', 'ok'),
+           toolEv('b1', 'Bash', { command: 'npm run check' }), resEv('b1', 'Types clean')],
+  repoRoot: 'C:/repo', branch: 'repair/x', baseCommit: 'abc1234', worktreePath: WT,
+  verifyScripts: VS, gitFn: gitNone,
+})
+check('changes with no commit are INCOMPLETE even when every check passed',
+  loose.outcome === 'incomplete', loose.outcome)
+
+/* Nothing happened at all. */
+const nothing = deriveReport({
+  state: 'completed', events: [], repoRoot: 'C:/repo', branch: 'repair/x',
+  baseCommit: 'abc1234', worktreePath: WT, verifyScripts: VS, gitFn: gitNone,
+})
+check('a run that changed nothing says so rather than claiming a fix',
+  nothing.outcome === 'no-change', nothing.outcome)
+check('and it is retryable', isRetryable({ state: 'completed', report: nothing }))
+
+check('a failed process is a failed repair',
+  deriveReport({ state: 'failed', events: [], repoRoot: 'C:/repo', verifyScripts: VS, gitFn: gitNone }).outcome === 'failed')
+check('and an unfinished one claims nothing',
+  classifyOutcome({ state: 'running', changedFiles: [], verification: [], commits: [], uncommitted: [] }).outcome === 'unknown')
+
+/* ── The written report ──────────────────────────────────────────────────── */
+
+const md = renderReportMd({ reviewId: 'search-x', page: { title: 'Search' }, branch: 'repair/x', finishedAt: 'now' }, refusedRun)
+check('the report file leads with the verdict, in the negative', /Result: INCOMPLETE/.test(md))
+check('it states there were no commits', /## Commits\n\n- ✗ None\./.test(md))
+check('it always says production was not touched', /cannot push, merge or deploy/.test(md))
+check("and it carries Claude's own words rather than replacing them",
+  /I could not run anything that writes\./.test(md))
+
+/* ── Nothing here may resolve the founder's review ───────────────────────── */
+
+const FRJ = join(REPO, 'launch', 'founder-review.json')
+mkdirSync(dirname(FRJ), { recursive: true })
+writeFileSync(FRJ, JSON.stringify({
+  pages: {
+    search: {
+      title: 'Search', status: 'fix', issues: 2, shots: 3,
+      resolution: 'the founder wrote this', resolvedAt: '2026-08-31T19:36:37.944Z',
+    },
+  },
+}, null, 2))
+
+recordRepairOutcome(REPO, { reviewId: 'search-x', page: { id: 'search' }, branch: 'repair/x', finishedAt: 'now' }, good)
+const pageAfter = JSON.parse(readFileSync(FRJ, 'utf8')).pages.search
+
+check('a repair records its outcome against the page', pageAfter.repair?.outcome === 'verified-local')
+// The whole point. A local commit is not evidence about production, so a bridge
+// that flipped this would be inventing the one fact the founder needs.
+check('but it does NOT touch the founder\'s own verdict', pageAfter.status === 'fix')
+check('and it does not rewrite their resolution', pageAfter.resolution === 'the founder wrote this')
+check('nor their resolvedAt', pageAfter.resolvedAt === '2026-08-31T19:36:37.944Z')
+check('nor their evidence counts', pageAfter.issues === 2 && pageAfter.shots === 3)
+check('and it says outright that production is unproven', pageAfter.repair.productionVerified === false)
+
+recordRepairOutcome(REPO, { reviewId: 'search-x', page: { id: 'search' } }, refusedRun)
+const pageAfter2 = JSON.parse(readFileSync(FRJ, 'utf8')).pages.search
+check('an incomplete repair is recorded as incomplete, never as fixed',
+  pageAfter2.repair.outcome === 'incomplete' && pageAfter2.status === 'fix')
+check('a page the file has never heard of is not invented',
+  recordRepairOutcome(REPO, { reviewId: 'x', page: { id: 'covers' } }, good) === null)
 
 /* ═══ Cleanup ═══════════════════════════════════════════════════════════════ */
 rmSync(REPO, { recursive: true, force: true })
