@@ -217,7 +217,7 @@ the gate, the marker never executed, and untouched `npm run lint` still ran.
 | `packaged` | Every file is on disk and verified non-empty |
 | `launching` | Claude Code has been spawned |
 | `running` | Claude Code emitted its init event **and** the process it announced itself from is alive |
-| `completed` | Claude exited 0 and did not report an error |
+| `completed` | Claude exited 0 and did not report an error — **the process, not the repair**; see the outcome table below |
 | `failed` | Claude ran and something went wrong |
 | `blocked` | The *environment* stopped Claude starting |
 | `stale` | A repair was started and nobody can say how it ended |
@@ -248,6 +248,68 @@ pid, and that pid is alive — which is why the card prints the pid next to it.
 
 This mirrors the PASS / FAIL / BLOCKED model the Browser Trust runner uses, for
 the same reason: a run that never started is not evidence of anything.
+
+## The outcome, which is not the state
+
+A process exiting is not a defect being repaired. Until 2026-09-01 the card
+said **Claude repair complete** on the strength of exit code 0 alone, and the
+2026-08-30 Search run is what that cost: it exited 0 having committed nothing,
+with both of its checks refused, and its own final message said so — under a
+green headline, in a 300-character slice nobody read to the end of.
+
+So a finished run now carries a second, separate verdict. `state` says whether
+the process ended. `report.outcome` says whether the work got done, and it is
+the one the card leads with.
+
+| Outcome | Means | Button |
+|---|---|---|
+| `verified-local` | Changed, verified and committed on its own branch | Send again |
+| `incomplete` | Changed something, but a check failed or nothing was committed | **Continue this repair** |
+| `no-change` | Claude changed no code at all | **Continue this repair** |
+| `failed` | The repair did not complete | Retry |
+
+**Nothing tops out above `verified-local`, ever.** An unattended repair cannot
+push, merge or deploy — those are refused — so nothing it does is evidence
+about production. Every verified report says that outright and lists the three
+steps that are still yours: integrate, deploy, re-check the page live.
+
+### What the report is made of
+
+Two kinds of evidence, kept apart on purpose:
+
+- **From git, in your checkout** — the commits, and anything left uncommitted
+  in the repair worktree. A repair cannot write a commit into existence by
+  claiming one, and anything you would act on comes from here.
+- **From the transcript** — which verification commands ran and whether the
+  command itself errored, which files were edited, what was refused. These are
+  the stream's own `tool_result` records, not Claude's summary of them.
+
+A failing check outranks a commit that exists, because a repair can commit a
+broken change and every other signal would still look green. A check that
+failed and was then re-run and passed counts as passed — it is keyed by script,
+at its final result.
+
+Claude's own report is kept whole at the bottom of the panel, as the author's
+account rather than the verdict, and written to `<package>/report.md` so it
+outlives the browser. The whole report is stored in `run.json`, so it survives
+a page reload, a bridge restart and the worktree being removed.
+
+### What it must never do
+
+`recordRepairOutcome` writes exactly one new key — `repair` — onto the page in
+`launch/founder-review.json`. It does not touch `status`, `resolution`,
+`resolvedAt` or your evidence counts. Those are your verdict on what you saw on
+production, and a local commit is not evidence about production. A bridge that
+flipped a page to fixed because a commit exists would be inventing the one fact
+you actually need. The handoff test asserts this directly.
+
+### Continue
+
+An `incomplete` or `no-change` run is retryable on the **same** reviewId, so
+the bridge reuses the package on disk, the branch that already holds the first
+attempt's commits, and the worktree that already holds its edits. The prompt
+tells the session not to revert them, so Continue genuinely continues. A
+`verified-local` run is refused as a duplicate — there is nothing left to do.
 
 ## If it says "Claude Code is signed out"
 
