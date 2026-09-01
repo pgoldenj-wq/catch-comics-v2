@@ -1184,11 +1184,37 @@ check('and says the slot is unreviewed, naming the specifier',
 check('prose about an import is not mistaken for one',
   specifiersIn("/* see: import x from './nope' */\n// import y from './also-nope'\nimport { a } from './real'\n")
     .join(',') === './real')
-check('a URL survives the comment stripper',
+check('a URL is not read as the start of a line comment',
   specifiersIn("const u = 'https://example.com'\nimport { a } from './real'\n").join(',') === './real')
 check('export-from, side-effect and dynamic imports all count',
   specifiersIn("export * from './a'\nimport './b'\nawait import('./c')\nrequire('./d')\n")
     .sort().join(',') === './a,./b,./c,./d')
+
+/* The gate caught this one in itself, the first time it ran against a real
+   commit. THIS file tests the scanner, so it necessarily contains import syntax
+   inside string literals — and a regex over raw text read the `import('./c')`
+   on the line above as a real import of a module that has never existed. The
+   gate then refused test:founder-review outright. A false refusal is not a safe
+   failure: it takes a verification command away from a repair for a reason that
+   is not true. Strings are opaque now, and this is the proof. */
+check('import syntax QUOTED inside a string is not an import',
+  specifiersIn(`const example = "import x from './nope'"\nconst e2 = 'await import(\\'./also-nope\\')'\n`).length === 0)
+check('a real import still counts when it sits beside a quoted one',
+  specifiersIn(`const example = "import x from './nope'"\nimport { a } from './real'\n`).join(',') === './real')
+// This file's own text is the case that failed. Scanning it must find only the
+// modules it genuinely imports, all of which are committed.
+const selfSpecs = specifiersIn(readFileSync(new URL(import.meta.url), 'utf8'))
+check('scanning this very file finds no phantom module',
+  selfSpecs.every(s => !/^\.\/[a-d]$/.test(s)), selfSpecs.filter(s => /^\.\/[a-d]$/.test(s)).join(','))
+// A regex literal containing a quote must not be read as the start of a string.
+// verification-integrity.mjs itself contains one, so the scanner would have
+// swallowed the rest of its source.
+check('a quote inside a regex literal does not swallow the source',
+  specifiersIn(`const q = /['\"]/\nimport { a } from './real'\n`).join(',') === './real')
+check('division is not mistaken for a regex',
+  specifiersIn(`const r = total / count / 2\nimport { a } from './real'\n`).join(',') === './real')
+check('a template literal is never a specifier',
+  specifiersIn('const t = `import x from "./nope"`\n').length === 0)
 check('bare package specifiers are left alone',
   resolveRepoSpecifier('scripts/x.ts', 'node:fs', () => true) === null
   && resolveRepoSpecifier('scripts/x.ts', '@prisma/client', () => true) === null)

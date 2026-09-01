@@ -131,28 +131,108 @@ export const WALK_LIMITS = { maxDepth: 12, maxFiles: 200 }
 const RESOLVE_SUFFIXES = ['', '.ts', '.tsx', '.mjs', '.cjs', '.js', '.json',
   '/index.ts', '/index.tsx', '/index.mjs', '/index.cjs', '/index.js']
 
-/** Comments are stripped before scanning so that prose describing an import —
- *  which this file and its neighbours are full of — cannot be mistaken for one.
- *  Approximate by design: it protects `https://` and leaves string contents
- *  otherwise alone, which is enough for source that already parses. */
-export function stripComments(src) {
-  return String(src)
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/(^|[^:\\])\/\/[^\n]*/g, '$1')
-}
-
-/** Every module specifier a source file names. Three narrow forms rather than
- *  one clever one, for the same reason ENTRYPOINT_RE is not a shell parser. */
-const SPEC_PATTERNS = [
-  /(?:^|[\s;})])(?:import|export)\b[^'"]*?\bfrom\s*['"]([^'"\n]+)['"]/g,  // import x from 'y' / export * from 'y'
-  /(?:^|[\s;})])import\s*['"]([^'"\n]+)['"]/g,                            // import 'y'
-  /\b(?:import|require)\s*\(\s*['"]([^'"\n]+)['"]\s*\)/g,                 // import('y') / require('y')
+/** A string literal is a specifier only when the CODE just before it says so.
+ *  `from` and a bare `import` cover the statement forms; the open bracket
+ *  covers the call forms. */
+const SPECIFIER_POSITION = [
+  /\bfrom$/,                      // import x from 'y' / export * from 'y'
+  /\bimport$/,                    // import 'y'
+  /\b(?:import|require)\s*\($/,   // import('y') / require('y')
 ]
 
+/** Where a `/` opens a regex literal rather than dividing. The standard
+ *  heuristic: a regex can only start where a value can. It matters here because
+ *  this very file contains /['"]/ , and a scanner that read that quote as the
+ *  start of a string would swallow the rest of the source. */
+const REGEX_MAY_START = /(?:[([{,;:=!&|?+\-*%^~<>]|\b(?:return|typeof|instanceof|in|of|new|delete|void|case|do|else|yield|await))$/
+
+/**
+ * Every module specifier a source file names.
+ *
+ * This walks the source rather than running regexes over it, because regexes
+ * over raw text cannot tell code from a string that merely LOOKS like code —
+ * and the first real file this gate met proved it. scripts/test-founder-review-
+ * handoff.mjs tests this very function, so it contains import syntax inside
+ * string literals; a regex read one of those as a real import of a module that
+ * has never existed, and the gate refused test:founder-review outright. A false
+ * refusal is not a safe failure: it takes a verification command away from a
+ * repair for a reason that is not true.
+ *
+ * So strings, templates, comments and regex literals are consumed whole and
+ * treated as opaque. A string counts as a specifier only when the code
+ * skeleton immediately before it is in specifier position, which is what makes
+ * a quoted example of an import statement inert.
+ */
 export function specifiersIn(source) {
-  const clean = stripComments(source)
+  const src = String(source)
   const out = new Set()
-  for (const re of SPEC_PATTERNS) for (const m of clean.matchAll(re)) out.add(m[1])
+  let code = ''            // the source with strings, comments and regexes removed
+  let i = 0
+
+  const tail = () => code.trimEnd()
+
+  while (i < src.length) {
+    const c = src[i]
+    const next = src[i + 1]
+
+    if (c === '/' && next === '/') {                       // line comment
+      while (i < src.length && src[i] !== '\n') i++
+      continue
+    }
+    if (c === '/' && next === '*') {                       // block comment
+      i += 2
+      while (i < src.length && !(src[i] === '*' && src[i + 1] === '/')) i++
+      i += 2
+      code += ' '
+      continue
+    }
+    if (c === '/' && REGEX_MAY_START.test(tail())) {       // regex literal
+      i++
+      let inClass = false
+      while (i < src.length) {
+        if (src[i] === '\\') { i += 2; continue }
+        if (src[i] === '[') inClass = true
+        else if (src[i] === ']') inClass = false
+        else if (src[i] === '/' && !inClass) { i++; break }
+        else if (src[i] === '\n') break                    // unterminated; give up on it
+        i++
+      }
+      code += ' '
+      continue
+    }
+    if (c === '`') {                                       // template literal
+      i++
+      let depth = 0
+      while (i < src.length) {
+        if (src[i] === '\\') { i += 2; continue }
+        if (src[i] === '$' && src[i + 1] === '{') { depth++; i += 2; continue }
+        if (src[i] === '}' && depth > 0) { depth--; i++; continue }
+        if (src[i] === '`' && depth === 0) { i++; break }
+        i++
+      }
+      code += ' '                                          // never a static specifier
+      continue
+    }
+    if (c === '"' || c === "'") {                          // string literal
+      const quote = c
+      i++
+      let body = ''
+      while (i < src.length) {
+        if (src[i] === '\\') { body += src[i + 1] ?? ''; i += 2; continue }
+        if (src[i] === quote) { i++; break }
+        if (src[i] === '\n') break                         // unterminated; give up on it
+        body += src[i]
+        i++
+      }
+      if (SPECIFIER_POSITION.some(re => re.test(tail()))) out.add(body)
+      code += ' '
+      continue
+    }
+
+    code += c
+    i++
+  }
+
   return [...out]
 }
 
