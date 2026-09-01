@@ -29,7 +29,10 @@ import {
   classifyOutcome, deriveReport, relativise, renderReportMd, verifyScriptIn,
 } from '../launch/operations/repair-outcome.mjs'
 import { WorktreeError, ensureRepairWorktree, removeRepairWorktree } from '../launch/operations/repair-worktree.mjs'
-import { entrypointsIn, integrityOf, scriptsNamedIn, verdictForCommand } from '../launch/operations/verification-integrity.mjs'
+import {
+  SUBJECT_ROOTS, WALK_LIMITS, baseTree, blobAt, entrypointsIn, integrityOf, isSubject,
+  resolveRepoSpecifier, scriptsNamedIn, specifiersIn, verdictForCommand, walkImports,
+} from '../launch/operations/verification-integrity.mjs'
 
 let pass = 0, fail = 0
 const check = (name, ok, extra = '') => {
@@ -1051,6 +1054,240 @@ check('the code under test is explicitly NOT what was objected to',
   !/lib\/thing\.ts/.test(tampered.reason ?? ''))
 ggit(['checkout', '--', 'scripts/test-safe.ts'])
 check('restoring the reviewed runner restores permission', at('test:safe').ok === true)
+
+/* ── 12b. The third form: leave the runner alone, rewrite what it imports ────
+   Freezing the entrypoint freezes its assertions, and that is most of the
+   value. It does not freeze what the entrypoint DELEGATES to. This repo's own
+   test:founder-review is the case that made it concrete — its runner is a thin
+   driver over five modules in launch/operations, so hashing the driver alone
+   left every module it actually exercises writable by the session being judged.
+   A green tick from that proves the rewritten mechanism agrees with itself.
+
+   The controls matter as much as the attacks here, so both are below: the
+   subject stays editable, and the boundary is absorbing.                     */
+console.log('\nA verification command cannot be hollowed out through its imports')
+
+mkdirSync(join(GATEREPO, 'harness'), { recursive: true })
+mkdirSync(join(GATEREPO, 'lib', 'deep'), { recursive: true })
+
+// A runner that delegates: assertions in the entrypoint, judgement in a module.
+gwrite('scripts/test-delegating.ts', [
+  "import { assertSame } from '../harness/assert'",
+  "import { value } from '../lib/subject'",
+  "assertSame(value(), 'expected')",
+].join('\n') + '\n')
+gwrite('harness/assert.ts', [
+  "import { fail } from './report'",
+  "export const assertSame = (a, b) => { if (a !== b) fail(`${a} !== ${b}`) }",
+].join('\n') + '\n')
+gwrite('harness/report.ts', "export const fail = m => { throw new Error(m) }\n")
+// The subject, which reaches further into subject territory. Nothing beyond
+// this point may be frozen, however deep it goes.
+gwrite('lib/subject.ts', [
+  "import { helper } from './deep/helper'",
+  "export const value = () => helper()",
+].join('\n') + '\n')
+gwrite('lib/deep/helper.ts', "export const helper = () => 'expected'\n")
+
+const pkgAdd = (name, value) => {
+  const p = pkg(); p.scripts[name] = value
+  gwrite('package.json', JSON.stringify(p, null, 2) + '\n')
+}
+pkgAdd('test:delegating', 'tsx scripts/test-delegating.ts')
+ggit(['add', '.'])
+ggit(['commit', '-qm', 'delegating'])
+// Everything above is now committed, so THIS is the reviewed mechanism. The
+// base moves with it, exactly as a real repair's base is the HEAD it branched.
+const GATEBASE2 = ggit(['rev-parse', 'HEAD']).stdout.trim()
+const at2 = script => integrityOf({ repoRoot: GATEREPO, worktree: GATEREPO, base: GATEBASE2, script })
+
+check('a delegating runner is permitted while its whole mechanism is intact',
+  at2('test:delegating').ok === true, at2('test:delegating').reason ?? '')
+
+/* The attack: the entrypoint and package.json are untouched, and the module
+   that decides pass-or-fail is neutered. Before this walk existed, this ran. */
+gwrite('harness/assert.ts', [
+  "import { fail } from './report'",
+  'export const assertSame = () => { /* everything passes now */ }',
+].join('\n') + '\n')
+const viaImport = at2('test:delegating')
+check('rewriting a module the runner imports cannot inherit the runner\'s permission',
+  viaImport.ok === false)
+check('and the refusal names the module, not just the script',
+  /harness\/assert\.ts has been modified/.test(viaImport.reason ?? ''), viaImport.reason ?? '')
+check('and shows the import chain that reaches it',
+  /scripts\/test-delegating\.ts → harness\/assert\.ts/.test(viaImport.reason ?? ''), viaImport.reason ?? '')
+check('and says why a pass from it would be worthless',
+  /rewritten version agreeing with itself/.test(viaImport.reason ?? ''))
+ggit(['checkout', '--', 'harness/assert.ts'])
+check('restoring it restores permission', at2('test:delegating').ok === true)
+
+/* Depth: the walk is transitive, so hiding one level down changes nothing. */
+gwrite('harness/report.ts', "export const fail = () => {}\n")
+const viaDepth2 = at2('test:delegating')
+check('a module two imports deep is reached just the same', viaDepth2.ok === false)
+check('and the chain shows the whole route to it',
+  /scripts\/test-delegating\.ts → harness\/assert\.ts → harness\/report\.ts/.test(viaDepth2.reason ?? ''),
+  viaDepth2.reason ?? '')
+ggit(['checkout', '--', 'harness/report.ts'])
+
+/* Deleting it is not a way round either. */
+rmSync(join(GATEREPO, 'harness', 'report.ts'))
+check('deleting an imported module is refused rather than ignored', at2('test:delegating').ok === false)
+check('and says it was deleted, not merely changed',
+  /has been deleted from this worktree/.test(at2('test:delegating').reason ?? ''))
+ggit(['checkout', '--', 'harness/report.ts'])
+
+/* ── The controls. Without these the gate would be a cage. ───────────────── */
+
+// The whole reason the walk stops where it does. A repair exists to change
+// lib/; if editing it cost the repair its verification command, the gate would
+// have made repairs impossible rather than honest.
+gwrite('lib/subject.ts', [
+  "import { helper } from './deep/helper'",
+  "export const value = () => helper() // repaired",
+].join('\n') + '\n')
+check('the code UNDER test is still freely editable', at2('test:delegating').ok === true,
+  at2('test:delegating').reason ?? '')
+
+// Absorbing, not merely skipped: a repair free to rewrite lib/subject.ts can
+// delete its import of anything beyond, so freezing past the boundary would
+// promise a guarantee that is not there.
+gwrite('lib/deep/helper.ts', "export const helper = () => 'repaired too'\n")
+check('and so is everything reached only through it', at2('test:delegating').ok === true,
+  at2('test:delegating').reason ?? '')
+check('the refusal for an unrelated script is unaffected by subject edits', at2('check').ok === true)
+ggit(['checkout', '--', 'lib'])
+
+// The 14-of-16 case in this repo: a test that imports only its subject gains
+// nothing frozen, so this must not have quietly become a cost.
+check('a runner that imports only subject code freezes nothing new',
+  at2('test:safe').ok === true, at2('test:safe').reason ?? '')
+
+/* ── An unreviewed slot is a refusal, not a shrug ─────────────────────────── */
+
+// A mechanism file importing something absent from committed history is a hole
+// the worktree could fill with a module of its own choosing.
+gwrite('scripts/test-ghost.ts', "import './not-committed'\n")
+pkgAdd('test:ghost', 'tsx scripts/test-ghost.ts')
+ggit(['add', '.'])
+ggit(['commit', '-qm', 'ghost'])
+const GATEBASE3 = ggit(['rev-parse', 'HEAD']).stdout.trim()
+const ghost = integrityOf({ repoRoot: GATEREPO, worktree: GATEREPO, base: GATEBASE3, script: 'test:ghost' })
+check('a mechanism import with nothing behind it at base is refused', ghost.ok === false)
+check('and says the slot is unreviewed, naming the specifier',
+  /imports "\.\/not-committed", which does not exist at the base commit/.test(ghost.reason ?? ''),
+  ghost.reason ?? '')
+
+/* ── The parts, on their own ──────────────────────────────────────────────── */
+
+check('prose about an import is not mistaken for one',
+  specifiersIn("/* see: import x from './nope' */\n// import y from './also-nope'\nimport { a } from './real'\n")
+    .join(',') === './real')
+check('a URL survives the comment stripper',
+  specifiersIn("const u = 'https://example.com'\nimport { a } from './real'\n").join(',') === './real')
+check('export-from, side-effect and dynamic imports all count',
+  specifiersIn("export * from './a'\nimport './b'\nawait import('./c')\nrequire('./d')\n")
+    .sort().join(',') === './a,./b,./c,./d')
+check('bare package specifiers are left alone',
+  resolveRepoSpecifier('scripts/x.ts', 'node:fs', () => true) === null
+  && resolveRepoSpecifier('scripts/x.ts', '@prisma/client', () => true) === null)
+check('the @/ alias resolves against the repo root, not the importing file',
+  resolveRepoSpecifier('scripts/deep/x.ts', '@/lib/thing', r => r === 'lib/thing.ts')?.rel === 'lib/thing.ts')
+check('a specifier climbing out of the repo is not followed',
+  resolveRepoSpecifier('scripts/x.ts', '../../outside/secrets', () => true) === null)
+check('lib/ and app/ are the declared subject roots',
+  SUBJECT_ROOTS.join(',') === 'lib/,app/' && isSubject('lib/a.ts') && isSubject('app/b.tsx') && !isSubject('launch/c.mjs'))
+
+// Cycles are ordinary in real module graphs; a gate that hung on one would be
+// a gate that hung the repair.
+const cyclic = { 'scripts/a.mjs': "import './b.mjs'", 'scripts/b.mjs': "import './a.mjs'" }
+const cyc = walkImports({
+  entrypoints: ['scripts/a.mjs'],
+  sourceOf: r => cyclic[r] ?? null,
+  existsAtBase: r => r in cyclic,
+})
+check('an import cycle terminates rather than spinning',
+  cyc.ok === true && [...cyc.files.keys()].join(',') === 'scripts/b.mjs')
+
+// The bounds exist so a hook that runs before every command can never wander.
+// Hitting one only ever refuses, so it cannot be turned into a way through.
+const chainSrc = Object.fromEntries(
+  Array.from({ length: 30 }, (_, i) => [`scripts/n${i}.mjs`, `import './n${i + 1}.mjs'`]))
+chainSrc['scripts/n30.mjs'] = ''
+const tooDeep = walkImports({
+  entrypoints: ['scripts/n0.mjs'],
+  sourceOf: r => chainSrc[r] ?? null,
+  existsAtBase: r => r in chainSrc,
+  limits: { maxDepth: 4 },
+})
+check('a mechanism deeper than the walk bound is refused, not waved through', tooDeep.ok === false)
+check('and says it could not be walked to the end', /nest more than/.test(tooDeep.reason ?? ''))
+// A graph that simply ENDS at the bound has been walked to completion, so it is
+// vouched for. Refusing it would be the gate mistaking "finished" for "gave up".
+const exactlyAtBound = walkImports({
+  entrypoints: ['scripts/n0.mjs'],
+  sourceOf: r => ({ 'scripts/n0.mjs': "import './n1.mjs'", 'scripts/n1.mjs': '' })[r] ?? null,
+  existsAtBase: r => ['scripts/n0.mjs', 'scripts/n1.mjs'].includes(r),
+  limits: { maxDepth: 2 },
+})
+check('a mechanism that ends exactly at the bound is walked, not refused',
+  exactlyAtBound.ok === true, exactlyAtBound.reason ?? '')
+const tooWide = walkImports({
+  entrypoints: ['scripts/n0.mjs'],
+  sourceOf: r => chainSrc[r] ?? null,
+  existsAtBase: r => r in chainSrc,
+  limits: { maxFiles: 3 },
+})
+check('so is one that reaches more files than the bound', tooWide.ok === false)
+check('and it is left for a human to run', /left for a human to run/.test(tooWide.reason ?? ''))
+check('the shipped bounds are far clear of this repo\'s largest closure',
+  WALK_LIMITS.maxDepth >= 12 && WALK_LIMITS.maxFiles >= 200)
+
+/* ── And the guarantee, stated against the real repo ──────────────────────── */
+
+/* The docblock's claim is about THIS repo's allowlist, so it is checked against
+   THIS repo rather than a fixture — and deliberately WITHOUT requiring a clean
+   checkout. The founder's tree is dirty almost always (other sessions edit it
+   live), so a check that only ran on a clean one would be a check that never
+   ran, which is the failure this project keeps meeting.
+
+   What is asserted here holds either way: for every allowlisted command, the
+   mechanism must be fully WALKABLE at HEAD — every import it names resolves to
+   a committed file, within the bounds. A repair's own edits cannot affect this,
+   because the walk resolves and reads entirely at the base commit. If it ever
+   fails, the gate would start refusing a command the founder believes is
+   available, and this is where they should find that out. */
+const REPO_ROOT = resolve(dirname(new URL(import.meta.url).pathname.slice(1)), '..')
+const headSha = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: REPO_ROOT, encoding: 'utf8', windowsHide: true })
+if (headSha.status === 0) {
+  const REAL_BASE = headSha.stdout.trim()
+  const tree = baseTree(REPO_ROOT, REAL_BASE)
+  const headDefs = JSON.parse(blobAt(REPO_ROOT, REAL_BASE, 'package.json')).scripts ?? {}
+  const unwalkable = []
+  let reached = 0, frozenBeyondEntrypoints = 0
+  for (const s of VERIFY_SCRIPTS) {
+    const eps = entrypointsIn(headDefs[s] ?? '')
+    if (!eps.length) continue                       // check, lint — no runner to walk
+    const w = walkImports({
+      entrypoints: eps,
+      sourceOf: rel => blobAt(REPO_ROOT, REAL_BASE, rel),
+      existsAtBase: rel => tree.has(rel),
+    })
+    if (!w.ok) { unwalkable.push(`${s}: ${w.reason}`); continue }
+    reached += eps.length + w.files.size
+    frozenBeyondEntrypoints += w.files.size
+  }
+  check(`every allowlisted verification command is walkable at HEAD (${reached} files reached)`,
+    unwalkable.length === 0, unwalkable.join(' | '))
+  // The measurement the docblock quotes. If this number ever jumps, the gate has
+  // started freezing more of the repo than the founder was told it would, and
+  // that is a decision to make deliberately rather than to discover.
+  check(`the walk freezes only the mechanism, not the repo (${frozenBeyondEntrypoints} files beyond the runners)`,
+    frozenBeyondEntrypoints <= 20, String(frozenBeyondEntrypoints))
+} else {
+  check('every allowlisted verification command is walkable at HEAD', true, 'skipped — git unavailable')
+}
 
 /* A script the repair invented has no reviewed version, so it cannot run —
    which is also what keeps the allow list honest about scripts not yet at HEAD. */
