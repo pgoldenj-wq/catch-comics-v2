@@ -36,11 +36,14 @@
  */
 
 import { spawn } from 'node:child_process'
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync, statSync } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
 import { SIGNIN_COMMAND, claudeVersion, findClaude, readiness } from './claude-readiness.mjs'
 import { WorktreeError, ensureRepairWorktree } from './repair-worktree.mjs'
 import { deriveReport, renderReportMd } from './repair-outcome.mjs'
+import {
+  LAUNCH_FILE, ensureWorkspaceTrust, readSessionState, visibleLaunchArgv,
+} from './repair-session.mjs'
 
 /* ── Bounds ──────────────────────────────────────────────────────────────── */
 export const LIMITS = {
@@ -781,7 +784,7 @@ Finish with an issue-by-issue report: diagnosis, fix, verification (name the com
  *   - it is passed on the argv, so there is no settings file on disk for a
  *     repair to rewrite either.
  */
-export function integritySettings({ repoRoot, worktreePath, base }) {
+export function integritySettings({ repoRoot, worktreePath, base, packageDir: pkgDir = null }) {
   if (!repoRoot || !base) return null
   const fwd = p => String(p).replace(/\\/g, '/')
   const gate = `${fwd(repoRoot)}/launch/operations/verification-integrity.mjs`
@@ -790,29 +793,118 @@ export function integritySettings({ repoRoot, worktreePath, base }) {
   // security boundary on.
   const command = `node "${gate}" --hook --repo "${fwd(repoRoot)}" --base ${base}`
     + (worktreePath ? ` --worktree "${fwd(worktreePath)}"` : '')
-  return JSON.stringify({
-    hooks: { PreToolUse: [{ matcher: 'Bash', hooks: [{ type: 'command', command }] }] },
-  })
+
+  const PreToolUse = [{ matcher: 'Bash', hooks: [{ type: 'command', command }] }]
+  const hooks = { PreToolUse }
+
+  // The recorder. It exists only because a VISIBLE session writes no
+  // transcript while it runs — measured, the file at `transcript_path` is not
+  // there even at Stop — so the reporting contract has to be met from hook
+  // payloads instead. Every one of these appends to the same claude-run.jsonl
+  // the piped run produced, in the same shape, so nothing downstream changed.
+  //
+  // It is addressed in the FOUNDER'S checkout for the same reason the gate is:
+  // the repair can edit its own worktree, and evidence a subject can rewrite
+  // is not evidence. It is on the argv for the same reason too — there is no
+  // settings file on disk to tamper with.
+  if (pkgDir) {
+    const rec = ev => ({
+      type: 'command',
+      command: `node "${fwd(repoRoot)}/launch/operations/repair-session.mjs" --record ${ev} "${fwd(pkgDir)}"`,
+    })
+    // A second PreToolUse entry, NOT a replacement: two hooks on Bash were
+    // measured to both run, and a deny from either still wins.
+    PreToolUse.push({ matcher: '*', hooks: [rec('PreToolUse')] })
+    hooks.PostToolUse = [{ matcher: '*', hooks: [rec('PostToolUse')] }]
+    hooks.SessionStart = [{ hooks: [rec('SessionStart')] }]
+    hooks.Stop = [{ hooks: [rec('Stop')] }]
+    hooks.SessionEnd = [{ hooks: [rec('SessionEnd')] }]
+  }
+  return JSON.stringify({ hooks })
+}
+
+/**
+ * The argv for the VISIBLE interactive session.
+ *
+ * The prompt is the last positional argument, which was measured to be
+ * SUBMITTED rather than merely prefilled: an interactive session opened this
+ * way starts working with no keystroke from the founder. There is no `-p`,
+ * no `--output-format` and no `--verbose`, because there is no pipe any more —
+ * the founder is the one watching the output.
+ *
+ * `--max-budget-usd` is gone with them: the CLI accepts it only with --print.
+ * The ceiling a visible session has instead is the founder, who can see what
+ * it is doing and stop it — which is the whole reason for the change.
+ *
+ * Nothing here reaches a shell. This array is handed to claude by the wrapper
+ * inside the terminal, through launch.json; the terminal's own command line
+ * carries only generated paths.
+ */
+/** The standing instruction, as a file the session reads. */
+export const INSTRUCTIONS_FILE = 'repair-instructions.md'
+
+/**
+ * The turn the visible session opens with. ONE short line.
+ *
+ * MEASURED, 2026-09-01, and the reason this exists. A single-line positional
+ * prompt is submitted by an interactive session the moment it starts — proven
+ * three times. The full 2.9 KB standing instruction, with its blank lines and
+ * headings, was NOT: the first real visible repair opened correctly in its
+ * worktree, with its name, its permissions and its hooks all in place, and sat
+ * at an empty prompt because a long multi-line positional argument lands in
+ * the composer as a draft instead of being sent.
+ *
+ * So the instruction goes where instructions belong — a file in the package,
+ * next to the review it is about — and the command line carries a sentence.
+ * This is also what the founder asked for: point at the package, do not
+ * duplicate it into argv.
+ */
+export function kickoffPrompt(relPackagePath) {
+  return `Read ${relPackagePath}/${INSTRUCTIONS_FILE} and follow it exactly, starting now.`
 }
 
 export function claudeArgv(relPackagePath, ctx = {}) {
   const settings = integritySettings(ctx)
   return [
-    '-p', repairPrompt(relPackagePath, ctx),
-    '--output-format', 'stream-json',
-    '--verbose',
+    // THE PROMPT COMES FIRST, AND THAT IS NOT A STYLE CHOICE.
+    //
+    // MEASURED, 2026-09-01, twice, in a real window. `--allowedTools` and
+    // `--disallowedTools` are VARIADIC (`<tools...>`): they consume every
+    // following argument until the next flag. With the prompt last, it was
+    // swallowed as the 93rd value of --disallowedTools — so the session opened
+    // perfectly, in the right worktree, with the right name and permissions,
+    // and no turn was ever sent. The window just sat at an empty prompt.
+    //
+    // Nothing downstream of a variadic option is safe. The positional goes at
+    // the front, where no option can reach it.
+    kickoffPrompt(relPackagePath),
+    // A name for the session, which the CLI also puts in the terminal title.
+    // Built from the page ID, never founder text — see windowTitleFor().
+    '-n', windowTitleFor(ctx.pageId),
     '--permission-mode', 'acceptEdits',
     ...(settings ? ['--settings', settings] : []),
     // Pinned, not aliased: on CLI 2.1.218 the `opus` alias still resolves to
     // claude-opus-4-8. A founder repair should get the current best model, so
     // the id is stated outright rather than left to an alias to decide.
     '--model', 'claude-opus-5',
-    '--max-budget-usd', '15',
     // Default-deny: only these run without a human to ask.
     '--allowedTools', ...ALLOWED_TOOLS,
     // Named refusals, which beat the allow list and would beat a bypass too.
+    // Variadic, and therefore LAST: anything after this is eaten by it.
     '--disallowedTools', ...DISALLOWED_TOOLS,
   ]
+}
+
+/**
+ * The window's name. Derived from the page ID — one of a fixed list — and
+ * never from `page.title`, which the browser supplies and the founder can
+ * type into. It is the one string that reaches a cmd.exe command line, so it
+ * is the one string that must not be founder-controlled.
+ */
+export function windowTitleFor(pageId) {
+  const id = PAGE_IDS.includes(pageId) ? pageId : 'review'
+  const pretty = id.replace(/-/g, ' ').replace(/\b[a-z]/g, c => c.toUpperCase())
+  return `Catch Comics Repair — ${pretty}`
 }
 
 /** The one sentence the founder is given when Claude Code is signed out. It
@@ -821,15 +913,43 @@ export const SIGNED_OUT_REASON =
   'Claude Code is signed out. Your review is saved — press “Sign in to Claude Code”, '
   + `finish the browser approval, then press Retry. (Manual fallback: ${SIGNIN_COMMAND})`
 
-/** Classify a finished run. `blocked` is an environment problem, not a failure. */
-export function classifyRun({ exitCode, result, spawnError }) {
-  if (spawnError) return { state: 'blocked', reason: spawnError }
-  const text = String(result?.result ?? '')
+/**
+ * Classify a finished run. `blocked` is an environment problem, not a failure.
+ *
+ * `stopped` is the new first question and it outranks the exit code, because
+ * with a visible session those two facts came apart: Claude finishing its
+ * repair and the founder closing the terminal are different events, and they
+ * can happen in either order. A run that reported back through the Stop hook
+ * has DONE something, whatever later became of the window — so the report is
+ * derived and the founder gets it. Only a run with no Stop at all is judged by
+ * how its process ended.
+ */
+export function classifyRun({ exitCode, result, spawnError, stopped = false }) {
+  // The token check comes first and reads BOTH sources. A piped run put an
+  // expired token in its result text; a visible one dies and the wrapper
+  // records the message on exit.json instead. Same cause, same answer, and
+  // the answer names the sign-in button rather than quoting an OAuth error at
+  // a founder who cannot act on it.
+  const text = `${result?.result ?? ''}\n${spawnError ?? ''}`
   if (/authenticat|OAuth session expired|Invalid API key|credit balance/i.test(text)) {
     return { state: 'blocked', reason: SIGNED_OUT_REASON }
   }
+  if (spawnError) return { state: 'blocked', reason: spawnError }
+  if (stopped) return { state: 'completed', reason: null }
   if (exitCode === 0 && result && result.is_error !== true) return { state: 'completed', reason: null }
-  return { state: 'failed', reason: text.slice(0, 400) || `Claude Code exited with code ${exitCode}` }
+  // A visible session that ended without ever reporting back is not a failed
+  // repair — nobody can say what it did. That is what `stale` is for, and it
+  // is what the founder sees if they close the window mid-repair.
+  if (exitCode === 0 || exitCode === null) return { state: 'stale', reason: STALE_REASON }
+  // `.trim()` before the fallback, not after: a killed session left `"\n"` in
+  // this field, which is falsy to nobody and useless to everybody. The founder
+  // was shown a blank red line where a reason should have been.
+  const said = text.trim().slice(0, 400)
+  return {
+    state: 'failed',
+    reason: said || `The Claude Code session ended with exit code ${exitCode} before it reported back. `
+      + 'Your review is saved — press Retry to hand it to Claude again.',
+  }
 }
 
 /* ── What the repair is doing ────────────────────────────────────────────────
@@ -940,7 +1060,8 @@ export const STALE_REASON =
 export class ReviewRunner {
   constructor(repoRoot, {
     spawnFn = spawn, findClaudeFn = findClaude, readinessFn = readiness,
-    worktreeFn = ensureRepairWorktree,
+    worktreeFn = ensureRepairWorktree, trustFn = ensureWorkspaceTrust,
+    readSessionFn = readSessionState, pollMs = 1500, launchGraceMs = 90_000,
   } = {}) {
     this.repoRoot = repoRoot
     this.spawnFn = spawnFn
@@ -951,9 +1072,20 @@ export class ReviewRunner {
     // The shared readiness check. Injected so the tests can drive a signed-out
     // machine without touching the founder's real account.
     this.readinessFn = readinessFn
+    // Marks the freshly-made worktree trusted, so the interactive session does
+    // not stop on the trust dialog. Injected so tests never touch ~/.claude.json.
+    this.trustFn = trustFn
+    // How the bridge learns what a window it does not own is doing.
+    this.readSessionFn = readSessionFn
+    this.pollMs = pollMs
+    // How long a terminal has to prove it opened before this is called a
+    // failed launch rather than a slow one. Windows Terminal cold-starting
+    // behind an antivirus scan has taken most of a minute on this machine.
+    this.launchGraceMs = launchGraceMs
     this.runs = new Map()
     this.activeId = null     // single-flight: one repair session at a time
     this.children = new Map()
+    this.timers = new Map()
     this.hydrate()
   }
 
@@ -982,14 +1114,22 @@ export class ReviewRunner {
         } catch { /* an unreadable review.json is not worth failing hydration for */ }
       }
       if (UNFINISHED.includes(rec.state)) {
-        // Never re-claim it as running: this process did not start it and
-        // cannot prove what happened to it.
-        rec.state = 'stale'
-        rec.reason = STALE_REASON
-        rec.finishedAt = rec.finishedAt ?? new Date().toISOString()
-        // A pid that is still alive is the one case worth acting on: something
-        // may still be editing this repo, so it holds the single-flight lock.
-        rec.orphanPid = this.#orphanPid(rec) ?? null
+        // A visible session writes its own evidence, so a restarted bridge is
+        // no longer blind: a repair that finished while the bridge was down
+        // left a stop.json, and reporting THAT as "stopped unexpectedly" would
+        // throw away a real report the founder is waiting for. Only when there
+        // is no evidence at all does the old answer still hold.
+        if (!this.#settle(rec)) {
+          // Never re-claim it as running: this process did not start it and
+          // cannot prove what happened to it.
+          rec.state = 'stale'
+          rec.reason = STALE_REASON
+          rec.finishedAt = rec.finishedAt ?? new Date().toISOString()
+          // A pid that is still alive is the one case worth acting on:
+          // something may still be editing this repo, so it holds the
+          // single-flight lock.
+          rec.orphanPid = this.#orphanPid(rec) ?? null
+        }
         this.persist(rec)
       }
       // Runs that finished before reports existed still have their transcript
@@ -1000,6 +1140,52 @@ export class ReviewRunner {
       }
       this.runs.set(rec.reviewId, rec)
     }
+  }
+
+  /**
+   * Apply what the visible session left on disk to one record, and say whether
+   * it is finished. This is the single place the precedence lives, because
+   * three callers need it and they must never disagree:
+   *
+   *   stop.json  beats  exit.json  beats  the wrapper's pid
+   *
+   * The order is the honesty of the whole design. A repair that reported back
+   * and was THEN closed is `completed` and keeps its report; a window closed
+   * before it reported is `stale` and never reads as fixed, whatever its exit
+   * code said. Reading the pid first would invert both.
+   *
+   * Returns false when there is no evidence of an ending yet, which is the
+   * caller's cue that the session is still working.
+   */
+  #settle(rec) {
+    let disk
+    try { disk = this.readSessionFn(packageDir(this.repoRoot, rec.reviewId)) }
+    catch { return false }
+    const { session, exit, stop } = disk ?? {}
+
+    if (session?.pid && rec.pid !== session.pid) rec.pid = session.pid
+    if (session?.sessionId && rec.sessionId !== session.sessionId) rec.sessionId = session.sessionId
+
+    const windowGone = !!session?.pid && !pidAlive(session.pid)
+    if (!stop && !exit && !windowGone) return false
+
+    rec.finishedAt = rec.finishedAt ?? new Date().toISOString()
+    if (exit) rec.exitCode = exit.exitCode ?? null
+    // Claude's own closing words, carried verbatim rather than summarised.
+    rec.summary = stop?.lastAssistantMessage || null
+    const c = classifyRun({
+      exitCode: exit ? exit.exitCode : null,
+      result: null,
+      spawnError: exit?.error ?? null,
+      stopped: !!stop,
+    })
+    rec.state = c.state
+    rec.reason = c.reason
+    // An exit code says a process ended. It does not say a defect was
+    // repaired, so the two are recorded separately and the card leads with
+    // this one.
+    this.deriveOutcome(rec)
+    return true
   }
 
   /** The pid of a possibly-surviving repair from a previous bridge, or null. */
@@ -1015,20 +1201,26 @@ export class ReviewRunner {
    */
   reconcile() {
     if (this.activeId) {
-      // `children` is emptied by the exit and error handlers, so membership
-      // already means "has not reported an exit". The pid check is what
-      // catches the case those handlers can never fire for: the child died
-      // with the bridge, or with the console it was started from.
-      const child = this.children.get(this.activeId)
-      const alive = !!child && !child.killed && pidAlive(child.pid)
+      const rec = this.runs.get(this.activeId)
+      // Liveness is now the WRAPPER's pid, read out of session.json, because
+      // the handle this bridge holds belongs to cmd.exe — which exits the
+      // moment the window is up and proves nothing about the session inside
+      // it. Before that file exists the run is still `launching`, and the
+      // grace period in #watch is what decides whether that ever became real.
+      const launching = rec && ['sending', 'packaging', 'packaged', 'launching'].includes(rec.state)
+      const alive = launching || (!!rec?.pid && pidAlive(rec.pid))
       if (!alive) {
-        const rec = this.runs.get(this.activeId)
         if (rec && UNFINISHED.includes(rec.state)) {
-          rec.state = 'stale'
-          rec.reason = STALE_REASON
-          rec.finishedAt = new Date().toISOString()
+          // The window is gone, but gone-having-finished and gone-having-been
+          // -closed are different runs. Ask the evidence before assuming.
+          if (!this.#settle(rec)) {
+            rec.state = 'stale'
+            rec.reason = STALE_REASON
+            rec.finishedAt = new Date().toISOString()
+          }
           this.persist(rec)
         }
+        this.#stopWatch(this.activeId)
         this.children.delete(this.activeId)
         this.activeId = null
       }
@@ -1269,9 +1461,45 @@ export class ReviewRunner {
     rec.branch = tree.branch
     rec.baseCommit = tree.base
 
-    let child
-    try {
-      child = this.spawnFn(exe, claudeArgv(rec.packagePath, {
+    // A brand-new worktree has no persisted trust, and an interactive session
+    // in an untrusted directory stops on the trust dialog and never sends a
+    // turn — measured, not assumed. Without this every visible repair would
+    // open a window that sits there waiting to be clicked, which is the exact
+    // "I still have to do something" the founder asked to be rid of.
+    const trust = this.trustFn(tree.path)
+    rec.workspaceTrust = trust.ok ? (trust.already ? 'already' : 'granted') : 'unavailable'
+    if (!trust.ok) console.error(`[founder-review] could not pre-trust ${tree.path}: ${trust.reason}`)
+
+    // Everything Claude is started with goes in a FILE, not on a command line.
+    // The terminal is opened through cmd.exe, so anything on that line is
+    // shell-parsed; the prompt, the settings JSON and the allow/deny lists
+    // must never go near it.
+    // The standing instruction, written where the session can read it. It goes
+    // into BOTH copies on purpose: the repo package is the durable record a
+    // person can open next to the review, and the worktree copy is the one the
+    // session actually reads, since its cwd is the worktree. The worktree copy
+    // has to be written here rather than carried by ensureRepairWorktree,
+    // because the worktree is made before this text exists.
+    const instructions = repairPrompt(rec.packagePath, {
+      branch: tree.branch, worktreePath: tree.path,
+    })
+    for (const root of [this.repoRoot, tree.path]) {
+      const target = join(root, ...rec.packagePath.split('/'), INSTRUCTIONS_FILE)
+      try {
+        mkdirSync(join(root, ...rec.packagePath.split('/')), { recursive: true })
+        writeFileSync(target, instructions)
+      } catch (err) {
+        console.error(`[founder-review] could not write ${target}: ${err.message}`)
+      }
+    }
+
+    const plan = {
+      reviewId: rec.reviewId,
+      exe,
+      cwd: tree.path,
+      branch: tree.branch,
+      windowTitle: windowTitleFor(rec.page?.id),
+      args: claudeArgv(rec.packagePath, {
         branch: tree.branch,
         worktreePath: tree.path,
         // The integrity gate needs both: the founder's checkout is where the
@@ -1279,118 +1507,185 @@ export class ReviewRunner {
         // is what "reviewed" means for this run.
         repoRoot: this.repoRoot,
         base: tree.base,
-      }), {
-        cwd: tree.path,
-        shell: false,
-        stdio: ['ignore', 'pipe', 'pipe'],
-        windowsHide: true,
-      })
+        // Where the recorder hooks write their evidence.
+        packageDir: dir,
+        pageId: rec.page?.id,
+      }),
+      createdAt: new Date().toISOString(),
+    }
+    try {
+      writeFileSync(join(dir, LAUNCH_FILE), JSON.stringify(plan, null, 2))
     } catch (err) {
-      const c = classifyRun({ spawnError: `Claude Code could not be started: ${err.message}` })
+      const c = classifyRun({ spawnError: `The repair could not be prepared: ${err.message}` })
       Object.assign(rec, c, { finishedAt: new Date().toISOString() })
       this.persist(rec)
       return rec
     }
 
-    // spawn() resolved without throwing, but only a pid proves a process was
-    // actually created. Without one there is nothing to call running later.
-    if (!child.pid) {
-      const c = classifyRun({ spawnError: 'Claude Code was started but no process appeared. Your review is saved — press Retry.' })
+    // A retry reuses the package, so last attempt's evidence would otherwise
+    // be read as this one's. The transcript is rebuilt by the hooks.
+    for (const f of ['stop.json', 'exit.json', 'session.json', 'claude-run.jsonl']) {
+      try { rmSync(join(dir, f), { force: true }) } catch { /* nothing to clear */ }
+    }
+
+    const launch = visibleLaunchArgv({ packageDir: dir, cwd: tree.path, title: plan.windowTitle })
+    rec.launch = { command: launch.command, commandLine: launch.args[0] }
+    let child
+    try {
+      child = this.spawnFn(launch.command, launch.args, launch.options)
+    } catch (err) {
+      const c = classifyRun({ spawnError: `Claude Code could not be opened in a terminal: ${err.message}` })
       Object.assign(rec, c, { finishedAt: new Date().toISOString() })
       this.persist(rec)
       return rec
     }
 
-    rec.pid = child.pid
+    // The launcher is not the session. cmd.exe creates the window and exits,
+    // so its pid proves only that the launch was attempted; the pid that
+    // MEANS something is the wrapper's, and the wrapper writes it into
+    // session.json the instant it starts. Until that file appears this run is
+    // `launching`, and the card says "Opening Claude Code…".
+    if (!child?.pid) {
+      const c = classifyRun({ spawnError: 'Could not open Claude Code — no terminal process appeared. Your review is saved, press Retry.' })
+      Object.assign(rec, c, { finishedAt: new Date().toISOString() })
+      this.persist(rec)
+      return rec
+    }
+    rec.launcherPid = child.pid
+    rec.pid = null
+    rec.visible = true
     this.activeId = rec.reviewId
     this.children.set(rec.reviewId, child)
-
-    let tail = ''
-    let result = null
-    let stderr = ''
-    let lastProgressWrite = 0
-    const lines = []
-
-    child.stdout.on('data', chunk => {
-      tail += chunk.toString()
-      const parts = tail.split('\n')
-      tail = parts.pop() ?? ''
-      for (const line of parts) {
-        if (!line.trim()) continue
-        lines.push(line)
-        let ev
-        try { ev = JSON.parse(line) } catch { continue }
-        // The init event is the honest signal that Claude really started —
-        // the process being alive is not the same thing.
-        if (ev.type === 'system' && ev.subtype === 'init') {
-          rec.sessionId = ev.session_id ?? null
-          // Claude announced itself. Confirm the process it announced itself
-          // from is still there before anyone is told a repair is running:
-          // an init line that arrives from a child already gone is a message,
-          // not a running session.
-          if (this.children.has(rec.reviewId) && !child.killed && pidAlive(child.pid)) rec.state = 'running'
-          this.persist(rec)
-        }
-        // A repair runs headless for minutes at a time. Without this the card
-        // can only say "running", which is indistinguishable from the hang the
-        // founder reported. Every assistant turn carries what Claude just
-        // decided to do, so that is what the card gets to show.
-        if (ev.type === 'assistant') {
-          rec.progress = {
-            turns: (rec.progress?.turns ?? 0) + 1,
-            activity: describeActivity(ev) ?? rec.progress?.activity ?? null,
-            lastEventAt: new Date().toISOString(),
-          }
-          // The page reads the live record, so the founder sees this without a
-          // disk write. Persisting every turn would be churn for nothing, so it
-          // is throttled to the rate a bridge restart could actually use.
-          const now = Date.now()
-          if (now - lastProgressWrite > 5000) { lastProgressWrite = now; this.persist(rec) }
-        }
-        if (ev.type === 'result') result = ev
-      }
-    })
-    child.stderr.on('data', d => { stderr = (stderr + d.toString()).slice(-4000) })
-
-    child.on('exit', code => {
-      this.children.delete(rec.reviewId)
-      if (this.activeId === rec.reviewId) this.activeId = null
-      if (tail.trim()) lines.push(tail)
-      try { writeFileSync(logPath, lines.join('\n') + '\n') } catch { /* transcript is best-effort */ }
-
-      rec.exitCode = code
-      rec.finishedAt = new Date().toISOString()
-      rec.costUsd = typeof result?.total_cost_usd === 'number' ? result.total_cost_usd : null
-      rec.sessionId = result?.session_id ?? rec.sessionId
-      const c = classifyRun({ exitCode: code, result })
-      rec.state = c.state
-      rec.reason = c.reason || (c.state === 'failed' && stderr ? stderr.slice(0, 400) : c.reason)
-      // The full final message, not a 2000-char stub. It is the one part of
-      // the report Claude wrote itself, the founder is meant to read it instead
-      // of a transcript, and truncating it mid-sentence is how "I could not
-      // commit, and here is why" became invisible.
-      rec.summary = typeof result?.result === 'string' && c.state === 'completed' ? result.result : null
-      // An exit code says a process ended. It does not say a defect was
-      // repaired, so the two are recorded separately and the card leads with
-      // this one.
-      this.deriveOutcome(rec)
-      this.persist(rec)
-      console.log(`[founder-review] ${rec.reviewId} — ${rec.state}`
-        + `${rec.report ? ` · ${rec.report.outcome}` : ''}`
-        + `${rec.reason ? ` (${rec.reason.slice(0, 120)})` : ''}`)
-    })
-
-    child.on('error', err => {
-      this.children.delete(rec.reviewId)
-      if (this.activeId === rec.reviewId) this.activeId = null
-      const c = classifyRun({ spawnError: `Claude Code could not be started: ${err.message}` })
+    child.on?.('error', err => {
+      // Only meaningful before the wrapper has proved itself; once session.json
+      // exists the terminal is real whatever cmd.exe reported.
+      if (rec.pid) return
+      const c = classifyRun({ spawnError: `Could not open Claude Code: ${err.message}` })
       Object.assign(rec, c, { finishedAt: new Date().toISOString() })
+      this.#release(rec.reviewId)
       this.persist(rec)
     })
 
     this.persist(rec)
-    console.log(`[founder-review] ${rec.reviewId} — launched Claude repair as process ${rec.pid} (${rec.counts.issues} issues, ${rec.counts.notes ?? 0} notes, ${rec.counts.screenshots} screenshots)`)
+    console.log(`[founder-review] ${rec.reviewId} — opening a visible Claude Code session in ${tree.path}`
+      + ` (${rec.counts.issues} issues, ${rec.counts.notes ?? 0} notes, ${rec.counts.screenshots} screenshots)`)
+    this.#watch(rec)
     return rec
+  }
+
+  /** Drop the single-flight lock and the launcher handle for one review. */
+  #release(reviewId) {
+    this.children.delete(reviewId)
+    if (this.activeId === reviewId) this.activeId = null
+  }
+
+  /* ── Watching a window we do not own ──────────────────────────────────────
+     A piped child announced itself on stdout and told us when it exited. A
+     visible one cannot: the process holding the console is the wrapper, three
+     handles away from this one. So the bridge reads the same four facts off
+     disk instead, all of them written by things that cannot lie about them:
+
+       session.json   the wrapper's own pid, written before claude starts
+       claude-run.jsonl  hook records, one per tool call
+       stop.json      the repair reported back, with Claude's own words
+       exit.json      claude exited, with its code
+
+     Precedence is deliberate and is the whole honesty of this design:
+     stop.json beats exit.json beats the pid. A founder who closes the window
+     mid-repair leaves a dead pid and no stop.json, and that is `stale` — never
+     "fixed". A founder who reads the final report and THEN closes the window
+     leaves a stop.json, and that stays `completed` forever.                  */
+
+  #watch(rec) {
+    const dir = packageDir(this.repoRoot, rec.reviewId)
+    const started = Date.now()
+    let lastLogSize = -1
+
+    const tick = () => {
+      const live = this.runs.get(rec.reviewId)
+      if (live !== rec) return this.#stopWatch(rec.reviewId)   // superseded by a retry
+
+      let disk = null
+      try { disk = this.readSessionFn(dir) } catch { /* read again next tick */ }
+
+      // The wrapper wrote its pid, so a window really is on screen with a
+      // session in it. This is the first moment anything may be called running.
+      if (disk?.session?.pid && rec.pid !== disk.session.pid) {
+        rec.pid = disk.session.pid
+        rec.sessionId = disk.session.sessionId ?? rec.sessionId
+        rec.state = 'running'
+        this.persist(rec)
+        console.log(`[founder-review] ${rec.reviewId} — Claude Code window open (process ${rec.pid})`)
+      }
+
+      // No window within the grace period is a launch that did not happen, and
+      // saying so is the whole point: never claim a terminal opened when none
+      // did.
+      if (!disk?.session && Date.now() - started > this.launchGraceMs) {
+        rec.state = 'blocked'
+        rec.reason = 'Could not open Claude Code — no terminal window appeared. Your review is saved, press Retry.'
+        rec.finishedAt = new Date().toISOString()
+        this.#release(rec.reviewId)
+        this.persist(rec)
+        return this.#stopWatch(rec.reviewId)
+      }
+
+      this.#readProgress(rec, dir, size => { lastLogSize = size }, lastLogSize)
+
+      if (!this.#settle(rec)) return                             // still working
+      this.#release(rec.reviewId)
+      this.persist(rec)
+      console.log(`[founder-review] ${rec.reviewId} — ${rec.state}`
+        + `${rec.report ? ` · ${rec.report.outcome}` : ''}`
+        + `${rec.reason ? ` (${rec.reason.slice(0, 120)})` : ''}`)
+      // The window may still be on screen with the final reply in it, and the
+      // founder is meant to read it. Nothing here closes it.
+      this.#stopWatch(rec.reviewId)
+    }
+
+    this.#stopWatch(rec.reviewId)
+    const timer = setInterval(tick, this.pollMs)
+    timer.unref?.()
+    this.timers.set(rec.reviewId, timer)
+    tick()
+  }
+
+  #stopWatch(reviewId) {
+    const t = this.timers.get(reviewId)
+    if (t) { clearInterval(t); this.timers.delete(reviewId) }
+  }
+
+  /**
+   * What the repair is doing right now, from the hook log.
+   *
+   * A repair runs for minutes at a time. The founder can watch the window, but
+   * the Smoke Test card must not go mute while they are looking elsewhere, so
+   * the same phrase the piped run produced is derived from the same events —
+   * they simply arrive through a file instead of a pipe.
+   */
+  #readProgress(rec, dir, remember, lastSize) {
+    let events
+    try {
+      const p = join(dir, 'claude-run.jsonl')
+      if (!existsSync(p)) return
+      const size = statSync(p).size
+      if (size === lastSize) return
+      remember(size)
+      events = readFileSync(p, 'utf8').split('\n').filter(l => l.trim())
+    } catch { return }
+
+    let turns = 0
+    let activity = null
+    for (const line of events) {
+      let ev
+      try { ev = JSON.parse(line) } catch { continue }
+      if (ev.type !== 'assistant') continue
+      turns += 1
+      activity = describeActivity(ev) ?? activity
+    }
+    if (!turns) return
+    rec.progress = { turns, activity, lastEventAt: new Date().toISOString() }
+    this.persist(rec)
   }
 
   /**

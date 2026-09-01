@@ -16,19 +16,22 @@
 
 import { EventEmitter } from 'node:events'
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve, sep } from 'node:path'
 import {
   ALLOWED_TOOLS, DISALLOWED_TOOLS, LIMITS, PAGE_IDS, ReviewRunner, STALE_REASON,
   VERIFY_SCRIPTS, ValidationError, classifyRun, countEvidence, decodeImage,
   describeActivity, integritySettings, isRetryable, packageDir, permissionFor, pidAlive,
-  recordRepairOutcome, validateSubmission,
+  recordRepairOutcome, validateSubmission, windowTitleFor,
 } from '../launch/operations/founder-review-handler.mjs'
 import {
   classifyOutcome, deriveReport, relativise, renderReportMd, verifyScriptIn,
 } from '../launch/operations/repair-outcome.mjs'
 import { WorktreeError, ensureRepairWorktree, removeRepairWorktree } from '../launch/operations/repair-worktree.mjs'
+import {
+  ensureWorkspaceTrust, eventsForHook, responseText, visibleLaunchArgv,
+} from '../launch/operations/repair-session.mjs'
 import {
   SUBJECT_ROOTS, WALK_LIMITS, baseTree, blobAt, entrypointsIn, integrityOf, isSubject,
   resolveRepoSpecifier, scriptsNamedIn, specifiersIn, verdictForCommand, walkImports,
@@ -90,45 +93,89 @@ function homepageReview(reviewId = 'homepage-2026-08-24-1930-abc123') {
   }
 }
 
-/* ── A fake Claude Code ──────────────────────────────────────────────────────
-   Same stdout shape the real binary emits with --output-format stream-json, so
-   the runner's parsing is exercised for real. */
-function fakeClaude({ initDelay = 0, exitCode = 0, result = null, throwOnSpawn = null, pid = process.pid, neverExit = false, turns = [] } = {}) {
+/* ── A fake visible terminal ─────────────────────────────────────────────────
+   The handler no longer owns a piped child. It opens a WINDOW through cmd.exe
+   and then reads four files the session writes for itself, so that is what the
+   fake has to be: something that receives the cmd.exe command line and then
+   leaves the same evidence on disk a real wrapper and a real set of hooks
+   would leave.
+
+   Nothing here is stubbed past. The package directory is parsed back out of
+   the command line the handler actually built — so a handler that mis-quoted
+   it would fail these tests — and every event is written in the shape the
+   recorder writes, through the same files the runner reads.                  */
+
+/** The package directory, read back out of `… --run "<dir>"`. */
+function dirFromLaunchLine(line) {
+  const m = /--run\s+"([^"]+)"\s*$/.exec(String(line))
+  if (!m) throw new Error(`no --run "<dir>" in the launch command line: ${line}`)
+  return m[1]
+}
+
+/** One PreToolUse/PostToolUse pair, as the recorder would write them. */
+const toolPair = (name, input, { failed = false, output = 'ok' } = {}, i = 0) => {
+  const id = `toolu_fake_${i}`
+  const out = [{ type: 'assistant', message: { content: [{ type: 'tool_use', id, name, input }] } }]
+  // A refused or failing tool emits NO PostToolUse — measured, and the reason
+  // a missing result is what "did not succeed" looks like.
+  if (!failed) out.push({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: id, is_error: false, content: output }] } })
+  return out
+}
+
+function fakeTerminal({
+  exitCode = 0, summary = 'Repaired 4 issues.', tools = [], throwOnSpawn = null,
+  pid = process.pid, launcherPid = 4242, startDelay = 0,
+  neverOpens = false,      // the terminal never appears at all
+  neverStops = false,      // the session opens and is still working
+  windowClosed = false,    // the founder closed it before it reported back
+  exitError = null,        // claude died on its way up, e.g. an expired token
+  reportsBack = true,      // the Stop hook fired: the repair said what it did
+} = {}) {
   const calls = []
-  const fn = (exe, argv, opts) => {
-    calls.push({ exe, argv, opts })
+  const fn = (command, args, options) => {
+    calls.push({ command, args, options, exe: command, argv: args, opts: options })
     if (throwOnSpawn) throw new Error(throwOnSpawn)
     const child = new EventEmitter()
-    // A real spawned child always has a pid, and the runner now refuses to
-    // call anything `running` without one. Using this process's own pid keeps
-    // the liveness check genuinely exercised rather than stubbed past:
-    // it is a number that really is alive.
-    child.pid = pid
-    child.stdout = new EventEmitter()
-    child.stderr = new EventEmitter()
+    // cmd.exe's pid. Deliberately NOT the session's: the launcher exits as
+    // soon as the window is up, and a handler that mistook one for the other
+    // would report a repair as running when nothing was.
+    child.pid = launcherPid
+    if (neverOpens) return child
+
+    const dir = dirFromLaunchLine(args[0])
+    const write = (f, o) => writeFileSync(join(dir, f), JSON.stringify(o, null, 2))
     setTimeout(() => {
-      child.stdout.emit('data', JSON.stringify({ type: 'system', subtype: 'init', session_id: 'sess-fake-0001' }) + '\n')
-      // The turns a real repair emits while it works. They are what the card
-      // shows instead of a spinner, so the parsing that lifts them out has to
-      // be exercised here rather than assumed.
-      for (const t of turns) child.stdout.emit('data', JSON.stringify(t) + '\n')
-      // A child that announces itself and then never exits — the shape a repair
-      // has while it is genuinely working, and the one a bridge that dies
-      // leaves behind with nobody to hear its exit.
-      if (neverExit) return
-      setTimeout(() => {
-        if (result) child.stdout.emit('data', JSON.stringify({ type: 'result', ...result }) + '\n')
-        child.emit('exit', exitCode)
-      }, 5)
-    }, initDelay)
+      // The wrapper, writing its own pid before claude starts.
+      write('session.json', { pid, startedAt: new Date().toISOString(), sessionId: 'sess-fake-0001', launcher: 'repair-session.mjs' })
+      const lines = tools.flatMap((t, i) => toolPair(t.name, t.input, t, i))
+      if (lines.length) writeFileSync(join(dir, 'claude-run.jsonl'), lines.map(l => JSON.stringify(l)).join('\n') + '\n')
+      if (neverStops) return
+      if (exitError) return write('exit.json', { exitCode: 1, error: exitError, endedAt: new Date().toISOString() })
+      // A closed window leaves NOTHING further: no stop, no exit. The only
+      // evidence is a session.json whose pid is gone, and that must never read
+      // as fixed. It is the single most important case in this file.
+      if (windowClosed) return
+      if (reportsBack) write('stop.json', { at: new Date().toISOString(), sessionId: 'sess-fake-0001', lastAssistantMessage: summary })
+      write('exit.json', { exitCode, endedAt: new Date().toISOString(), via: 'wrapper' })
+    }, startDelay)
     return child
   }
   fn.calls = calls
   return fn
 }
 
-const OK_RESULT = { is_error: false, result: 'Repaired 4 issues.', total_cost_usd: 1.23, session_id: 'sess-fake-0001' }
-const settle = () => new Promise(r => setTimeout(r, 60))
+/** The handler polls, so the tests have to wait rather than assume. */
+const settle = (ms = 120) => new Promise(r => setTimeout(r, ms))
+/** Wait until a record reaches one of these states, or give up honestly. */
+async function until(runnerObj, reviewId, states, ms = 3000) {
+  const deadline = Date.now() + ms
+  for (;;) {
+    const rec = runnerObj.get(reviewId)
+    if (rec && states.includes(rec.state)) return rec
+    if (Date.now() > deadline) return rec
+    await settle(15)
+  }
+}
 
 /* A machine whose Claude Code readiness we control. The handler asks this
    before launching, so the tests can drive a signed-out machine without going
@@ -149,12 +196,27 @@ const FAKE_TREE = reviewId => ({
   copiedPackage: true,
 })
 
+/* The trust write is stubbed everywhere except its own section: it edits the
+   founder's real ~/.claude.json, and a test suite has no business in there. */
+const TRUSTED = []
+const fakeTrust = dirPath => { TRUSTED.push(dirPath); return { ok: true, already: false, reason: null } }
+
 const runner = (opts = {}) => new ReviewRunner(REPO, {
-  spawnFn: opts.spawnFn ?? fakeClaude(opts.claude),
+  spawnFn: opts.spawnFn ?? fakeTerminal(opts.claude),
   findClaudeFn: opts.findClaudeFn ?? (() => 'C:\\fake\\claude.exe'),
   readinessFn: opts.readinessFn ?? (() => READY),
   worktreeFn: opts.worktreeFn ?? ((repoRoot, reviewId) => FAKE_TREE(reviewId)),
+  trustFn: opts.trustFn ?? fakeTrust,
+  // The real poll is 1.5s, which would make this suite take minutes. The
+  // mechanism is identical; only the interval changes.
+  pollMs: opts.pollMs ?? 5,
+  launchGraceMs: opts.launchGraceMs ?? 400,
 })
+
+/** The argv claude is actually started with, read from the file the wrapper
+ *  reads. This is a truer assertion target than the spawn call: the spawn call
+ *  is cmd.exe, and launch.json is what reaches Claude Code. */
+const planFor = reviewId => JSON.parse(readFileSync(join(packageDir(REPO, reviewId), 'launch.json'), 'utf8'))
 
 /* ═══ 1. Validation and path safety ═════════════════════════════════════════ */
 console.log('\nValidation refuses anything that could escape or bloat')
@@ -206,7 +268,7 @@ check('a PNG is detected from its bytes', decodeImage(PNG_1PX, 'x').ext === 'png
 /* ═══ 2. The package on disk ════════════════════════════════════════════════ */
 console.log('\nFour issues and four screenshots land as real files')
 
-const r1 = runner({ claude: { result: OK_RESULT } })
+const r1 = runner()
 const rec1 = r1.submit(homepageReview())
 const dir1 = packageDir(REPO, 'homepage-2026-08-24-1930-abc123')
 
@@ -263,7 +325,7 @@ check('founder-review.json records the issue count', frj.pages.homepage.issues =
 check('founder-review.json links back to the package', frj.pages.homepage.lastReviewId === 'homepage-2026-08-24-1930-abc123')
 check('founder-review.json keeps the tool marker mission-control reads', frj.tool === 'smoke-test-v4')
 check('a second page does not erase the first', (() => {
-  const rOther = runner({ claude: { result: OK_RESULT } })
+  const rOther = runner()
   rOther.submit({ ...homepageReview('search-2026-08-24-1940-other1'), page: { id: 'search', title: 'Search', url: '/search' }, verdict: 'good' })
   const d = JSON.parse(readFileSync(join(REPO, 'launch', 'founder-review.json'), 'utf8'))
   return d.pages.homepage.status === 'fix' && d.pages.search.status === 'good'
@@ -273,7 +335,7 @@ check('a second page does not erase the first', (() => {
 console.log('\nA screenshot pointing at a deleted issue is not lost')
 const orphan = homepageReview('homepage-2026-08-24-1931-orph01')
 orphan.screenshots[0].issueUid = 'deleted-uid-999'
-const rOrph = runner({ claude: { result: OK_RESULT } })
+const rOrph = runner()
 rOrph.submit(orphan)
 const orphJson = JSON.parse(readFileSync(join(packageDir(REPO, 'homepage-2026-08-24-1931-orph01'), 'review.json'), 'utf8'))
 check('the orphan becomes a page-level screenshot', orphJson.screenshots.some(s => s.issue === null && s.file === 'screenshots/page-shot-1.png' || s.file === 'screenshots/page-shot-1.jpg'))
@@ -283,13 +345,89 @@ check('all four screenshots survive an orphaned link', orphJson.counts.screensho
 /* ═══ 4. The Claude launch contract ═════════════════════════════════════════ */
 console.log('\nClaude Code is launched exactly once, pointed at the package')
 
-const spawn1 = fakeClaude({ result: OK_RESULT })
+const spawn1 = fakeTerminal({ tools: [{ name: 'Edit', input: { file_path: 'lib/x.ts' } }] })
 const r2 = runner({ spawnFn: spawn1 })
 const rec2 = r2.submit(homepageReview('homepage-2026-08-24-1932-launch'))
 
-check('exactly one Claude process was started', spawn1.calls.length === 1, `got ${spawn1.calls.length}`)
-const argv = spawn1.calls[0].argv
-const promptArg = argv[argv.indexOf('-p') + 1]
+check('exactly one terminal was opened', spawn1.calls.length === 1, `got ${spawn1.calls.length}`)
+
+/* The window is opened through cmd.exe, and everything that is opened THROUGH
+   a shell has to be read as a shell would read it. So the command line is
+   asserted on separately from the argv: the line may carry only paths this
+   process generated, and the argv — which never touches a shell — carries the
+   prompt. Mixing the two up is the whole class of bug this split prevents. */
+const launchLine = spawn1.calls[0].argv[0]
+check('the terminal is opened with a real Windows console launcher',
+  spawn1.calls[0].exe === 'cmd.exe' && /^\/c start /.test(launchLine))
+check('the window is titled so the founder can find it',
+  launchLine.includes('"Catch Comics Repair — Homepage"'))
+check('the terminal itself opens IN the isolated repair worktree',
+  launchLine.includes(`/D "${FAKE_TREE('homepage-2026-08-24-1932-launch').path}"`), launchLine)
+check('it runs the repair-session wrapper, not claude directly',
+  /repair-session\.mjs" --run "/.test(launchLine))
+check('the launcher command line is quoting-safe: only generated paths on it',
+  !/hover enlargement|Navbar logo|scrollbar/i.test(launchLine))
+check('and no founder-typed page title reaches it either',
+  !launchLine.includes('Homepage — the founder typed this'))
+check('argument escaping is verbatim, so cmd receives exactly what was written',
+  spawn1.calls[0].opts.windowsVerbatimArguments === true)
+
+/* What Claude Code is actually started with. It travels in launch.json and is
+   handed over as an argv array, so no shell ever sees the prompt. */
+const plan2 = planFor('homepage-2026-08-24-1932-launch')
+const argv = plan2.args
+const kickoff = argv[0]
+
+/* THE REGRESSION THIS FILE EXISTS TO PREVENT.
+   `--allowedTools` and `--disallowedTools` are variadic: they swallow every
+   argument up to the next flag. With the prompt last, it became the 93rd value
+   of --disallowedTools and no turn was ever sent — the window opened in the
+   right worktree with the right permissions and sat at an empty prompt, twice,
+   before anyone looked at the screen. The prompt must sit where no variadic
+   option can reach it, which is the front. */
+check('the prompt is the FIRST argument, out of reach of the variadic options',
+  typeof argv[0] === 'string' && !argv[0].startsWith('-'))
+check('nothing positional trails a variadic option, where it would be eaten', (() => {
+  const variadic = ['--allowedTools', '--disallowedTools']
+  for (const flag of variadic) {
+    const i = argv.indexOf(flag)
+    if (i === -1) continue
+    // Everything from here to the next flag is that option's values; the only
+    // thing allowed after them is another flag.
+    let k = i + 1
+    while (k < argv.length && !argv[k].startsWith('--')) k++
+    if (k < argv.length && !argv[k].startsWith('--')) return false
+  }
+  // And the last variadic must genuinely run to the end of the argv.
+  const last = Math.max(argv.indexOf('--allowedTools'), argv.indexOf('--disallowedTools'))
+  if (last === -1) return true
+  return argv.slice(last + 1).every(a => !a.startsWith('--') || a === '--allowedTools' || a === '--disallowedTools')
+})())
+check('the deny list really is the tail of the argv, so it swallows nothing else',
+  argv.indexOf('--disallowedTools') > argv.indexOf('--allowedTools')
+  && DISALLOWED_TOOLS.includes(argv[argv.length - 1]))
+
+/* The kickoff is one line, and that is load-bearing rather than tidy: a long
+   multi-line positional prompt was measured NOT to be submitted by an
+   interactive session — it lands in the composer as a draft and the window
+   sits there. The standing instruction therefore lives in a file, and the
+   command line carries a sentence that points at it. */
+
+check('the kickoff is ONE line, so it is actually sent',
+  !kickoff.includes('\n') && kickoff.length < 200, JSON.stringify(kickoff))
+check('the kickoff points at the durable instruction file, not a copy of it',
+  kickoff.includes('launch/reviews/homepage-2026-08-24-1932-launch/repair-instructions.md'))
+check('and it tells the session to begin without being asked twice', /starting now/.test(kickoff))
+
+/* The standing instruction itself, read from the file the session opens. */
+const instrPath = join(packageDir(REPO, 'homepage-2026-08-24-1932-launch'), 'repair-instructions.md')
+check('the instruction file is written next to the review it is about', existsSync(instrPath))
+const promptArg = existsSync(instrPath) ? readFileSync(instrPath, 'utf8') : ''
+check('the founder can open it with no tooling at all', promptArg.length > 500)
+check('there is no -p: this is a visible interactive session, not a pipe',
+  !argv.includes('-p') && !argv.includes('--print'))
+check('and nothing is asking for a machine-readable stream any more',
+  !argv.includes('--output-format'))
 check('the prompt carries the exact package path', promptArg.includes('launch/reviews/homepage-2026-08-24-1932-launch/review.md'))
 check('the prompt points at review.json too', promptArg.includes('launch/reviews/homepage-2026-08-24-1932-launch/review.json'))
 check('the prompt points at the screenshots directory', promptArg.includes('launch/reviews/homepage-2026-08-24-1932-launch/screenshots/'))
@@ -301,7 +439,9 @@ check('Claude is told to preserve unrelated work', /Preserve unrelated work/.tes
 check('Claude is told to report issue-by-issue', /issue-by-issue report/.test(promptArg))
 check('Claude is told not to run unrelated audits', /Do not perform unrelated audits/.test(promptArg))
 check('the run happens in the isolated repair worktree, NOT the founder\'s checkout',
-  spawn1.calls[0].opts.cwd === FAKE_TREE('homepage-2026-08-24-1932-launch').path && spawn1.calls[0].opts.cwd !== REPO)
+  plan2.cwd === FAKE_TREE('homepage-2026-08-24-1932-launch').path && plan2.cwd !== REPO)
+check('the worktree was trusted first, or the session would stop on the trust dialog',
+  TRUSTED.includes(FAKE_TREE('homepage-2026-08-24-1932-launch').path))
 check('the record says where the repair worktree is', rec2.worktreePath === FAKE_TREE(rec2.reviewId).path)
 check('the record says which branch the repair commits on', rec2.branch === 'repair/homepage-2026-08-24-1932-launch')
 check('the record remembers the commit it started from', rec2.baseCommit === 'a1b2c3d4e5f6')
@@ -313,13 +453,12 @@ check('the prompt names the verification commands it may run',
 check('the prompt tells Claude not to hunt for another spelling of a refused command',
   /do NOT hunt for another spelling/.test(promptArg))
 check('the prompt tells Claude to finish on a commit', /FINISH ON A COMMIT/.test(promptArg))
-check('no shell is involved', spawn1.calls[0].opts.shell === false)
+check('no shell is involved in starting claude itself', spawn1.calls[0].opts.shell === false)
 check('push and deploy are denied', (() => {
   const i = argv.indexOf('--disallowedTools')
   const denied = argv.slice(i + 1).join(' ')
   return i > -1 && denied.includes('git push') && denied.includes('vercel')
 })())
-check('the session cannot exceed a spend ceiling', argv[argv.indexOf('--max-budget-usd') + 1] === '15')
 check('no founder text reaches the argv beyond the fixed prompt',
   !argv.some(a => a !== promptArg && /hover enlargement|Navbar logo|scrollbar/i.test(a)))
 check('the fixed prompt does not contain founder text either',
@@ -329,11 +468,12 @@ check('the fixed prompt does not contain founder text either',
 console.log('\nStates report what actually happened')
 
 check('a launched run is not reported as complete', rec2.state === 'launching' || rec2.state === 'running')
-await settle()
-check('a finished run is reported complete', r2.get(rec2.reviewId).state === 'completed', r2.get(rec2.reviewId).state)
-check('the session id is captured for resuming', r2.get(rec2.reviewId).sessionId === 'sess-fake-0001')
-check('the cost is recorded', r2.get(rec2.reviewId).costUsd === 1.23)
-check('a transcript was written', existsSync(join(packageDir(REPO, rec2.reviewId), 'claude-run.jsonl')))
+const done2 = await until(r2, rec2.reviewId, ['completed', 'failed', 'stale', 'blocked'])
+check('a finished run is reported complete', done2.state === 'completed', done2.state)
+check('the session id is captured for resuming', done2.sessionId === 'sess-fake-0001')
+check("Claude's own closing words come back verbatim, not summarised",
+  done2.summary === 'Repaired 4 issues.', String(done2.summary))
+check('a transcript was written by the hooks', existsSync(join(packageDir(REPO, rec2.reviewId), 'claude-run.jsonl')))
 check('run.json records the outcome next to the review',
   JSON.parse(readFileSync(join(packageDir(REPO, rec2.reviewId), 'run.json'), 'utf8')).state === 'completed')
 
@@ -346,7 +486,7 @@ check('the review package survives a blocked launch',
 check('all four screenshots survive a blocked launch',
   JSON.parse(readFileSync(join(packageDir(REPO, 'homepage-2026-08-24-1933-nocli'), 'review.json'), 'utf8')).counts.screenshots === 4)
 
-const rAuth = runner({ claude: { exitCode: 1, result: { is_error: true, result: 'Failed to authenticate: OAuth session expired and could not be refreshed' } } })
+const rAuth = runner({ claude: { exitError: 'Failed to authenticate: OAuth session expired and could not be refreshed' } })
 const recAuth = rAuth.submit(homepageReview('homepage-2026-08-24-1934-auth01'))
 await settle()
 check('an auth failure is BLOCKED, not a product failure', rAuth.get(recAuth.reviewId).state === 'blocked', rAuth.get(recAuth.reviewId).state)
@@ -362,7 +502,7 @@ check('the auth message promises the review is safe',
    discovered by starting a session that then failed. Now readiness is asked
    first, and the answer costs nothing but a Retry.                          */
 console.log('\nAn expired sign-in never costs the founder their review')
-const spawnSignedOut = fakeClaude({ result: OK_RESULT })
+const spawnSignedOut = fakeTerminal()
 const rOut = runner({ spawnFn: spawnSignedOut, readinessFn: () => SIGNED_OUT })
 const recOut = rOut.submit(homepageReview('homepage-2026-08-24-1941-signout'))
 const dirOut = packageDir(REPO, 'homepage-2026-08-24-1941-signout')
@@ -379,7 +519,7 @@ check('the founder text survived', /hover enlargement is clipped/.test(readFileS
 
 console.log('\nAfter signing in, Retry uses the review that is already saved')
 let signedIn = false
-const spawnAfter = fakeClaude({ result: OK_RESULT })
+const spawnAfter = fakeTerminal()
 const rAfter = new ReviewRunner(REPO, {
   spawnFn: spawnAfter,
   findClaudeFn: () => 'C:\\fake\\claude.exe',
@@ -401,16 +541,15 @@ check('the retry did not re-write a second package',
 check('the screenshots are still attached after the retry',
   shotsBefore.length === 4 && shotsBefore.every(f => existsSync(join(dirAfter, ...f.split('/')))))
 check('the retry points Claude at the same package',
-  spawnAfter.calls[0].argv[spawnAfter.calls[0].argv.indexOf('-p') + 1].includes('launch/reviews/homepage-2026-08-24-1942-after1/review.md'))
-await settle()
-check('the retry completed', rAfter.get(afterBody.reviewId).state === 'completed')
+  readFileSync(join(dirAfter, 'repair-instructions.md'), 'utf8').includes('launch/reviews/homepage-2026-08-24-1942-after1/review.md'))
+check('the retry completed', (await until(rAfter, afterBody.reviewId, ['completed','failed','stale'])).state === 'completed')
 
-const rCrash = runner({ claude: { exitCode: 2, result: { is_error: true, result: 'something broke' } } })
+const rCrash = runner({ claude: { exitCode: 2, reportsBack: false } })
 const recCrash = rCrash.submit(homepageReview('homepage-2026-08-24-1935-crash1'))
 await settle()
 check('a genuine Claude failure is reported as failed', rCrash.get(recCrash.reviewId).state === 'failed')
 
-const rSpawnFail = runner({ spawnFn: fakeClaude({ throwOnSpawn: 'EACCES' }) })
+const rSpawnFail = runner({ spawnFn: fakeTerminal({ throwOnSpawn: 'EACCES' }) })
 const recSpawnFail = rSpawnFail.submit(homepageReview('homepage-2026-08-24-1936-spawn1'))
 check('a spawn that throws is BLOCKED and keeps the package', recSpawnFail.state === 'blocked'
   && existsSync(join(packageDir(REPO, 'homepage-2026-08-24-1936-spawn1'), 'review.json')))
@@ -421,7 +560,7 @@ check('classifyRun never calls a missing binary a failure', classifyRun({ spawnE
 /* ═══ 6. Retry safety ═══════════════════════════════════════════════════════ */
 console.log('\nA double-click cannot duplicate anything')
 
-const spawnDbl = fakeClaude({ result: OK_RESULT })
+const spawnDbl = fakeTerminal()
 const rDbl = runner({ spawnFn: spawnDbl })
 const body = homepageReview('homepage-2026-08-24-1937-double')
 const first = rDbl.submit(body)
@@ -457,7 +596,7 @@ await settle()
 
 console.log('\nA retry after a blocked launch reuses the saved package')
 let cliPresent = false
-const spawnRetry = fakeClaude({ result: OK_RESULT })
+const spawnRetry = fakeTerminal()
 const rRetry = new ReviewRunner(REPO, {
   spawnFn: spawnRetry,
   findClaudeFn: () => (cliPresent ? 'C:\\fake\\claude.exe' : null),
@@ -473,11 +612,10 @@ check('the retry launches', spawnRetry.calls.length === 1)
 check('the retry is not treated as a duplicate', retried.duplicate === false)
 check('the retry reused the same package path', retried.packagePath === blocked.packagePath)
 check('the retry counted a second attempt', rRetry.get(retryBody.reviewId).attempts === 2)
-await settle()
-check('the retry completed', rRetry.get(retryBody.reviewId).state === 'completed')
+check('the retry completed', (await until(rRetry, retryBody.reviewId, ['completed','failed','stale'])).state === 'completed')
 
 console.log('\nTwo different reviews cannot repair at once')
-const spawnConc = fakeClaude({ initDelay: 500, result: OK_RESULT })
+const spawnConc = fakeTerminal({ neverStops: true })
 const rConc = runner({ spawnFn: spawnConc })
 rConc.submit(homepageReview('homepage-2026-08-24-1939-conc01'))
 const secondPage = { ...homepageReview('search-2026-08-24-1939-conc02'), page: { id: 'search', title: 'Search', url: '/search' } }
@@ -531,7 +669,7 @@ check('a dead pid is reported dead', pidAlive(DEAD_PID) === false)
 check('a live pid is reported live', pidAlive(process.pid) === true)
 
 // spawn() can return without producing a process. That must never read as running.
-const rNoPid = runner({ spawnFn: fakeClaude({ pid: 0, result: OK_RESULT }) })
+const rNoPid = runner({ spawnFn: fakeTerminal({ launcherPid: 0 }) })
 const noPid = rNoPid.submit(homepageReview('homepage-2026-08-24-1950-nopid'))
 await settle()
 check('a spawn that produced no process is never running', noPid.state !== 'running')
@@ -544,7 +682,7 @@ check('all four screenshots survived it too',
 check('and it is retryable', ['blocked', 'failed', 'stale'].includes(noPid.state))
 
 // A child that says "init" from a pid that is already gone is a message, not a run.
-const rDead = runner({ spawnFn: fakeClaude({ pid: DEAD_PID, neverExit: true }) })
+const rDead = runner({ spawnFn: fakeTerminal({ pid: DEAD_PID, neverStops: true }) })
 const deadRec = rDead.submit(homepageReview('homepage-2026-08-24-1951-deadpid'))
 await settle()
 check('an init line from a dead process does not make it running', deadRec.state !== 'running')
@@ -556,7 +694,7 @@ const afterDead = rDead.submit({ ...homepageReview('search-2026-08-24-1951-after
 check('a stale lock does not block the next review', afterDead.state !== 'blocked')
 
 console.log('\nA restarted bridge reconciles what the previous one left behind')
-const spawnLive = fakeClaude({ neverExit: true, result: OK_RESULT })
+const spawnLive = fakeTerminal({ neverStops: true })
 const rBefore = runner({ spawnFn: spawnLive })
 const liveRec = rBefore.submit(homepageReview('homepage-2026-08-24-1952-restart'))
 await settle()
@@ -566,7 +704,7 @@ check('run.json on disk says running', JSON.parse(readFileSync(join(packageDir(R
 
 // The restart. A brand new runner over the same repo is exactly what the
 // founder gets when Command Centre is closed and reopened.
-const spawnAfterRestart = fakeClaude({ result: OK_RESULT })
+const spawnAfterRestart = fakeTerminal()
 const rRestarted = new ReviewRunner(REPO, {
   spawnFn: spawnAfterRestart, findClaudeFn: () => 'C:\\fake\\claude.exe', readinessFn: () => READY,
   worktreeFn: (repoRoot, reviewId) => FAKE_TREE(reviewId),
@@ -584,8 +722,7 @@ const retryStale = rRestarted.submit(homepageReview(liveRec.reviewId))
 check('a stale run can be retried', retryStale.duplicate === false)
 check('the retry reused the package already on disk', retryStale.packagePath === liveRec.packagePath)
 check('the retry started exactly one process', spawnAfterRestart.calls.length === 1)
-await settle()
-check('the retry completed', rRestarted.get(liveRec.reviewId).state === 'completed')
+check('the retry completed', (await until(rRestarted, liveRec.reviewId, ['completed','failed','stale'])).state === 'completed')
 // Pressing Continue again is one relaunch per press — never a fan-out, and
 // never a second package. (This fake run changes nothing, so it stays
 // continuable; a verified one would be refused, which is asserted above.)
@@ -605,7 +742,7 @@ const notesOnly = {
     { issueUid: null, note: 'The Under £X filter does not filter.', annotated: false, dataUrl: PNG_1PX },
   ],
 }
-const rNotes = runner({ claude: { result: OK_RESULT } })
+const rNotes = runner()
 const notesRec = rNotes.submit(notesOnly)
 check('no issue rows is still counted as none', notesRec.counts.issues === 0)
 check('both screenshots are counted', notesRec.counts.screenshots === 2)
@@ -639,16 +776,25 @@ check('a turn with nothing in it claims nothing',
 check('a non-assistant event is not activity',
   describeActivity({ type: 'result', result: 'done' }) === null)
 
+/* The founder can now WATCH the repair, but the card must not go mute while
+   they are looking elsewhere — and with a visible session the progress no
+   longer arrives on a pipe. It is read back out of the file the recorder hooks
+   append to, so that is what this drives. */
 const rProg = runner({
-  spawnFn: fakeClaude({
-    neverExit: true,
-    turns: [asstText('Starting on the format labels'), asstTool('Read', { file_path: '/r/lib/identity/format.ts' }), asstTool('Edit', { file_path: '/r/app/search/page.tsx' })],
+  spawnFn: fakeTerminal({
+    neverStops: true,
+    tools: [
+      { name: 'Read', input: { file_path: '/r/lib/identity/format.ts' } },
+      { name: 'Edit', input: { file_path: '/r/app/search/page.tsx' } },
+    ],
   }),
 })
 const progRec = rProg.submit(homepageReview('homepage-2026-08-24-1954-progress'))
-await settle()
-check('the repair is running', progRec.state === 'running')
-check('every turn is counted', progRec.progress?.turns === 3)
+const progDir = packageDir(REPO, progRec.reviewId)
+await until(rProg, progRec.reviewId, ['running'])
+for (let i = 0; i < 60 && !progRec.progress; i++) await settle(15)
+check('the repair is running', progRec.state === 'running', progRec.state)
+check('every tool call is counted', progRec.progress?.turns === 2, String(progRec.progress?.turns))
 check('the card can say what it is doing right now', progRec.progress?.activity === 'Editing search/page.tsx')
 check('and when it last did anything', Number.isFinite(Date.parse(progRec.progress?.lastEventAt ?? '')))
 check('progress reaches the page through the same view the status endpoint uses',
@@ -656,9 +802,10 @@ check('progress reaches the page through the same view the status endpoint uses'
 
 // A turn that describes nothing must not blank out the last thing that did —
 // the card would flicker back to a bare spinner for no reason.
-rProg.children.get(progRec.reviewId).stdout.emit('data', JSON.stringify({ type: 'assistant', message: { content: [] } }) + '\n')
+appendFileSync(join(progDir, 'claude-run.jsonl'), JSON.stringify({ type: 'assistant', message: { content: [] } }) + '\n')
+for (let i = 0; i < 60 && progRec.progress?.turns !== 3; i++) await settle(15)
 check('a turn with no describable action keeps the last one', progRec.progress.activity === 'Editing search/page.tsx')
-check('but it still counts as a turn', progRec.progress.turns === 4)
+check('but it still counts as a turn', progRec.progress.turns === 3, String(progRec.progress.turns))
 
 /* ═══ 10. What an unattended repair is allowed to run ═══════════════════════
    The founder's decision of 2026-08-31: a narrow allowlist, not a broader
@@ -964,7 +1111,7 @@ throwsWorktree('a directory that is not a git repository is refused',
 
 /* And a worktree that cannot be made BLOCKS the run — it does not quietly
    fall back to the founder's checkout, which is the whole security decision. */
-const spawnNever = fakeClaude({ result: OK_RESULT })
+const spawnNever = fakeTerminal()
 const rBlocked = runner({
   spawnFn: spawnNever,
   worktreeFn: () => { throw new WorktreeError('git worktree add failed: disk full') },
@@ -1563,8 +1710,187 @@ check('an incomplete repair is recorded as incomplete, never as fixed',
 check('a page the file has never heard of is not invented',
   recordRepairOutcome(REPO, { reviewId: 'x', page: { id: 'covers' } }, good) === null)
 
+/* ═══ 15. The visible session ═══════════════════════════════════════════════
+   Everything above proves the handoff still keeps its promises. This section
+   is about the promise the visible window ADDS, and the four ways it can be
+   read dishonestly if the precedence is wrong.                              */
+console.log('\nA visible Claude Code window, and the four ways it can end')
+
+/* ── It never claims a window that did not open ──────────────────────────── */
+const rNoWin = runner({ spawnFn: fakeTerminal({ neverOpens: true }), launchGraceMs: 60 })
+const recNoWin = rNoWin.submit(homepageReview('homepage-2026-09-01-1500-nowindow'))
+check('a launch with no window yet is `launching`, not `running`',
+  recNoWin.state === 'launching', recNoWin.state)
+check('and it reports no session pid, because there is no session',
+  recNoWin.pid === null || recNoWin.pid === undefined)
+const settledNoWin = await until(rNoWin, recNoWin.reviewId, ['blocked', 'failed', 'stale'])
+check('a terminal that never appears is BLOCKED, honestly', settledNoWin.state === 'blocked', settledNoWin.state)
+check('and it says so in the founder\'s words, with a Retry',
+  /Could not open Claude Code/.test(settledNoWin.reason) && /Retry/.test(settledNoWin.reason), settledNoWin.reason)
+check('the review survived a terminal that never opened',
+  existsSync(join(packageDir(REPO, recNoWin.reviewId), 'review.md')))
+check('and it can be handed to Claude again', isRetryable(settledNoWin))
+check('a launch that never opened holds no lock', rNoWin.reconcile() === null)
+
+/* ── THE case that must never be got wrong ───────────────────────────────── */
+const rClosed = runner({
+  spawnFn: fakeTerminal({
+    pid: DEAD_PID, windowClosed: true,
+    tools: [{ name: 'Edit', input: { file_path: 'lib/search/priceFilter.ts' } }],
+  }),
+})
+const recClosed = rClosed.submit(homepageReview('homepage-2026-09-01-1501-closed'))
+const closed = await until(rClosed, recClosed.reviewId, ['completed', 'failed', 'stale', 'blocked'])
+check('closing the window before the repair reports back is STALE', closed.state === 'stale', closed.state)
+check('it is never completed, whatever it had edited', closed.state !== 'completed')
+check('and it never carries a fixed-looking outcome',
+  !closed.report || !['verified-local'].includes(closed.report.outcome), closed.report?.outcome)
+check('stale says exactly what is known, and no more', closed.reason === STALE_REASON)
+check('the review and its screenshots are all still there',
+  JSON.parse(readFileSync(join(packageDir(REPO, recClosed.reviewId), 'review.json'), 'utf8')).counts.screenshots === 4)
+check('and Continue is offered rather than a rebuilt review', isRetryable(closed))
+
+/* ── Reported back, THEN closed. The opposite order, the opposite answer. ── */
+const rReported = runner({
+  spawnFn: fakeTerminal({
+    pid: DEAD_PID, summary: 'Fixed the price filter. Committed as 1a2b3c4.',
+    tools: [{ name: 'Edit', input: { file_path: 'lib/search/priceFilter.ts' } }],
+  }),
+})
+const recRep = rReported.submit(homepageReview('homepage-2026-09-01-1502-reported'))
+const reported = await until(rReported, recRep.reviewId, ['completed', 'failed', 'stale'])
+check('a repair that reported back is completed even though its window is gone',
+  reported.state === 'completed', reported.state)
+check('stop beats the dead pid — the report is not thrown away with the terminal',
+  reported.summary === 'Fixed the price filter. Committed as 1a2b3c4.')
+check('and the report file is next to the review, readable with no tooling',
+  existsSync(join(packageDir(REPO, recRep.reviewId), 'report.md')))
+check('the report says production is still unproven',
+  /cannot push, merge or deploy/.test(readFileSync(join(packageDir(REPO, recRep.reviewId), 'report.md'), 'utf8')))
+
+/* ── A bridge restart, across a repair that finished while it was down ───── */
+const rPreRestart = runner({ spawnFn: fakeTerminal({ neverStops: true }) })
+const liveVis = rPreRestart.submit(homepageReview('homepage-2026-09-01-1503-restart'))
+await until(rPreRestart, liveVis.reviewId, ['running'])
+check('the run really was running before the restart', liveVis.state === 'running', liveVis.state)
+// Claude finishes while nobody is listening, exactly as the hooks would leave it.
+const visDir = packageDir(REPO, liveVis.reviewId)
+writeFileSync(join(visDir, 'stop.json'), JSON.stringify({ at: new Date().toISOString(), lastAssistantMessage: 'Done while the bridge was down.' }))
+writeFileSync(join(visDir, 'exit.json'), JSON.stringify({ exitCode: 0, endedAt: new Date().toISOString() }))
+const rReborn = new ReviewRunner(REPO, {
+  spawnFn: fakeTerminal(), findClaudeFn: () => 'C:\\fake\\claude.exe',
+  readinessFn: () => READY, worktreeFn: (r, id) => FAKE_TREE(id), trustFn: fakeTrust, pollMs: 5,
+})
+const reborn = rReborn.get(liveVis.reviewId)
+check('a restarted bridge still knows the run', reborn !== null)
+check('and it reads the evidence rather than guessing: completed, not stale',
+  reborn.state === 'completed', reborn.state)
+check("Claude's own words survived the restart",
+  reborn.summary === 'Done while the bridge was down.')
+check('the report survived it too', !!reborn.report)
+check('a finished run holds no lock after a restart', rReborn.reconcile() === null)
+
+/* ── Single-flight, unchanged ────────────────────────────────────────────── */
+const rFlight = runner({ spawnFn: fakeTerminal({ neverStops: true }) })
+const flight1 = rFlight.submit(homepageReview('homepage-2026-09-01-1504-flight1'))
+await until(rFlight, flight1.reviewId, ['running'])
+const flight2 = rFlight.submit({ ...homepageReview('search-2026-09-01-1504-flight2'), page: { id: 'search', title: 'Search', url: '/search' } })
+check('a second review is not launched while a visible repair is running',
+  flight2.state === 'blocked', flight2.state)
+check('it says which repair is holding the floor', /already running/.test(flight2.reason))
+check('and the second review was still saved in full',
+  JSON.parse(readFileSync(join(packageDir(REPO, 'search-2026-09-01-1504-flight2'), 'review.json'), 'utf8')).counts.screenshots === 4)
+
+/* ── The recorder: hook payloads in, the shape the report reads out ──────── */
+console.log('\nThe recorder turns hook payloads into the transcript the report already reads')
+
+const preEv = eventsForHook('PreToolUse', { tool_use_id: 'toolu_1', tool_name: 'Bash', tool_input: { command: 'npm run check' } })
+const postEv = eventsForHook('PostToolUse', { tool_use_id: 'toolu_1', tool_name: 'Bash', tool_response: { stdout: 'Types clean', stderr: '' } })
+check('PreToolUse becomes the tool_use half', preEv[0].type === 'assistant' && preEv[0].message.content[0].type === 'tool_use')
+check('PostToolUse becomes the tool_result half', postEv[0].type === 'user' && postEv[0].message.content[0].type === 'tool_result')
+check('the two halves pair on the same id',
+  preEv[0].message.content[0].id === postEv[0].message.content[0].tool_use_id)
+check('the existing report pipeline reads them with no change at all', (() => {
+  const rep = deriveReport({ state: 'completed', events: [...preEv, ...postEv], verifyScripts: ['check'], repoRoot: REPO, gitFn: () => null })
+  return rep.verification.length === 1 && rep.verification[0].ok === true && rep.verification[0].script === 'check'
+})())
+check('a refused or failed command emits no PostToolUse, so it never reads as passed', (() => {
+  const rep = deriveReport({ state: 'completed', events: preEv, verifyScripts: ['check'], repoRoot: REPO, gitFn: () => null })
+  return rep.verification[0].ok === false && /never reported back/.test(rep.verification[0].detail)
+})())
+check('Stop carries Claude\'s own closing words through as an assistant turn', (() => {
+  const ev = eventsForHook('Stop', { last_assistant_message: 'I fixed two of three.' })
+  return ev[0].message.content[0].text === 'I fixed two of three.'
+})())
+check('a Bash response is read as its output', responseText({ stdout: 'a', stderr: 'b' }) === 'a\nb')
+check('a Read response is read as the file it returned', responseText({ type: 'text', file: { content: 'hello' } }) === 'hello')
+check('a payload with no tool_use_id records nothing rather than guessing',
+  eventsForHook('PreToolUse', { tool_name: 'Bash' }).length === 0)
+
+/* ── The launcher command line, on its own ───────────────────────────────── */
+const L = visibleLaunchArgv({ packageDir: 'C:/r/launch/reviews/search-a', cwd: 'C:/r-repairs/search-a', title: 'Catch Comics Repair — Search' })
+check('the launcher is cmd.exe, which is on every Windows install', L.command === 'cmd.exe')
+check('it starts a new console window', /^\/c start /.test(L.args[0]))
+check('every path on the line is quoted',
+  (L.args[0].match(/"/g) ?? []).length % 2 === 0 && L.args[0].includes('"C:/r-repairs/search-a"'))
+check('the window opens in the worktree, and the wrapper is pointed at the package',
+  L.args[0].includes('/D "C:/r-repairs/search-a"') && L.args[0].endsWith('--run "C:/r/launch/reviews/search-a"'))
+check('the title is derived from the page id, never from founder text',
+  windowTitleFor('search') === 'Catch Comics Repair — Search'
+  && windowTitleFor('<script>alert(1)</script>') === 'Catch Comics Repair — Review')
+
+/* ── Trust, against a throwaway config rather than the founder's ─────────── */
+const cfgDir = mkdtempSync(join(tmpdir(), 'cc-trust-'))
+const cfg = join(cfgDir, '.claude.json')
+writeFileSync(cfg, JSON.stringify({ projects: { 'C:/existing': { hasTrustDialogAccepted: true, keepMe: 1 } } }, null, 2))
+const t1 = ensureWorkspaceTrust('C:\\r-repairs\\search-a', { configPath: cfg })
+const afterTrust = JSON.parse(readFileSync(cfg, 'utf8'))
+check('a new worktree is marked trusted, so the session does not stop on the dialog', t1.ok && !t1.already)
+check('both spellings of the path are written, because the CLI has used both',
+  afterTrust.projects['C:\\r-repairs\\search-a']?.hasTrustDialogAccepted === true
+  && afterTrust.projects['C:/r-repairs/search-a']?.hasTrustDialogAccepted === true)
+check('nothing else in the founder\'s config is disturbed',
+  afterTrust.projects['C:/existing'].keepMe === 1 && afterTrust.projects['C:/existing'].hasTrustDialogAccepted === true)
+check('trusting again is a no-op rather than a rewrite',
+  ensureWorkspaceTrust('C:\\r-repairs\\search-a', { configPath: cfg }).already === true)
+check('an unreadable config is reported, never thrown — the window still opens',
+  ensureWorkspaceTrust('C:\\x', { configPath: join(cfgDir, 'nope.json') }).ok === false)
+rmSync(cfgDir, { recursive: true, force: true })
+
+/* ── The recorder hook rides ALONGSIDE the integrity gate, never instead ── */
+const visSettings = JSON.parse(integritySettings({
+  repoRoot: 'C:/repo', worktreePath: 'C:/repo-repairs/x', base: 'abc1234',
+  packageDir: 'C:/repo/launch/reviews/x',
+}))
+check('the integrity gate is still the FIRST PreToolUse hook on Bash',
+  /verification-integrity\.mjs/.test(visSettings.hooks.PreToolUse[0].hooks[0].command))
+check('the recorder is added as a second hook, not in place of it',
+  visSettings.hooks.PreToolUse.length === 2
+  && /repair-session\.mjs" --record PreToolUse/.test(visSettings.hooks.PreToolUse[1].hooks[0].command))
+check('every event the report needs is recorded',
+  ['PreToolUse', 'PostToolUse', 'SessionStart', 'Stop', 'SessionEnd'].every(k => k in visSettings.hooks))
+check('the recorder is addressed in the founder\'s checkout, out of the repair\'s reach',
+  visSettings.hooks.Stop[0].hooks[0].command.includes('C:/repo/launch/operations/repair-session.mjs')
+  && !visSettings.hooks.Stop[0].hooks[0].command.includes('repo-repairs'))
+check('a launch with no package directory gets the gate and nothing else',
+  Object.keys(JSON.parse(integritySettings({ repoRoot: 'C:/repo', base: 'abc1234' })).hooks).join() === 'PreToolUse')
+
+/* ── The permission boundary is exactly what it was ──────────────────────── */
+const visArgv = planFor('homepage-2026-08-24-1932-launch').args
+check('the visible session still uses acceptEdits',
+  visArgv[visArgv.indexOf('--permission-mode') + 1] === 'acceptEdits')
+check('and never bypassPermissions', !visArgv.join(' ').includes('bypassPermissions')
+  && !visArgv.includes('--dangerously-skip-permissions') && !visArgv.includes('--allow-dangerously-skip-permissions'))
+check('the allow list is carried in full',
+  ALLOWED_TOOLS.every(t => visArgv.includes(t)))
+check('the deny list is carried in full',
+  DISALLOWED_TOOLS.every(t => visArgv.includes(t)))
+check('the integrity gate rides on the argv, so there is no file to rewrite',
+  visArgv.includes('--settings') && !visArgv.some(a => typeof a === 'string' && /--settings-file/.test(a)))
+
 /* ═══ Cleanup ═══════════════════════════════════════════════════════════════ */
 rmSync(REPO, { recursive: true, force: true })
+rmSync(join(REPO, '..', 'cc-frv4-repairs'), { recursive: true, force: true })
 
 console.log(`\n${fail === 0 ? '✓ PASS' : '✗ FAIL'} — ${pass} passed, ${fail} failed\n`)
 process.exit(fail === 0 ? 0 : 1)

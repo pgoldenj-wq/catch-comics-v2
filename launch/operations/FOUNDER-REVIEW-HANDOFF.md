@@ -9,24 +9,83 @@
    one so it is attached to the issue it is evidence for.
 4. Mark the page **Looks good** or **Needs fixing**.
 5. Press **SEND \<PAGE\> TO CLAUDE**.
+6. **A new Claude Code window opens by itself and starts repairing.** Watch it,
+   interrupt it, or ignore it — the Smoke Test tracks it either way.
 
-That is the whole journey. Nothing is copied, nothing is pasted into a
-terminal, no folder is picked.
+That is the whole journey. You never open Claude, never open PowerShell or
+Windows Terminal, never `cd` anywhere, never paste a kickoff command, never
+find `review.md`, never move a screenshot and never retype a note. **There is
+no manual Claude kickoff in the normal founder workflow.** If a document tells
+you to paste a command, it is describing the fallback for a broken bridge.
 
 ## What happens on that click
 
 ```
 Smoke Test V4  ──POST /review/submit──▶  local bridge (127.0.0.1:8319)
                     review + images                │
-                                                   ├─▶ launch/reviews/<reviewId>/
-                                                   ├─▶ launch/founder-review.json
+                                                   ├─▶ launch/reviews/<reviewId>/      the durable package
+                                                   ├─▶ launch/founder-review.json      Mission Control's row
                                                    ├─▶ git worktree add  ../catch-comics-repairs/<reviewId>
-                                                   └─▶ claude -p "<fixed repair prompt>"
-                                                         cwd = the worktree, never your checkout
+                                                   ├─▶ mark that worktree trusted      (or the session stalls on a dialog)
+                                                   ├─▶ launch.json                     everything claude is started with
+                                                   └─▶ cmd /c start "Catch Comics Repair — <Page>"
+                                                          └─▶ repair-session.mjs --run <package>
+                                                                 └─▶ claude  (VISIBLE, interactive)
+                                                                       cwd = the worktree, never your checkout
 ```
 
 The bridge is `browser-trust-bridge.mjs` — the same one behind "Run Browser
-Trust" — and all the review logic lives in `founder-review-handler.mjs`.
+Trust" — the review logic lives in `founder-review-handler.mjs`, and the window
+and its reporting live in `repair-session.mjs`.
+
+## The visible window
+
+Until 2026-09-01 the repair ran headless: correct, durable, and invisible. You
+pressed Send and got a spinner for eight minutes with no way to watch, steer or
+stop it. It now opens a real terminal window, titled
+**`Catch Comics Repair — <Page>`**, running a normal interactive Claude Code
+session. You can read what it is doing, interrupt it, and talk to it when it
+finishes.
+
+Three things had to be true for that to work, and all three were measured on
+this machine rather than assumed (CLI 2.1.251, Windows 11):
+
+| Fact | Consequence |
+|---|---|
+| Node's `detached: true` gives a new console but **no tty** — libuv always sets `STARTF_USESTDHANDLES`, so the TUI will not render | the window is created by `cmd /c start`, not by spawn flags |
+| An interactive session in a directory with **no persisted trust** stops on the trust dialog and never sends a turn | the bridge marks each new worktree trusted in `~/.claude.json` first — the CLI's own documented remedy |
+| An interactive session **does not write its transcript to disk** while it runs; the file at `transcript_path` is not there even at `Stop` | progress and the final report come from **hooks**, not from tailing a file |
+
+### The argv trap, written down so it cannot come back
+
+`--allowedTools` and `--disallowedTools` are **variadic**: they swallow every
+argument up to the next flag. With the prompt at the end it became the 93rd
+value of `--disallowedTools`, and the session opened perfectly — right
+worktree, right name, right permissions — and **sat at an empty prompt with no
+turn ever sent**. Twice, before anyone looked at the screen.
+
+The kickoff is therefore the **first** argument, where no variadic option can
+reach it, and `test:founder-review` asserts that nothing positional ever trails
+a variadic option again.
+
+### The kickoff is one line
+
+The standing instruction is written to `repair-instructions.md` inside the
+package. The command line carries only:
+
+> Read `launch/reviews/<id>/repair-instructions.md` and follow it exactly, starting now.
+
+No founder text ever reaches a command line. The prompt, the settings JSON and
+the allow/deny lists travel in `launch.json` and are handed to claude as an argv
+array with no shell involved — the only things on the `cmd.exe` line are paths
+the bridge generated and a window title built from the page **id**, which comes
+from a fixed list.
+
+### What it costs
+
+`--max-budget-usd` only works with `--print`, so a visible session has no hard
+spend ceiling. The ceiling it has instead is you: you can see what it is doing
+and stop it, which is the whole reason for the change.
 
 ## Where the repo comes from
 
@@ -48,8 +107,13 @@ launch/reviews/<page>-<yyyy-mm-dd-hh-mm>-<id>/
   screenshots/
     issue-01-shot-1.jpg    evidence for issue-01
     page-shot-1.jpg        about the page in general
-  run.json             what the launch did (state, exit code, session id, cost)
-  claude-run.jsonl     transcript of the run
+  repair-instructions.md   the standing instruction the session opens and follows
+  launch.json          exactly what claude was started with — argv, cwd, branch
+  session.json         the wrapper's own pid, written before claude starts
+  claude-run.jsonl     the run's evidence, appended by the recorder hooks
+  stop.json            the repair reported back, with Claude's own closing words
+  exit.json            claude exited, and with what code
+  run.json             what the launch did (state, pid, outcome, full report)
 ```
 
 Every filename is generated by the bridge from an index. The browser cannot
@@ -215,8 +279,8 @@ the gate, the marker never executed, and untouched `npm run lint` still ran.
 |---|---|
 | `sending` / `packaging` | The browser is encoding the review |
 | `packaged` | Every file is on disk and verified non-empty |
-| `launching` | Claude Code has been spawned |
-| `running` | Claude Code emitted its init event **and** the process it announced itself from is alive |
+| `launching` | The terminal has been asked to open, and has not proved it yet |
+| `running` | The wrapper inside the window wrote its pid to `session.json` **and** that pid is alive |
 | `completed` | Claude exited 0 and did not report an error — **the process, not the repair**; see the outcome table below |
 | `failed` | Claude ran and something went wrong |
 | `blocked` | The *environment* stopped Claude starting |
@@ -243,8 +307,28 @@ claiming a repair it can no longer see. `stale` is retryable exactly like
 `blocked` and `failed`, against the package already on disk.
 
 `running` is never inferred from a launch request, a saved package, a stored
-status or a 200 from the bridge. It means a child process was spawned, has a
-pid, and that pid is alive — which is why the card prints the pid next to it.
+status or a 200 from the bridge. The pid the bridge watches is the **wrapper's**,
+not `cmd.exe`'s: cmd exits the moment the window is up and proves nothing about
+the session inside it. Until `session.json` exists the card says
+**Opening Claude Code…**, and if no window appears within the grace period the
+run is `blocked` with *Could not open Claude Code* — it never claims a terminal
+that is not there.
+
+### If you close the window
+
+Three files decide what happened, and their order is the whole honesty of it:
+
+> `stop.json` beats `exit.json` beats the pid.
+
+- Closed **before** it reported back → `stale` or `failed`. Never "fixed",
+  whatever it had already edited. Continue/Retry reuses the same package,
+  branch and worktree, so nothing is rebuilt.
+- Reported back and **then** closed → `completed`, and the report stands. The
+  terminal is not the source of truth, and the report never depends on it
+  staying open.
+
+A finished window is left on screen deliberately, so you can read Claude's last
+message and carry on talking to it. Closing it changes nothing already recorded.
 
 This mirrors the PASS / FAIL / BLOCKED model the Browser Trust runner uses, for
 the same reason: a run that never started is not evidence of anything.
