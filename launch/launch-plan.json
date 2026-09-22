@@ -70,9 +70,9 @@
     },
     {
       "id": "W2",
-      "title": "Travelling Man price refresh completing",
-      "state": "RUNNING",
-      "detail": "A price-verify write run has been going since 19:07 UTC, 0 errors. Freshness is already safe — launch health reports 0 stale listings and Travelling Man last seen 2026-09-21 — so this is a top-up, not a race.",
+      "title": "Travelling Man price refresh — finished, then dropped at 97%",
+      "state": "DONE, WITH A BLIP",
+      "detail": "The write run of 2026-09-22 refreshed 2,213 of 2,280 rows and then crashed at 19:57 on \"Can't reach database server\" — a Neon serverless connection drop, the kind CLAUDE.md warns to expect, not data loss. It did its job: freshness went from 1,363 to 2,213 listings under 7 days old, Travelling Man last seen today, 0 stale. The 67 rows it never reached are still inside the 30-day window. No action needed before launch; re-run when convenient.",
       "recheck": "launch/operations/price-verify-status.json"
     },
     {
