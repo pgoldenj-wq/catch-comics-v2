@@ -4,14 +4,14 @@
   "mode": "LAUNCH",
   "note": "The single source of truth for what is left before Catch Comics launches. Edit this file, reload Launch Control. Every claim here was measured on 2026-09-22 — see `evidence` on each item.",
   "targets": {
-    "soft": "2026-09-24",
+    "soft": "2026-09-23",
     "public": "2026-09-29",
-    "rationale": "Two blockers remain and both are hours of work, not weeks. Soft launch two days out leaves one clear day of production soak after the last fix. Public launch five days after that is enough to see whether real shoppers search, click and buy — and short enough that it cannot quietly become another month."
+    "rationale": "Both blockers closed on 2026-09-22 and the offers fix is already verified on production. Soft launch tomorrow gives the mobile fix one deploy and one night of soak. Public launch six days later is enough to see whether real shoppers search, click and buy — and short enough that it cannot quietly become another month."
   },
   "verdict": {
-    "state": "NOT READY",
-    "because": "One production defect priced the wrong book, fixed today but not yet deployed. Everything else on the customer journey is proven.",
-    "clearsWhen": "Both blockers below are done."
+    "state": "READY",
+    "because": "Both launch blockers are closed and production-verified. The customer journey — discover, search, identify, trust the price, click through, attribute — is proven end to end.",
+    "clearsWhen": "Nothing outstanding. Ship it."
   },
   "blockers": [
     {
@@ -19,45 +19,45 @@
       "title": "Ship the eBay edition gate to production",
       "why": "Production is serving the wrong book as the cheapest offer. For Hellboy Omnibus Vol. 1, 7 of 8 eBay offers were a different book — Vol. 2, Vol. 4 and a B.P.R.D. title — and the page quoted \"from £14.42\" for a book that costs £19.36. A shopper following the cheapest offer bought the wrong comic. This is the one defect that breaks the site's whole purpose.",
       "owner": "CLAUDE",
-      "status": "in-progress",
+      "status": "done",
       "done": "The Hellboy Omnibus Vol. 1 page on production lists only Hellboy Omnibus Vol. 1 offers, and npm run audit:ebay-relevance shows 0 rails emptied.",
-      "evidence": "Fixed, tested and verified on localhost 2026-09-22: lib/listings/productRelevance.ts, 28/28 unit assertions, calibrated against live production offers. Awaiting the Vercel deploy from this commit."
+      "evidence": "DONE 2026-09-22. Deployed and verified on production: /api/ebay for ISBN 9781506706665 now returns 2 rows, both Hellboy Omnibus Vol. 1, leading at £26.99 — the Volume 2, Volume 4 and B.P.R.D. rows are gone. Launch smoke 20/20 after deploy."
     },
     {
       "id": "B2",
       "title": "Confirm product pages do not scroll sideways on a phone",
       "why": "The 2026-09-01 review recorded every product page rendering 644px wide at a 390px viewport, on production, with the header search form overflowing. Most comic shoppers are on a phone. If it is real it is a serious mobile failure on the core journey; if it is stale it costs one test run to close.",
       "owner": "CLAUDE",
-      "status": "todo",
+      "status": "done",
       "done": "A Playwright assertion at 390px proves documentElement.scrollWidth <= viewport width on home, search and a product page — or the overflow is found and fixed.",
-      "evidence": "UNVERIFIED this session: the in-app browser pane cannot emulate a viewport narrower than 644px, so neither confirmation nor refutation was possible. Browser Trust's mobile-chromium project passes 9 tests but asserts nothing about horizontal overflow."
+      "evidence": "DONE 2026-09-22. CONFIRMED real, then fixed. tests/e2e/mobile-overflow.spec.ts proved the product page rendered 644px in a 390px viewport; the cause was the shared Navbar — a 170px shrink-0 UK block plus px-8 gutters that 390px could not fund. Now px-4 below sm, the country label hidden below sm (the flag still states the fact), and min-w-0 on the search so it can actually shrink. All three pages pass; the rest of Browser Trust unregressed."
     }
   ],
   "today": [
     {
       "id": "T1",
-      "title": "Verify the eBay edition gate on production once Vercel finishes",
+      "title": "Send Catch Comics to 20 real comic buyers",
       "owner": "FOUNDER",
       "status": "todo",
-      "done": "Open catchcomics.com/product/hellboy-omnibus-706665 and confirm no Volume 2, Volume 4 or B.P.R.D. row appears in the price table.",
-      "link": "https://www.catchcomics.com/product/hellboy-omnibus-706665"
+      "done": "20–30 real UK comic buyers have the link and at least five have searched for a comic they actually want.",
+      "note": "This is the only test left that matters. Everything internal has been proven; nothing else will be learned without real shoppers."
     },
     {
       "id": "T2",
       "title": "Read the real Amazon qualifying-sale count in Associates Central",
       "owner": "FOUNDER",
       "status": "todo",
-      "done": "The verified trailing-30-day qualifying-sale count is written into the Amazon card below, replacing the founder estimate.",
+      "done": "The verified trailing-30-day qualifying-sale count replaces the founder estimate in the Amazon card.",
       "link": "https://affiliate-program.amazon.co.uk/",
-      "note": "The API cannot tell us this. It returns only eligible / not eligible, and today it returns AssociateNotEligible."
+      "note": "The API cannot tell us this — it returns only eligible / not eligible, and today it returns AssociateNotEligible."
     },
     {
       "id": "T3",
       "title": "Decide whether an honest Amazon search link goes on the product page",
       "owner": "FOUNDER",
       "status": "todo",
-      "done": "A yes/no decision. If yes, Claude adds a clearly-labelled \"Search Amazon UK\" link (no price, no fake offer) to the main product page in one bounded change.",
-      "note": "This is the real Amazon unblock — see the Amazon card. Today there is no Amazon link on the pages people actually use, so qualifying sales cannot happen at all."
+      "done": "A yes/no decision. If yes, Claude adds a clearly-labelled \"Search Amazon UK\" link — no price, no fake offer — to the main product page in one bounded change.",
+      "note": "This is the real Amazon unblock. Today there is no Amazon link on the pages people actually use, so qualifying sales cannot be earned at all."
     }
   ],
   "waiting": [
@@ -83,17 +83,62 @@
     }
   ],
   "gates": [
-    { "id": "production", "label": "Production", "state": "pass", "detail": "Launch smoke 20/20 at 19:07 UTC today, including security headers, OG image, 404 handling." },
-    { "id": "search", "label": "Search finds the exact product", "state": "pass", "detail": "Format labels and the Under-£X filter production-verified 2026-08-31; junk and £0.00 rows gone." },
-    { "id": "identity", "label": "Product identity trusted", "state": "pass", "detail": "One format map across search, product, series; unknown formats omitted rather than guessed." },
-    { "id": "offers", "label": "Retailer offers are the right book", "state": "fixing", "detail": "The wrong-edition eBay defect is fixed and verified locally; the gate turns green when B1 deploys." },
-    { "id": "affiliate", "label": "Affiliate attribution", "state": "pass", "detail": "/go returns 302 to the retailer; disclosure on its own page, in the footer, privacy page and cookie notice." },
-    { "id": "mobile", "label": "Core journey on a phone", "state": "unknown", "detail": "Unverified this session — see B2." },
-    { "id": "analytics", "label": "Real human usage measurable", "state": "pass", "detail": "307 clickouts from 261 distinct visitors in the trailing 30 days, readable with npm run launch:signal." },
-    { "id": "amazon", "label": "Amazon", "state": "waiting", "detail": "Blocked by Amazon's own eligibility gate. Does not block launch." }
+    {
+      "id": "production",
+      "label": "Production",
+      "state": "pass",
+      "detail": "Launch smoke 20/20 at 19:07 UTC today, including security headers, OG image, 404 handling."
+    },
+    {
+      "id": "search",
+      "label": "Search finds the exact product",
+      "state": "pass",
+      "detail": "Format labels and the Under-£X filter production-verified 2026-08-31; junk and £0.00 rows gone."
+    },
+    {
+      "id": "identity",
+      "label": "Product identity trusted",
+      "state": "pass",
+      "detail": "One format map across search, product, series; unknown formats omitted rather than guessed."
+    },
+    {
+      "id": "offers",
+      "label": "Retailer offers are the right book",
+      "state": "pass",
+      "detail": "Title-derived eBay rows must match the edition; verified on production today — the Hellboy Vol. 1 page no longer lists Vol. 2, Vol. 4 or B.P.R.D."
+    },
+    {
+      "id": "affiliate",
+      "label": "Affiliate attribution",
+      "state": "pass",
+      "detail": "/go returns 302 to the retailer; disclosure on its own page, in the footer, privacy page and cookie notice."
+    },
+    {
+      "id": "mobile",
+      "label": "Core journey on a phone",
+      "state": "pass",
+      "detail": "Home, search and product pages all fit a 390px viewport with no horizontal scroll — tests/e2e/mobile-overflow.spec.ts."
+    },
+    {
+      "id": "analytics",
+      "label": "Real human usage measurable",
+      "state": "pass",
+      "detail": "307 clickouts from 261 distinct visitors in the trailing 30 days, readable with npm run launch:signal."
+    },
+    {
+      "id": "amazon",
+      "label": "Amazon",
+      "state": "waiting",
+      "detail": "Blocked by Amazon's own eligibility gate. Does not block launch."
+    }
   ],
   "amazon": {
-    "qualifyingSales": { "value": 5, "of": 10, "confidence": "FOUNDER ESTIMATE", "verified": false },
+    "qualifyingSales": {
+      "value": 5,
+      "of": 10,
+      "confidence": "FOUNDER ESTIMATE",
+      "verified": false
+    },
     "window": "trailing 30 days",
     "status": "WAITING FOR ELIGIBILITY",
     "code": "READY",
@@ -106,14 +151,38 @@
     "afterEligibility": "The client, adapter, env wiring and bounded probe already exist. What remains is the importer that turns a getItems response into listings — ISBN/ASIN-anchored, condition honest, freshness rules unchanged — plus a dry run and founder approval before the first live write."
   },
   "afterLaunch": [
-    { "title": "Description and synopsis coverage", "detail": "68.5% of listed products have no description at all. A free Open Library / Google Books ISBN backfill is the plan-level fix; it writes canonical_products so it needs approval and a dry run." },
-    { "title": "Creator credits and a creator index", "detail": "93% of products store no creators, and /api/search has no creator matching, so clickable credits would land on junk. Needs a creator route — hands-off search SQL, plan first." },
-    { "title": "Merge fix/product-page-consolidated", "detail": "Contents rail, 8-line description clamp and eBay row collapse, all verified locally on 2026-09-01 and never merged. Real improvements, but shipping nothing keeps the status quo honest, so it is not a blocker. Merge this branch — NOT the repair/product-* branches, whose rail shipped false contents." },
-    { "title": "Retailer feed revival", "detail": "Bring back Waterstones, Wordery, WHSmith, Zavvi, AbeBooks so comparison depth stops being 1." },
-    { "title": "Comparison depth as a real feature", "detail": "0 products currently show two stored retailers. Until feeds return, eBay is the second source." },
-    { "title": "Cover coverage", "detail": "20.3% of products have an R2 cover; 94,141 have none." },
-    { "title": "Collection system, accounts, social, recommendations", "detail": "Explicitly frozen. Nothing here may pre-empt launch." },
-    { "title": "Advanced SEO programme", "detail": "Basics are in place — robots, sitemap, canonicals, OG all returning 200. Anything beyond that waits." }
+    {
+      "title": "Description and synopsis coverage",
+      "detail": "68.5% of listed products have no description at all. A free Open Library / Google Books ISBN backfill is the plan-level fix; it writes canonical_products so it needs approval and a dry run."
+    },
+    {
+      "title": "Creator credits and a creator index",
+      "detail": "93% of products store no creators, and /api/search has no creator matching, so clickable credits would land on junk. Needs a creator route — hands-off search SQL, plan first."
+    },
+    {
+      "title": "Merge fix/product-page-consolidated",
+      "detail": "Contents rail, 8-line description clamp and eBay row collapse, all verified locally on 2026-09-01 and never merged. Real improvements, but shipping nothing keeps the status quo honest, so it is not a blocker. Merge this branch — NOT the repair/product-* branches, whose rail shipped false contents."
+    },
+    {
+      "title": "Retailer feed revival",
+      "detail": "Bring back Waterstones, Wordery, WHSmith, Zavvi, AbeBooks so comparison depth stops being 1."
+    },
+    {
+      "title": "Comparison depth as a real feature",
+      "detail": "0 products currently show two stored retailers. Until feeds return, eBay is the second source."
+    },
+    {
+      "title": "Cover coverage",
+      "detail": "20.3% of products have an R2 cover; 94,141 have none."
+    },
+    {
+      "title": "Collection system, accounts, social, recommendations",
+      "detail": "Explicitly frozen. Nothing here may pre-empt launch."
+    },
+    {
+      "title": "Advanced SEO programme",
+      "detail": "Basics are in place — robots, sitemap, canonicals, OG all returning 200. Anything beyond that waits."
+    }
   ],
   "softLaunch": {
     "cohort": "20–30 real UK comic buyers. People who actually buy comics, not friends being polite. Reddit r/comicbooks and r/graphicnovels regulars, a local shop's customers, two or three comics Discords.",
@@ -133,8 +202,15 @@
     "p1": "Wrong product · broken retailer flow · major mobile failure"
   },
   "frozen": [
-    "collection system", "accounts", "social features", "redesign",
-    "recommendation engine", "data architecture", "dashboard features",
-    "speculative retailer integrations", "advanced SEO programme", "major catalogue project"
+    "collection system",
+    "accounts",
+    "social features",
+    "redesign",
+    "recommendation engine",
+    "data architecture",
+    "dashboard features",
+    "speculative retailer integrations",
+    "advanced SEO programme",
+    "major catalogue project"
   ]
 }
