@@ -88,7 +88,11 @@ export default function Navbar({ initialQuery, region: controlledRegion, onRegio
        stays under the search/product filter drawer's backdrop (z-index 40), which
        must keep dimming the header while that drawer is open. */
     <header style={{ background: '#fff', borderBottom: '1px solid #F0F0F0', position: 'sticky', top: 0, zIndex: 30 }}>
-      <div className="max-w-6xl mx-auto px-8 h-20 flex items-center gap-4">
+      {/* px-4 below sm: at 390px the 32px-a-side gutter cost more than the
+          layout could spare, and the row overflowed to 644px — every product
+          page scrolled sideways under the thumb (founder review 2026-09-01,
+          confirmed by tests/e2e/mobile-overflow.spec.ts 2026-09-22). */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-8 h-20 flex items-center gap-4">
 
         {/* Logo */}
         <Link href="/" className="shrink-0" aria-label="Catch Comics home">
@@ -131,8 +135,10 @@ export default function Navbar({ initialQuery, region: controlledRegion, onRegio
           </Link>
         </nav>
 
-        {/* Search bar */}
-        <div className="flex-1" style={{ maxWidth: '520px' }}>
+        {/* Search bar. min-w-0 because a flex item defaults to min-width:auto,
+            which refuses to shrink below its content and pushes the row wider
+            than the viewport instead. */}
+        <div className="flex-1 min-w-0" style={{ maxWidth: '520px' }}>
           <SearchBar region={region} variant="header" initialQuery={initialQuery} />
         </div>
 
@@ -143,7 +149,7 @@ export default function Navbar({ initialQuery, region: controlledRegion, onRegio
             states a fact rather than offering a choice. */}
         <div className="flex items-center gap-3 ml-auto shrink-0">
           <div
-            className="flex items-center gap-2.5 pl-2 pr-4 py-1.5 rounded-full border-2"
+            className="flex items-center gap-2.5 p-1.5 sm:pl-2 sm:pr-4 sm:py-1.5 rounded-full border-2"
             style={{ borderColor: '#E5E7EB', background: '#fff' }}
             title="Catch Comics compares UK prices"
           >
@@ -153,7 +159,9 @@ export default function Navbar({ initialQuery, region: controlledRegion, onRegio
             >
               <UKFlag />
             </span>
-            <span className="text-sm font-medium" style={{ color: '#6B7280' }}>
+            {/* Below sm the flag alone carries the fact; the words cost ~100px
+                the row does not have. The title attribute still explains it. */}
+            <span className="text-sm font-medium hidden sm:inline" style={{ color: '#6B7280' }}>
               United Kingdom
             </span>
           </div>
