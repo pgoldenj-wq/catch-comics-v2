@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "generatedAt": "2026-09-22T19:47:19.820Z",
+  "source": "read-only Postgres queries (scripts/launch-signal.ts)",
+  "windowDays": 7,
+  "since": "2026-09-15T19:47:19.452Z",
+  "excludedUserAgents": [
+    "cc-launch-smoke/1",
+    "cc-ebay-relevance-audit/1"
+  ],
+  "clickouts": 26,
+  "visitors": 26,
+  "activeDays": 7,
+  "byRetailer": {
+    "Travelling Man": 26
+  },
+  "topProducts": [
+    {
+      "title": "Absolute Batman Volume 2 Abomination",
+      "clicks": 10
+    },
+    {
+      "title": "Jujutsu Kaisen Volume 30",
+      "clicks": 2
+    },
+    {
+      "title": "Exceptional X-Men by Eve L. Ewing Vol. 1",
+      "clicks": 1
+    },
+    {
+      "title": "Spider-Man: Kizuna Volume 3",
+      "clicks": 1
+    },
+    {
+      "title": "Rent-A-Girlfriend Volume 36",
+      "clicks": 1
+    },
+    {
+      "title": "Spider-Man Octo-Girl Volume 3",
+      "clicks": 1
+    },
+    {
+      "title": "Batman '89 Echoes Hardcover",
+      "clicks": 1
+    },
+    {
+      "title": "Akane-banashi Volume 15",
+      "clicks": 1
+    },
+    {
+      "title": "Persona 5 Volume 15",
+      "clicks": 1
+    },
+    {
+      "title": "Kemono Jihen Volume 21",
+      "clicks": 1
+    }
+  ],
+  "byReferrer": {
+    "direct": 16,
+    "catchcomics.com": 10
+  }
+}
