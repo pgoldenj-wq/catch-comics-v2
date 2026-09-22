@@ -21,7 +21,19 @@
       "owner": "CLAUDE",
       "status": "done",
       "done": "The Hellboy Omnibus Vol. 1 page on production lists only Hellboy Omnibus Vol. 1 offers, and npm run audit:ebay-relevance shows 0 rails emptied.",
-      "evidence": "DONE 2026-09-22. Deployed and verified on production: /api/ebay for ISBN 9781506706665 now returns 2 rows, both Hellboy Omnibus Vol. 1, leading at £26.99 — the Volume 2, Volume 4 and B.P.R.D. rows are gone. Launch smoke 20/20 after deploy."
+      "evidence": "DONE 2026-09-22. Deployed and verified on production: /api/ebay for ISBN 9781506706665 now returns 2 rows, both Hellboy Omnibus Vol. 1, leading at £26.99 — the Volume 2, Volume 4 and B.P.R.D. rows are gone. Launch smoke 20/20 after deploy.",
+      "actions": [
+        {
+          "kind": "link",
+          "label": "Check the fixed page",
+          "href": "https://www.catchcomics.com/product/hellboy-omnibus-706665"
+        },
+        {
+          "kind": "command",
+          "label": "Re-run the offers audit",
+          "command": "npm run audit:ebay-relevance"
+        }
+      ]
     },
     {
       "id": "B2",
@@ -30,7 +42,19 @@
       "owner": "CLAUDE",
       "status": "done",
       "done": "A Playwright assertion at 390px proves documentElement.scrollWidth <= viewport width on home, search and a product page — or the overflow is found and fixed.",
-      "evidence": "DONE 2026-09-22. CONFIRMED real, then fixed. tests/e2e/mobile-overflow.spec.ts proved the product page rendered 644px in a 390px viewport; the cause was the shared Navbar — a 170px shrink-0 UK block plus px-8 gutters that 390px could not fund. Now px-4 below sm, the country label hidden below sm (the flag still states the fact), and min-w-0 on the search so it can actually shrink. All three pages pass; the rest of Browser Trust unregressed."
+      "evidence": "DONE 2026-09-22. CONFIRMED real, then fixed. tests/e2e/mobile-overflow.spec.ts proved the product page rendered 644px in a 390px viewport; the cause was the shared Navbar — a 170px shrink-0 UK block plus px-8 gutters that 390px could not fund. Now px-4 below sm, the country label hidden below sm (the flag still states the fact), and min-w-0 on the search so it can actually shrink. All three pages pass; the rest of Browser Trust unregressed.",
+      "actions": [
+        {
+          "kind": "run",
+          "action": "browser-trust",
+          "label": "Run Browser Trust"
+        },
+        {
+          "kind": "command",
+          "label": "Re-run the mobile check",
+          "command": "npm run test:e2e:prod -- mobile-overflow"
+        }
+      ]
     }
   ],
   "today": [
@@ -40,7 +64,19 @@
       "owner": "FOUNDER",
       "status": "todo",
       "done": "20–30 real UK comic buyers have the link and at least five have searched for a comic they actually want.",
-      "note": "This is the only test left that matters. Everything internal has been proven; nothing else will be learned without real shoppers."
+      "note": "This is the only test left that matters. Everything internal has been proven; nothing else will be learned without real shoppers.",
+      "actions": [
+        {
+          "kind": "copy",
+          "label": "Copy outreach message",
+          "text": "I've built Catch Comics — a UK comic price-comparison site. It tracks real retailer prices so you can see what a specific edition actually costs before you buy.\n\nhttps://www.catchcomics.com\n\nI'm after one thing: find a comic you actually want, and tell me whether the price and the edition are right. If anything looks wrong — wrong volume, wrong price, a dead link — that's exactly what I need to hear."
+        },
+        {
+          "kind": "link",
+          "label": "View production",
+          "href": "https://www.catchcomics.com"
+        }
+      ]
     },
     {
       "id": "T2",
@@ -49,7 +85,14 @@
       "status": "todo",
       "done": "The verified trailing-30-day qualifying-sale count replaces the founder estimate in the Amazon card.",
       "link": "https://affiliate-program.amazon.co.uk/",
-      "note": "The API cannot tell us this — it returns only eligible / not eligible, and today it returns AssociateNotEligible."
+      "note": "The API cannot tell us this — it returns only eligible / not eligible, and today it returns AssociateNotEligible.",
+      "actions": [
+        {
+          "kind": "link",
+          "label": "Open Amazon Associates",
+          "href": "https://affiliate-program.amazon.co.uk/home/summary"
+        }
+      ]
     },
     {
       "id": "T3",
@@ -57,7 +100,28 @@
       "owner": "FOUNDER",
       "status": "todo",
       "done": "A yes/no decision. If yes, Claude adds a clearly-labelled \"Search Amazon UK\" link — no price, no fake offer — to the main product page in one bounded change.",
-      "note": "This is the real Amazon unblock. Today there is no Amazon link on the pages people actually use, so qualifying sales cannot be earned at all."
+      "note": "This is the real Amazon unblock. Today there is no Amazon link on the pages people actually use, so qualifying sales cannot be earned at all.",
+      "actions": [
+        {
+          "kind": "claude",
+          "label": "Open in Claude",
+          "task": "ADD AN HONEST AMAZON UK AFFILIATE FALLBACK TO PRODUCT PAGES",
+          "notes": [
+            "The Amazon Creators API currently returns AssociateNotEligible, so there is no price data and no way to get any.",
+            "Catch Comics already has a working UK Associates tag, catchcomics-21, in NEXT_PUBLIC_AMAZON_UK_ASSOCIATE_TAG.",
+            "lib/amazon.ts already has buildAmazonUrl(), and components/PricingPanel.tsx already renders a tagged \"Search Amazon UK\" link — but PricingPanel only renders on the legacy /comic/[id] route, not on app/product/[slug]/page.tsx.",
+            "There are zero stored Amazon listings, so the main product page shows no Amazon link at all. That is why no qualifying sales can be earned.",
+            "It must never display a price, a fake offer, or anything that looks like a tracked retailer row. It is a search link and must read as one.",
+            "It must not disturb OffersTable, the /go redirect, AWIN wrapping or click logging.",
+            "Affiliate disclosure already exists site-wide; check whether anything more is needed beside this link."
+          ]
+        },
+        {
+          "kind": "link",
+          "label": "Amazon Creators docs",
+          "href": "https://affiliate-program.amazon.co.uk/"
+        }
+      ]
     }
   ],
   "waiting": [
@@ -66,20 +130,48 @@
       "title": "Amazon Creators API eligibility",
       "state": "BLOCKED BY AMAZON",
       "detail": "Amazon returns AssociateNotEligible. Credentials, OAuth, token caching and the affiliate tag are all proven working — no code change can lift this. It needs ~10 qualifying sales in the trailing 30 days, which needs real shoppers, which needs launch.",
-      "recheck": "npm run amazon:creators:test"
+      "recheck": "npm run amazon:creators:test",
+      "actions": [
+        {
+          "kind": "link",
+          "label": "Open Amazon Associates",
+          "href": "https://affiliate-program.amazon.co.uk/home/summary"
+        }
+      ]
     },
     {
       "id": "W2",
       "title": "Travelling Man price refresh — finished, then dropped at 97%",
       "state": "DONE, WITH A BLIP",
       "detail": "The write run of 2026-09-22 refreshed 2,213 of 2,280 rows and then crashed at 19:57 on \"Can't reach database server\" — a Neon serverless connection drop, the kind CLAUDE.md warns to expect, not data loss. It did its job: freshness went from 1,363 to 2,213 listings under 7 days old, Travelling Man last seen today, 0 stale. The 67 rows it never reached are still inside the 30-day window. No action needed before launch; re-run when convenient.",
-      "recheck": "launch/operations/price-verify-status.json"
+      "recheck": "launch/operations/price-verify-status.json",
+      "actions": [
+        {
+          "kind": "run",
+          "action": "retailer",
+          "label": "Refresh retailer prices"
+        }
+      ]
     },
     {
       "id": "W3",
       "title": "Retailer coverage beyond Travelling Man",
       "state": "EXTERNAL",
-      "detail": "Waterstones, Wordery, WHSmith, Zavvi and AbeBooks feeds stopped refreshing in May–July and their listings aged out. Comparison depth is 0 products at 2+ stored retailers. The site's copy is already honest about this (\"Cheapest tracked retailer — eBay may be lower\") and eBay adds a live second source at view time, so it does not block launch. It is the main post-launch growth job."
+      "detail": "Waterstones, Wordery, WHSmith, Zavvi and AbeBooks feeds stopped refreshing in May–July and their listings aged out. Comparison depth is 0 products at 2+ stored retailers. The site's copy is already honest about this (\"Cheapest tracked retailer — eBay may be lower\") and eBay adds a live second source at view time, so it does not block launch. It is the main post-launch growth job.",
+      "actions": [
+        {
+          "kind": "claude",
+          "label": "Open in Claude",
+          "task": "BRING BACK THE LAPSED RETAILER FEEDS SO PRICE COMPARISON HAS MORE THAN ONE SOURCE",
+          "notes": [
+            "Waterstones, Wordery, WHSmith, Zavvi and AbeBooks feeds stopped refreshing between May and July 2026 and their listings aged out under the 30-day rule.",
+            "Comparison depth is currently 0 products showing two or more stored retailers; only Travelling Man (2,246 listings) and World of Books (34) remain.",
+            "Adapters live in lib/adapters/. RETAILER_OPS.md records the per-retailer state.",
+            "This is a post-launch growth job, not a launch blocker — the site copy is already honest that it shows the cheapest tracked retailer.",
+            "Diagnose why each feed stopped before proposing new integrations."
+          ]
+        }
+      ]
     }
   ],
   "gates": [
@@ -212,5 +304,31 @@
     "speculative retailer integrations",
     "advanced SEO programme",
     "major catalogue project"
-  ]
+  ],
+  "claudeContext": "I'm launching Catch Comics (https://www.catchcomics.com), a UK comic discovery and price-comparison site. Comic database first, price comparison second.\n\nStack: Next.js 16 App Router, React 19, Tailwind v4, TypeScript strict, Prisma 5 on Neon Postgres, hosted on Vercel (branch main auto-deploys), images on Cloudflare R2.\n\nLaunch state as of 2026-09-22: production smoke 20/20, Browser Trust passing, both launch blockers closed. Soft launch 23 Sept, public launch 29 Sept. Retailer prices come from Travelling Man (2,246 listings) plus live eBay; Amazon is affiliate-only with no price API (Rainforest retired 2026-07-13) and the Creators API returns AssociateNotEligible.\n\nHands-off without explicit approval: OffersTable and the pricing layer, /go affiliate redirect and click logging, prisma/schema.prisma, lib/search scoring and SQL, next.config.ts remotePatterns, sitemap/robots/structured data, .env.local.",
+  "claudeClosing": "Write me the exact Claude Code prompt required to inspect, implement, test, commit, push and production-verify this task.\n\nKeep it bounded and launch-focused. Do not invent additional work. Do not touch the hands-off list without saying why and asking first.",
+  "quickActions": {
+    "note": "Both run through the local action bridge on 127.0.0.1:8319 that the Command Centre launcher already starts. Fixed arguments, no shell, single-flight locks — nothing on this page can pass anything to the child process.",
+    "actions": [
+      {
+        "id": "retailer",
+        "label": "Refresh retailer prices",
+        "running": "Refreshing prices…",
+        "detail": "Re-checks every live Travelling Man listing against the retailer and updates price, stock and last-seen. Roughly 45 minutes. Writes to production.",
+        "endpoint": "/retailer/run",
+        "status": "/retailer/status",
+        "guard": "A second click while a refresh is in progress is refused by the bridge — this writes to production."
+      },
+      {
+        "id": "browser-trust",
+        "label": "Run Browser Trust",
+        "running": "Running Browser Trust…",
+        "detail": "Drives the real customer journeys in a real browser, desktop and mobile, against localhost. Roughly 8 minutes. Read-only.",
+        "endpoint": "/run",
+        "status": "/status",
+        "report": "operations/browser-trust-report/index.html",
+        "guard": "Single-flight: a second click while a run is in progress is refused."
+      }
+    ]
+  }
 }
