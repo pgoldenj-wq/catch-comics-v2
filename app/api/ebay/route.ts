@@ -10,6 +10,10 @@
  *      Uses title + format keyword to narrow results.
  *
  * Filtering:
+ *   - Title-derived rows must pass listingMatchesProduct() — they are keyword
+ *     hits, not edition matches, and used to put a different book at the top
+ *     of the price table (Vol. 2 shown as the cheapest offer for Vol. 1).
+ *     ISBN rows are edition-anchored and are never gated.
  *   - eBay category 259104 (Comics & Graphic Novels) — enforced in searchListings()
  *   - FCBD and non-comic terms — filtered in lib/ebay.ts
  *   - "Lot of" / bundle listings — filtered here (too noisy for single-item comparison)
@@ -28,6 +32,7 @@ import { searchListings, EbayListing } from '@/lib/ebay'
 import { TTLCache } from '@/lib/cache'
 import { enforceRateLimit } from '@/lib/security/rateLimit'
 import { normalizeIsbn13 } from '@/lib/identity/isbn'
+import { listingMatchesProduct } from '@/lib/listings/productRelevance'
 
 // Module-level 1-hour cache — shared across warm serverless instances
 const ebayProductCache = new TTLCache<EbayListing[]>(60 * 60 * 1000)
@@ -101,13 +106,18 @@ export async function GET(req: NextRequest) {
       listings = await searchListings(isbn, 'EBAY_GB', 20)
 
       // If ISBN returns < 3 results, supplement with title search
-      // (some listings don't include the ISBN in their title)
+      // (some listings don't include the ISBN in their title).
+      //
+      // A keyword hit is not an edition match. These rows are merged into a
+      // price-sorted table, so an unchecked one becomes "the cheapest offer"
+      // for a book it is not — see lib/listings/productRelevance. Gate them
+      // against our own title; the ISBN rows above are never gated.
       if (listings.length < 3 && title) {
         const titleResults = await searchListings(title, 'EBAY_GB', 20)
         // Merge, dedup by itemId
         const seen = new Set(listings.map(l => l.itemId))
         for (const l of titleResults) {
-          if (!seen.has(l.itemId)) {
+          if (!seen.has(l.itemId) && listingMatchesProduct(l.title, title)) {
             listings.push(l)
             seen.add(l.itemId)
           }
@@ -115,7 +125,10 @@ export async function GET(req: NextRequest) {
       }
     } else {
       // No ISBN — title-only search
-      listings = await searchListings(title, 'EBAY_GB', 20)
+      // Every row here is a keyword hit with nothing anchoring it to an
+      // edition, so the same gate applies.
+      listings = (await searchListings(title, 'EBAY_GB', 20))
+        .filter(l => listingMatchesProduct(l.title, title))
     }
 
     // Apply additional product-page filters
