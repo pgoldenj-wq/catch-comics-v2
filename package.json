@@ -95,6 +95,7 @@
     "test:costguard:webhook": "tsx scripts/test-costguard-webhook.ts",
     "check:cost-hazards": "node scripts/check-cost-hazards.mjs",
     "launch:health": "dotenv -e .env.local -- tsx scripts/launch-health.ts",
+    "launch:signal": "dotenv -e .env.local -- tsx scripts/launch-signal.ts",
     "test:secrets": "tsx scripts/test-secret-hygiene.ts",
     "test:identity": "tsx scripts/test-edition-identity.ts",
     "test:listing-trust": "tsx scripts/test-listing-trust.ts",

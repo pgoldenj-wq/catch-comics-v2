@@ -16,7 +16,7 @@ param(
   [switch]$SkipChecks,      # skip health+smoke (just ensure server + open page)
   [switch]$NoBrowser,       # don't open the browser (testing)
   [switch]$NonInteractive,  # never prompt (testing / scripted runs)
-  [string]$Page = 'mission-control.html'
+  [string]$Page = 'launch-control.html'
 )
 
 $ErrorActionPreference = 'Continue'

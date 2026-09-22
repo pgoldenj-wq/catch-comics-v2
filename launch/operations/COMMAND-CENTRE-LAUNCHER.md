@@ -1,5 +1,26 @@
 # Command Centre Launcher — one click to operational truth
 
+## What opens (2026-09-22)
+
+One click now opens **Launch Control** (`launch/launch-control.html`), not Mission Control.
+
+Launch Control answers one question — *what do I need to do next to launch Catch Comics?* —
+and it decides the answer itself, from `launch/launch-plan.json`. Blockers first, then at most
+three things for today, then what we are waiting on someone else for, then everything
+deliberately postponed, collapsed.
+
+- **The plan is a file.** Edit `launch/launch-plan.json` and reload. There is no database and
+  no admin screen; the plan is meant to be edited by hand, in a text editor, in seconds.
+- **The numbers are real.** It reads what the operational scripts already write:
+  `launch-smoke-latest.json`, `launch-health-latest.json`, `launch-signal-latest.json` and the
+  live `price-verify-status.json`. Anything it cannot read shows as unknown rather than as a
+  wrong claim.
+- **Smoke Test is still there**, demoted to a footer link. It is a tool for when a
+  launch-critical issue genuinely needs review, not the founder's daily job.
+- **Mission Control is kept** as an archive link — nothing was deleted.
+
+To open the old screen instead: `open-command-centre.ps1 -Page mission-control.html`.
+
 ## Install (once)
 
 ```powershell
