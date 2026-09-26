@@ -42,6 +42,7 @@ import { normalizeIsbn13 }                  from '@/lib/identity/isbn'
 import { formatLabel }                      from '@/lib/identity/format'
 import { suppressDuplicateRetailerListings } from '@/lib/listings/dedupeListings'
 import { BASE_URL } from '@/lib/site-url'
+import { stripHtml as stripHtmlText } from '@/lib/utils/text'
 
 // ISR: cache each product page for 1 hour, then regenerate in the background.
 // Switched from force-dynamic (which hit the DB on every request) — there is no
@@ -305,8 +306,13 @@ export async function generateMetadata(
   if (!product) return { title: 'Not Found' }
 
   const title       = product.title
-  const description = product.description
-    ?? `Compare prices for ${title}${displayPublisher(product.publisher) ? ` from ${displayPublisher(product.publisher)}` : ''}.`
+  // Search snippets and chat link previews show this verbatim, so it gets the
+  // same cleaning as the visible Description: the raw column carries HTML
+  // (shares read "<p>Saga is an ongoing…") and some rows are whole wiki pages.
+  const cleaned     = product.description ? stripHtmlText(product.description) : ''
+  const description = cleaned
+    ? (cleaned.length > 200 ? `${cleaned.slice(0, 200).replace(/\s+\S*$/, '')}…` : cleaned)
+    : `Compare prices for ${title}${displayPublisher(product.publisher) ? ` from ${displayPublisher(product.publisher)}` : ''}.`
   const url         = `${BASE_URL}/product/${slug}`
   const image       = product.coverImageUrl
 
