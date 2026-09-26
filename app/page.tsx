@@ -472,8 +472,14 @@ export default function Home() {
       {/* ═══════════════════════════════════════════════════════════════════════
           DESKTOP LAYOUT (hidden md:block, ≥768px only)
           Original design — frozen, no changes made inside this wrapper.
+          overflow-x-clip: the hero's red-glow bloom sits 80px past the card's
+          right edge, and below ~1264px the gutter is only 24px, so the page
+          measured 824px wide at 768 (tablet). Clipping here, at the viewport
+          edge, changes nothing visible — the bloom still spills past the card
+          wherever there is room. `clip`, not `hidden`: no scroll container, so
+          the sticky Navbar and the search dropdown are unaffected.
           ══════════════════════════════════════════════════════════════════════ */}
-      <div className="hidden md:block">
+      <div className="hidden md:block overflow-x-clip">
 
       {/* ── HEADER — shared Navbar component ────────────────────────────── */}
       <Navbar region={region} onRegionChange={setRegion} />
