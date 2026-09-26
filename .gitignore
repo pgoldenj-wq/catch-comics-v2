@@ -163,3 +163,4 @@ launch/reviews/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+/scripts/.cover-lowres/

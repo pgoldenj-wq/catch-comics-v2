@@ -1011,6 +1011,11 @@ function SearchResults() {
                         <img
                           src={adjustImgSrc(comic.image.medium_url)}
                           alt={comic.name}
+                          // Rows below the first screenful fetch on approach, not
+                          // all ~20 up front; the fixed 100x150 frame means no
+                          // layout shift when they arrive.
+                          loading={index < 4 ? 'eager' : 'lazy'}
+                          decoding="async"
                           style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px' }}
                           onLoad={e => {
                             const img = e.currentTarget
