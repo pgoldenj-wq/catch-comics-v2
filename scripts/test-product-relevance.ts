@@ -8,7 +8,7 @@
  *
  * Run: npm run test:product-relevance
  */
-import { listingMatchesProduct } from '@/lib/listings/productRelevance'
+import { listingMatchesProduct, titleSupplementAllowed } from '@/lib/listings/productRelevance'
 
 let pass = 0, fail = 0
 const check = (name: string, ok: boolean, extra = '') => {
@@ -176,6 +176,15 @@ for (const [listing, product] of [
 ] as const) {
   check(`kept for "${product}": ${listing.slice(0, 44)}…`, listingMatchesProduct(listing, product))
 }
+
+console.log('\nKeyword rows are only a fallback for NO edition-anchored rows (prod 2026-09-26)')
+// ISBN 9781534398092 is Invincible Volume 3 NEW EDITION. Its ISBN search found
+// New Edition listings; the keyword supplement then added the ORIGINAL Vol. 3
+// "Perfect Strangers" (#9-13) as the cheapest offer. No title rule can separate
+// two printings that share a title, so once anchored rows exist none are added.
+check('no ISBN rows → keyword rows may fill the table', titleSupplementAllowed(0))
+check('one ISBN row → no keyword rows', !titleSupplementAllowed(1))
+check('two ISBN rows (the old "< 3" case) → no keyword rows', !titleSupplementAllowed(2))
 
 console.log('\nThe gate never guesses')
 check('a product title of nothing but stopwords matches nothing',

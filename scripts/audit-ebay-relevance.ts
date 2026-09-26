@@ -20,7 +20,7 @@
  * Run: npm run audit:ebay-relevance
  *      npm run audit:ebay-relevance -- --base http://localhost:3000
  */
-import { listingMatchesProduct } from '@/lib/listings/productRelevance'
+import { listingMatchesProduct, titleSupplementAllowed } from '@/lib/listings/productRelevance'
 
 const argOf = (flag: string, fallback: string) => {
   const i = process.argv.indexOf(flag)
@@ -98,7 +98,11 @@ async function main() {
     if (listings.length === 0) continue
 
     sampled.push(p.title)
-    const kept = listings.filter(l => fromIsbnSearch(l, p.isbn13) || listingMatchesProduct(l.title, p.title))
+    // Mirror app/api/ebay/route.ts: keyword rows only when no ISBN row exists.
+    const isbnRows = listings.filter(l => fromIsbnSearch(l, p.isbn13))
+    const kept = titleSupplementAllowed(isbnRows.length)
+      ? listings.filter(l => listingMatchesProduct(l.title, p.title))
+      : isbnRows
     const dropped = listings.filter(l => !kept.includes(l))
     totalRows += listings.length
     totalKept += kept.length

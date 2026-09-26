@@ -4,8 +4,9 @@
  *
  * Founder review 2026-08-29 raised it; 2026-09-22 confirmed it live in
  * production. /api/ebay searches by ISBN first — precise, edition-anchored —
- * and then, whenever the ISBN returns fewer than three rows, merges in a plain
- * keyword search for the product's title. Nothing checked what came back. The
+ * and then, whenever the ISBN returned fewer than three rows, merged in a plain
+ * keyword search for the product's title (since 2026-09-26 only when it returns
+ * none — see titleSupplementAllowed). Nothing checked what came back. The
  * merged rows were then sorted by price ascending, so the cheapest of them led
  * the price table.
  *
@@ -194,6 +195,24 @@ function wordBeforeEdition(listingTitle: string): string | null {
     if (!NEUTRAL_BEFORE_EDITION.has(words[i])) return words[i]
   }
   return null
+}
+
+/**
+ * May /api/ebay add title-derived keyword rows, given how many rows the ISBN
+ * search returned? Only when it returned NONE.
+ *
+ * It used to supplement whenever the ISBN search returned fewer than three.
+ * Verifying the edition gate on production (2026-09-26) showed why that mixes
+ * editions no title can separate: ISBN 9781534398092 is Invincible Volume 3
+ * NEW EDITION, its ISBN search returned the New Edition, and the keyword search
+ * for "Invincible, Volume 3" added the ORIGINAL Volume 3, "Perfect Strangers"
+ * (#9-13) — which became the cheapest offer. Star Wars Vol. 3 (2020) got
+ * Aaron's 2015 Vol. 3 hardcover the same way. Once an edition-anchored offer
+ * exists, an unanchored one can only dilute it; with none, a gated keyword row
+ * is better than an empty table (Saga Volume 1 has no ISBN hits at all).
+ */
+export function titleSupplementAllowed(isbnRowCount: number): boolean {
+  return isbnRowCount === 0
 }
 
 /**
