@@ -773,17 +773,27 @@ export default async function ProductPage(
 
             Below md: collapses to a single column.  Source order is issues
             → pricing → description+YMAL, but Tailwind `order-` classes flip
-            mobile to pricing → issues → description → related per spec. */}
+            mobile to pricing → issues → description → related per spec.
+            `order` only applies inside a flex or grid container, so below md
+            this must be `flex flex-col`, not a plain block — as a block the
+            classes were inert and a phone scrolled past every issue cover in
+            the series (72 for Saga, ~11,500px) before reaching a price.
+
+            md–lg (768–1023px) is TWO columns: the issue rail on the left
+            spanning both rows, pricing then description on the right. Three
+            fixed columns (240 + 320 + gaps) left pricing 112px wide at 768 —
+            headers collided and the tabs spilled into Description. Row 2 is
+            1fr so the tall rail's height lands there, not under the pricing. */}
         <section className="bg-white">
           <div className="max-w-6xl mx-auto px-4 py-10 sm:py-14">
-            <div className="md:grid md:grid-cols-[240px_1fr_320px] md:gap-8 md:items-start">
+            <div className="flex flex-col md:grid md:grid-cols-[240px_1fr] md:grid-rows-[auto_1fr] lg:grid-cols-[240px_1fr_320px] lg:grid-rows-none md:gap-8 md:items-start">
 
               {/* LEFT — Issue grid.  order-2 on mobile so pricing appears
                   first, order-1 on md+ for left column. The grid lists the
                   SERIES' issues from CV on both page types — a collected
                   edition's grid is not its contents, so the old
                   "Collects Issues" label overstated the data (CC-028). */}
-              <div className="order-2 md:order-1 min-w-0 mt-10 md:mt-0">
+              <div className="order-2 md:order-1 md:col-start-1 md:row-start-1 md:row-span-2 lg:row-span-1 min-w-0 mt-10 md:mt-0">
                 <IssueListGrid
                   comicvineId={cvVolumeId}
                   searchTitle={product.seriesName ?? product.title}
@@ -800,7 +810,7 @@ export default async function ProductPage(
                   T1-A: id="price-comparison" is the anchor target from the hero
                   price link. scroll-mt-20 keeps the heading clear of the
                   sticky navbar (h-20 = 80px). */}
-              <div id="price-comparison" className="order-1 md:order-2 min-w-0 scroll-mt-20">
+              <div id="price-comparison" className="order-1 md:order-2 md:col-start-2 md:row-start-1 min-w-0 scroll-mt-20">
 
                 <div className="mb-5">
                   <h2 className="text-2xl font-bold text-[#0A0A0A]">
@@ -878,7 +888,7 @@ export default async function ProductPage(
 
               {/* RIGHT — Description + You Might Also Like.  order-3 always
                   (last on both mobile and desktop). */}
-              <aside className="order-3 mt-10 md:mt-0 space-y-8">
+              <aside className="order-3 md:col-start-2 md:row-start-2 lg:col-start-3 lg:row-start-1 min-w-0 mt-10 md:mt-0 space-y-8">
                 <div>
                   <h2 className="text-xl font-semibold text-[#0A0A0A] mb-3">
                     Description
@@ -914,7 +924,7 @@ export default async function ProductPage(
                         ? 'You might also like'
                         : (displayPublisher(product.publisher) ? `More from ${displayPublisher(product.publisher)}` : 'You might also like')}
                     </h2>
-                    <div className="grid grid-cols-2 md:grid-cols-1 gap-3">
+                    <div className="grid grid-cols-2 lg:grid-cols-1 gap-3">
                       {related.slice(0, 4).map(r => (
                         <RelatedCard key={r.id} r={r} />
                       ))}
