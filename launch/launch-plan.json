@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "updated": "2026-09-22",
+  "updated": "2026-09-26",
   "mode": "LAUNCH",
-  "note": "The single source of truth for what is left before Catch Comics launches. Edit this file, reload Launch Control. Every claim here was measured on 2026-09-22 — see `evidence` on each item.",
+  "note": "The single source of truth for what is left before Catch Comics launches. Edit this file, reload Launch Control. Claims were measured on 2026-09-22 and re-verified on production by the final smoke test of 2026-09-26 — see `evidence` on each item and launch/operations/final-smoke-2026-09-26.md.",
   "targets": {
     "soft": "2026-09-23",
     "public": "2026-09-29",
@@ -10,7 +10,7 @@
   },
   "verdict": {
     "state": "READY",
-    "because": "Both launch blockers are closed and production-verified. The customer journey — discover, search, identify, trust the price, click through, attribute — is proven end to end.",
+    "because": "Final smoke test complete on 2026-09-26: all 14 Smoke Test sections reviewed, 4 P1s and 4 P2s found, fixed and production-verified. Production smoke 20/20, Browser Trust 44/0 on the final deploy. Zero known P0/P1.",
     "clearsWhen": "Nothing outstanding. Ship it."
   },
   "blockers": [
@@ -53,6 +53,27 @@
           "kind": "command",
           "label": "Re-run the mobile check",
           "command": "npm run test:e2e:prod -- mobile-overflow"
+        }
+      ]
+    },
+    {
+      "id": "B3",
+      "title": "Final smoke test — every launch surface reviewed, on production",
+      "why": "Ten of the fourteen Smoke Test sections had never been reviewed, and the founder had spent weeks testing by hand. A launch needs one deep, honest pass over the whole customer journey — right comic, right edition, trustworthy offer — on the real site.",
+      "owner": "CLAUDE",
+      "status": "done",
+      "done": "Every section reviewed with evidence; every P0/P1 found is fixed, deployed and verified on https://www.catchcomics.com.",
+      "evidence": "DONE 2026-09-26 (deploy dpl_6W5h3YRHqg1vuDDXPv499WDa1FEM, commit dccf9ff). Found and fixed on production: wrong-book eBay offers (X-Men priced with Avengers vs X-Men: AXIS, Invincible Vol. 3 with Invincible Iron Man, Hellboy Omnibus Vol. 1 with a Monster Sized HC, Star Wars Vol. 3 with Darth Vader) and different printings mixed into ISBN-anchored pages; Price Comparison 11,898px down a phone; a 112px-wide price column on tablets. Also: search focus ring, search failure retry, clean share previews, the Watchmen chip. 114 checkpoints recorded in launch/operations/final-smoke-2026-09-26.md.",
+      "actions": [
+        {
+          "kind": "link",
+          "label": "Read the final smoke report",
+          "href": "https://github.com/pgoldenj-wq/catch-comics-v2/blob/main/launch/operations/final-smoke-2026-09-26.md"
+        },
+        {
+          "kind": "command",
+          "label": "Re-run the production smoke",
+          "command": "npm run launch:smoke"
         }
       ]
     }
@@ -141,9 +162,9 @@
     },
     {
       "id": "W2",
-      "title": "Travelling Man price refresh — finished, then dropped at 97%",
-      "state": "DONE, WITH A BLIP",
-      "detail": "The write run of 2026-09-22 refreshed 2,213 of 2,280 rows and then crashed at 19:57 on \"Can't reach database server\" — a Neon serverless connection drop, the kind CLAUDE.md warns to expect, not data loss. It did its job: freshness went from 1,363 to 2,213 listings under 7 days old, Travelling Man last seen today, 0 stale. The 67 rows it never reached are still inside the 30-day window. No action needed before launch; re-run when convenient.",
+      "title": "Travelling Man price refresh",
+      "state": "HEALTHY",
+      "detail": "Re-run on 2026-09-26: all 2,246 Travelling Man listings seen today, 0 stale (launch:health). No action needed before launch; re-run when convenient.",
       "recheck": "launch/operations/price-verify-status.json",
       "actions": [
         {
@@ -179,7 +200,7 @@
       "id": "production",
       "label": "Production",
       "state": "pass",
-      "detail": "Launch smoke 20/20 at 19:07 UTC today, including security headers, OG image, 404 handling."
+      "detail": "Launch smoke 20/20 and Browser Trust 44 passed / 0 failed on the final deploy, 2026-09-26."
     },
     {
       "id": "search",
@@ -197,19 +218,19 @@
       "id": "offers",
       "label": "Retailer offers are the right book",
       "state": "pass",
-      "detail": "Title-derived eBay rows must match the edition; verified on production today — the Hellboy Vol. 1 page no longer lists Vol. 2, Vol. 4 or B.P.R.D."
+      "detail": "eBay keyword rows are refused unless they can be anchored, and only used when the ISBN finds nothing. Verified on production 2026-09-26: X-Men, Spider-Man, Invincible Vol. 3, Star Wars Vol. 3, Hellboy and Berserk now show only their own edition. 0 ISBN mismatches across 3,783 stored offers."
     },
     {
       "id": "affiliate",
       "label": "Affiliate attribution",
       "state": "pass",
-      "detail": "/go returns 302 to the retailer; disclosure on its own page, in the footer, privacy page and cookie notice."
+      "detail": "Bookshop.org UK /go → AWIN (awinmid, awinaffid, clickref, ISBN-exact ued, no double wrap); Travelling Man /go → the matching product page; eBay rows carry campid. Verified 2026-09-26."
     },
     {
       "id": "mobile",
       "label": "Core journey on a phone",
       "state": "pass",
-      "detail": "Home, search and product pages all fit a 390px viewport with no horizontal scroll — tests/e2e/mobile-overflow.spec.ts."
+      "detail": "Phone and tablet: no horizontal scroll at 390/768/1024/1280, and Price Comparison now sits under the hero on a phone and 464px wide on a tablet — tests/e2e/product-layout.spec.ts."
     },
     {
       "id": "analytics",
@@ -222,6 +243,12 @@
       "label": "Amazon",
       "state": "waiting",
       "detail": "Blocked by Amazon's own eligibility gate. Does not block launch."
+    },
+    {
+      "id": "smoke",
+      "label": "Final smoke test",
+      "state": "pass",
+      "detail": "All 14 sections reviewed on production 2026-09-26 — 4 P1 + 4 P2 fixed and verified; remaining items deferred or external, none blocking."
     }
   ],
   "amazon": {
@@ -274,6 +301,26 @@
     {
       "title": "Advanced SEO programme",
       "detail": "Basics are in place — robots, sitemap, canonicals, OG all returning 200. Anything beyond that waits."
+    },
+    {
+      "title": "Search: vol / volume synonyms",
+      "detail": "\"saga vol 1\" ranks Saga Volume 1 sixth, \"invincible vol 1\" fifth — both on page one. The fix is in hands-off scoring/SQL; plan it deliberately."
+    },
+    {
+      "title": "Sitemap over the 50,000-URL limit",
+      "detail": "sitemap.xml is one file of 136,296 URLs (28 MB). Search engines may reject it; split into a sitemap index. SEO area is hands-off — needs a go-ahead."
+    },
+    {
+      "title": "Offers table copy on small screens",
+      "detail": "\"No all listings available.\" on offer-less pages, and the Condition column is hidden below 1024px so used eBay rows read as \"eBay £1.16\" on phones (the Used tab count is the only cue). OffersTable is hands-off."
+    },
+    {
+      "title": "Catalogue identity clean-up",
+      "detail": "Generic stored titles (\"Hellboy omnibus\" for two ISBNs, bare \"X-Men\"), some mismatched ComicVine enrichments, and Fullmetal Alchemist missing Vols 2, 7, 12, 22, 25, 26. The offers layer now refuses to guess for these."
+    },
+    {
+      "title": "Flaky local native-link tests",
+      "detail": "Browser Trust new-tab gesture tests fail intermittently against the local dev server (also on untouched main) and pass on production; uncommitted rework already exists in the main checkout."
     }
   ],
   "softLaunch": {

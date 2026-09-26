@@ -6,7 +6,20 @@
       "lastSentAt": null,
       "lastReviewedAt": null,
       "title": "series-index",
-      "status": null
+      "status": null,
+      "finalSmoke": {
+        "date": "2026-09-26",
+        "by": "Claude (final smoke test)",
+        "outcome": "PASS",
+        "checkpoints": "5/5 verified",
+        "counts": {
+          "pass": 5,
+          "fixed": 0,
+          "deferred": 0,
+          "external": 0
+        },
+        "report": "launch/operations/final-smoke-2026-09-26.md#series-index"
+      }
     },
     "affiliate": {
       "shots": 0,
@@ -14,7 +27,20 @@
       "lastSentAt": null,
       "lastReviewedAt": null,
       "title": "affiliate",
-      "status": null
+      "status": null,
+      "finalSmoke": {
+        "date": "2026-09-26",
+        "by": "Claude (final smoke test)",
+        "outcome": "PASS",
+        "checkpoints": "10/10 verified",
+        "counts": {
+          "pass": 10,
+          "fixed": 0,
+          "deferred": 0,
+          "external": 0
+        },
+        "report": "launch/operations/final-smoke-2026-09-26.md#affiliate"
+      }
     },
     "loading": {
       "shots": 0,
@@ -22,7 +48,20 @@
       "lastSentAt": null,
       "lastReviewedAt": null,
       "title": "loading",
-      "status": null
+      "status": null,
+      "finalSmoke": {
+        "date": "2026-09-26",
+        "by": "Claude (final smoke test)",
+        "outcome": "PASS",
+        "checkpoints": "6/6 verified",
+        "counts": {
+          "pass": 6,
+          "fixed": 0,
+          "deferred": 0,
+          "external": 0
+        },
+        "report": "launch/operations/final-smoke-2026-09-26.md#loading"
+      }
     },
     "route": {
       "shots": 0,
@@ -30,7 +69,20 @@
       "lastSentAt": null,
       "lastReviewedAt": null,
       "title": "route",
-      "status": null
+      "status": null,
+      "finalSmoke": {
+        "date": "2026-09-26",
+        "by": "Claude (final smoke test)",
+        "outcome": "PASS",
+        "checkpoints": "7/7 verified",
+        "counts": {
+          "pass": 7,
+          "fixed": 0,
+          "deferred": 0,
+          "external": 0
+        },
+        "report": "launch/operations/final-smoke-2026-09-26.md#route"
+      }
     },
     "launch-readiness": {
       "shots": 0,
@@ -38,15 +90,83 @@
       "lastSentAt": null,
       "lastReviewedAt": null,
       "title": "launch-readiness",
-      "status": null
+      "status": null,
+      "finalSmoke": {
+        "date": "2026-09-26",
+        "by": "Claude (final smoke test)",
+        "outcome": "FIXED + VERIFIED",
+        "checkpoints": "9/10 verified",
+        "counts": {
+          "pass": 8,
+          "fixed": 1,
+          "deferred": 0,
+          "external": 1
+        },
+        "report": "launch/operations/final-smoke-2026-09-26.md#launch-readiness"
+      }
     },
     "offerstable": {
       "shots": 0,
-      "checkpoints": "0/0",
-      "lastSentAt": null,
-      "lastReviewedAt": null,
-      "title": "offerstable",
-      "status": null
+      "checkpoints": "6/8",
+      "lastSentAt": "2026-08-31T23:28:56.797Z",
+      "lastReviewedAt": "2026-08-31T23:28:56.797Z",
+      "title": "Offers Table",
+      "status": "fix",
+      "issues": 0,
+      "lastReviewId": "offerstable-2026-08-31-23-28-iyxup8",
+      "repair": {
+        "reviewId": "offerstable-2026-08-31-23-28-iyxup8",
+        "outcome": "verified-local",
+        "label": "Verified locally — not on production yet",
+        "finishedAt": "2026-09-01T23:14:31.791Z",
+        "branch": "repair/offerstable-2026-08-31-23-28-iyxup8",
+        "commits": [
+          "e00fb44"
+        ],
+        "changedFiles": [],
+        "verification": [
+          {
+            "command": "npm run check",
+            "ok": true
+          },
+          {
+            "command": "npm run lint",
+            "ok": true
+          },
+          {
+            "command": "npm run test:retailer-card",
+            "ok": true
+          },
+          {
+            "command": "npm run test:identity",
+            "ok": true
+          },
+          {
+            "command": "npm run test:search-ranking",
+            "ok": true
+          }
+        ],
+        "missing": [],
+        "productionVerified": false,
+        "founderSteps": [
+          "Review the commit and integrate it into main",
+          "Deploy",
+          "Re-check the page on production"
+        ]
+      },
+      "finalSmoke": {
+        "date": "2026-09-26",
+        "by": "Claude (final smoke test)",
+        "outcome": "FIXED + VERIFIED",
+        "checkpoints": "7/8 verified",
+        "counts": {
+          "pass": 7,
+          "fixed": 1,
+          "deferred": 3,
+          "external": 0
+        },
+        "report": "launch/operations/final-smoke-2026-09-26.md#offerstable"
+      }
     },
     "errors": {
       "shots": 0,
@@ -54,15 +174,85 @@
       "lastSentAt": null,
       "lastReviewedAt": null,
       "title": "errors",
-      "status": null
+      "status": null,
+      "finalSmoke": {
+        "date": "2026-09-26",
+        "by": "Claude (final smoke test)",
+        "outcome": "FIXED + VERIFIED",
+        "checkpoints": "5/5 verified",
+        "counts": {
+          "pass": 4,
+          "fixed": 1,
+          "deferred": 0,
+          "external": 0
+        },
+        "report": "launch/operations/final-smoke-2026-09-26.md#errors"
+      }
     },
     "product": {
       "shots": 0,
-      "checkpoints": "0/0",
-      "lastSentAt": null,
-      "lastReviewedAt": null,
-      "title": "product",
-      "status": null
+      "checkpoints": "7/11",
+      "lastSentAt": "2026-09-01T16:16:09.271Z",
+      "lastReviewedAt": "2026-09-01T16:16:09.271Z",
+      "title": "Product Pages",
+      "status": "fix",
+      "issues": 1,
+      "lastReviewId": "product-2026-09-01-16-16-wba960",
+      "fixedAt": "2026-09-12T19:06:14.885Z",
+      "fixSummary": "Merge fix/product-page-consolidated, NOT the repair/product-* branches (their rail shipped false contents) — contents rail, 8-line Read more, eBay collapse verified on localhost; 4 notes open",
+      "resolution": "Manual /founder-review pass, 2026-09-12. Three automatic repairs of this page (repair/product-2026-08-31-23-26-ee1b76, -09-01-12-53-izpra2, -09-01-16-16-wba960) had each re-implemented the same notes; none was merged, and none had touched real data. With the founder's go-ahead they were consolidated onto ONE branch off main, fix/product-page-consolidated (local, not pushed): 6f3a19f + 7ea3e39 cherry-picked from wba960, then 9bceec3, 22cc61a, e81b481. (1) issue-01 contents rail — the wba960 parser, audited against the live catalogue for the first time, claimed contents for 495 collected editions and many were wrong: Saga Volume 1 would have read 'Collected in this volume: #1-60' (it collects #1-6), from ComicVine's series-wide 'Collected Editions' lists merged into one run; also multi-volume blurbs, second sources, point numbering (#16.1-20.1 read as #1-20), volume/episode counts, and a mismatched enrichment (Stella Must Die described as Nightwing #16-21). 9bceec3 refuses all six shapes; 188 claims remain, every one read by hand. Verified in a real browser on localhost:3001: Descender Vol. 4 leads with 'Collected in this volume · Collects issues #17-21' (5 cards), earlier/later/all navigation expands and scrolls to #22, Back restores; Saga Vol. 1 keeps 'Issues in this series'; the one residual copied description (JMS Captain America Vol. 3) is rejected by the rail's CV-volume gate. The rail cannot confirm ranges past issue #100 (the CV issues endpoint caps at 100), so The Walking Dead Vol. 28 honestly stays in series view. Tests: 56/56 (was 33, never executed). (2) Synopsis 'too much text' — 7ea3e39 clamps to exactly 8 lines behind Read more / Show less (measured: 182px of 842px, 37 lines when open; aria-expanded + aria-controls resolve; visible focus outline; same at 390px). (3) eBay crowding — 22cc61a, with the founder's explicit OffersTable go-ahead: cheapest eBay row only, 'Show N more eBay listings' beneath it; expanded rows keep strict price order (grouping them was rejected after it listed eBay £15.99 above Travelling Man £12.99); tab counts unchanged; per-tab collapse on New/Used; keyboard Enter works. /go, AWIN, click logging untouched. Typecheck clean; lint adds nothing; test:url-filters, test:identity, test:listing-trust pass. NOT on production.",
+      "openFollowUp": "In priority order. (A) RETAILER COVERAGE IS COLLAPSING, deadline ~2026-09-22 — this is the real cause of the 'comprehensive pricing' note, and it is feeds, not the page: listings are soft-deleted 30 days after last sighting and feeds stopped refreshing (Waterstones last seen 06-07, Wordery 05-25, WHSmith/Zavvi/AbeBooks May-June, World of Books 529,893 deleted after 08-23). Today only 2,337 products show any trusted retailer price, 16 show two, none show three. Travelling Man's remaining 2,246 live rows were last seen 08-23 and age out ~09-22; the 08-23 dry run (launch/operations/tm-revival-dryrun-latest.json, price-verify-dryrun-latest.json) already verified them safe to refresh and found 23,315 deleted TM rows still live on the site. The write run needs founder approval. (B) Synopsis MISSING: 93,243 of 136,079 listed products (68.5%) have no description and no synopsis at all; only 6.8% carry CV metadata; the enrichment checkpoint last moved 2026-08-07 (22,553 attempted, 34% match rate) — the job is not running. A free ISBN description backfill (Open Library / Google Books) is the plan-level fix; it writes canonical_products, so it needs approval. Also: many 'descriptions' are ComicVine series wiki text, not the book's blurb. (C) Creator credits: 93% of products have none stored (coverage, same cause as B). Clickable credits deliberately NOT built: /api/search for 'Brian K. Vaughan' returns zero catalogue results (lib/search has no creator matching), so a link would land on eBay-only junk. Needs a creator index/route — hands-off search SQL — plan first. The izpra2 'off-list roles' fix was measured at 0 affected products and dropped. (D) Amazon — founder manual task (10 qualifying sales), not engineering. Also seen, not touched: at 390px every product page scrolls sideways (document 644px wide) on production too — the header search form overflows; worth a mobile review.",
+      "repair": {
+        "reviewId": "product-2026-09-01-16-16-wba960",
+        "outcome": "verified-local",
+        "label": "Verified locally — not on production yet",
+        "finishedAt": "2026-09-01T17:03:16.825Z",
+        "branch": "repair/product-2026-09-01-16-16-wba960",
+        "commits": [
+          "9d4494e"
+        ],
+        "changedFiles": [
+          "lib/series/collectedIssues.ts",
+          "components/IssueListGrid.tsx",
+          "app/product/[slug]/page.tsx",
+          "scripts/test-collected-issues.ts",
+          "package.json"
+        ],
+        "verification": [
+          {
+            "command": "npm run check",
+            "ok": true
+          },
+          {
+            "command": "npm run lint",
+            "ok": true
+          },
+          {
+            "command": "npm run test:url-filters",
+            "ok": true
+          }
+        ],
+        "missing": [],
+        "productionVerified": false,
+        "founderSteps": [
+          "Review the commit and integrate it into main",
+          "Deploy",
+          "Re-check the page on production"
+        ]
+      },
+      "finalSmoke": {
+        "date": "2026-09-26",
+        "by": "Claude (final smoke test)",
+        "outcome": "FIXED + VERIFIED",
+        "checkpoints": "7/11 verified",
+        "counts": {
+          "pass": 7,
+          "fixed": 4,
+          "deferred": 4,
+          "external": 2
+        },
+        "report": "launch/operations/final-smoke-2026-09-26.md#product"
+      }
     },
     "series-pages": {
       "shots": 0,
@@ -70,7 +260,20 @@
       "lastSentAt": null,
       "lastReviewedAt": null,
       "title": "series-pages",
-      "status": null
+      "status": null,
+      "finalSmoke": {
+        "date": "2026-09-26",
+        "by": "Claude (final smoke test)",
+        "outcome": "PASS",
+        "checkpoints": "7/10 verified",
+        "counts": {
+          "pass": 7,
+          "fixed": 0,
+          "deferred": 0,
+          "external": 3
+        },
+        "report": "launch/operations/final-smoke-2026-09-26.md#series-pages"
+      }
     },
     "mobile": {
       "shots": 0,
@@ -78,7 +281,20 @@
       "lastSentAt": null,
       "lastReviewedAt": null,
       "title": "mobile",
-      "status": null
+      "status": null,
+      "finalSmoke": {
+        "date": "2026-09-26",
+        "by": "Claude (final smoke test)",
+        "outcome": "FIXED + VERIFIED",
+        "checkpoints": "7/8 verified",
+        "counts": {
+          "pass": 6,
+          "fixed": 1,
+          "deferred": 0,
+          "external": 1
+        },
+        "report": "launch/operations/final-smoke-2026-09-26.md#mobile"
+      }
     },
     "homepage": {
       "shots": 4,
@@ -91,7 +307,20 @@
       "lastReviewId": "homepage-2026-08-29-13-10-ca77u5",
       "resolvedAt": "2026-08-24T19:10:00.000Z",
       "resolution": "All 6 defects fixed and production-verified (PR #38 merge fbc6408, PR #39 merge 0d8afd3). Hero right corners rounded (the edge-fade overlay had no border-radius); publisher marquee constrained to the cover stack; hover-enlarged rail cards no longer clipped (0px top/bottom); Series is real primary nav plus a footer link; mobile UK/US toggle removed - it blanked all 12 prices because every deal has lowestPriceUSD null; rail relabelled \"Cheapest tracked retailer - eBay may be lower\" because the rail MINs stored retailer_listings and eBay is live-only; canonical/og/sitemap moved to the www host that actually serves 200. Launch smoke 20/20, Browser Trust 13/0/3 against production. Awaiting founder re-review to move to good.",
-      "openFollowUp": "P0 raised, not built (founder chose plan-first): /api/ebay merges an unfiltered fuzzy title search whenever the ISBN lookup returns fewer than 3 hits, so /product/hellboy-omnibus-706665 lists Hellboy Omnibus Vol 2 and a B.P.R.D. book at the TOP of its price table at GBP 10.80 - a different book presented as the cheapest offer. Plan: launch/product-excellence/ebay-relevance-gate-plan.md"
+      "openFollowUp": "P0 raised, not built (founder chose plan-first): /api/ebay merges an unfiltered fuzzy title search whenever the ISBN lookup returns fewer than 3 hits, so /product/hellboy-omnibus-706665 lists Hellboy Omnibus Vol 2 and a B.P.R.D. book at the TOP of its price table at GBP 10.80 - a different book presented as the cheapest offer. Plan: launch/product-excellence/ebay-relevance-gate-plan.md",
+      "finalSmoke": {
+        "date": "2026-09-26",
+        "by": "Claude (final smoke test)",
+        "outcome": "FIXED + VERIFIED",
+        "checkpoints": "12/13 verified",
+        "counts": {
+          "pass": 14,
+          "fixed": 1,
+          "deferred": 2,
+          "external": 1
+        },
+        "report": "launch/operations/final-smoke-2026-09-26.md#homepage"
+      }
     },
     "recommendation": {
       "shots": 0,
@@ -99,7 +328,20 @@
       "lastSentAt": null,
       "lastReviewedAt": null,
       "title": "recommendation",
-      "status": null
+      "status": null,
+      "finalSmoke": {
+        "date": "2026-09-26",
+        "by": "Claude (final smoke test)",
+        "outcome": "PASS",
+        "checkpoints": "6/6 verified",
+        "counts": {
+          "pass": 6,
+          "fixed": 0,
+          "deferred": 0,
+          "external": 0
+        },
+        "report": "launch/operations/final-smoke-2026-09-26.md#recommendation"
+      }
     },
     "covers": {
       "shots": 0,
@@ -107,7 +349,20 @@
       "lastSentAt": null,
       "lastReviewedAt": null,
       "title": "covers",
-      "status": null
+      "status": null,
+      "finalSmoke": {
+        "date": "2026-09-26",
+        "by": "Claude (final smoke test)",
+        "outcome": "PASS",
+        "checkpoints": "7/7 verified",
+        "counts": {
+          "pass": 7,
+          "fixed": 0,
+          "deferred": 0,
+          "external": 0
+        },
+        "report": "launch/operations/final-smoke-2026-09-26.md#covers"
+      }
     },
     "search": {
       "shots": 2,
@@ -130,9 +385,61 @@
           "2ca1b93"
         ],
         "evidence": "Root cause: unmatched listings have no product identity by definition (canonical_product_id IS NULL); the only link to the query was Postgres trigram similarity(title,q) > 0.2, and isLikelyComic() was the sole gate after it. For \"absolute batman\" that returned 6 rows and ZERO were the product: 3x bare \"Batman\" at £0.00, \"Absolutely Fabulous\" £6.69, \"Batman vs. Two-Face (DVD)\" £0.00, \"Sewing for Absolute Beginners\" £0.00. Nothing checked the price was real: 25,816 of 26,591 live unmatched listings (97%) are priced <= 0, and 47,302 such offers hang off 22,858 REAL products where queryA ranks offers by price ASC — so a £0.00 stub sorted first and became the \"From £...\" quoted to the shopper. FIX: lib/listings/trustedPrice.ts gates price >= 0.01 in SQL in queryA/queryB and in the loose-eBay mapper; lib/search/listingRelevance.ts requires every significant query word as a whole word in the title and refuses a different volume/issue number; non-book media (DVD, Blu-ray, vinyl, game, figure, calendar) added as non-comic flags. PRODUCTION VERIFIED 2026-08-31: /search?q=absolute+batman - 52 cards intact, Other listings rail now empty (all 6 rows were junk), From eBay rail all genuine Absolute Batman at £4.10-£156.70, zero £0.00 anywhere. Under £5 shows only £4.10/£4.10/£4.95/£4.10 and no £0.00 rows (it previously showed three). Second, materially different product /search?q=hellboy+omnibus: 80 cards, no £0.00, eBay rail all genuine Hellboy Omnibus £14.42-£73.50. The rail is not dead: of a 400-row sample of unmatched listings with a real price, 59 look like comics and 59/59 survive a search for their own title; \"sakamoto days volume 21\" returns exactly that volume at £6.29. Tests: npm run test:listing-trust, 37 assertions PASS. Format/Under-£X fix re-verified unregressed in the same pass (ABSOLUTE EDITION 23, SINGLE ISSUE 20, TRADE PAPERBACK 7, zero lossy labels)."
+      },
+      "repair": {
+        "reviewId": "search-2026-08-29-14-11-o4rzqw",
+        "outcome": "incomplete",
+        "label": "Incomplete — not verified fixed",
+        "finishedAt": "2026-08-30T15:45:44.962Z",
+        "branch": null,
+        "commits": [],
+        "changedFiles": [
+          "app/search/page.tsx",
+          "scripts/test-format-and-price-filter.ts",
+          "lib/search/priceFilter.ts"
+        ],
+        "verification": [
+          {
+            "command": "npm run check",
+            "ok": false
+          },
+          {
+            "command": "npm run test:format-price",
+            "ok": false
+          }
+        ],
+        "missing": [
+          "Verification (a check failed)",
+          "Commit"
+        ],
+        "productionVerified": false,
+        "founderSteps": []
+      },
+      "finalSmoke": {
+        "date": "2026-09-26",
+        "by": "Claude (final smoke test)",
+        "outcome": "FIXED + VERIFIED",
+        "checkpoints": "8/8 verified",
+        "counts": {
+          "pass": 9,
+          "fixed": 2,
+          "deferred": 1,
+          "external": 0
+        },
+        "report": "launch/operations/final-smoke-2026-09-26.md#search"
       }
     }
   },
   "tool": "smoke-test-v4",
-  "updated": "2026-08-31T21:06:46.066Z"
+  "updated": "2026-09-01T23:14:32.123Z",
+  "finalSmoke": {
+    "date": "2026-09-26",
+    "verdict": "COMPLETE — READY TO LAUNCH",
+    "production": {
+      "url": "https://www.catchcomics.com",
+      "commit": "dccf9ff",
+      "deployment": "dpl_6W5h3YRHqg1vuDDXPv499WDa1FEM"
+    },
+    "report": "launch/operations/final-smoke-2026-09-26.md"
+  }
 }
