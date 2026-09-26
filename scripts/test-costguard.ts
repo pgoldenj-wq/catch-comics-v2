@@ -20,6 +20,7 @@ process.chdir(workDir)
 
 import { COSTGUARD_CONFIG as CFG } from '../lib/costguard/config'
 import { evaluate } from '../lib/costguard/engine'
+import { consecutiveFailures } from '../lib/costguard/collect'
 import { assertJobAllowed, JobBudget, withCappedRetries } from '../lib/costguard/gate'
 import { granularityLadder, parseNeonConsumption } from '../lib/costguard/providers/neon'
 import { appendEvent, getEvents, setState } from '../lib/costguard/store'
@@ -459,6 +460,49 @@ async function main() {
     ok('null body yields no shape', parseNeonConsumption(null).shape === null)
     ok('metrics array with only unknown names yields no shape',
       parseNeonConsumption({ periods: [{ consumption: [{ metrics: [{ metric_name: 'mystery', value: 9 }] }] }] }).shape === null)
+  }
+
+  // ── Persistent blind spot escalation ───────────────────────────────────────
+  // A single stale provider only produces AMBER, and AMBER exits 0, so before
+  // this a provider could stop reporting indefinitely behind green ticks —
+  // which is exactly what Neon did for 33 hours on 2026-08-08.
+  {
+    const snap = (flags: boolean[]): Snapshot[] => flags.map((ok, i) => ({
+      at: new Date(Date.UTC(2026, 7, 9, i)).toISOString(),
+      monthKey: '2026-08',
+      providers: [provider('neon', { ok }), provider('vercel', { ok: true })],
+      totalVariableMtdUsd: 0, totalFixedUsd: 0,
+    }))
+
+    ok('a clean provider has no failure streak',
+      consecutiveFailures(snap([true, true, true]), 'neon') === 0)
+    ok('counts only the trailing run of failures',
+      consecutiveFailures(snap([false, false, true, false, false]), 'neon') === 2)
+    ok('a 5-sample blackout stays below the escalation bar',
+      consecutiveFailures(snap([true, false, false, false, false, false]), 'neon') === 5)
+    ok('a 6-sample blackout reaches the escalation bar',
+      consecutiveFailures(snap([true, false, false, false, false, false, false]), 'neon') === 6)
+    ok('a recovery ends the streak',
+      consecutiveFailures(snap([false, false, false, false, false, false, true]), 'neon') === 0)
+
+    // Recovery is judged on the streak BEFORE this collection, so the run that
+    // brings a provider back can still tell it had been escalated.
+    ok('ignoreLast sees the pre-recovery streak',
+      consecutiveFailures(snap([false, false, false, false, false, false, true]), 'neon', 1) === 6)
+    ok('ignoreLast on a brief blip stays under the bar — no unearned recovery email',
+      consecutiveFailures(snap([true, true, false, true]), 'neon', 1) === 1)
+
+    // An unconfigured provider is a different failure (NOT CONFIGURED), and
+    // must not also be reported as a blind spot.
+    const unconf: Snapshot[] = [1, 2, 3, 4, 5, 6, 7].map(i => ({
+      at: new Date(Date.UTC(2026, 7, 9, i)).toISOString(),
+      monthKey: '2026-08',
+      providers: [provider('neon', { ok: false, configured: false })],
+      totalVariableMtdUsd: 0, totalFixedUsd: 0,
+    }))
+    ok('unconfigured providers never count as a blind spot',
+      consecutiveFailures(unconf, 'neon') === 0)
+    ok('no snapshots yields no streak', consecutiveFailures([], 'neon') === 0)
   }
 
   // ── Neon granularity window ────────────────────────────────────────────────

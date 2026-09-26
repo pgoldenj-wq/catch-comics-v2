@@ -163,6 +163,41 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
+          # A provider blind for 6+ consecutive collections is a failure, not a
+          # warning. Without this a single stale provider sits at AMBER forever
+          # and AMBER exits 0 — exactly how Neon went unmonitored for 33 hours
+          # behind green ticks. staleEscalations counts only NEWLY emitted
+          # alerts, so a continuing blackout costs one email plus the store's
+          # 6-hourly reminder rather than one an hour.
+          PSTALE=$(echo "$RESPONSE" | jq -r '(.persistentStaleProviders // []) | join(", ")' 2>/dev/null || true)
+          ESCALATIONS=$(echo "$RESPONSE" | jq -r '.staleEscalations // 0' 2>/dev/null || true)
+          ESCALATIONS=${ESCALATIONS:-0}
+          case "$ESCALATIONS" in ''|*[!0-9]*) ESCALATIONS=0 ;; esac
+          RECOVERED=$(echo "$RESPONSE" | jq -r '(.recoveredProviders // []) | join(", ")' 2>/dev/null || true)
+          if [ -n "$RECOVERED" ]; then
+            echo "::notice::Cost Guard recovered — $RECOVERED is reporting again after a blackout."
+            echo "### Cost Guard: RECOVERED :white_check_mark:" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`$RECOVERED\` is reporting again — its spend is measured once more." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -n "$PSTALE" ]; then
+            if [ "$ESCALATIONS" -gt 0 ]; then
+              echo "::error::Cost Guard blind spot — $PSTALE has returned no telemetry for 6+ consecutive collections. Its spend is unmonitored and reads as \$0."
+              {
+                echo "### Cost Guard: BLIND SPOT :x:"
+                echo ""
+                echo "\`$PSTALE\` has returned no usable telemetry for 6+ consecutive collections."
+                echo "That provider's spend is **unmonitored** and contributes \$0 to the totals because it is missing, not because it is zero."
+                echo "$RESPONSE" | jq -r '.reasons[]? | "- " + .'
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+            echo "::warning::Cost Guard blind spot continues — $PSTALE still unmonitored (already reported; not re-failed)."
+            {
+              echo "### Cost Guard: BLIND SPOT (continuing) :warning:"
+              echo ""
+              echo "\`$PSTALE\` still unmonitored. Already reported — annotated, not re-failed. Re-fails on the store's 6-hourly re-emit or on any change."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
           if [ "$STATE" = "AMBER" ]; then
             echo "::warning::Cost Guard is AMBER — degraded but inside approved budget. Fresh providers: $FRESH_LIST."
             {

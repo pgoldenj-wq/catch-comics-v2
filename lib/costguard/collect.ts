@@ -20,13 +20,50 @@ import { collectCloudflare } from './providers/cloudflare'
 import { collectGithub } from './providers/github'
 import { collectNeon } from './providers/neon'
 import { collectVercel } from './providers/vercel'
-import type { CostGuardState, Snapshot } from './types'
+import type { CostGuardState, ProviderId, Snapshot } from './types'
 
 export interface CollectResult {
   state: CostGuardState
   snapshot: Snapshot
   storeMode: 'kv' | 'file'
   emittedEvents: number
+  /** Providers blind for more than STALE_ESCALATION_SAMPLES collections running. */
+  persistentStaleProviders: ProviderId[]
+  /** Newly-emitted persistent-stale alerts — 0 means "already reported". */
+  staleEscalations: number
+  /** Providers that were persistently stale and answered again this cycle. */
+  recoveredProviders: ProviderId[]
+}
+
+/**
+ * A provider blind for this many consecutive collections stops being a passing
+ * warning and becomes a failure. Six hourly samples ≈ 6h, matching the recovery
+ * hysteresis: long enough that a transient provider blip stays quiet, short
+ * enough that a real blackout cannot hide for a day.
+ *
+ * This exists because of 2026-08-08: Neon returned nothing for 33 hours while
+ * every run showed a green tick, because a single stale provider only ever
+ * produced AMBER and AMBER exits 0.
+ */
+const STALE_ESCALATION_SAMPLES = 6
+
+/**
+ * How many collections in a row, counting back from the end, this configured
+ * provider failed to return usable telemetry. Derived from the snapshots we
+ * already store, so no new state is persisted for it.
+ */
+export function consecutiveFailures(
+  snapshots: Snapshot[], provider: ProviderId, ignoreLast = 0,
+): number {
+  const list = ignoreLast ? snapshots.slice(0, -ignoreLast) : snapshots
+  let n = 0
+  for (let i = list.length - 1; i >= 0; i--) {
+    const p = list[i].providers.find(x => x.provider === provider)
+    if (!p || !p.configured) break        // unconfigured is a different problem
+    if (p.ok) break
+    n += 1
+  }
+  return n
 }
 
 export async function runCollection(now: Date = new Date()): Promise<CollectResult> {
@@ -94,5 +131,63 @@ export async function runCollection(now: Date = new Date()): Promise<CollectResu
     }
   }
 
-  return { state, snapshot, storeMode: storeMode(), emittedEvents: emitted }
+  // ── Persistent blind spots ────────────────────────────────────────────────
+  // A single stale provider only ever yields AMBER, and AMBER exits 0, so a
+  // provider can stop reporting indefinitely behind a wall of green ticks.
+  // Once a provider has been blind for STALE_ESCALATION_SAMPLES collections
+  // running it escalates to a failure — but only ONCE per dedupe window, so a
+  // long blackout costs one email plus a 6-hourly reminder, not one an hour.
+  const persistentStaleProviders: ProviderId[] = []
+  const recoveredProviders: ProviderId[] = []
+  let staleEscalations = 0
+
+  for (const p of providers) {
+    if (!p.configured) continue
+    const streak = consecutiveFailures(snapshots, p.provider)
+
+    if (!p.ok && streak >= STALE_ESCALATION_SAMPLES) {
+      persistentStaleProviders.push(p.provider)
+      const fresh = await appendEvent(
+        {
+          at: now.toISOString(),
+          kind: 'alert',
+          provider: p.provider,
+          // Numberless key: the streak grows every hour, and keying on it would
+          // defeat the dedupe and reproduce the original email storm.
+          dedupeKey: `stale-persistent:${p.provider}`,
+          message: `${p.provider} has returned no usable telemetry for ${streak} consecutive collections — its spend is unmonitored and reads as $0.`,
+          detail: { provider: p.provider, consecutiveFailures: streak, note: p.note ?? null },
+        },
+        CFG.alertDedupeWindowMs,
+      )
+      if (fresh) { staleEscalations += 1; emitted += 1 }
+    }
+
+    // Recovery is reported exactly once, and only for a blackout that was
+    // actually escalated — a one-sample blip never earned an email, so it must
+    // not earn a recovery one either. A unique key means it is never suppressed.
+    if (p.ok) {
+      const priorStreak = consecutiveFailures(snapshots, p.provider, 1)
+      if (priorStreak >= STALE_ESCALATION_SAMPLES) {
+        recoveredProviders.push(p.provider)
+        await appendEvent(
+          {
+            at: now.toISOString(),
+            kind: 'alert',
+            provider: p.provider,
+            dedupeKey: `stale-recovered:${p.provider}:${now.toISOString()}`,
+            message: `${p.provider} is reporting again after ${priorStreak} failed collections — its spend is measured once more.`,
+            detail: { provider: p.provider, missedCollections: priorStreak },
+          },
+          CFG.alertDedupeWindowMs,
+        )
+        emitted += 1
+      }
+    }
+  }
+
+  return {
+    state, snapshot, storeMode: storeMode(), emittedEvents: emitted,
+    persistentStaleProviders, staleEscalations, recoveredProviders,
+  }
 }

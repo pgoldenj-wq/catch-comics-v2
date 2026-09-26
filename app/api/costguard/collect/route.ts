@@ -44,6 +44,13 @@ export async function POST(req: NextRequest) {
         .map(p => p.provider),
       storeMode: result.storeMode,
       emittedEvents: result.emittedEvents,
+      // A provider blind for 6+ consecutive collections. CI escalates this to a
+      // failure: a single stale provider otherwise sits at AMBER (exit 0)
+      // indefinitely, which is how Neon went unmonitored for 33 hours behind
+      // green ticks on 2026-08-08.
+      persistentStaleProviders: result.persistentStaleProviders,
+      staleEscalations: result.staleEscalations,
+      recoveredProviders: result.recoveredProviders,
       at: result.snapshot.at,
     })
   } catch (err) {
