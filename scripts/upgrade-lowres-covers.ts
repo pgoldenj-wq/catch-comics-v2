@@ -28,8 +28,11 @@
  *   4. VISUAL IDENTITY: the candidate must match the artwork already stored for
  *      this product (normalised cross-correlation of the trimmed cover regions).
  *      Measured: same cover 0.74-0.99, different products <= 0.48.
- *      >= 0.85 auto-approved; 0.70-0.85 goes to a review contact sheet and is
- *      written only with --approve-review; < 0.70 rejected.
+ *      >= 0.85 auto-approved; < 0.70 rejected. 0.70-0.85 is approved only when
+ *      the stored cover is a square letterboxed thumbnail AND the frame-faithful
+ *      box comparison (boxSimilarity) is >= 0.95 — measured over 4,830
+ *      different-product pairs its maximum was 0.595. The rest of that band goes
+ *      to a review contact sheet and is written only with --approve-review.
  *
  * FLOW:
  *   DRY-RUN  — evaluates the cohort, stages processed bytes, writes a manifest
@@ -41,6 +44,7 @@
  *              appended to a crash-safe JSONL log (reversible).
  *
  *   npx dotenv -e .env.local -- tsx scripts/upgrade-lowres-covers.ts [--title "blade runner%"] [--limit N] [--with-ol]
+ *   npx dotenv -e .env.local -- tsx scripts/upgrade-lowres-covers.ts --rescore   # re-apply the gate to the manifest
  *   npx dotenv -e .env.local -- tsx scripts/upgrade-lowres-covers.ts --execute [--approve-review]
  */
 import fs from 'fs'
@@ -57,6 +61,7 @@ import { webpDims, effectiveCoverWidth } from '../lib/images/webp-dims'
 const argv = process.argv.slice(2)
 const EXECUTE = argv.includes('--execute')
 const APPROVE_REVIEW = argv.includes('--approve-review')
+const RESCORE = argv.includes('--rescore')
 const WITH_OL = argv.includes('--with-ol')
 const arg = (k: string) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : undefined }
 const TITLE = arg('--title')
@@ -69,7 +74,7 @@ const MIN_NEW = 300                  // an upgrade must reach at least this…
 const MIN_GAIN = 1.5                 // …and be 1.5x the stored artwork width
 const GOOD_ENOUGH = 600              // stop trying further sources once reached
 const ASPECT_MIN = 1.2, ASPECT_MAX = 1.75
-const SIM_AUTO = 0.85, SIM_REVIEW = 0.70
+const SIM_AUTO = 0.85, SIM_REVIEW = 0.70, BOX_AUTO = 0.95
 const CONCURRENCY = EXECUTE ? 6 : 10
 const UA = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
 
@@ -82,7 +87,7 @@ const PROOF_DIR = path.join(os.tmpdir(), 'cover-lowres-proof')
 type Source = 'shopify' | 'waterstones' | 'openlibrary'
 interface Entry {
   id: string; title: string; isbn: string; oldUrl: string; oldW: number; oldH: number; oldEff: number
-  src: string; kind: Source; newW: number; newH: number; sim: number; sig: string; review: boolean
+  src: string; kind: Source; newW: number; newH: number; sim: number; boxSim?: number; sig: string; review: boolean
 }
 
 async function fetchBuf(url: string, headers: Record<string, string> = UA): Promise<Buffer | null> {
@@ -104,6 +109,30 @@ async function coverVector(b: Buffer): Promise<number[]> {
   try { src = await sharp(src).trim({ threshold: 20 }).toBuffer() } catch { /* nothing to trim */ }
   return Array.from(await sharp(src).resize(24, 36, { fit: 'fill' }).grayscale().raw().toBuffer())
 }
+
+/**
+ * Frame-faithful comparison for LETTERBOXED stored covers: render the candidate
+ * the way the stored thumbnail was made (fit inside the stored WxH on white),
+ * then compare only the box where its artwork lands. Unlike coverVector's
+ * white-trim this does not eat into covers whose own art has white areas
+ * (Black Butler, Saga, Invincible). Bars are excluded, so shared white bars
+ * cannot inflate the score for unrelated products.
+ */
+async function boxSimilarity(oldBuf: Buffer, oldW: number, oldH: number, cand: Buffer): Promise<number> {
+  const cm = await sharp(cand).metadata()
+  const s = Math.min(oldW / (cm.width || 1), oldH / (cm.height || 1))
+  const bw = Math.max(1, Math.min(oldW, Math.round((cm.width ?? 0) * s))), bh = Math.max(1, Math.min(oldH, Math.round((cm.height ?? 0) * s)))
+  const box = { left: Math.floor((oldW - bw) / 2), top: Math.floor((oldH - bh) / 2), width: bw, height: bh }
+  const vec = async (b: Buffer) => {
+    const framed = await sharp(b).flatten({ background: '#ffffff' }).resize(oldW, oldH, { fit: 'contain', background: '#ffffff' }).toBuffer()
+    const cropped = await sharp(framed).extract(box).toBuffer()
+    return Array.from(await sharp(cropped).resize(24, 36, { fit: 'fill' }).grayscale().raw().toBuffer())
+  }
+  return ncc(await vec(oldBuf), await vec(cand))
+}
+
+/** Square stored frames are letterboxed thumbnails — the case the box metric is calibrated for. */
+const isLetterboxed = (w: number, h: number) => Math.abs(h / w - 1) < 0.05
 
 export function ncc(a: number[], b: number[]): number {
   const ma = a.reduce((s, x) => s + x, 0) / a.length, mb = b.reduce((s, x) => s + x, 0) / b.length
@@ -230,8 +259,10 @@ async function dryRun() {
         if (d.w < need) { lastReason = `${s.kind}: not bigger (${d.w} < ${need})`; continue }
         const sim = ncc(oldVec, await coverVector(d.processed))
         if (sim < SIM_REVIEW) { lastReason = `${s.kind}: different artwork (sim ${sim.toFixed(2)})`; continue }
+        const boxSim = sim < SIM_AUTO && isLetterboxed(p.w, p.h) ? await boxSimilarity(oldBuf, p.w, p.h, d.processed) : undefined
         const cand = { id: p.id, title: p.title, isbn: p.isbn, oldUrl: p.url, oldW: p.w, oldH: p.h, oldEff: p.eff,
-          src: s.url, kind: s.kind, newW: d.w, newH: d.h, sim: +sim.toFixed(3), sig: d.sig, review: sim < SIM_AUTO, processed: d.processed }
+          src: s.url, kind: s.kind, newW: d.w, newH: d.h, sim: +sim.toFixed(3), boxSim: boxSim === undefined ? undefined : +boxSim.toFixed(3),
+          sig: d.sig, review: sim < SIM_AUTO && !(boxSim !== undefined && boxSim >= BOX_AUTO), processed: d.processed }
         // Prefer auto-approvable over review-band; then the larger image.
         if (!best || (best.review && !cand.review) || (best.review === cand.review && cand.newW > best.newW)) best = cand
       }
@@ -290,6 +321,22 @@ async function execute() {
   console.log(`\n── EXECUTED ──`, stats, `\n   log: ${logPath}`)
 }
 
-(EXECUTE ? execute() : dryRun())
+/** Re-apply the identity gate to an existing manifest (review-band rows only; no network writes). */
+async function rescore() {
+  const manifest: Entry[] = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'))
+  let promoted = 0, checked = 0
+  await pool(manifest.filter(e => e.review && isLetterboxed(e.oldW, e.oldH)), CONCURRENCY, async e => {
+    const old = await fetchBuf(e.oldUrl)
+    if (!old) return
+    checked++
+    e.boxSim = +(await boxSimilarity(old, e.oldW, e.oldH, fs.readFileSync(path.join(STAGING, `${e.id}.webp`)))).toFixed(3)
+    if (e.boxSim >= BOX_AUTO) { e.review = false; promoted++ }
+  })
+  fs.writeFileSync(MANIFEST, JSON.stringify(manifest, null, 1))
+  console.log(`RESCORE: ${checked} letterboxed review rows checked, ${promoted} promoted (box >= ${BOX_AUTO}); still in review: ${manifest.filter(e => e.review).length}`)
+  await contactSheet(manifest.filter(e => e.boxSim !== undefined && !e.review).sort((a, b) => (a.boxSim ?? 0) - (b.boxSim ?? 0)).slice(0, 60), path.join(PROOF_DIR, 'promoted-lowest.png'))
+}
+
+(EXECUTE ? execute() : RESCORE ? rescore() : dryRun())
   .catch(e => { console.error('ERR', e); process.exit(1) })
   .finally(() => prisma.$disconnect())
