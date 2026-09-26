@@ -36,11 +36,23 @@ const QUERIES = [
   'chainsaw man',         // manga, numbered volumes
   'watchmen',             // single famous edition, no volume at all
   'sandman omnibus',      // omnibus vs volumes vs box set
+  'x-men',                // bare series name stored as a whole TPB title (2026-09-26)
+  'invincible volume 3',  // "Invincible Iron Man Volume 3" contains every word
+  'star wars vol',        // Darth Vader / Doctor Aphra / Epic Collection "Vol 3"s
+  'berserk volume',       // Deluxe hardcovers sold as "Berserk Volume 1"
 ]
 const PER_QUERY = 2       // products sampled per query
 
 type Canon = { title: string; isbn13: string | null }
-type Row = { title: string; price: { value: number } }
+type Row = { title: string; price: { value: number }; itemWebUrl?: string }
+
+/**
+ * Rows from the ISBN search are edition-anchored and the route never gates
+ * them. eBay echoes the search keyword back in the item URL as `_skw`, so a
+ * row whose `_skw` is our ISBN came from the ISBN search.
+ */
+const fromIsbnSearch = (l: Row, isbn13: string | null) =>
+  !!isbn13 && String(l.itemWebUrl ?? '').includes(`_skw=${isbn13}`)
 
 const money = (n: number) => `£${n.toFixed(2)}`
 
@@ -86,7 +98,7 @@ async function main() {
     if (listings.length === 0) continue
 
     sampled.push(p.title)
-    const kept = listings.filter(l => listingMatchesProduct(l.title, p.title))
+    const kept = listings.filter(l => fromIsbnSearch(l, p.isbn13) || listingMatchesProduct(l.title, p.title))
     const dropped = listings.filter(l => !kept.includes(l))
     totalRows += listings.length
     totalKept += kept.length
@@ -115,10 +127,10 @@ async function main() {
   console.log(`  rails emptied entirely  : ${emptied}`)
   console.log(`  rails wholly unchanged  : ${unchanged}`)
   console.log(`  cheapest offer corrected: ${cheapestChanged}`)
-  console.log('\n  NOTE: production still runs the UNGATED code, so every row above was')
-  console.log('  served to a real shopper. The gate only applies to title-derived rows,')
-  console.log('  and this audit cannot tell which rows came from the ISBN search — so')
-  console.log('  real retention after deploy is HIGHER than the figure above.\n')
+  console.log('\n  NOTE: rows served came from the target; "kept" applies THIS checkout\'s')
+  console.log('  gate. ISBN-search rows (eBay echoes our ISBN back as _skw) are never')
+  console.log('  gated, exactly as in app/api/ebay/route.ts. An emptied rail means every')
+  console.log('  row was a title-derived keyword hit the gate could not anchor.\n')
 }
 
 main().catch(e => { console.error(e); process.exit(1) })
