@@ -213,8 +213,11 @@ export default function Home() {
   // Design width of the hero cover stack — covers span left 8px → 465px.
   const COVER_STACK_W = 465;
 
-  // Popular search terms — clicking always navigates to a fresh search page
-  const trending = ['Batman', 'Spider-Man', 'One Piece', 'Saga', 'Watchmen', 'Naruto', 'X-Men', 'Invincible', 'Demon Slayer', 'Hellboy'];
+  // Popular search terms — clicking always navigates to a fresh search page.
+  // Each one must land on a page of the right comics: "Watchmen" was replaced
+  // (2026-09-26) because the catalogue holds one Watchmen edition, and its
+  // results page padded out with "It Watches", "Watch Dog" and "The Watcher".
+  const trending = ['Batman', 'Spider-Man', 'One Piece', 'Saga', 'The Walking Dead', 'Naruto', 'X-Men', 'Invincible', 'Demon Slayer', 'Hellboy'];
 
   // viewBox adds vertical padding so flags have breathing room inside the circular button.
   // US flag uses xMinYMid to show the left (canton / stars) rather than the centre stripe area.
