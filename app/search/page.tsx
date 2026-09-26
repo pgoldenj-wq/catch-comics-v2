@@ -944,7 +944,22 @@ function SearchResults() {
           )}
 
           {/* Error */}
-          {error && <div style={{ textAlign: 'center', padding: '64px 0', color: '#6B7280' }}>{error}</div>}
+          {/* A failed search used to be one grey line and a dead end. Neon
+              drops serverless connections now and then (CLAUDE.md), so a
+              shopper WILL meet this — give them the way forward. */}
+          {error && (
+            <div role="alert" style={{ textAlign: 'center', padding: '64px 0', color: '#6B7280' }}>
+              <p style={{ fontWeight: 500, color: '#0A0A0A', marginBottom: '8px', fontSize: '15px' }}>{error}</p>
+              <p style={{ fontSize: '14px', marginBottom: '16px' }}>We couldn&rsquo;t load results just now.</p>
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                style={{ background: '#E8272A', color: '#fff', border: 'none', borderRadius: '999px', padding: '10px 22px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
+              >
+                Try again
+              </button>
+            </div>
+          )}
 
           {/* Result cards */}
           {!loading && !error && filteredResults.length > 0 && (
