@@ -79,12 +79,12 @@
     },
     {
       "id": "B4",
-      "title": "Put priced retailer offers back, and keep them there",
+      "title": "Put priced retailer offers back — the refresh button no longer can",
       "owner": "FOUNDER",
       "status": "todo",
-      "why": "The site has 0 priced listings. 2,280 were soft-deleted at 2026-10-27 03:00:46 UTC, thirty days after their last refresh on 2026-09-26, by the retention sweep working exactly as designed. Nothing refreshed them because Travelling Man and World of Books both carry scheduled_sync_disabled, so the hourly and 4-hourly crons skip them, and the manual run that used to cover the gap died 17 seconds in on 2026-09-26 — price-verify-status.json has read \"running\" ever since. Until this is fixed, Catch Comics is a catalogue with an eBay widget, not a price comparison.",
+      "why": "The site has 0 priced listings. 2,280 were soft-deleted at 2026-10-27 03:00:46 UTC, thirty days after their last refresh on 2026-09-26, by the retention sweep working exactly as designed. Nothing refreshed them because Travelling Man and World of Books both carry scheduled_sync_disabled, so the hourly and 4-hourly crons skip them, and the manual run that used to cover the gap died 17 seconds in on 2026-09-26. The refresh itself cannot undo this: price-verify selects rows WHERE deleted_at IS NULL and scopes every update the same way, so with no active rows left there is nothing for it to refresh. Reviving the offers means clearing deleted_at on those rows or re-ingesting the retailer — both production data changes, and both yours to approve.",
       "done": "launch:health reports priced listings above zero and products at 2+ retailers above zero, and a real product page shows the same edition at two retailers.",
-      "evidence": "Confirmed 2026-11-22 against the production database: 2,246 Travelling Man + 34 World of Books rows all stamped deleted_at 2026-10-27 03:00:46.263; price-verify-write-latest.json records the matching 2,280 rows written 2026-09-26 15:57 with nextExpiryAt 2026-10-26 15:57.",
+      "evidence": "Proven by running it, 2026-11-22 16:47 UTC: the read-only dry run (npx tsx scripts/price-verify-dryrun.ts --max-rows 2300) reported target rows 0 for Travelling Man and 0 for World of Books — 41 sitemap requests, 0 product requests, 0 rows written, 1.6 min. Database: 2,246 Travelling Man + 34 World of Books rows all stamped deleted_at 2026-10-27 03:00:46.263. Travelling Man still lists the flagship edition at £14.99 but shows Sold out, so some of those rows should not come back at all.",
       "actions": [
         {
           "kind": "run",

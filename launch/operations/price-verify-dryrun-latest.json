@@ -1,0 +1,148 @@
+{
+  "version": 2,
+  "runAt": "2026-11-22T16:47:15.810Z",
+  "mode": "DRY-RUN (read-only, zero writes)",
+  "breakerTripped": null,
+  "bounds": {
+    "TM_MAX_ROWS": 2300,
+    "WOB_MAX_ROWS": 50,
+    "TOTAL_TARGET_ROWS": 2350,
+    "TOTAL_PRODUCT_REQUESTS": 2350,
+    "TOTAL_REQUESTS_MAX": 2600,
+    "BETWEEN_PRODUCT_MS": 1000,
+    "MAX_RETRIES": 3,
+    "MAX_PRICE_RATIO": 10
+  },
+  "enumeration": {
+    "source": "sitemap index + product sitemaps",
+    "filesDiscovered": 40,
+    "filesFetched": 40,
+    "distinctHandles": 39621,
+    "complete": true
+  },
+  "travellingMan": {
+    "targetRows": 0,
+    "rowsAttempted": 0,
+    "successfulExactVerifications": 0,
+    "availableUnchangedPrice": 0,
+    "availablePriceChanged": 0,
+    "unavailable": 0,
+    "variantMissing": 0,
+    "productIdMismatch": 0,
+    "notFound404": 0,
+    "transientFailures": 0,
+    "otherErrors": 0,
+    "safeForSubsequentWrite": 0,
+    "mustNotBeRefreshed": 0,
+    "rowsWritten": 0,
+    "activeRowsExcludedNotInSitemap": 0,
+    "scheduledSyncDisabled": true
+  },
+  "worldOfBooks": {
+    "targetRows": 0,
+    "rowsAttempted": 0,
+    "successfulExactVerifications": 0,
+    "availableUnchangedPrice": 0,
+    "availablePriceChanged": 0,
+    "unavailable": 0,
+    "variantMissing": 0,
+    "productIdMismatch": 0,
+    "notFound404": 0,
+    "transientFailures": 0,
+    "otherErrors": 0,
+    "safeForSubsequentWrite": 0,
+    "mustNotBeRefreshed": 0,
+    "rowsWritten": 0
+  },
+  "priceChanges": [],
+  "writeTotals": {
+    "rowsWritten": 0,
+    "priceHistoryRowsCreated": 0,
+    "skippedRowNotActive": 0,
+    "excludedImplausiblePrice": 0,
+    "listingsCreated": 0,
+    "canonicalProductsCreated": 0,
+    "deletedRowsTouched": 0,
+    "deletedAtCleared": 0,
+    "retailerLastSyncedAtTouched": 0,
+    "syncLogsCreated": 0
+  },
+  "productionState": {
+    "before": {
+      "travellingman.com": {
+        "total": 25764,
+        "active": 0,
+        "deleted": 25764,
+        "inStock": 0,
+        "outOfStock": 0,
+        "maxLastSeenAt": "2026-09-26T15:56:41.445Z",
+        "lastSyncedAt": "2026-08-18T22:30:42.211Z",
+        "syncLogs": 2375,
+        "syncLogsLatest": "2026-08-18T22:30:41.399Z",
+        "scheduledSyncDisabled": true
+      },
+      "worldofbooks.com": {
+        "total": 529927,
+        "active": 0,
+        "deleted": 529927,
+        "inStock": 0,
+        "outOfStock": 0,
+        "maxLastSeenAt": "2026-09-26T15:57:25.984Z",
+        "lastSyncedAt": "2026-06-03T13:05:51.760Z",
+        "syncLogs": 2180,
+        "syncLogsLatest": "2026-08-09T10:01:01.094Z",
+        "scheduledSyncDisabled": true
+      },
+      "canonicalProducts": 150694,
+      "retailerListings": 808344,
+      "priceHistory": 624421
+    },
+    "after": {
+      "travellingman.com": {
+        "total": 25764,
+        "active": 0,
+        "deleted": 25764,
+        "inStock": 0,
+        "outOfStock": 0,
+        "maxLastSeenAt": "2026-09-26T15:56:41.445Z",
+        "lastSyncedAt": "2026-08-18T22:30:42.211Z",
+        "syncLogs": 2375,
+        "syncLogsLatest": "2026-08-18T22:30:41.399Z",
+        "scheduledSyncDisabled": true
+      },
+      "worldofbooks.com": {
+        "total": 529927,
+        "active": 0,
+        "deleted": 529927,
+        "inStock": 0,
+        "outOfStock": 0,
+        "maxLastSeenAt": "2026-09-26T15:57:25.984Z",
+        "lastSyncedAt": "2026-06-03T13:05:51.760Z",
+        "syncLogs": 2180,
+        "syncLogsLatest": "2026-08-09T10:01:01.094Z",
+        "scheduledSyncDisabled": true
+      },
+      "canonicalProducts": 150694,
+      "retailerListings": 808344,
+      "priceHistory": 624421
+    }
+  },
+  "cost": {
+    "sitemapRequests": 41,
+    "productRequests": 0,
+    "retryRequests": 0,
+    "totalHttpRequests": 41,
+    "inboundBytes": 19121812,
+    "inboundMiB": 18.24,
+    "wallClockMs": 93772,
+    "wallClockMin": 1.6,
+    "inngestExecutions": 0,
+    "externalApiCostGBP": 0
+  },
+  "softDeletedTmRowsTouched": 0,
+  "freshness": {
+    "policyDays": 30,
+    "refreshedAt": null,
+    "nextExpiryAt": null
+  }
+}
