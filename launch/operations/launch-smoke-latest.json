@@ -2,10 +2,10 @@
   "version": 1,
   "environment": "production",
   "url": "https://www.catchcomics.com",
-  "checkedAt": "2026-09-26T17:26:16.937Z",
-  "verdict": "PASS",
-  "passed": 20,
-  "warned": 0,
+  "checkedAt": "2026-11-22T16:37:20.184Z",
+  "verdict": "PASS-WITH-WARNINGS",
+  "passed": 19,
+  "warned": 2,
   "failed": 0,
   "checks": [
     {
@@ -77,8 +77,8 @@
     {
       "id": "product-count",
       "label": "Offer count reads \"tracked retailer\"",
-      "status": "pass",
-      "detail": ""
+      "status": "warn",
+      "detail": "no tracked-retailer label (may have 0 SSR offers)"
     },
     {
       "id": "product-history",
@@ -105,10 +105,16 @@
       "detail": ""
     },
     {
+      "id": "go-route",
+      "label": "Affiliate route answers (unknown id → 404)",
+      "status": "pass",
+      "detail": "HTTP 404"
+    },
+    {
       "id": "go",
       "label": "Affiliate redirect returns 3xx to retailer",
-      "status": "pass",
-      "detail": "HTTP 302 → https://travellingman.com/products/absolute-batman-volume-2-"
+      "status": "warn",
+      "detail": "not exercised — no retailer link on 4 sampled product pages"
     },
     {
       "id": "price-hint",
