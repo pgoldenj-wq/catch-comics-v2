@@ -26,7 +26,12 @@ body {
   /* Prevent horizontal scroll into off-canvas whitespace caused by decorative
      overflow (e.g. the hero's red-glow bloom positioned beyond the card edge,
      and hover-scaled covers). `clip` — not `hidden` — so no scroll container is
-     created and position:sticky / vertical dropdowns are unaffected. */
+     created and position:sticky / vertical dropdowns are unaffected.
+     CAVEAT: while <html> is overflow:visible, the browser propagates this to
+     the viewport (as `hidden`) and does not clip at body. It hides the
+     scrollbar, but the document still measures wider than the screen, and
+     getComputedStyle(body) still says `clip`. Clip decorative overflow at its
+     own wrapper instead (see the desktop wrapper in app/page.tsx). */
   overflow-x: clip;
 }
 

@@ -213,8 +213,11 @@ export default function Home() {
   // Design width of the hero cover stack — covers span left 8px → 465px.
   const COVER_STACK_W = 465;
 
-  // Popular search terms — clicking always navigates to a fresh search page
-  const trending = ['Batman', 'Spider-Man', 'One Piece', 'Saga', 'Watchmen', 'Naruto', 'X-Men', 'Invincible', 'Demon Slayer', 'Hellboy'];
+  // Popular search terms — clicking always navigates to a fresh search page.
+  // Each one must land on a page of the right comics: "Watchmen" was replaced
+  // (2026-09-26) because the catalogue holds one Watchmen edition, and its
+  // results page padded out with "It Watches", "Watch Dog" and "The Watcher".
+  const trending = ['Batman', 'Spider-Man', 'One Piece', 'Saga', 'The Walking Dead', 'Naruto', 'X-Men', 'Invincible', 'Demon Slayer', 'Hellboy'];
 
   // viewBox adds vertical padding so flags have breathing room inside the circular button.
   // US flag uses xMinYMid to show the left (canton / stars) rather than the centre stripe area.
@@ -472,8 +475,14 @@ export default function Home() {
       {/* ═══════════════════════════════════════════════════════════════════════
           DESKTOP LAYOUT (hidden md:block, ≥768px only)
           Original design — frozen, no changes made inside this wrapper.
+          overflow-x-clip: the hero's red-glow bloom sits 80px past the card's
+          right edge, and below ~1264px the gutter is only 24px, so the page
+          measured 824px wide at 768 (tablet). Clipping here, at the viewport
+          edge, changes nothing visible — the bloom still spills past the card
+          wherever there is room. `clip`, not `hidden`: no scroll container, so
+          the sticky Navbar and the search dropdown are unaffected.
           ══════════════════════════════════════════════════════════════════════ */}
-      <div className="hidden md:block">
+      <div className="hidden md:block overflow-x-clip">
 
       {/* ── HEADER — shared Navbar component ────────────────────────────── */}
       <Navbar region={region} onRegionChange={setRegion} />

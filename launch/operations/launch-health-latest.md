@@ -1,24 +1,23 @@
-# Launch Health — 2026-08-24 17:07 UTC
+# Launch Health — 2026-09-26 17:32 UTC
 
-Source: read-only Postgres queries (scripts/launch-health.ts). Deltas vs 2026-08-23.
+Source: read-only Postgres queries (scripts/launch-health.ts). Deltas vs 2026-08-24.
 
 ## Catalogue
-- Live products: **136,277** (+0 since 2026-08-23)
-- R2 covers: **27,729 (20.3%)** (+0 since 2026-08-23) · no cover: 94,142
-- Format known: 10.4% · CV-matched: 10,099 (7.4%) (+0 since 2026-08-23)
-- Descriptions: 34,839 · creators: 9,087 · **suspect-flagged: 4**
+- Live products: **136,277** (+0 since 2026-08-24)
+- R2 covers: **27,730 (20.3%)** (+1 since 2026-08-24) · no cover: 94,141
+- Format known: 10.4% · CV-matched: 10,164 (7.5%) (+65 since 2026-08-24)
+- Descriptions: 34,890 · creators: 9,087 · **suspect-flagged: 4**
 
 ## Pricing
-- Priced listings: **32,935** (-839 since 2026-08-23) · products priced: 31,501 (-749 since 2026-08-23)
-- Freshness: 2,452 <7d · 29,620 7–30d · **863 stale (2.62%)** (+456 since 2026-08-23)
-- Comparison depth: 31,484 products @ 1 retailer · **18 @ 2+** (overlap 0.06%)
-- World of Books: 30,516 listings, 29,653 fresh, last seen 2026-08-23
-- Travelling Man: 2,247 listings, 2,247 fresh, last seen 2026-08-23
-- Bookshop.org (UK): 172 listings, 172 fresh, last seen 2026-08-18
+- Priced listings: **2,280** (-30655 since 2026-08-24) · products priced: 2,182 (-29319 since 2026-08-24)
+- Freshness: 2,280 <7d · 0 7–30d · **0 stale (0%)** (-863 since 2026-08-24)
+- Comparison depth: 2,183 products @ 1 retailer · **0 @ 2+** (overlap 0%)
+- Travelling Man: 2,246 listings, 2,246 fresh, last seen 2026-09-26
+- World of Books: 34 listings, 34 fresh, last seen 2026-09-26
 
 ## Wave 4 — catalogue trust
-- Price history: **624,278** observations (2026-05-11 → 2026-08-23) · **3 products eligible** for the Price History chart (7+ distinct-day observations — matches the UI MIN_POINTS gate)
-- Suspect metadata: **179** distributor-as-publisher (omitted at display) · 1,012 CV-matched w/o creators
+- Price history: **624,421** observations (2026-05-11 → 2026-09-26) · **1 products eligible** for the Price History chart (7+ distinct-day observations — matches the UI MIN_POINTS gate)
+- Suspect metadata: **179** distributor-as-publisher (omitted at display) · 1,077 CV-matched w/o creators
 - Issue covers on R2 (sampled): **22** across 1 volume(s)
 
 ## Amazon — AFFILIATE-ONLY / STORED OFFERS (informational, not a failure)

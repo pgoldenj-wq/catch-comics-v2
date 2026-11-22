@@ -32,7 +32,7 @@ import { searchListings, EbayListing } from '@/lib/ebay'
 import { TTLCache } from '@/lib/cache'
 import { enforceRateLimit } from '@/lib/security/rateLimit'
 import { normalizeIsbn13 } from '@/lib/identity/isbn'
-import { listingMatchesProduct } from '@/lib/listings/productRelevance'
+import { listingMatchesProduct, titleSupplementAllowed } from '@/lib/listings/productRelevance'
 
 // Module-level 1-hour cache — shared across warm serverless instances
 const ebayProductCache = new TTLCache<EbayListing[]>(60 * 60 * 1000)
@@ -105,14 +105,16 @@ export async function GET(req: NextRequest) {
       // or use the ISBN field. Category 259104 + ISBN query gives very clean results.
       listings = await searchListings(isbn, 'EBAY_GB', 20)
 
-      // If ISBN returns < 3 results, supplement with title search
-      // (some listings don't include the ISBN in their title).
+      // Only when the ISBN search found NOTHING, supplement with a title
+      // search (some listings don't include the ISBN). Once an edition-
+      // anchored row exists, a keyword row can only add a different printing
+      // or edition — see titleSupplementAllowed().
       //
       // A keyword hit is not an edition match. These rows are merged into a
       // price-sorted table, so an unchecked one becomes "the cheapest offer"
       // for a book it is not — see lib/listings/productRelevance. Gate them
       // against our own title; the ISBN rows above are never gated.
-      if (listings.length < 3 && title) {
+      if (titleSupplementAllowed(listings.length) && title) {
         const titleResults = await searchListings(title, 'EBAY_GB', 20)
         // Merge, dedup by itemId
         const seen = new Set(listings.map(l => l.itemId))

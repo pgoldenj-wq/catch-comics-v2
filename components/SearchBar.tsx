@@ -181,7 +181,12 @@ export default function SearchBar({ initialQuery = '', region, variant = 'hero' 
 
   return (
     <div ref={wrapperRef} style={{ position: 'relative', width: '100%' }}>
-      <form onSubmit={handleSubmit} style={{
+      {/* The input's own outline is off (inline style below), which also
+          defeats the global input:focus-visible ring — so a keyboard user
+          tabbing into the site's main control saw no focus at all. The pill
+          carries the ring instead. Outline, not a Tailwind ring: the inline
+          boxShadow below would override a box-shadow ring. */}
+      <form onSubmit={handleSubmit} className="focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[#E8272A]" style={{
           display: 'flex',
           alignItems: 'center',
           background: '#fff',

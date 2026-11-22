@@ -1180,11 +1180,14 @@ function verdictBanner(s){
 
 const STATE_TEXT = {
   sending:   s => `Packaging ${evidenceOf(s)}…`,
-  packaged:  s => `Saved · ${evidenceOf(s)} · starting Claude…`,
-  launching: s => `Sent · ${evidenceOf(s)} · <strong>starting Claude…</strong>`,
-  // The pid is printed because it is the whole claim: this line means a
-  // process, and the founder can go and look at it.
-  running:   s => `Sent · ${evidenceOf(s)} · <strong>Claude repair running</strong>${s.pid ? ` · process ${s.pid}` : ''}${runProgress(s)}`,
+  packaged:  s => `Saved · ${evidenceOf(s)} · opening Claude Code…`,
+  // Deliberately NOT "Claude Code opened". Until the wrapper inside the window
+  // has written its pid, nothing has proved a terminal exists, and claiming a
+  // window that is not there is the one thing this line must never do.
+  launching: s => `Sent · ${evidenceOf(s)} · <strong>opening Claude Code…</strong>`,
+  // The pid is printed because it is the whole claim: this line means a real
+  // session in a real window, and the founder can go and watch it.
+  running:   s => `Sent · ${evidenceOf(s)} · <strong>Claude Code opened · repair running</strong>${s.pid ? ` · PID ${s.pid}` : ''}${runProgress(s)}`,
   // "Complete" used to be said here on the strength of exit code 0 alone. The
   // 2026-08-30 Search run proves what that cost: it exited 0 having committed
   // nothing and failed both its checks, and this line called it complete. The
@@ -1198,7 +1201,9 @@ const STATE_TEXT = {
   blocked:   s => s.blockedBy
     ? `<strong>Not started yet — a Claude repair is already running for ${esc(s.blockedBy)}.</strong> This review is saved.`
     : `<strong>Review saved — Claude was not started.</strong>`,
-  stale:     s => `<strong>Previous repair stopped unexpectedly — ready to retry.</strong> Your review is saved at <code>${esc(s.packagePath||'')}</code>`,
+  // Covers the founder closing the Claude window mid-repair, which is now a
+  // thing they can actually do. It must never read as a finished repair.
+  stale:     s => `<strong>The Claude Code session ended before it reported back — ready to retry.</strong> Your review is saved at <code>${esc(s.packagePath||'')}</code>`,
 };
 
 function sendCardMeta(p, ps){
@@ -1229,7 +1234,7 @@ function sendCardMeta(p, ps){
       return `Sends ${issues} issue${issues===1?'':'s'} and ${shots} screenshot${shots===1?'':'s'} straight into the repo.<br>` +
              `<strong>Claude Code was not found on this machine</strong> — the review will still be saved.`;
     }
-    return `Writes the review and every screenshot into the repo and starts the Claude repair. Nothing to copy or paste.` +
+    return `Writes the review and every screenshot into the repo, then opens a new Claude Code window on it and starts the repair. Nothing to copy, paste or type.` +
            (r ? `<br><span style="color:var(--good)">Claude Code connected${r.claude && r.claude.version ? ` · ${esc(r.claude.version)}` : ''}</span>` : '') +
            (ps.lastSentAt ? `<br>Last sent: ${new Date(ps.lastSentAt).toLocaleString()}` : '');
   }
@@ -1292,9 +1297,9 @@ function paintSendCard(p, ps){
   // package, branch and worktree, so the next session picks up where this one
   // left off rather than starting the review again from nothing.
   const unfinished = st === 'completed' && ['incomplete','no-change'].includes(ps.send?.report?.outcome);
-  const label = st === 'running'   ? 'Claude repair running…'
+  const label = st === 'running'   ? 'Claude Code is open — repair running…'
               : st === 'sending'   ? 'Packaging…'
-              : st === 'launching' || st === 'packaged' ? 'Starting Claude…'
+              : st === 'launching' || st === 'packaged' ? 'Opening Claude Code…'
               : unfinished         ? 'Continue this repair'
               : st === 'completed' ? `Send ${p.title} to Claude again`
               : (st === 'blocked' || st === 'failed' || st === 'stale') ? 'Retry sending to Claude'
@@ -1398,7 +1403,7 @@ function watchRun(p){
       else toast(`Claude finished for ${p.title} — ${evidenceOf(rec)} reviewed`);
     }
     else if (rec.state === 'blocked') toast(`${p.title} review saved, but Claude was not started — ${rec.reason || 'see the card'}`, 'err');
-    else if (rec.state === 'stale')   toast(`The repair for ${p.title} stopped unexpectedly — your review is saved, press Retry`, 'err');
+    else if (rec.state === 'stale')   toast(`The Claude Code session for ${p.title} ended before it reported back — your review is saved, press Retry`, 'err');
     else                              toast(`Claude repair did not finish for ${p.title} — your review is saved`, 'err');
   }, 2500);
   pollers.set(p.id, iv);
