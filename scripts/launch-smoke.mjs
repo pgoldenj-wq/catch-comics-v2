@@ -4,7 +4,7 @@
  *
  * Verifies the launch-critical public surface honestly: key routes respond,
  * trust copy is intact, APIs return sane shapes, and nothing fabricates data.
- * Read-only, ~11 polite requests, no auth, no paid APIs, no rate-limit bursts.
+ * Read-only, ~15 polite requests, no auth, no paid APIs, no rate-limit bursts.
  *
  * Usage:
  *   npm run launch:smoke                      # checks https://www.catchcomics.com
@@ -29,9 +29,21 @@ const FIXTURES = {
   productSlug: 'absolute-batman-volume-2-abomination-507512',
   seriesSlug:  'saga',
   searchQuery: 'absolute batman',
-  // Travelling Man listing for the product above (affiliate chain check).
-  // One GET per run logs one identifiable click (User-Agent above).
-  goListingId: '7a599e33-a079-46e1-9b21-a443ddebc2db',
+}
+
+// The affiliate check used to name one listing id. A listing id is not a
+// stable fixture: the 30-day retention sweep soft-deleted that Travelling Man
+// row on 2026-10-27 and /go has answered 404 for it every day since, so the
+// check reported the site broken when only the fixture was. It now finds a
+// listing a shopper could actually click — a /go/ href on a real page — and
+// says plainly when there is none left to click.
+const GO_DISCOVERY_PAGES = 4
+
+// Product slugs harvested from the search check, which runs first — the order
+// a shopper would meet them in.
+const candidateSlugs = []
+const addCandidates = (slugs) => {
+  for (const s of slugs) if (s && !candidateSlugs.includes(s)) candidateSlugs.push(s)
 }
 
 const checks = []
@@ -108,6 +120,7 @@ async function run() {
       const shapeOk = j.type === 'unified' && Array.isArray(results)
         && results.every(r => r.title && r.canonicalSlug && 'format' in r)
       const flagship = results.some(r => /absolute batman/i.test(r.title))
+      addCandidates(results.map(r => r.canonicalSlug))
       if (!shapeOk) add('search-api', 'Search API returns valid unified shape', 'fail')
       else {
         add('search-api', 'Search API returns valid unified shape', 'pass', `${results.length} canonical results`)
@@ -141,14 +154,47 @@ async function run() {
     }
   } catch (e) { add('series', 'Series page loads', 'fail', String(e.message || e)) }
 
-  // ── 7. Affiliate redirect (one click, identifiable UA) ───────────────────
+  // ── 7a. /go route is alive — an unknown id must 404, never 500 ──────────
+  // Separates "the catalogue has nothing to click" from "the redirect is
+  // broken", which is the first question incident-response.md asks.
   try {
-    const res = await fetch(`${TARGET}/go/${FIXTURES.goListingId}`, {
+    const res = await fetch(`${TARGET}/go/00000000-0000-4000-8000-000000000000`, {
       redirect: 'manual', headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(20_000),
     })
-    const loc = res.headers.get('location') || ''
-    const ok = res.status >= 300 && res.status < 400 && /^https?:\/\//.test(loc)
-    add('go', 'Affiliate redirect returns 3xx to retailer', ok ? 'pass' : 'fail', `HTTP ${res.status} → ${loc.slice(0, 60)}`)
+    add('go-route', 'Affiliate route answers (unknown id → 404)', res.status === 404 ? 'pass' : 'fail', `HTTP ${res.status}`)
+  } catch (e) { add('go-route', 'Affiliate route answers', 'fail', String(e.message || e)) }
+
+  // ── 7b. Affiliate redirect (one click, identifiable UA) ─────────────────
+  // The listing is discovered from a real page, never hard-coded: see the
+  // note by GO_DISCOVERY_PAGES. One GET on the winner logs one identifiable
+  // click (User-Agent above).
+  try {
+    let listingId = null
+    let foundOn   = null
+    let sampled   = 0
+    for (const slug of [FIXTURES.productSlug, ...candidateSlugs].slice(0, GO_DISCOVERY_PAGES)) {
+      sampled++
+      const { res, body } = await get(`/product/${slug}`)
+      if (res.status !== 200) continue
+      const m = body.match(/\/go\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i)
+      if (m) { listingId = m[1]; foundOn = slug; break }
+    }
+
+    if (!listingId) {
+      // Not proof the redirect is broken — proof that a shopper walking these
+      // pages has no retailer to click. Degraded price comparison, shown as
+      // such rather than quietly skipped.
+      add('go', 'Affiliate redirect returns 3xx to retailer', 'warn',
+        `not exercised — no retailer link on ${sampled} sampled product pages`)
+    } else {
+      const res = await fetch(`${TARGET}/go/${listingId}`, {
+        redirect: 'manual', headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(20_000),
+      })
+      const loc = res.headers.get('location') || ''
+      const ok = res.status >= 300 && res.status < 400 && /^https?:\/\//.test(loc)
+      add('go', 'Affiliate redirect returns 3xx to retailer', ok ? 'pass' : 'fail',
+        `HTTP ${res.status} → ${loc.slice(0, 60)} (via /product/${foundOn})`)
+    }
   } catch (e) { add('go', 'Affiliate redirect returns 3xx', 'fail', String(e.message || e)) }
 
   // ── 8. price-hint honesty guard (no eBay call — invalid key) ────────────
