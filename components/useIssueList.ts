@@ -30,25 +30,11 @@ interface UseIssueListResult {
   loading: boolean
 }
 
-const SELF_HEAL_THRESHOLD = 0.45
-
-// Inlined from /api/comic/search route — same word-overlap similarity scorer
-function titleSimilarity(query: string, candidate: string): number {
-  const STOP = new Set(['the','a','an','of','and','vol','volume',
-    'edition','book','part','absolute','omnibus','deluxe','complete'])
-  const tokenise = (s: string) =>
-    s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
-      .filter(w => w.length > 1 && !STOP.has(w))
-  const qWords = new Set(tokenise(query))
-  const cWords = new Set(tokenise(candidate))
-  if (qWords.size === 0 || cWords.size === 0) return 0
-  let hits = 0
-  for (const w of qWords) if (cWords.has(w)) hits++
-  const precision = hits / qWords.size
-  const recall    = hits / cWords.size
-  if (precision + recall === 0) return 0
-  return (2 * precision * recall) / (precision + recall)
-}
+// The similarity scorer that used to be inlined here is gone. It guarded a
+// public write from the browser, which is not a gate a client can hold: the
+// server took the id on trust and never re-checked it. The one implementation
+// now lives in lib/comicvine/title-match.ts and runs server-side, inside the
+// route that performs the write.
 
 export function useIssueList(
   comicvineId: string | null | undefined,
@@ -73,17 +59,19 @@ export function useIssueList(
             const data = await r.json() as { volumeId: string | null; name: string | null }
             volumeId = data.volumeId ?? null
 
-            // Self-heal — only when name similarity is high enough to trust
-            const returnedName = data.name ?? ''
-            const confident =
-              volumeId && productSlug && searchTitle &&
-              titleSimilarity(searchTitle, returnedName) >= SELF_HEAL_THRESHOLD
-            if (confident) {
-              fetch(`/api/product/${productSlug}/comicvine-id`, {
-                method:  'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify({ comicvineId: volumeId }),
-              }).catch(() => { /* non-critical */ })
+            // Ask the server to self-heal. It does NOT take the id from here:
+            // it reads the product's own title, repeats this lookup itself and
+            // applies the same confidence gate server-side. The browser cannot
+            // choose what gets stored, so nothing is sent but the slug.
+            //
+            // The local similarity check that used to guard this call is gone
+            // with it — it was the only gate on a public write, which is not a
+            // job a client can do. Asking when the server will decline costs
+            // one throttled request and no Comic Vine quota (the route returns
+            // before any CV call once the id is set).
+            if (volumeId && productSlug) {
+              fetch(`/api/product/${productSlug}/comicvine-id`, { method: 'PATCH' })
+                .catch(() => { /* non-critical */ })
             }
           }
         } catch {
