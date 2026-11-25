@@ -84,6 +84,28 @@ async function main() {
     WHERE r.is_active
     GROUP BY r.name HAVING COUNT(l.id) > 0 ORDER BY listings DESC`
 
+  // ── Retention expiry watch ─────────────────────────────────────────────────
+  //
+  // cleanup-stale (lib/inngest/functions/cleanup-stale.ts, cron '0 3 * * *')
+  // soft-deletes any listing whose last_seen_at is older than 30 days. On
+  // 2026-10-27 03:00:46 it removed all 2,280 priced listings at once, exactly
+  // 30 days after the last verified refresh on 2026-09-26. Nothing warned
+  // first, because every freshness number was computed over listings that
+  // still existed — an emptied table reports "0 stale (0%)", which reads
+  // identically to "nothing is stale".
+  //
+  // This measures the deadline instead: the OLDEST live priced listing is the
+  // next one the sweep will take, and its last_seen_at + 30d is when. Evidence
+  // is the write itself (last_seen_at advances only when a refresh actually
+  // re-observed the offer), never a job heartbeat or a 'started' marker.
+  const [expiry] = await prisma.$queryRaw<Row[]>`
+    SELECT
+      MIN(l.last_seen_at)::text AS oldest_live_seen,
+      MAX(l.last_seen_at)::text AS newest_live_seen,
+      COUNT(*) FILTER (WHERE l.last_seen_at <= NOW() - INTERVAL '23 days') AS expiring_within_7d
+    FROM retailer_listings l JOIN retailers r ON r.id = l.retailer_id
+    WHERE l.deleted_at IS NULL AND l.price_amount > 0 AND r.is_active`
+
   // ── Amazon staleness deadline (Wave 3D) ────────────────────────────────────
   const [amz] = await prisma.$queryRaw<Row[]>`
     SELECT COUNT(*) AS total,
@@ -138,6 +160,56 @@ async function main() {
   const one = n(depth.find(d => n(d.retailers) === 1)?.products)
   const twoPlus = depth.filter(d => n(d.retailers) >= 2).reduce((s, d) => s + n(d.products), 0)
 
+  // ── Pricing alert ──────────────────────────────────────────────────────────
+  // Severity from measured writes and the retention deadline, so the alert
+  // cannot be satisfied by a job that merely started.
+  const RETENTION_DAYS = 30            // must track cleanup-stale SOFT_DELETE_DAYS
+  const WARN_DAYS_BEFORE_EXPIRY = 7
+  const livePriced = n(price.priced_listings)
+  const oldestLiveSeen = expiry?.oldest_live_seen ? String(expiry.oldest_live_seen) : null
+  const newestLiveSeen = expiry?.newest_live_seen ? String(expiry.newest_live_seen) : null
+  const nextExpiryAt = oldestLiveSeen
+    ? new Date(new Date(oldestLiveSeen).getTime() + RETENTION_DAYS * 864e5).toISOString()
+    : null
+  const daysUntilNextExpiry = nextExpiryAt
+    ? +((new Date(nextExpiryAt).getTime() - Date.now()) / 864e5).toFixed(1)
+    : null
+  const lastSuccessfulWriteAgeDays = newestLiveSeen
+    ? +((Date.now() - new Date(newestLiveSeen).getTime()) / 864e5).toFixed(1)
+    : null
+
+  let pricingAlertLevel: 'OK' | 'WARN' | 'CRITICAL' = 'OK'
+  const pricingAlertReasons: string[] = []
+  if (livePriced === 0) {
+    pricingAlertLevel = 'CRITICAL'
+    pricingAlertReasons.push(
+      'No priced listings exist. Price comparison is DOWN — not merely stale. ' +
+      'Note that every freshness figure below reads 0/0% because the set is empty, not clean.',
+    )
+  } else {
+    if (daysUntilNextExpiry !== null && daysUntilNextExpiry <= WARN_DAYS_BEFORE_EXPIRY) {
+      pricingAlertLevel = daysUntilNextExpiry <= 0 ? 'CRITICAL' : 'WARN'
+      pricingAlertReasons.push(
+        `Oldest live priced listing was last re-observed ${oldestLiveSeen?.slice(0, 10)}; ` +
+        `the 30-day retention sweep removes it on ${nextExpiryAt?.slice(0, 10)} ` +
+        `(${daysUntilNextExpiry} days). Refresh before then or it is deleted.`,
+      )
+    }
+    if (twoPlus === 0) {
+      if (pricingAlertLevel === 'OK') pricingAlertLevel = 'WARN'
+      pricingAlertReasons.push('0 products priced at 2+ retailers — no genuine comparison is possible.')
+    }
+  }
+  // Coverage falling against the previous snapshot is its own signal.
+  const prevPriced = n(previous?.pricing?.pricedListings)
+  if (prevPriced > 0 && livePriced < prevPriced * 0.9) {
+    pricingAlertLevel = 'CRITICAL'
+    pricingAlertReasons.push(
+      `Priced listings fell from ${prevPriced.toLocaleString()} to ${livePriced.toLocaleString()} ` +
+      `since the previous snapshot — a drop of more than 10%.`,
+    )
+  }
+
   const snapshot = {
     version: 1,
     generatedAt: new Date().toISOString(),
@@ -164,6 +236,18 @@ async function main() {
       outOfStock: n(price.out_of_stock),
       productsPriced: n(price.products_priced),
       comparisonDepth: { oneRetailer: one, twoPlusRetailers: twoPlus },
+      // Early warning, keyed on real writes and the retention deadline.
+      alert: {
+        level: pricingAlertLevel,
+        reasons: pricingAlertReasons,
+        lastSuccessfulWriteAt: newestLiveSeen,
+        lastSuccessfulWriteAgeDays,
+        oldestLiveSeenAt: oldestLiveSeen,
+        nextExpiryAt,
+        daysUntilNextExpiry,
+        expiringWithin7d: n(expiry?.expiring_within_7d),
+        retentionDays: RETENTION_DAYS,
+      },
       // Overlap % = share of priced products with a genuine 2+ retailer comparison.
       comparisonOverlapPct: +(100 * twoPlus / Math.max(1, n(price.products_priced))).toFixed(2),
       retailers: retailers.map(r => ({
@@ -232,6 +316,10 @@ Source: ${d.source}. ${d.deltas ? `Deltas vs ${String(d.previousSnapshotAt).slic
 - Descriptions: ${d.catalogue.described.toLocaleString()} · creators: ${d.catalogue.withCreators.toLocaleString()} · **suspect-flagged: ${d.catalogue.suspectFlagged}**
 
 ## Pricing
+${d.pricing.alert.level === 'OK' ? '' : `> **PRICING ${d.pricing.alert.level}**
+${d.pricing.alert.reasons.map((r: string) => `> - ${r}`).join('\n')}
+> - Last successful write: ${d.pricing.alert.lastSuccessfulWriteAt ?? 'never'}${d.pricing.alert.lastSuccessfulWriteAgeDays !== null ? ` (${d.pricing.alert.lastSuccessfulWriteAgeDays}d ago)` : ''} · next retention deletion: ${d.pricing.alert.nextExpiryAt?.slice(0, 10) ?? 'n/a'}
+`}
 - Priced listings: **${d.pricing.pricedListings.toLocaleString()}**${delta('pricedListings')} · products priced: ${d.pricing.productsPriced.toLocaleString()}${delta('productsPriced')}
 - Freshness: ${d.pricing.fresh7d.toLocaleString()} <7d · ${d.pricing.aged7to30d.toLocaleString()} 7–30d · **${d.pricing.stale30dPlus.toLocaleString()} stale (${d.pricing.stalePct}%)**${delta('stale30dPlus')}
 - Comparison depth: ${d.pricing.comparisonDepth.oneRetailer.toLocaleString()} products @ 1 retailer · **${d.pricing.comparisonDepth.twoPlusRetailers} @ 2+** (overlap ${d.pricing.comparisonOverlapPct}%)
