@@ -416,12 +416,44 @@ function render(plan, smoke, health, signal, verify){
   // The next action is decided here, from the plan — never by the reader.
   const next = openBlockers[0] || openToday[0] || null;
 
-  const prodOK   = smoke && smoke.verdict === 'PASS';
-  const prodLabel = !smoke ? 'UNKNOWN' : (prodOK ? 'HEALTHY' : 'FAILING');
-  const prodClass = !smoke ? 'amber' : (prodOK ? 'green' : 'red');
+  /* Production = TECHNICAL AVAILABILITY only — is the site up and behaving?
+   *
+   * It used to read `verdict === 'PASS'`, so PASS-WITH-WARNINGS rendered as a
+   * red FAILING, and the sub-line counted warnings in the denominator
+   * ("19/21 checks") which made 0 failures look like 2 failures. On
+   * 2026-11-25 that showed PRODUCTION FAILING while the same run reported
+   * `0 failed` — the site was up the whole time.
+   *
+   * A warning is not a failure. It is "we could not exercise this", and the
+   * reason it could not be exercised is almost always missing pricing — which
+   * is now reported in its own cell rather than smuggled into this one.
+   * A real failure still goes red, and nothing here can mask one. */
+  const sFailed = smoke ? (smoke.failed || 0) : 0;
+  const sWarned = smoke ? (smoke.warned || 0) : 0;
+  const sPassed = smoke ? (smoke.passed || 0) : 0;
+  const prodLabel = !smoke ? 'UNKNOWN' : sFailed > 0 ? 'FAILING' : sWarned > 0 ? 'DEGRADED' : 'HEALTHY';
+  const prodClass = !smoke ? 'amber' : sFailed > 0 ? 'red' : sWarned > 0 ? 'amber' : 'green';
   const prodSub  = smoke
-    ? `${smoke.passed}/${smoke.passed + smoke.warned + smoke.failed} checks · ${ago(smoke.checkedAt)}`
+    ? `${sPassed} passed · ${sWarned} warning${sWarned === 1 ? '' : 's'} · ${sFailed} failed · ${ago(smoke.checkedAt)}`
     : 'run npm run launch:smoke';
+
+  /* Pricing coverage = the product promise, reported separately.
+   * The site can be perfectly available while price comparison is not
+   * working at all. Reading this out of launch-health-latest.json means the
+   * dashboard states it from measured data, with that file's own timestamp. */
+  const pricedListings = health?.pricing?.pricedListings ?? null;
+  const pricedProducts = health?.pricing?.productsPriced ?? null;
+  const twoPlus        = health?.pricing?.comparisonDepth?.twoPlusRetailers ?? null;
+  const priceKnown     = pricedListings !== null;
+  const priceLabel = !priceKnown ? 'UNKNOWN'
+    : pricedListings === 0 ? 'NONE'
+    : twoPlus > 0 ? 'COMPARING' : 'SINGLE';
+  const priceClass = !priceKnown ? 'amber'
+    : pricedListings === 0 ? 'red'
+    : twoPlus > 0 ? 'green' : 'amber';
+  const priceSub = !priceKnown
+    ? 'run npm run launch:health'
+    : `${pricedProducts} priced · ${twoPlus} at 2+ retailers · ${ago(health.generatedAt)}`;
 
   const ready = openBlockers.length === 0;
   const amz = plan.amazon || {};
@@ -448,6 +480,11 @@ function render(plan, smoke, health, signal, verify){
         <div class="k">Production</div>
         <div class="v ${prodClass}">${prodLabel}</div>
         <div class="s">${esc(prodSub)}</div>
+      </div>
+      <div class="cell">
+        <div class="k">Price comparison</div>
+        <div class="v ${priceClass}">${priceLabel}</div>
+        <div class="s">${esc(priceSub)}</div>
       </div>
       <div class="cell">
         <div class="k">Amazon</div>

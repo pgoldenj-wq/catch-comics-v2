@@ -50,6 +50,11 @@ Say '  CATCH COMICS - COMMAND CENTRE' Cyan
 Say "  Repo: $RepoRoot"
 Say ''
 
+# Pricing coverage is reported separately from technical availability: the
+# site can be fully up while price comparison is not working at all. On
+# 2026-11-25 the launcher printed "All good" with zero priced listings.
+$pricingStatus = 'UNKNOWN'
+$pricingDegraded = $false
 $healthStatus = 'SKIPPED'
 $smokeStatus  = 'SKIPPED'
 $anyFailure   = $false
@@ -103,6 +108,23 @@ if (-not $SkipChecks) {
       $healthStatus = "FAILED (exit $healthExit)"
       $anyFailure = $true
       Say "  launch:health FAILED (exit $healthExit) - read the output above" Red
+    }
+
+    # Read pricing coverage from the same current report the status above is
+    # verdicted on, so the two can never disagree.
+    if ($reportIsCurrent -and $healthReport.pricing) {
+      $pl = [int]$healthReport.pricing.pricedListings
+      $pp = [int]$healthReport.pricing.productsPriced
+      $tp = [int]$healthReport.pricing.comparisonDepth.twoPlusRetailers
+      if ($pl -eq 0) {
+        $pricingStatus = 'NONE - 0 priced listings, price comparison is DOWN'
+        $pricingDegraded = $true
+      } elseif ($tp -eq 0) {
+        $pricingStatus = "SINGLE - $pp priced, 0 at 2+ retailers (no comparison)"
+        $pricingDegraded = $true
+      } else {
+        $pricingStatus = "COMPARING - $pp priced, $tp at 2+ retailers"
+      }
     }
 
     if (-not $reportIsCurrent) {
@@ -234,8 +256,10 @@ Say ''
 Say '  -- SUMMARY ----------------------------------------------' Cyan
 $hc = 'Yellow'; if ($healthStatus -eq 'PASSED') { $hc = 'Green' } elseif ($healthStatus -eq 'FAILED') { $hc = 'Red' }
 $sc = 'Yellow'; if ($smokeStatus  -eq 'PASSED') { $sc = 'Green' } elseif ($smokeStatus  -eq 'FAILED') { $sc = 'Red' }
+$pc = 'Yellow'; if ($pricingStatus -like 'COMPARING*') { $pc = 'Green' } elseif ($pricingStatus -like 'NONE*') { $pc = 'Red' }
 Say "  Data health   : $healthStatus" $hc
 Say "  Prod smoke    : $smokeStatus" $sc
+Say "  Price compare : $pricingStatus" $pc
 Say "  Server        : $serverStatus"
 Say "  Action bridge : $bridgeStatus"
 $cc = 'Yellow'; if ($claudeStatus -like 'CONNECTED*') { $cc = 'Green' } elseif ($claudeStatus -like 'NOT INSTALLED*' -or $claudeStatus -like 'REPO*') { $cc = 'Red' }
@@ -248,6 +272,18 @@ if ($anyFailure) {
   Say '  Playbook: launch/operations/incident-response.md' Red
   if (-not $NonInteractive) { Read-Host 'Press Enter to close' }
   exit 1
+}
+# Nothing FAILED. That is not the same as "all good": a degraded customer
+# journey (no prices, or prices at only one retailer) leaves the site up and
+# the product promise broken, and the launcher must say so rather than sign
+# off. Still exit 0 — this is a degraded state, not a broken build.
+if ($pricingDegraded -or $smokeStatus -eq 'PASSED WITH WARNINGS') {
+  Say '  DEGRADED - nothing failed, but the customer journey is not whole.' Yellow
+  if ($pricingDegraded) { Say "  Price comparison: $pricingStatus" Yellow }
+  if ($smokeStatus -eq 'PASSED WITH WARNINGS') { Say '  Smoke warnings above are checks that could NOT be exercised, not passes.' Yellow }
+  Say '  Playbook: launch/operations/incident-response.md' Yellow
+  if (-not $SkipChecks -and -not $NonInteractive) { Read-Host 'Press Enter to close' }
+  exit 0
 }
 if (-not $SkipChecks -and -not $NonInteractive) { Read-Host 'All good. Press Enter to close' }
 exit 0
