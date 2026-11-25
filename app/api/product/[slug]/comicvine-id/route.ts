@@ -1,28 +1,39 @@
 /**
  * PATCH /api/product/[slug]/comicvine-id
  *
- * Self-healing endpoint: writes a newly-discovered Comic Vine volume ID back to
- * the canonical_products row so that the next ISR revalidation serves the
- * comicvineId from the DB (making character tags, issues, and cover fetch work
- * without another CV search).
+ * Self-healing endpoint: fills in a missing Comic Vine volume id on a
+ * canonical product so the next ISR revalidation can serve character tags,
+ * the issue grid and the cover without another CV search.
  *
- * Called client-side by CVIssuesGrid after a successful title-based CV search.
- * Fire-and-forget — the caller does not await the response.
+ * Called client-side by the issue grid. Fire-and-forget.
  *
- * Self-healing means filling a gap, never overwriting. proxy.ts gates only
- * /admin and /api/admin, so this route is public: an unconditional update let
- * anyone repoint any product at any Comic Vine volume, and comicvine_id is
- * what drives the character tags, the issue grid and the cover. A write is
- * accepted only where the column is still null — the only case the caller
- * needs — and the route is throttled like every other public endpoint that
- * reaches the database.
+ * THE CALLER DOES NOT CHOOSE THE ID.
  *
- * Body: { comicvineId: string }
+ * This route is public — proxy.ts matches only /admin/* and /api/admin/*.
+ * It originally took an unconditional `update` from an unauthenticated body,
+ * so one request could repoint any product at any volume. That was narrowed
+ * to gap-fill only (2026-11-22), which stopped overwrites but still let an
+ * anonymous caller pick the FIRST value for any of the ~125k products whose
+ * comicvine_id is null — and because gap-fill then refuses to overwrite, a
+ * poisoned id became permanent and uncorrectable.
+ *
+ * The decision that authorises the write — "does this volume's name actually
+ * match this product?" — used to be computed in the browser, in
+ * components/useIssueList.ts, and the server took it on trust. It is now made
+ * here, on the server, from the product's own title as stored in the database
+ * and a Comic Vine lookup this route performs itself. The request body is
+ * ignored entirely: there is no value a caller can send that becomes data.
+ *
+ * Body: none required. Any body is ignored.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { enforceRateLimit } from '@/lib/security/rateLimit'
+import { searchVolumeByTitle, titleSimilarity, SELF_HEAL_THRESHOLD } from '@/lib/comicvine/title-match'
+
+/** One answer for every outcome that is not a write, so probing reveals nothing. */
+const NO_CHANGE = { ok: true, updated: false } as const
 
 export async function PATCH(
   request: NextRequest,
@@ -33,40 +44,51 @@ export async function PATCH(
 
   const { slug } = await params
 
-  let body: unknown
   try {
-    body = await request.json()
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
-  }
+    // The title comes from our own row, never from the caller.
+    const product = await prisma.canonicalProduct.findFirst({
+      where:  { canonicalSlug: slug, deletedAt: null },
+      select: { comicvineId: true, seriesName: true, title: true },
+    })
 
-  const comicvineId =
-    body && typeof body === 'object' && 'comicvineId' in body
-      ? (body as Record<string, unknown>).comicvineId
-      : undefined
+    // Unknown slug, or the id is already set. Both answer identically, and
+    // both return before spending any Comic Vine quota.
+    if (!product || product.comicvineId !== null) {
+      return NextResponse.json(NO_CHANGE)
+    }
 
-  if (!comicvineId || typeof comicvineId !== 'string' || !/^\d+$/.test(comicvineId)) {
-    return NextResponse.json(
-      { error: 'comicvineId must be a non-empty numeric string' },
-      { status: 400 }
-    )
-  }
+    const searchTitle = (product.seriesName ?? product.title ?? '').trim()
+    if (!searchTitle) return NextResponse.json(NO_CHANGE)
 
-  try {
-    // The null in the WHERE makes the check and the write one statement, so
-    // two callers arriving together cannot both get past it.
+    // Resolve server-side. This is the same lookup /api/comic/search serves,
+    // so a caller gains nothing by calling that first.
+    const match = await searchVolumeByTitle(searchTitle)
+    if (!match.volumeId || !match.name) return NextResponse.json(NO_CHANGE)
+
+    // The confidence gate, re-made here rather than believed from a client.
+    const similarity = titleSimilarity(searchTitle, match.name)
+    if (similarity < SELF_HEAL_THRESHOLD) {
+      console.warn(
+        `[product/comicvine-id] refused slug=${slug}: "${match.name}" scored ` +
+        `${similarity.toFixed(2)} against "${searchTitle}" (need ${SELF_HEAL_THRESHOLD})`,
+      )
+      return NextResponse.json(NO_CHANGE)
+    }
+
+    // The null in the WHERE keeps the check and the write a single statement,
+    // so two callers arriving together cannot both get past it.
     const { count } = await prisma.canonicalProduct.updateMany({
       where: { canonicalSlug: slug, comicvineId: null },
-      data:  { comicvineId },
+      data:  { comicvineId: match.volumeId },
     })
-    if (count === 0) {
-      // The product already has an id, or there is no such slug. Both are
-      // fine for a fire-and-forget self-heal, and the same answer to each
-      // tells a prober nothing about which it was.
-      return NextResponse.json({ ok: true, updated: false })
-    }
-    console.log(`[product/comicvine-id] self-healed slug=${slug} → CV ${comicvineId}`)
+    if (count === 0) return NextResponse.json(NO_CHANGE)
+
+    console.log(
+      `[product/comicvine-id] self-healed slug=${slug} → CV ${match.volumeId} ` +
+      `("${match.name}", similarity ${similarity.toFixed(2)})`,
+    )
     return NextResponse.json({ ok: true, updated: true })
+
   } catch (err) {
     console.error('[product/comicvine-id] PATCH failed:', err)
     return NextResponse.json({ error: 'DB update failed' }, { status: 500 })
