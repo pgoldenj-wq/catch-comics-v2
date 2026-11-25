@@ -1,17 +1,17 @@
 {
   "version": 1,
-  "updated": "2026-09-26",
+  "updated": "2026-11-22",
   "mode": "LAUNCH",
-  "note": "The single source of truth for what is left before Catch Comics launches. Edit this file, reload Launch Control. Claims were measured on 2026-09-22 and re-verified on production by the final smoke test of 2026-09-26 — see `evidence` on each item and launch/operations/final-smoke-2026-09-26.md.",
+  "note": "The single source of truth for what is left before Catch Comics launches. Edit this file, reload Launch Control. Re-verified against production and the production database on 2026-11-22; every gate and blocker below carries the date its claim was last checked. It replaces the 2026-09-26 readings, which had gone 57 days stale and several of which had become false.",
   "targets": {
     "soft": "2026-09-23",
     "public": "2026-09-29",
     "rationale": "Both blockers closed on 2026-09-22 and the offers fix is already verified on production. Soft launch tomorrow gives the mobile fix one deploy and one night of soak. Public launch six days later is enough to see whether real shoppers search, click and buy — and short enough that it cannot quietly become another month."
   },
   "verdict": {
-    "state": "READY",
-    "because": "Final smoke test complete on 2026-09-26: all 14 Smoke Test sections reviewed, 4 P1s and 4 P2s found, fixed and production-verified. Production smoke 20/20, Browser Trust 44/0 on the final deploy. Zero known P0/P1.",
-    "clearsWhen": "Nothing outstanding. Ship it."
+    "state": "NOT READY",
+    "because": "Price comparison is not operating. Every stored retailer offer — 2,246 Travelling Man and 34 World of Books, 2,280 in all — was soft-deleted by the 30-day retention sweep at 03:00 on 2026-10-27, thirty days after the last verified refresh on 2026-09-26. No scheduled job can replace them: every retailer with a price feed carries scheduled_sync_disabled, and price_check.canonical_products has recorded no run since 2026-08-09. A shopper today sees a live eBay price and nothing to compare it against.",
+    "clearsWhen": "A verified retailer refresh has written priced listings again, launch:health reports products at 2+ retailers above zero, and a real product page shows the same edition at two retailers."
   },
   "blockers": [
     {
@@ -76,6 +76,49 @@
           "command": "npm run launch:smoke"
         }
       ]
+    },
+    {
+      "id": "B4",
+      "title": "Put priced retailer offers back — the refresh button no longer can",
+      "owner": "FOUNDER",
+      "status": "todo",
+      "why": "The site has 0 priced listings. 2,280 were soft-deleted at 2026-10-27 03:00:46 UTC, thirty days after their last refresh on 2026-09-26, by the retention sweep working exactly as designed. Nothing refreshed them because Travelling Man and World of Books both carry scheduled_sync_disabled, so the hourly and 4-hourly crons skip them, and the manual run that used to cover the gap died 17 seconds in on 2026-09-26. The refresh itself cannot undo this: price-verify selects rows WHERE deleted_at IS NULL and scopes every update the same way, so with no active rows left there is nothing for it to refresh. Reviving the offers means clearing deleted_at on those rows or re-ingesting the retailer — both production data changes, and both yours to approve.",
+      "done": "launch:health reports priced listings above zero and products at 2+ retailers above zero, and a real product page shows the same edition at two retailers.",
+      "evidence": "Proven by running it, 2026-11-22 16:47 UTC: the read-only dry run (npx tsx scripts/price-verify-dryrun.ts --max-rows 2300) reported target rows 0 for Travelling Man and 0 for World of Books — 41 sitemap requests, 0 product requests, 0 rows written, 1.6 min. Database: 2,246 Travelling Man + 34 World of Books rows all stamped deleted_at 2026-10-27 03:00:46.263. Travelling Man still lists the flagship edition at £14.99 but shows Sold out, so some of those rows should not come back at all.",
+      "actions": [
+        {
+          "kind": "run",
+          "action": "retailer",
+          "label": "Refresh retailer prices"
+        }
+      ]
+    },
+    {
+      "id": "B5",
+      "title": "Release the sitemap split so the catalogue can be indexed",
+      "owner": "FOUNDER",
+      "status": "todo",
+      "why": "One sitemap of 136,296 URLs and 26.7 MB is over both the 50,000-URL and 50 MB limits, so search engines reject the file whole and none of the product pages is submitted through it. On a catalogue-first site that is the file that matters most.",
+      "done": "robots.txt lists /sitemap.xml plus the four product chunks, each chunk loads, and Search Console accepts them.",
+      "evidence": "Fixed locally on branch audit/launch-blockers and verified against the live catalogue: 4 chunks of 45,000 / 45,000 / 45,000 / 1,277 = 136,277 products, plus 19 static routes, none over the limit. Not released."
+    },
+    {
+      "id": "B6",
+      "title": "Release the ComicVine endpoint fix",
+      "owner": "FOUNDER",
+      "status": "todo",
+      "why": "PATCH /api/product/{slug}/comicvine-id is public — proxy.ts gates only /admin and /api/admin — and took an unconditional write. One request repointed any product at any Comic Vine volume, and that column drives the character tags, the issue grid and the cover.",
+      "done": "A PATCH against a product that already has a ComicVine id leaves it unchanged, and the route is throttled.",
+      "evidence": "Confirmed reachable without authentication on production 2026-11-22 (HTTP 400 for an invalid value, so nothing was gating it). Fixed locally on audit/launch-blockers: gap-fill only, 30/min per IP. Not released."
+    },
+    {
+      "id": "B7",
+      "title": "Decide what the homepage shows when there are no price finds",
+      "owner": "FOUNDER",
+      "status": "todo",
+      "why": "With 0 priced listings, /api/homepage-deals returns no cards and the homepage falls back to TOP_DEALS — ten hard-coded comics with hard-coded prices and RRPs, shown under \"Price finds today\" and labelled only \"Sample prices\" in 11px grey. Six invented prices are the first thing a collector sees. That is a design decision, not a code fix, so it has been left exactly as it is.",
+      "done": "The founder has chosen what that rail shows with no live data, and the homepage reflects it.",
+      "evidence": "Observed on production 2026-11-22: the rail rendered \"Price finds today / Sample prices\" with Absolute Batman Vol. 1 £29.99, Amazing Spider-Man Vol. 1 £13.99, One Piece Vol. 1 £6.99 and three more. /api/homepage-deals returned no cards on 10 of 10 samples at 16:43 UTC, having returned 12 at 14:05 and 16:40 — the cached copy is inconsistent."
     }
   ],
   "today": [
@@ -163,8 +206,8 @@
     {
       "id": "W2",
       "title": "Travelling Man price refresh",
-      "state": "HEALTHY",
-      "detail": "Re-run on 2026-09-26: all 2,246 Travelling Man listings seen today, 0 stale (launch:health). No action needed before launch; re-run when convenient.",
+      "state": "OVERDUE",
+      "detail": "Corrected 2026-11-22. The 2026-09-26 run wrote 2,246 Travelling Man rows and the retention sweep removed every one of them on 2026-10-27, thirty days later. A follow-up run the same evening stalled 17 seconds in, and price-verify-status.json has read \"running\" since 2026-09-26 23:28. This is blocker B4, not a healthy background item.",
       "recheck": "launch/operations/price-verify-status.json",
       "actions": [
         {
@@ -197,58 +240,95 @@
   ],
   "gates": [
     {
-      "id": "production",
-      "label": "Production",
+      "id": "health-query",
+      "label": "The health query ran",
       "state": "pass",
-      "detail": "Launch smoke 20/20 and Browser Trust 44 passed / 0 failed on the final deploy, 2026-09-26."
+      "verifiedAt": "2026-11-22T16:36Z",
+      "detail": "launch:health completed against the production database at 16:36 UTC on 2026-11-22 and wrote launch-health-latest.{json,md}. This gate says only that the measurement happened — it stays green even when every number it reports is zero."
+    },
+    {
+      "id": "reach-retailer",
+      "label": "A shopper can reach a retailer",
+      "state": "pass",
+      "verifiedAt": "2026-11-22T14:45Z",
+      "detail": "Verified 2026-11-22 14:45 UTC: /go/fa013714 returned 302 to awin1.com with awinmid=62675 and clickref=cc-fa013714 intact. Narrow, though — only 800 of 136,277 products carry a retailer link, all Bookshop.org, and the rotating set is mostly not comics: 4 of the 6 titles real visitors clicked in the last 7 days were academic non-fiction."
+    },
+    {
+      "id": "current-price",
+      "label": "A current price is visible",
+      "state": "pass",
+      "verifiedAt": "2026-11-22T14:50Z",
+      "detail": "Verified 2026-11-22 14:50 UTC in a browser: the Absolute Batman Vol. 2 page rendered four live eBay offers from £15.73. That comes from the eBay Browse API at request time, not from a tracked retailer. Stored retailer prices are zero, so eBay is the only price source left, and it covers only editions it can match by ISBN."
+    },
+    {
+      "id": "compare-editions",
+      "label": "A shopper can compare the same edition across retailers",
+      "state": "fail",
+      "verifiedAt": "2026-11-22T16:36Z",
+      "detail": "Zero. Measured 16:36 UTC on 2026-11-22: 0 products priced at 1 retailer, 0 at 2 or more, overlap 0%. A direct query for any product carrying two priced listings from different retailers returns nothing. This is the gate the site exists to pass."
+    },
+    {
+      "id": "offer-freshness",
+      "label": "Stored retailer offers are fresh",
+      "state": "fail",
+      "verifiedAt": "2026-11-22T16:36Z",
+      "detail": "0 priced listings, down from 2,280 on 2026-10-25. All were soft-deleted in one transaction at 2026-10-27 03:00:46 UTC by cleanup-stale (cron 0 3 * * *), 30 days after they were last seen on 2026-09-26. The \"0 stale\" line in launch:health is an empty set, not a clean one."
+    },
+    {
+      "id": "refresh-pipeline",
+      "label": "Offers will still be there tomorrow",
+      "state": "fail",
+      "verifiedAt": "2026-11-22T16:00Z",
+      "detail": "No. Travelling Man, World of Books, Lets Buy Books and Amazon UK all carry scheduled_sync_disabled, which both sync-scheduled and price-check honour, and job_runs holds no price_check.canonical_products row since 2026-08-09. The only job still writing listings is bookshop.refresh, which produces £0.00 link-only rows. A one-off manual refresh would be swept away again 30 days later."
+    },
+    {
+      "id": "production",
+      "label": "Production smoke",
+      "state": "fixing",
+      "verifiedAt": "2026-11-22T16:40Z",
+      "detail": "PASS-WITH-WARNINGS at 16:40 UTC on 2026-11-22 using the corrected script: 19 passed, 2 warnings, 0 failures. The warnings are the real state — no tracked-retailer label on the flagship, and the affiliate redirect could not be exercised because no sampled product page carried a retailer link. The daily CI smoke had failed every day from at least 2026-11-16 on an expired hard-coded listing id; that fix is in PR #49 and is not yet on main."
+    },
+    {
+      "id": "browser-trust",
+      "label": "Browser Trust suite",
+      "state": "fail",
+      "verifiedAt": "2026-11-22T15:52Z",
+      "detail": "product.spec.ts:46 fails on desktop and mobile — \"at least one retailer link on the flagship product\", element not found. The assertion is right and has been left intact: Absolute Batman Vol. 2 genuinely has no retailer control. Travelling Man still lists that exact edition at £14.99 but shows Sold out, so the offer should not be there."
     },
     {
       "id": "search",
       "label": "Search finds the exact product",
       "state": "pass",
-      "detail": "Format labels and the Under-£X filter production-verified 2026-08-31; junk and £0.00 rows gone."
+      "verifiedAt": "2026-11-22T16:43Z",
+      "detail": "Verified 2026-11-22: /api/search returns 52 canonical results for the flagship query in a valid unified shape; autocomplete and series preview both answer 200. Format labels and the Under-£X filter were production-verified 2026-08-31."
     },
     {
       "id": "identity",
       "label": "Product identity trusted",
       "state": "pass",
-      "detail": "One format map across search, product, series; unknown formats omitted rather than guessed."
+      "verifiedAt": "2026-11-22T16:00Z",
+      "detail": "One format map across search, product and series; unknown formats omitted rather than guessed. Hardened 2026-11-22: the public PATCH /api/product/{slug}/comicvine-id took an unconditional write from anyone, so any product could be repointed at any Comic Vine volume — and that column drives the character tags, the issue grid and the cover. Fixed locally, not yet released."
     },
     {
-      "id": "offers",
+      "id": "offers-correct",
       "label": "Retailer offers are the right book",
-      "state": "pass",
-      "detail": "eBay keyword rows are refused unless they can be anchored, and only used when the ISBN finds nothing. Verified on production 2026-09-26: X-Men, Spider-Man, Invincible Vol. 3, Star Wars Vol. 3, Hellboy and Berserk now show only their own edition. 0 ISBN mismatches across 3,783 stored offers."
+      "state": "unknown",
+      "verifiedAt": "2026-11-22T16:36Z",
+      "detail": "The 2026-09-26 evidence — 0 ISBN mismatches across 3,783 stored offers — can no longer be re-run, because no stored offers remain to check. The eBay edition gate itself is still in place and still refuses keyword rows it cannot anchor."
     },
     {
       "id": "affiliate",
       "label": "Affiliate attribution",
       "state": "pass",
-      "detail": "Bookshop.org UK /go → AWIN (awinmid, awinaffid, clickref, ISBN-exact ued, no double wrap); Travelling Man /go → the matching product page; eBay rows carry campid. Verified 2026-09-26."
+      "verifiedAt": "2026-11-22T14:45Z",
+      "detail": "Bookshop.org UK /go wraps through AWIN with awinmid=62675 and a per-listing clickref; eBay outbound links carry campid=5339151767 and resolve at ebay.co.uk. Bookshop.org US has no affiliate_network set, so its clicks — 10 of the last 18 — redirect unwrapped and earn nothing."
     },
     {
-      "id": "mobile",
-      "label": "Core journey on a phone",
-      "state": "pass",
-      "detail": "Phone and tablet: no horizontal scroll at 390/768/1024/1280, and Price Comparison now sits under the hero on a phone and 464px wide on a tablet — tests/e2e/product-layout.spec.ts."
-    },
-    {
-      "id": "analytics",
-      "label": "Real human usage measurable",
-      "state": "pass",
-      "detail": "307 clickouts from 261 distinct visitors in the trailing 30 days, readable with npm run launch:signal."
-    },
-    {
-      "id": "amazon",
-      "label": "Amazon",
-      "state": "waiting",
-      "detail": "Blocked by Amazon's own eligibility gate. Does not block launch."
-    },
-    {
-      "id": "smoke",
-      "label": "Final smoke test",
-      "state": "pass",
-      "detail": "All 14 sections reviewed on production 2026-09-26 — 4 P1 + 4 P2 fixed and verified; remaining items deferred or external, none blocking."
+      "id": "sitemap",
+      "label": "The catalogue is submitted to search engines",
+      "state": "fixing",
+      "verifiedAt": "2026-11-22T15:10Z",
+      "detail": "It was not. /sitemap.xml was one file of 136,296 URLs and 26.7 MB on 2026-11-22, past both the 50,000-URL and 50 MB limits, and an oversized sitemap is rejected whole rather than trimmed. Split locally into 4 chunks at /product/sitemap/{id}.xml with robots.txt advertising each, verified against the live catalogue. Not yet released, and Search Console will need the new sitemaps submitted."
     }
   ],
   "amazon": {
