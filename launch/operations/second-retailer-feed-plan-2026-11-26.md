@@ -1,5 +1,28 @@
 # Second retailer feed — scope
 
+> ## ⚠️ CORRECTED LATER THE SAME DAY — read this first
+>
+> **This document's central claim about Awin is wrong.** It says a Waterstones
+> or Wordery feed is blocked because `AWIN_API_TOKEN` is unset, and calls that
+> "a commercial decision with a lead time".
+>
+> `AWIN_API_TOKEN` is referenced in exactly one file in this repository —
+> `scripts/b4-scope-second-feed.ts`, which this same piece of work added. **No
+> adapter reads it.** The credential the Awin feed adapter actually uses is
+> `AWIN_DATAFEED_KEY`, and it was set the whole time. The publisher account has
+> **578 joined Awin feeds**, including **Waterstones (feed 3787, 153,576
+> products, rebuilt daily)**.
+>
+> I checked a variable name instead of exercising the connection. Waterstones,
+> Scholastic and Lets Buy Books were connected on 2026-11-26 with no commercial
+> conversation and no new spend, taking priced listings from 89 to 3,833.
+>
+> What this document got right: World of Books was a sound first pair, Wordery
+> genuinely has no feed on this account, and the per-row `deleted_at` scoping
+> and cron-window rules were correct and are now in the adapter.
+>
+> Current state: **`launch/operations/retailer-access-2026-11-26.md`**.
+
 **Written 2026-11-26. Read-only measurement; nothing in here has been executed.**
 
 Reviving Travelling Man restored *prices* (0 → 10 priced listings). It did not
