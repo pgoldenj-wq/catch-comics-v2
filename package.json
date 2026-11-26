@@ -130,6 +130,8 @@
     "awin:ingest:dry": "dotenv -e .env.local -- tsx scripts/awin-ingest.ts",
     "awin:ingest": "dotenv -e .env.local -- tsx scripts/awin-ingest.ts",
     "retailers:offers": "dotenv -e .env.local -- tsx scripts/show-retailer-offers.ts",
+    "retailers:due": "dotenv -e .env.local -- tsx scripts/check-sync-due.ts",
+    "retailers:interval": "dotenv -e .env.local -- tsx scripts/set-refresh-interval.ts",
     "retailers:cohorts": "dotenv -e .env.local -- tsx scripts/check-deletion-cohorts.ts",
     "b4:pairs:measure": "dotenv -e .env.local -- tsx scripts/b4-revive-paired-offers.ts --measure-only",
     "b4:pairs:dry": "dotenv -e .env.local -- tsx scripts/b4-revive-paired-offers.ts",

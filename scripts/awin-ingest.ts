@@ -36,7 +36,22 @@ async function counts(retailerId: string) {
            COUNT(*) FILTER (WHERE deleted_at IS NULL AND price_amount > 0)::bigint AS priced,
            COUNT(*) FILTER (WHERE deleted_at IS NULL AND price_amount > 0 AND canonical_product_id IS NOT NULL)::bigint AS matched
     FROM retailer_listings WHERE retailer_id = ${retailerId}::uuid`
-  return { total: Number(r.total), active: Number(r.active), priced: Number(r.priced), matched: Number(r.matched) }
+  // Observation count and newest observation date: the two numbers that prove
+  // whether re-reading an UNCHANGED feed invented freshness. Both must hold
+  // steady across a repeat run of the same feed build.
+  const [h] = await prisma.$queryRaw<{ obs: bigint; newest: Date | null; seen: Date | null }[]>`
+    SELECT COUNT(ph.id)::bigint AS obs, MAX(ph.recorded_at) AS newest,
+           (SELECT MAX(last_seen_at) FROM retailer_listings
+             WHERE retailer_id = ${retailerId}::uuid AND deleted_at IS NULL) AS seen
+    FROM price_history ph
+    JOIN retailer_listings rl ON rl.id = ph.retailer_listing_id
+    WHERE rl.retailer_id = ${retailerId}::uuid`
+  return {
+    total: Number(r.total), active: Number(r.active), priced: Number(r.priced), matched: Number(r.matched),
+    observations: Number(h.obs),
+    newestObservation: h.newest ? h.newest.toISOString() : '—',
+    newestLastSeen: h.seen ? h.seen.toISOString() : '—',
+  }
 }
 
 async function depth() {
@@ -75,6 +90,7 @@ async function main() {
   const before = await counts(r.id)
   const dBefore = await depth()
   console.log(`BEFORE     ${before.total} rows · ${before.active} active · ${before.priced} priced · ${before.matched} priced+matched`)
+  console.log(`           observations ${before.observations} · newest observation ${before.newestObservation} · newest last_seen ${before.newestLastSeen}`)
   console.log(`           site depth: ${dBefore.one} @1 retailer · ${dBefore.two} @2 · ${dBefore.three} @3+`)
 
   if (!WRITE) { console.log('\nDry run — nothing written.'); await prisma.$disconnect(); return }
@@ -99,6 +115,10 @@ async function main() {
 
   console.log(`\nAFTER      ${after.total} rows (+${after.total - before.total}) · ${after.active} active (+${after.active - before.active}) · ${after.priced} priced (+${after.priced - before.priced}) · ${after.matched} priced+matched (+${after.matched - before.matched})`)
   console.log(`           site depth: ${dAfter.one} @1 (${dAfter.one - dBefore.one >= 0 ? '+' : ''}${dAfter.one - dBefore.one}) · ${dAfter.two} @2 (${dAfter.two - dBefore.two >= 0 ? '+' : ''}${dAfter.two - dBefore.two}) · ${dAfter.three} @3+ (${dAfter.three - dBefore.three >= 0 ? '+' : ''}${dAfter.three - dBefore.three})`)
+  console.log(`           observations ${after.observations} (${after.observations - before.observations >= 0 ? '+' : ''}${after.observations - before.observations}) · newest observation ${after.newestObservation} · newest last_seen ${after.newestLastSeen}`)
+  if (after.observations === before.observations && after.newestObservation === before.newestObservation) {
+    console.log(`           UNCHANGED FEED: no new observation and no new observation date — old prices did not acquire false freshness`)
+  }
   console.log(`adapter    ${result.productsFetched} products ingested · ${result.listingsCreated} created · ${result.listingsUpdated} updated · ${result.priceChanges} price changes · ${result.errors.length} errors · ${secs}s`)
   for (const e of result.errors.slice(0, 5)) console.log(`  [${e.type}] ${e.message}${e.context ? ` · ${e.context}` : ''}`)
   console.log(`checkpoint ${ckPath}`)
