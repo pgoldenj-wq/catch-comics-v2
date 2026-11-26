@@ -41,9 +41,14 @@ export default function EditionComparison({ groups }: Props) {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
               {group.editions.map(edition => {
                 const sym     = CURRENCY[edition.currency] ?? edition.currency
-                // W2-4: honest missing-price state instead of a CTA that
-                // implies a price is waiting on the other side.
-                const price   = edition.lowestPrice !== null ? `${sym}${edition.lowestPrice.toFixed(2)}` : 'No live price yet'
+                // W2-4 said "No live price yet" here because nothing was waiting
+                // on the other side. That stopped being true once product pages
+                // started querying eBay by ISBN at request time: every stored
+                // listing was soft-deleted on 2026-10-27, so lowestPrice is null
+                // for everything, while /product/saga-volume-1-370548 shows live
+                // offers from £9.99. Twelve cards claiming "no price" over twelve
+                // pages that have one is the dishonest state now, so point at it.
+                const price   = edition.lowestPrice !== null ? `${sym}${edition.lowestPrice.toFixed(2)}` : 'See prices'
                 const desc    = FORMAT_DESCRIPTORS[edition.format] ?? ''
                 return (
                   <Link

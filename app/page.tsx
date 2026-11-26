@@ -24,31 +24,42 @@ interface LiveDeal {
 
 // ─── Static fallback deals ────────────────────────────────────────────────────
 // Shown until live DB deals load (or if DB returns empty).
-// priceUK/priceUS = typical sale price  |  rrpUK/rrpUS = publisher RRP
+//
+// This set carried priceUK/priceUS/rrpUK/rrpUS — sample figures the site's own
+// pages contradicted (the Absolute Batman card said £29.99 while its product
+// page showed live eBay offers from £13.92). The fields are gone rather than
+// merely hidden, so the fallback cannot render a price again by accident.
+//
+// `slug` is the canonical product page for the card, resolved against the live
+// catalogue on 2026-11-26 and verified one by one. It is NOT derivable from a
+// search: /api/search returns the wrong book for most of these titles ("Saga
+// Vol. 1" ranks "Raven Saga, Vol. 1" first, "Hellboy Omnibus Vol. 1" ranks
+// "Noragami Omnibus 1"), and the scoring that causes that is hands-off.
+// `id` is the Comic Vine id and is still used to fetch the fallback cover.
 
 interface DealItem {
   id: number;
   title: string;
   publisher: string;
   format: string;
-  priceUK: number;
-  priceUS: number;
-  rrpUK: number;
-  rrpUS: number;
+  slug: string;
   searchQuery: string;
 }
 
 const TOP_DEALS: DealItem[] = [
-  { id: 796,    title: 'Absolute Batman Vol. 1',     publisher: 'DC Comics',    format: 'Hardcover',     priceUK: 29.99, priceUS: 39.99, rrpUK: 37.99, rrpUS: 49.99, searchQuery: 'Absolute Batman Vol 1 Hardcover' },
-  { id: 2127,   title: 'Amazing Spider-Man Vol. 1',  publisher: 'Marvel',       format: 'Graphic Novel', priceUK: 13.99, priceUS: 17.99, rrpUK: 17.99, rrpUS: 22.99, searchQuery: 'Amazing Spider-Man Wells Romita Vol 1' },
-  { id: 31022,  title: 'One Piece Vol. 1',           publisher: 'Viz Media',    format: 'Manga',         priceUK: 6.99,  priceUS: 9.99,  rrpUK: 9.99,  rrpUS: 12.99, searchQuery: 'One Piece Vol 1 Manga Viz Media' },
-  { id: 46568,  title: 'Saga Vol. 1',                publisher: 'Image Comics', format: 'Graphic Novel', priceUK: 9.99,  priceUS: 12.99, rrpUK: 13.99, rrpUS: 16.99, searchQuery: 'Saga Vol 1 Brian K Vaughan Image Comics' },
-  { id: 111792, title: 'Jujutsu Kaisen Vol. 1',      publisher: 'Viz Media',    format: 'Manga',         priceUK: 6.99,  priceUS: 9.99,  rrpUK: 9.99,  rrpUS: 12.99, searchQuery: 'Jujutsu Kaisen Vol 1 Manga Viz' },
-  { id: 2133,   title: 'X-Men: Days of Future Past', publisher: 'Marvel',       format: 'Graphic Novel', priceUK: 12.99, priceUS: 15.99, rrpUK: 16.99, rrpUS: 19.99, searchQuery: 'X-Men Days of Future Past Graphic Novel Marvel' },
-  { id: 18166,  title: 'The Walking Dead Vol. 1',    publisher: 'Image Comics', format: 'Graphic Novel', priceUK: 8.99,  priceUS: 11.99, rrpUK: 12.99, rrpUS: 14.99, searchQuery: 'Walking Dead Vol 1 Image Comics Kirkman' },
-  { id: 17993,  title: 'Invincible Vol. 1',          publisher: 'Image Comics', format: 'Graphic Novel', priceUK: 10.99, priceUS: 13.99, rrpUK: 13.99, rrpUS: 16.99, searchQuery: 'Invincible Vol 1 Robert Kirkman Image' },
-  { id: 18836,  title: 'Naruto Vol. 1',              publisher: 'Viz Media',    format: 'Manga',         priceUK: 6.99,  priceUS: 9.99,  rrpUK: 9.99,  rrpUS: 12.99, searchQuery: 'Naruto Vol 1 Manga Viz Media Kishimoto' },
-  { id: 72157,  title: 'Hellboy Omnibus Vol. 1',     publisher: 'Dark Horse',   format: 'Omnibus',       priceUK: 19.99, priceUS: 24.99, rrpUK: 24.99, rrpUS: 29.99, searchQuery: 'Hellboy Omnibus Vol 1 Dark Horse Mignola' },
+  { id: 796,    title: 'Absolute Batman Vol. 1',     publisher: 'DC Comics',    format: 'Hardcover',     slug: 'absolute-batman-volume-1-the-zoo-505259',                                 searchQuery: 'Absolute Batman Vol 1 Hardcover' },
+  { id: 2127,   title: 'Amazing Spider-Man Vol. 1',  publisher: 'Marvel',       format: 'Graphic Novel', slug: 'amazing-spider-man-by-wells-romita-jr-vol-1-world-without-love-9781302932725', searchQuery: 'Amazing Spider-Man Wells Romita Vol 1' },
+  { id: 31022,  title: 'One Piece Vol. 1',           publisher: 'Viz Media',    format: 'Manga',         slug: 'one-piece-vol-1-volume-1-9781569319017',                                  searchQuery: 'One Piece Vol 1 Manga Viz Media' },
+  { id: 46568,  title: 'Saga Vol. 1',                publisher: 'Image Comics', format: 'Graphic Novel', slug: 'saga-volume-1-370548',                                                    searchQuery: 'Saga Vol 1 Brian K Vaughan Image Comics' },
+  { id: 111792, title: 'Jujutsu Kaisen Vol. 1',      publisher: 'Viz Media',    format: 'Manga',         slug: 'jujutsu-kaisen-vol-1-9781974710027',                                      searchQuery: 'Jujutsu Kaisen Vol 1 Manga Viz' },
+  // X-Men: Days of Future Past was here. There is no such record in the
+  // catalogue — /api/search returns "The Future of China's Past" for it — and
+  // the card had no cover on production either. A card that cannot lead
+  // anywhere real is worse than nine cards, so it is out until the book exists.
+  { id: 18166,  title: 'The Walking Dead Vol. 1',    publisher: 'Image Comics', format: 'Graphic Novel', slug: 'the-walking-dead-vol-1-406725',                                           searchQuery: 'Walking Dead Vol 1 Image Comics Kirkman' },
+  { id: 17993,  title: 'Invincible Vol. 1',          publisher: 'Image Comics', format: 'Graphic Novel', slug: 'invincible-volume-1-399952',                                              searchQuery: 'Invincible Vol 1 Robert Kirkman Image' },
+  { id: 18836,  title: 'Naruto Vol. 1',              publisher: 'Viz Media',    format: 'Manga',         slug: 'naruto-vol-1-uzumaki-naruto-9781569319000',                               searchQuery: 'Naruto Vol 1 Manga Viz Media Kishimoto' },
+  { id: 72157,  title: 'Hellboy Omnibus Vol. 1',     publisher: 'Dark Horse',   format: 'Omnibus',       slug: 'hellboy-omnibus-706665',                                                  searchQuery: 'Hellboy Omnibus Vol 1 Dark Horse Mignola' },
 ];
 
 // Static R2 cover fallbacks for the Top-Deals carousel before the live,
@@ -77,6 +88,13 @@ const isPlaceholderCoverUrl = (url: string) => isBadCoverUrl(url)
 // from retailers" let the number read as "the cheapest", which it is not.
 // Declared once so the desktop and mobile rails cannot drift apart.
 const RAIL_PRICE_NOTE = 'Cheapest tracked retailer — eBay may be lower'
+
+// Shown when /api/homepage-deals returns nothing and the rail falls back to the
+// static TOP_DEALS set. Those carry sample figures, not measured prices, and the
+// site's own product pages contradict them — Absolute Batman Vol. 1 was listed
+// here at £29.99 while its product page showed live eBay offers from £13.92
+// (2026-11-26). The fallback therefore shows the comics and no numbers at all.
+const RAIL_FALLBACK_NOTE = 'Popular with collectors — open one for live prices'
 
 // Vertical headroom added to the deal rail's clip box so a hover-enlarged cover
 // (.cover-card-lg scales 1.53× from centre) is not sliced off at the top.
@@ -379,7 +397,7 @@ export default function Home() {
         <div style={{ marginBottom: '14px' }}>
           <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#111', margin: 0 }}>Price finds today</h2>
           <p style={{ fontSize: '11px', color: '#6B7280', margin: '2px 0 0' }}>
-            {liveDeals ? RAIL_PRICE_NOTE : 'Sample prices'}
+            {liveDeals ? RAIL_PRICE_NOTE : RAIL_FALLBACK_NOTE}
           </p>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
@@ -389,9 +407,12 @@ export default function Home() {
             const staticDeal = !isLive ? deal as DealItem : null
             const title      = liveDeal?.title     ?? staticDeal?.title     ?? ''
             const publisher  = liveDeal?.publisher ?? staticDeal?.publisher ?? null
+            // null on the static fallback — see RAIL_FALLBACK_NOTE. Both the
+            // cover badge and the price row below are already guarded on this,
+            // so neither renders a figure we cannot stand behind.
             const price      = isLive
               ? (region === 'uk' ? liveDeal!.lowestPriceGBP : liveDeal!.lowestPriceUSD)
-              : (region === 'uk' ? staticDeal!.priceUK : staticDeal!.priceUS)
+              : null
             const rawCover   = isLive
               ? (liveDeal!.coverImageUrl ?? '')
               : (staticDeal ? (dealCovers[staticDeal.id] || DEAL_FALLBACKS[staticDeal.id] || '') : '')
@@ -399,9 +420,13 @@ export default function Home() {
             const coverSrc   = rawCover && !isPlaceholderCoverUrl(rawCover) ? rawCover : ''
             // Real href, not a click handler — Ctrl/⌘+click, middle-click and
             // right-click → "Open in new tab" all work natively.
-            const href = isLive
-              ? `/product/${liveDeal!.slug}`
-              : `/comic/${staticDeal!.id}?region=${region}`
+            // The static fallback used to point at /comic/[id], the SERIES-level
+            // legacy page: the "Absolute Batman Vol. 1" card landed on "Batman"
+            // quoting £3.45 for a facsimile single issue, and "Hellboy Omnibus
+            // Vol. 1" on "Hellboy" at £2.23 with Cross Cult as the publisher.
+            // Both branches now go to the same place — the product page for the
+            // book on the card, which fetches live eBay prices for its own ISBN.
+            const href = `/product/${isLive ? liveDeal!.slug : staticDeal!.slug}`
             return (
               <Link
                 key={idx}
@@ -636,7 +661,7 @@ export default function Home() {
           <div style={{ flexShrink: 0 }}>
             <h2 style={{ fontSize: '15px', fontWeight: 600, color: '#111', margin: 0 }}>Price finds today</h2>
             <p style={{ fontSize: '11px', color: '#6B7280', margin: '2px 0 0' }}>
-              {liveDeals ? RAIL_PRICE_NOTE : 'Sample prices'}
+              {liveDeals ? RAIL_PRICE_NOTE : RAIL_FALLBACK_NOTE}
             </p>
           </div>
           {/* Right — popular search tags, low visual weight */}
@@ -734,9 +759,10 @@ export default function Home() {
 
               const title     = liveDeal?.title     ?? staticDeal?.title     ?? ''
               const publisher = liveDeal?.publisher ?? staticDeal?.publisher ?? null
+              // null on the static fallback — see RAIL_FALLBACK_NOTE.
               const price     = isLive
                 ? (region === 'uk' ? liveDeal!.lowestPriceGBP : liveDeal!.lowestPriceUSD)
-                : (region === 'uk' ? staticDeal!.priceUK : staticDeal!.priceUS)
+                : null
               const rawCover  = isLive
                 ? (liveDeal!.coverImageUrl ?? '')
                 : (staticDeal ? (dealCovers[staticDeal.id] || DEAL_FALLBACKS[staticDeal.id] || '') : '')
@@ -744,9 +770,9 @@ export default function Home() {
               const coverSrc  = rawCover && !isPlaceholderCoverUrl(rawCover) ? rawCover : ''
 
               // Real href, not a click handler — see the mobile grid above.
-              const href = isLive
-                ? `/product/${liveDeal!.slug}`
-                : `/comic/${staticDeal!.id}?region=${region}`
+              // Static fallback → the card's own product page, not /comic/[id].
+              // See the mobile grid above for what that legacy route served.
+              const href = `/product/${isLive ? liveDeal!.slug : staticDeal!.slug}`
 
               return (
                 <Link key={i} className="deal-card"
