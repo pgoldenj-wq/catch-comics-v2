@@ -120,6 +120,8 @@
     "b4:revive": "dotenv -e .env.local -- tsx scripts/b4-revive-verified-offers.ts --write",
     "b4:verify": "dotenv -e .env.local -- tsx scripts/b4-verify-recovery.ts",
     "b4:outbound": "dotenv -e .env.local -- tsx scripts/b4-check-outbound.ts",
+    "b4:scope-second-feed": "dotenv -e .env.local -- tsx scripts/b4-scope-second-feed.ts",
+    "b4:probe-second-feed": "dotenv -e .env.local -- tsx scripts/b4-probe-second-feed.ts",
     "test:offer-alerts": "dotenv -e .env.local -- tsx scripts/test-offer-health-alerts.ts",
     "verify:offer-jobs": "tsx scripts/verify-offer-jobs-registered.ts",
     "test:retailer-card": "node scripts/test-retailer-refresh-card.mjs",
