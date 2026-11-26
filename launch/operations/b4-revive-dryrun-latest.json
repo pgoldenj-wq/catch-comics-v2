@@ -1,0 +1,239 @@
+{
+  "version": 1,
+  "runAt": "2026-11-26T13:47:37.874Z",
+  "mode": "DRY-RUN (read-only, zero writes)",
+  "sweepAt": "2026-10-27T03:00:46.263Z",
+  "breakerTripped": null,
+  "bounds": {
+    "MAX_CANDIDATES": 40,
+    "MAX_PUBLISHED": 10,
+    "BETWEEN_PRODUCT_MS": 1000,
+    "MAX_RUNTIME_MS": 300000,
+    "MAX_RETRIES": 3,
+    "MAX_PRICE_RATIO": 10
+  },
+  "evidenceRule": "fresh /products/<handle>.js response in this run; exact product id and stored variant; available:true; plausible price. Sitemap never used as price evidence.",
+  "candidatesConsidered": 40,
+  "verification": {
+    "availableUnchanged": 8,
+    "availablePriceChanged": 2,
+    "unavailableLeftDeleted": 4,
+    "variantMissing": 0,
+    "productIdMismatch": 0,
+    "notFound404": 0,
+    "transientFailures": 0,
+    "otherErrors": 0
+  },
+  "published": 0,
+  "writeTotals": {
+    "rowsRevived": 0,
+    "priceHistoryRowsCreated": 0,
+    "listingsCreated": 0,
+    "canonicalProductsCreated": 0,
+    "matcherCalls": 0,
+    "inngestExecutions": 0,
+    "retailerLastSyncedAtTouched": 0,
+    "rowsTouchedOutsideSweepCohort": 0
+  },
+  "productionState": {
+    "before": {
+      "pricedListings": 0,
+      "pricedProducts": 0,
+      "productsAtTwoRetailers": 0,
+      "priceHistoryRows": 624421,
+      "retailerListings": 808344,
+      "canonicalProducts": 150694,
+      "sweepCohortStillDeleted": 2246,
+      "tmActiveRows": 0
+    },
+    "after": {
+      "pricedListings": 0,
+      "pricedProducts": 0,
+      "productsAtTwoRetailers": 0,
+      "priceHistoryRows": 624421,
+      "retailerListings": 808344,
+      "canonicalProducts": 150694,
+      "sweepCohortStillDeleted": 2246,
+      "tmActiveRows": 0
+    }
+  },
+  "cost": {
+    "productRequests": 14,
+    "retryRequests": 0,
+    "totalHttpRequests": 14,
+    "inboundMiB": 0.04,
+    "wallClockMs": 34563,
+    "wallClockMin": 0.6,
+    "externalApiCostGBP": 0
+  },
+  "outcomes": [
+    {
+      "id": "5f0e3067-5b02-4dd3-a926-2eccbbbcb26b",
+      "sku": "15584701120886",
+      "stored": "20.99",
+      "klass": "unavailable",
+      "live": "20.99",
+      "slug": "absolute-batman-volume-2-abomination-hardcover-507505",
+      "title": "Absolute Batman Volume 2 Abomination Hardcover",
+      "isbn": "9781799507505",
+      "published": false,
+      "skipReason": "sold out live — left soft-deleted, never published as purchasable"
+    },
+    {
+      "id": "35d388ca-6f5a-4289-b2df-e0da9c7a97cf",
+      "sku": "15487363383670",
+      "stored": "14.99",
+      "klass": "availableUnchanged",
+      "live": "14.99",
+      "slug": "boss-bxtch-baby-volume-1-614310",
+      "title": "BOSS, BXTCH, BABY Volume 1",
+      "isbn": "9798895614310",
+      "published": false,
+      "skipReason": "eligible — would be published with --write"
+    },
+    {
+      "id": "7a599e33-a079-46e1-9b21-a443ddebc2db",
+      "sku": "15572694532470",
+      "stored": "14.99",
+      "klass": "availableUnchanged",
+      "live": "14.99",
+      "slug": "absolute-batman-volume-2-abomination-507512",
+      "title": "Absolute Batman Volume 2 Abomination",
+      "isbn": "9781799507512",
+      "published": false,
+      "skipReason": "eligible — would be published with --write"
+    },
+    {
+      "id": "5ae50b47-6f8e-46c5-beab-6f615c581d2f",
+      "sku": "15463152681334",
+      "stored": "12.99",
+      "klass": "availableUnchanged",
+      "live": "12.99",
+      "slug": "absolute-green-lantern-volume-1-without-fear-505556",
+      "title": "Absolute Green Lantern Volume 1 Without Fear",
+      "isbn": "9781799505556",
+      "published": false,
+      "skipReason": "eligible — would be published with --write"
+    },
+    {
+      "id": "e46316f5-400d-49ea-bba6-05a2121903cb",
+      "sku": "15739972649334",
+      "stored": "12.99",
+      "klass": "availableUnchanged",
+      "live": "12.99",
+      "slug": "the-perks-of-being-an-s-class-heroine-volume-7-904905",
+      "title": "The Perks of Being an S-Class Heroine Volume 7",
+      "isbn": "9798400904905",
+      "published": false,
+      "skipReason": "eligible — would be published with --write"
+    },
+    {
+      "id": "05ad1771-aa54-4eb7-a7ca-e7fd90e1ac5b",
+      "sku": "15558319112566",
+      "stored": "11.99",
+      "klass": "availablePriceChanged",
+      "live": "10.99",
+      "slug": "blue-lock-volume-26-772393",
+      "title": "Blue Lock Volume 26",
+      "isbn": "9798888772393",
+      "published": false,
+      "skipReason": "eligible — would be published with --write"
+    },
+    {
+      "id": "ddd8c882-91cc-413a-81c3-0c9b6aba3956",
+      "sku": "15616094175606",
+      "stored": "9.99",
+      "klass": "availableUnchanged",
+      "live": "9.99",
+      "slug": "blue-lock-volume-27-772829",
+      "title": "Blue Lock Volume 27",
+      "isbn": "9798888772829",
+      "published": false,
+      "skipReason": "eligible — would be published with --write"
+    },
+    {
+      "id": "cc47024b-0c8c-4fa9-9f4d-9e3582502d2e",
+      "sku": "15574310355318",
+      "stored": "6.99",
+      "klass": "availableUnchanged",
+      "live": "6.99",
+      "slug": "batman-white-knight-dc-compact-comics-edition-507413",
+      "title": "Batman: White Knight DC Compact Comics Edition",
+      "isbn": "9781799507413",
+      "published": false,
+      "skipReason": "eligible — would be published with --write"
+    },
+    {
+      "id": "e851b42c-93e0-401e-a2e1-ee3caaa83bcb",
+      "sku": "15373279658358",
+      "stored": "54.99",
+      "klass": "unavailable",
+      "live": "54.99",
+      "slug": "blue-lock-season-one-box-set-part-2-775875",
+      "title": "Blue Lock Season One Box Set Part 2",
+      "isbn": "9798888775875",
+      "published": false,
+      "skipReason": "sold out live — left soft-deleted, never published as purchasable"
+    },
+    {
+      "id": "b8b69544-ee6d-4d15-8124-fe52ebac496e",
+      "sku": "15369412411766",
+      "stored": "37.99",
+      "klass": "unavailable",
+      "live": "37.99",
+      "slug": "dc-manga-box-set-500858",
+      "title": "DC Manga Box Set",
+      "isbn": "9781799500858",
+      "published": false,
+      "skipReason": "sold out live — left soft-deleted, never published as purchasable"
+    },
+    {
+      "id": "88cc29ad-aae2-46e2-88d3-da80b635c284",
+      "sku": "15528806318454",
+      "stored": "30",
+      "klass": "availableUnchanged",
+      "live": "30.00",
+      "slug": "battle-royale-deluxe-edition-volume-1-431445",
+      "title": "Battle Royale Deluxe Edition Volume 1",
+      "isbn": "9798855431445",
+      "published": false,
+      "skipReason": "eligible — would be published with --write"
+    },
+    {
+      "id": "d789176d-ceac-4ff7-9388-f4223b27f7d7",
+      "sku": "15568851829110",
+      "stored": "29.99",
+      "klass": "availableUnchanged",
+      "live": "29.99",
+      "slug": "akira-hardcover-collection-5-511389",
+      "title": "AKIRA Hardcover Collection 5",
+      "isbn": "9781646511389",
+      "published": false,
+      "skipReason": "eligible — would be published with --write"
+    },
+    {
+      "id": "f8899399-f6ad-456d-ad56-a815b9fb5e2f",
+      "sku": "15350387310966",
+      "stored": "27.99",
+      "klass": "unavailable",
+      "live": "27.99",
+      "slug": "disney-twisted-wonderland-book-of-heartslabyul-complete-box-set-759224",
+      "title": "Disney Twisted-Wonderland: Book of Heartslabyul Complete Box Set",
+      "isbn": "9781974759224",
+      "published": false,
+      "skipReason": "sold out live — left soft-deleted, never published as purchasable"
+    },
+    {
+      "id": "ab8f9beb-8b26-4562-9893-eb3f77ba23cb",
+      "sku": "15326141088118",
+      "stored": "26.99",
+      "klass": "availablePriceChanged",
+      "live": "24.99",
+      "slug": "akira-hardcover-collection-volume-1-511341",
+      "title": "Akira Hardcover Collection Volume 1",
+      "isbn": "9781646511341",
+      "published": false,
+      "skipReason": "eligible — would be published with --write"
+    }
+  ]
+}

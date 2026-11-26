@@ -1,0 +1,205 @@
+{
+  "runAt": "2026-11-26T13:38:09.313Z",
+  "mode": "READ-ONLY (zero writes, zero HTTP)",
+  "baseline": {
+    "pricedListings": 0,
+    "pricedProducts": 0,
+    "productsAtTwoRetailers": 0,
+    "activeListingsAnyPrice": 1600
+  },
+  "retailers": [
+    {
+      "name": "World of Books",
+      "domain": "worldofbooks.com",
+      "is_active": true,
+      "scheduled_sync_disabled": "true",
+      "last_synced_at": "2026-06-03T13:05:51.760Z",
+      "total": 529927,
+      "active": 0,
+      "active_priced": 0,
+      "max_last_seen": "2026-09-26T15:57:25.984Z"
+    },
+    {
+      "name": "Bookshop.org (UK)",
+      "domain": "uk.bookshop.org",
+      "is_active": true,
+      "scheduled_sync_disabled": null,
+      "last_synced_at": "2026-08-18T20:54:59.518Z",
+      "total": 103649,
+      "active": 800,
+      "active_priced": 0,
+      "max_last_seen": "2026-11-26T04:01:09.735Z"
+    },
+    {
+      "name": "Bookshop.org (US)",
+      "domain": "bookshop.org",
+      "is_active": true,
+      "scheduled_sync_disabled": null,
+      "last_synced_at": null,
+      "total": 94021,
+      "active": 800,
+      "active_priced": 0,
+      "max_last_seen": "2026-11-26T04:01:09.735Z"
+    },
+    {
+      "name": "Travelling Man",
+      "domain": "travellingman.com",
+      "is_active": true,
+      "scheduled_sync_disabled": "true",
+      "last_synced_at": "2026-08-18T22:30:42.211Z",
+      "total": 25764,
+      "active": 0,
+      "active_priced": 0,
+      "max_last_seen": "2026-09-26T15:56:41.445Z"
+    },
+    {
+      "name": "Waterstones",
+      "domain": "waterstones.com",
+      "is_active": true,
+      "scheduled_sync_disabled": null,
+      "last_synced_at": "2026-06-07T18:34:37.573Z",
+      "total": 17958,
+      "active": 0,
+      "active_priced": 0,
+      "max_last_seen": "2026-06-07T11:48:00.106Z"
+    },
+    {
+      "name": "Wordery",
+      "domain": "wordery.com",
+      "is_active": true,
+      "scheduled_sync_disabled": null,
+      "last_synced_at": null,
+      "total": 9150,
+      "active": 0,
+      "active_priced": 0,
+      "max_last_seen": "2026-05-25T22:16:47.440Z"
+    },
+    {
+      "name": "Lets Buy Books",
+      "domain": "letsbuybooks.com",
+      "is_active": true,
+      "scheduled_sync_disabled": "true",
+      "last_synced_at": "2026-07-16T21:49:49.806Z",
+      "total": 6467,
+      "active": 0,
+      "active_priced": 0,
+      "max_last_seen": "2026-07-16T21:49:46.463Z"
+    },
+    {
+      "name": "AbeBooks",
+      "domain": "abebooks.co.uk",
+      "is_active": true,
+      "scheduled_sync_disabled": null,
+      "last_synced_at": null,
+      "total": 4947,
+      "active": 0,
+      "active_priced": 0,
+      "max_last_seen": "2026-05-19T15:43:22.566Z"
+    },
+    {
+      "name": "Zavvi",
+      "domain": "zavvi.com",
+      "is_active": true,
+      "scheduled_sync_disabled": null,
+      "last_synced_at": null,
+      "total": 4904,
+      "active": 0,
+      "active_priced": 0,
+      "max_last_seen": "2026-05-18T16:10:52.386Z"
+    },
+    {
+      "name": "Forbidden Planet",
+      "domain": "forbiddenplanet.com",
+      "is_active": false,
+      "scheduled_sync_disabled": null,
+      "last_synced_at": null,
+      "total": 4863,
+      "active": 0,
+      "active_priced": 0,
+      "max_last_seen": "2026-05-17T20:33:45.441Z"
+    },
+    {
+      "name": "WHSmith",
+      "domain": "whsmith.co.uk",
+      "is_active": true,
+      "scheduled_sync_disabled": null,
+      "last_synced_at": null,
+      "total": 4863,
+      "active": 0,
+      "active_priced": 0,
+      "max_last_seen": "2026-05-17T20:59:09.616Z"
+    },
+    {
+      "name": "Amazon UK",
+      "domain": "amazon.co.uk",
+      "is_active": true,
+      "scheduled_sync_disabled": "true",
+      "last_synced_at": null,
+      "total": 1623,
+      "active": 0,
+      "active_priced": 0,
+      "max_last_seen": "2026-06-26T17:36:21.068Z"
+    },
+    {
+      "name": "Scholastic",
+      "domain": "scholastic.co.uk",
+      "is_active": true,
+      "scheduled_sync_disabled": "true",
+      "last_synced_at": "2026-06-07T18:24:37.474Z",
+      "total": 208,
+      "active": 0,
+      "active_priced": 0,
+      "max_last_seen": "2026-06-07T18:24:37.241Z"
+    }
+  ],
+  "tmDeletionCohorts": [
+    {
+      "deleted_at": "2026-05-13T14:37:27.161Z",
+      "rows": 15922
+    },
+    {
+      "deleted_at": "2026-07-04T03:00:15.559Z",
+      "rows": 6920
+    },
+    {
+      "deleted_at": "2026-10-27T03:00:46.263Z",
+      "rows": 2246
+    },
+    {
+      "deleted_at": "2026-06-11T03:00:12.041Z",
+      "rows": 280
+    },
+    {
+      "deleted_at": "2026-08-08T03:00:43.513Z",
+      "rows": 92
+    },
+    {
+      "deleted_at": "2026-07-21T03:00:29.262Z",
+      "rows": 84
+    },
+    {
+      "deleted_at": "2026-08-09T03:00:43.195Z",
+      "rows": 54
+    },
+    {
+      "deleted_at": "2026-07-09T03:00:36.913Z",
+      "rows": 42
+    },
+    {
+      "deleted_at": "2026-07-24T03:00:54.733Z",
+      "rows": 38
+    },
+    {
+      "deleted_at": "2026-07-13T03:00:29.605Z",
+      "rows": 34
+    },
+    {
+      "deleted_at": "2026-07-12T03:00:04.258Z",
+      "rows": 27
+    },
+    {
+      "deleted_at": "2026-08-02T03:00:40.899Z",
+      "rows": 24
+    }
+  ]
+}

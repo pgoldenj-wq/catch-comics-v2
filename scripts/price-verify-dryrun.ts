@@ -50,6 +50,14 @@ import { PrismaClient, Prisma }     from '@prisma/client'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join }            from 'node:path'
 
+// The identity rules, retry policy and price guard live in ONE place, shared
+// with scripts/b4-revive-verified-offers.ts, so the two cannot drift apart.
+import {
+  cost, extractLocs, handleOf, fetchRaw, verifyRow, isImplausiblePrice,
+  MAX_PRICE_RATIO, MAX_RETRIES, BACKOFF_BASE_MS,
+  type VerifyKlass, type VerifyRowResult,
+} from '@/lib/retailers/shopify-verify'
+
 const prisma = new PrismaClient()
 
 // ── Mode ─────────────────────────────────────────────────────────────────────
@@ -58,17 +66,12 @@ const WRITE    = argv.includes('--write')          // default: read-only
 const rowsIdx  = argv.indexOf('--max-rows')
 const MAX_ROWS_ARG = rowsIdx !== -1 ? parseInt(argv[rowsIdx + 1] ?? '', 10) : NaN
 
-/**
- * Price-plausibility guard. A verified read is still refused if the live value
- * is nonsensical or moves by more than 10x in either direction — a bounded
- * refresh must never launder a scraping artefact into a customer-facing price.
- * Refused rows are written NOTHING at all, not even freshness.
- */
-const MAX_PRICE_RATIO = 10
+// MAX_PRICE_RATIO (the price-plausibility guard: a verified read is refused if
+// the live value is nonsensical or moves by more than 10x in either direction)
+// and USER_AGENT now come from lib/retailers/shopify-verify.ts.
 
 const TM_DOMAIN  = 'travellingman.com'
 const WOB_DOMAIN = 'worldofbooks.com'
-const USER_AGENT = 'CatchComics/1.0 (+https://catchcomics.com/bot)'
 
 // ── Hard ceilings, asserted before the first product request ─────────────────
 const TM_MAX_ROWS            = 2_300
@@ -81,8 +84,8 @@ const MAX_SITEMAP_REQUESTS   = 50      // index + 38 product sitemaps
 // ── Conservative pacing / backoff ────────────────────────────────────────────
 const BETWEEN_PRODUCT_MS = 1_000  // strictly sequential, 1 req/s, no concurrency
 const BETWEEN_SITEMAP_MS = 2_000
-const MAX_RETRIES        = 3      // mirrors the adapter's fetchWithRetry policy
-const BACKOFF_BASE_MS    = 2_000
+// MAX_RETRIES (3, mirroring the adapter's fetchWithRetry policy) and
+// BACKOFF_BASE_MS come from the shared verifier.
 
 // ── Circuit breaker: stop if the retailer will not tolerate this rate ────────
 const MAX_CONSECUTIVE_TRANSIENT = 8
@@ -128,17 +131,12 @@ function writeStatus(state: string, extra: Record<string, unknown> = {}): void {
 }
 
 let sitemapRequests = 0
-let productRequests = 0   // first attempts only
-let retryRequests   = 0
-let inboundBytes    = 0
+// Product-request, retry and inbound-byte accounting lives in the shared
+// verifier's `cost` object, because that is where the requests are made.
 
-type Klass =
-  | 'availableUnchanged' | 'availablePriceChanged' | 'unavailable'
-  | 'variantMissing' | 'productIdMismatch' | 'notFound'
-  | 'transient' | 'otherError'
+type Klass = VerifyKlass
 
-interface RowResult {
-  id: string; sku: string; klass: Klass; stored: string; live: string | null
+interface RowResult extends VerifyRowResult {
   /** Populated only in --write mode. */
   written?: boolean
   writeSkipReason?: string
@@ -152,88 +150,6 @@ interface PriceChange {
 
 const priceChanges: PriceChange[] = []
 let rowsWritten = 0, priceHistoryRows = 0, writeSkippedNotActive = 0, excludedImplausible = 0
-
-function handleOf(url: string): string | null {
-  const m = /\/products\/([^/?#]+)/.exec(url)
-  return m ? decodeURIComponent(m[1]).toLowerCase() : null
-}
-
-function extractLocs(xml: string): string[] {
-  const out: string[] = []
-  const re = /<loc>([\s\S]*?)<\/loc>/g
-  let m: RegExpExecArray | null
-  while ((m = re.exec(xml)) !== null) {
-    out.push(m[1].trim().replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>'))
-  }
-  return out
-}
-
-async function fetchRaw(url: string, accept: string): Promise<{ status: number; text: string; transient: boolean }> {
-  let backoff = BACKOFF_BASE_MS
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT, Accept: accept } })
-    if (res.status === 429 || res.status >= 500) {
-      if (attempt === MAX_RETRIES) return { status: res.status, text: '', transient: true }
-      const ra = Number(res.headers.get('retry-after'))
-      const waitMs = Number.isFinite(ra) && ra > 0 ? ra * 1_000 : backoff
-      retryRequests++
-      await sleep(waitMs)
-      backoff *= 2
-      continue
-    }
-    const text = await res.text()
-    inboundBytes += Buffer.byteLength(text)
-    return { status: res.status, text, transient: false }
-  }
-  return { status: 0, text: '', transient: true }
-}
-
-/** Verify one stored row against the live product endpoint. */
-async function verifyRow(
-  domain: string,
-  row: { id: string; retailerSku: string; retailerUrl: string; priceAmount: unknown },
-): Promise<RowResult> {
-  const handle = handleOf(row.retailerUrl)
-  const stored = String(row.priceAmount)
-  const base: Omit<RowResult, 'klass' | 'live'> = { id: row.id, sku: row.retailerSku, stored }
-  if (!handle) return { ...base, klass: 'otherError', live: null }
-
-  productRequests++
-  const res = await fetchRaw(`https://${domain}/products/${handle}.js`, 'application/json')
-
-  if (res.transient)        return { ...base, klass: 'transient',  live: null }
-  if (res.status === 404)   return { ...base, klass: 'notFound',   live: null }
-  if (res.status !== 200)   return { ...base, klass: 'otherError', live: null }
-
-  let p: { id: number | string; variants?: { id: number | string; price: string; available: boolean; barcode?: string | null }[] }
-  try { p = JSON.parse(res.text) } catch { return { ...base, klass: 'otherError', live: null } }
-
-  const storedPid = row.retailerSku.includes('-') ? row.retailerSku.split('-')[0] : row.retailerSku
-  if (String(p.id) !== storedPid) return { ...base, klass: 'productIdMismatch', live: null }
-
-  const variants = p.variants ?? []
-  if (variants.length === 0) return { ...base, klass: 'variantMissing', live: null }
-
-  let variant: typeof variants[number] | undefined
-  if (row.retailerSku.includes('-')) {
-    // Exact stored variant only — never substitute another.
-    const vid = row.retailerSku.split('-')[1]
-    variant = variants.find(v => String(v.id) === vid)
-  } else {
-    // Product-level row: the adapter's existing primary rule.
-    variant = variants.find(v => v.available) ?? variants[0]
-  }
-  if (!variant) return { ...base, klass: 'variantMissing', live: null }
-
-  const livePrice = Number(variant.price) / 100
-  const live = livePrice.toFixed(2)
-  if (!variant.available) return { ...base, klass: 'unavailable', live }
-  return {
-    ...base,
-    klass: Number(live) === Number(stored) ? 'availableUnchanged' : 'availablePriceChanged',
-    live,
-  }
-}
 
 /**
  * Write ONE row that verified live in this same run. Mirrors the existing
@@ -253,9 +169,7 @@ async function writeRow(retailerName: string, r: RowResult): Promise<void> {
   const priceChanged = newPrice !== oldPrice
 
   if (priceChanged) {
-    const implausible =
-      !Number.isFinite(newPrice) || newPrice <= 0 ||
-      (oldPrice > 0 && (newPrice / oldPrice > MAX_PRICE_RATIO || oldPrice / newPrice > MAX_PRICE_RATIO))
+    const implausible = isImplausiblePrice(oldPrice, newPrice)
     const change: PriceChange = {
       retailer: retailerName, listingId: r.id, sku: r.sku,
       oldPrice, newPrice,
@@ -455,8 +369,8 @@ async function main() {
     log(`verifying ${name}: ${rows.length.toLocaleString()} rows against ${domain}`)
     for (const [i, row] of rows.entries()) {
       if (breakerTripped) break
-      if (productRequests >= TOTAL_PRODUCT_REQUESTS) { breakerTripped = 'total product request ceiling reached'; break }
-      if (sitemapRequests + productRequests + retryRequests >= TOTAL_REQUESTS_MAX) {
+      if (cost.productRequests >= TOTAL_PRODUCT_REQUESTS) { breakerTripped = 'total product request ceiling reached'; break }
+      if (sitemapRequests + cost.productRequests + cost.retryRequests >= TOTAL_REQUESTS_MAX) {
         breakerTripped = `total request ceiling ${TOTAL_REQUESTS_MAX} reached`
         log(`SAFE STOP — ${breakerTripped}`)
         break
@@ -492,7 +406,7 @@ async function main() {
           rowsChecked: rowsCheckedSoFar + out.length,
           rowsVerified: rowsVerifiedSoFar + tally(out, 'availableUnchanged') + tally(out, 'availablePriceChanged') + tally(out, 'unavailable'),
           rowsWritten, errors: rowsErroredSoFar + transientSoFar + tally(out, 'notFound') + tally(out, 'variantMissing') + tally(out, 'productIdMismatch') + tally(out, 'otherError'),
-          requests: sitemapRequests + productRequests + retryRequests,
+          requests: sitemapRequests + cost.productRequests + cost.retryRequests,
           elapsedMs: Date.now() - t0,
         })
       }
@@ -563,9 +477,12 @@ async function main() {
     },
     productionState: { before, after },
     cost: {
-      sitemapRequests, productRequests, retryRequests,
-      totalHttpRequests: sitemapRequests + productRequests + retryRequests,
-      inboundBytes, inboundMiB: Number((inboundBytes / 1048576).toFixed(2)),
+      sitemapRequests,
+      productRequests: cost.productRequests,
+      retryRequests:   cost.retryRequests,
+      totalHttpRequests: sitemapRequests + cost.productRequests + cost.retryRequests,
+      inboundBytes: cost.inboundBytes,
+      inboundMiB:   Number((cost.inboundBytes / 1048576).toFixed(2)),
       wallClockMs: wallMs, wallClockMin: Number((wallMs / 60000).toFixed(1)),
       inngestExecutions: 0, externalApiCostGBP: 0,
     },
@@ -585,9 +502,9 @@ async function main() {
     errors: rowsErroredSoFar, breakerTripped, nextExpiryAt,
     reason: fullSuccess ? null : breakerTripped ?? `wrote ${rowsWritten} of ${measuredTarget} rows`,
     cost: {
-      requests: sitemapRequests + productRequests + retryRequests,
-      retries: retryRequests,
-      inboundMiB: Number((inboundBytes / 1048576).toFixed(2)),
+      requests: sitemapRequests + cost.productRequests + cost.retryRequests,
+      retries: cost.retryRequests,
+      inboundMiB: Number((cost.inboundBytes / 1048576).toFixed(2)),
       inngestExecutions: 0, externalApiCostGBP: 0,
     },
     elapsedMs: wallMs,
@@ -649,7 +566,7 @@ async function main() {
   }
 
   log('')
-  log(`http: ${sitemapRequests} sitemap + ${productRequests} product + ${retryRequests} retries = ${report.cost.totalHttpRequests}`)
+  log(`http: ${sitemapRequests} sitemap + ${cost.productRequests} product + ${cost.retryRequests} retries = ${report.cost.totalHttpRequests}`)
   log(`inbound ${report.cost.inboundMiB} MiB · wall clock ${report.cost.wallClockMin} min · inngest 0 · rows written ${WRITE ? rowsWritten : 0}`)
   if (breakerTripped) log(`BREAKER TRIPPED: ${breakerTripped}`)
   log(`-> ${OUT}`)
