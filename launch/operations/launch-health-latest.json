@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-11-26T14:00:04.569Z",
+  "generatedAt": "2026-11-26T17:26:12.848Z",
   "source": "read-only Postgres queries (scripts/launch-health.ts)",
   "catalogue": {
     "liveProducts": 136277,
@@ -8,58 +8,62 @@
     "coverNone": 94140,
     "coverR2Pct": 20.3,
     "formatKnownPct": 10.4,
-    "cvMatched": 10730,
+    "cvMatched": 10732,
     "cvMatchedPct": 7.9,
     "described": 34900,
     "withCreators": 9087,
     "suspectFlagged": 4
   },
   "pricing": {
-    "pricedListings": 10,
-    "fresh7d": 10,
+    "pricedListings": 89,
+    "fresh7d": 89,
     "aged7to30d": 0,
     "stale30dPlus": 0,
     "stalePct": 0,
-    "inStock": 10,
+    "inStock": 89,
     "outOfStock": 0,
-    "productsPriced": 10,
+    "productsPriced": 49,
     "comparisonDepth": {
-      "oneRetailer": 10,
-      "twoPlusRetailers": 0
+      "oneRetailer": 9,
+      "twoPlusRetailers": 40
     },
     "alert": {
-      "level": "WARN",
-      "reasons": [
-        "0 products priced at 2+ retailers — no genuine comparison is possible."
-      ],
-      "lastSuccessfulWriteAt": "2026-11-26 13:48:25.814",
+      "level": "OK",
+      "reasons": [],
+      "lastSuccessfulWriteAt": "2026-11-26 17:22:23.692",
       "lastSuccessfulWriteAgeDays": 0,
       "oldestLiveSeenAt": "2026-11-26 13:48:11.683",
       "nextExpiryAt": "2026-12-26T13:48:11.683Z",
-      "daysUntilNextExpiry": 30,
+      "daysUntilNextExpiry": 29.8,
       "expiringWithin7d": 0,
       "retentionDays": 30
     },
-    "comparisonOverlapPct": 0,
+    "comparisonOverlapPct": 81.63,
     "retailers": [
       {
         "name": "Travelling Man",
-        "listings": 10,
-        "fresh30d": 10,
+        "listings": 49,
+        "fresh30d": 49,
+        "lastSeen": "2026-11-26"
+      },
+      {
+        "name": "World of Books",
+        "listings": 40,
+        "fresh30d": 40,
         "lastSeen": "2026-11-26"
       }
     ]
   },
   "wave4": {
     "priceHistory": {
-      "totalObservations": 624431,
+      "totalObservations": 624510,
       "oldest": "2026-05-11",
       "newest": "2026-11-26",
       "productsEligibleForChart": 0
     },
     "metadata": {
       "distributorAsPublisher": 179,
-      "cvMatchedNoCreators": 1643,
+      "cvMatchedNoCreators": 1645,
       "note": "distributorAsPublisher rows are omitted at display via lib/identity/publisher.displayPublisher — DB unchanged. Full breakdown: npm run audit:metadata"
     },
     "issueCovers": {
@@ -80,13 +84,13 @@
     "allVisibleRowsGoStaleBy": null,
     "note": "No action required. Amazon data coverage will decline as stored listings expire. This is intentional and honest until a compliant replacement (Amazon Creators API when eligible) is approved. See launch/operations/amazon-post-rainforest-plan.md."
   },
-  "previousSnapshotAt": "2026-11-22T16:36:52.206Z",
+  "previousSnapshotAt": "2026-11-26T14:00:04.569Z",
   "deltas": {
     "liveProducts": 0,
     "coverR2": 0,
-    "cvMatched": 45,
-    "pricedListings": 10,
+    "cvMatched": 2,
+    "pricedListings": 79,
     "stale30dPlus": 0,
-    "productsPriced": 10
+    "productsPriced": 39
   }
 }

@@ -1,0 +1,1764 @@
+{
+  "version": 1,
+  "runAt": "2026-11-26T17:19:19.835Z",
+  "mode": "DRY-RUN (read-only, zero writes)",
+  "unitOfWork": "pair — both sides verified live and available in this run, or neither side published",
+  "scope": {
+    "travellingMan": "deleted_at = 2026-10-27T03:00:46.263Z or already active",
+    "worldOfBooks": "deleted_at inside 3:00-04:01 UTC cron window, or already active",
+    "perRowScoping": "every UPDATE scoped to id AND the exact deleted_at read in this run"
+  },
+  "breakerTripped": null,
+  "bounds": {
+    "MAX_PAIR_CANDIDATES": 60,
+    "MAX_PAIRS": 40,
+    "BETWEEN_PRODUCT_MS": 1000,
+    "MAX_RUNTIME_MS": 480000,
+    "MAX_RETRIES": 3,
+    "MAX_PRICE_RATIO": 10
+  },
+  "evidenceRule": "fresh /products/<handle>.js response in this run, for BOTH sides; exact product id and stored variant; available:true; plausible price. Sitemap never used as price evidence.",
+  "pairCandidates": 60,
+  "refusedOutsideCronWindow": [],
+  "worldOfBooksCohorts": [
+    {
+      "deletedAt": "2026-07-03T03:00:10.150Z",
+      "rows": 39,
+      "inCronWindow": true
+    },
+    {
+      "deletedAt": "2026-08-21T03:01:05.782Z",
+      "rows": 1,
+      "inCronWindow": true
+    },
+    {
+      "deletedAt": "2026-08-17T03:00:21.659Z",
+      "rows": 1,
+      "inCronWindow": true
+    },
+    {
+      "deletedAt": "2026-08-15T03:00:45.335Z",
+      "rows": 1,
+      "inCronWindow": true
+    },
+    {
+      "deletedAt": "2026-07-29T03:00:18.894Z",
+      "rows": 1,
+      "inCronWindow": true
+    },
+    {
+      "deletedAt": "2026-07-15T03:00:15.243Z",
+      "rows": 13,
+      "inCronWindow": true
+    },
+    {
+      "deletedAt": "2026-07-13T03:00:29.605Z",
+      "rows": 1,
+      "inCronWindow": true
+    },
+    {
+      "deletedAt": "2026-07-10T03:01:17.287Z",
+      "rows": 2,
+      "inCronWindow": true
+    },
+    {
+      "deletedAt": "2026-07-07T03:00:06.407Z",
+      "rows": 1,
+      "inCronWindow": true
+    }
+  ],
+  "eligibleAfterGuard": 60,
+  "travellingManAlreadyLive": 1,
+  "verification": {
+    "availableUnchanged": 51,
+    "availablePriceChanged": 44,
+    "unavailableLeftDeleted": 16,
+    "variantMissing": 0,
+    "productIdMismatch": 0,
+    "notFound404": 1,
+    "transientFailures": 0,
+    "otherErrors": 0
+  },
+  "pairsPublished": 0,
+  "pairsAtDifferentLivePrice": 40,
+  "pairsAtIdenticalLivePrice": 0,
+  "writeTotals": {
+    "pairsPublished": 0,
+    "rowsRevived": 0,
+    "priceHistoryRowsCreated": 0,
+    "alreadyActiveRowsWritten": 0,
+    "priceDriftLeftForRefresh": 0,
+    "listingsCreated": 0,
+    "canonicalProductsCreated": 0,
+    "matcherCalls": 0,
+    "inngestExecutions": 0,
+    "retailerLastSyncedAtTouched": 0,
+    "rowsTouchedOutsideCronWindow": 0
+  },
+  "productionState": {
+    "before": {
+      "pricedListings": 10,
+      "pricedProducts": 10,
+      "productsAtTwoRetailers": 0,
+      "priceHistoryRows": 624431,
+      "retailerListings": 808344,
+      "canonicalProducts": 150694,
+      "tmSweepCohortStillDeleted": 2236,
+      "tmActiveRows": 10,
+      "wobActiveRows": 0,
+      "unrelatedDeletedRows": 274571
+    },
+    "after": {
+      "pricedListings": 10,
+      "pricedProducts": 10,
+      "productsAtTwoRetailers": 0,
+      "priceHistoryRows": 624431,
+      "retailerListings": 808344,
+      "canonicalProducts": 150694,
+      "tmSweepCohortStillDeleted": 2236,
+      "tmActiveRows": 10,
+      "wobActiveRows": 0,
+      "unrelatedDeletedRows": 274571
+    }
+  },
+  "cost": {
+    "productRequests": 112,
+    "retryRequests": 0,
+    "totalHttpRequests": 112,
+    "inboundMiB": 0.39,
+    "wallClockMs": 131352,
+    "wallClockMin": 2.2,
+    "externalApiCostGBP": 0
+  },
+  "outcomes": [
+    {
+      "slug": "boss-bxtch-baby-volume-1-614310",
+      "title": "BOSS, BXTCH, BABY Volume 1",
+      "isbn": "9798895614310",
+      "published": false,
+      "tm": {
+        "id": "35d388ca-6f5a-4289-b2df-e0da9c7a97cf",
+        "sku": "15487363383670",
+        "stored": "14.99",
+        "klass": "availableUnchanged",
+        "live": "14.99",
+        "domain": "travellingman.com",
+        "state": "alreadyActive",
+        "scopedDeletedAt": null,
+        "written": false
+      },
+      "wob": {
+        "id": "5d8ece1c-832b-4f97-82ad-48bf307a4a89",
+        "sku": "11070749770001",
+        "stored": "26.59",
+        "klass": "availablePriceChanged",
+        "live": "22.89",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "the-evil-secret-society-of-cats-vol-4-9798888433904",
+      "title": "The Evil Secret Society of Cats Vol. 4",
+      "isbn": "9798888433904",
+      "published": false,
+      "tm": {
+        "id": "bcf959e8-b356-460d-acc9-59d42a7bce39",
+        "sku": "15821940687222",
+        "stored": "10.99",
+        "klass": "availableUnchanged",
+        "live": "10.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "3d9f0fc7-0bab-4cfa-a980-dd52f026d0af",
+        "sku": "11142834520337",
+        "stored": "14.99",
+        "klass": "availableUnchanged",
+        "live": "14.99",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-08-21T03:01:05.782Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "i-ship-my-rival-x-me-volume-4-616826",
+      "title": "I Ship My Rival x Me Volume 4",
+      "isbn": "9798895616826",
+      "published": false,
+      "tm": {
+        "id": "078e3cdd-fb1f-4c33-b9d2-2d7459177e30",
+        "sku": "15448811471222",
+        "stored": "14.99",
+        "klass": "availableUnchanged",
+        "live": "14.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "8f1b0143-0ec5-40cd-9d5a-ff3f5931303c",
+        "sku": "11140057465105",
+        "stored": "21.99",
+        "klass": "availableUnchanged",
+        "live": "21.99",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-08-17T03:00:21.659Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "the-oblivious-girl-and-the-maidenly-man-vol-1-654109",
+      "title": "The Oblivious Girl and the Maidenly Man Vol. 1",
+      "isbn": "9798897654109",
+      "published": false,
+      "tm": {
+        "id": "9840a18f-914b-498c-91f7-838e216bdea9",
+        "sku": "15812573790582",
+        "stored": "10.99",
+        "klass": "availableUnchanged",
+        "live": "10.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "641f8b2e-f9cf-426e-b3ac-536d2fd5398f",
+        "sku": "11138566455569",
+        "stored": "14.99",
+        "klass": "availableUnchanged",
+        "live": "14.99",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-08-15T03:00:45.335Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "spacewalking-with-you-3-775301",
+      "title": "Spacewalking With You 3",
+      "isbn": "9798888775301",
+      "published": false,
+      "tm": {
+        "id": "5cb42f4d-3db4-4065-90c6-03c17c77005e",
+        "sku": "15812387701110",
+        "stored": "12.99",
+        "klass": "availablePriceChanged",
+        "live": "10.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "2a2219ba-5205-47a6-a519-2f04e9e8808e",
+        "sku": "11108301701393",
+        "stored": "13.99",
+        "klass": "availableUnchanged",
+        "live": "13.99",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-29T03:00:18.894Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "painter-of-the-night-volume-2-739527",
+      "title": "Painter of the Night Volume 2",
+      "isbn": "9798893739527",
+      "published": false,
+      "tm": {
+        "id": "42318fc9-29b1-4a12-be97-cf9b78413e7e",
+        "sku": "15515885175158",
+        "stored": "20.99",
+        "klass": "availableUnchanged",
+        "live": "20.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "5e077694-9e45-4d20-847b-991e3db61968",
+        "sku": "11085869220113",
+        "stored": "26.79",
+        "klass": "availablePriceChanged",
+        "live": "26.69",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-15T03:00:15.243Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "painter-of-the-night-volume-3-739534",
+      "title": "Painter of the Night Volume 3",
+      "isbn": "9798893739534",
+      "published": false,
+      "tm": {
+        "id": "5a0f6c8f-66d9-483d-b11e-2d467741159e",
+        "sku": "15713225015670",
+        "stored": "18.99",
+        "klass": "availableUnchanged",
+        "live": "18.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "851e9fb6-3ab2-45b0-97c2-cca8b718a71e",
+        "sku": "11085868925201",
+        "stored": "26.79",
+        "klass": "availableUnchanged",
+        "live": "26.79",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-15T03:00:15.243Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "dear-door-volume-1-613306",
+      "title": "Dear. Door Volume 1",
+      "isbn": "9798895613306",
+      "published": false,
+      "tm": {
+        "id": "31b82002-113d-4152-ace3-17d4e71ace72",
+        "sku": "15392757416310",
+        "stored": "15.99",
+        "klass": "unavailable",
+        "live": "15.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "35b339d7-1735-43e9-9fb0-5e97ae87d331",
+        "sku": "11085870039313",
+        "stored": "24.99",
+        "klass": "availableUnchanged",
+        "live": "24.99",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-15T03:00:15.243Z",
+        "written": false
+      },
+      "skipReason": "travellingman.com is sold out live — pair abandoned, neither side published"
+    },
+    {
+      "slug": "let-me-see-the-real-you-senpai-vol-2-737332",
+      "title": "Let Me See the Real You, Senpai! Vol. 2",
+      "isbn": "9798893737332",
+      "published": false,
+      "tm": {
+        "id": "562b7a50-44d8-4153-b65b-4e072ff66228",
+        "sku": "15779027812726",
+        "stored": "15.99",
+        "klass": "unavailable",
+        "live": "15.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "e79e32e4-f179-4db9-b866-2cde555a7e5c",
+        "sku": "11085869023505",
+        "stored": "16.99",
+        "klass": "unavailable",
+        "live": "16.99",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-15T03:00:15.243Z",
+        "written": false
+      },
+      "skipReason": "travellingman.com is sold out live — pair abandoned, neither side published"
+    },
+    {
+      "slug": "senpai-is-an-otokonoko-my-crossdressing-classmate-volume-1-773611",
+      "title": "Senpai is an Otokonoko: My Crossdressing Classmate Volume 1",
+      "isbn": "9798888773611",
+      "published": false,
+      "tm": {
+        "id": "102783c1-fde3-4e8a-8755-8196d7b2f4f5",
+        "sku": "15326127620470",
+        "stored": "14.99",
+        "klass": "unavailable",
+        "live": "14.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "e67e265b-79f2-4db9-806d-1dd8ebd8c6d3",
+        "sku": "11085867909393",
+        "stored": "15.99",
+        "klass": "availableUnchanged",
+        "live": "15.99",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-15T03:00:15.243Z",
+        "written": false
+      },
+      "skipReason": "travellingman.com is sold out live — pair abandoned, neither side published"
+    },
+    {
+      "slug": "lost-in-the-cloud-volume-2-739466",
+      "title": "Lost in the Cloud Volume 2",
+      "isbn": "9798893739466",
+      "published": false,
+      "tm": {
+        "id": "a63ddbca-8ab0-4226-8ee7-de9280209d33",
+        "sku": "15727508423030",
+        "stored": "14.99",
+        "klass": "availableUnchanged",
+        "live": "14.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "1dd3f6a2-a036-4e3d-b2fb-19102703475d",
+        "sku": "11085858504977",
+        "stored": "21.69",
+        "klass": "availableUnchanged",
+        "live": "21.69",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-15T03:00:15.243Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "perfect-addiction-volume-1-618509",
+      "title": "Perfect Addiction Volume 1",
+      "isbn": "9798895618509",
+      "published": false,
+      "tm": {
+        "id": "5244c509-68db-4ebf-89f3-9c692ce0bca3",
+        "sku": "15620060184950",
+        "stored": "13.99",
+        "klass": "unavailable",
+        "live": "13.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "6d102059-1d70-4f0f-ac79-b8d4098b404a",
+        "sku": "11085869547793",
+        "stored": "15.99",
+        "klass": "availableUnchanged",
+        "live": "15.99",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-15T03:00:15.243Z",
+        "written": false
+      },
+      "skipReason": "travellingman.com is sold out live — pair abandoned, neither side published"
+    },
+    {
+      "slug": "finding-camellia-volume-6-903854",
+      "title": "Finding Camellia Volume 6",
+      "isbn": "9798400903854",
+      "published": false,
+      "tm": {
+        "id": "70bce0f9-c870-46d4-bb7c-2440364ff611",
+        "sku": "15528687862134",
+        "stored": "11.99",
+        "klass": "availablePriceChanged",
+        "live": "12.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "73881114-0faf-4d01-aa3b-223a893937c1",
+        "sku": "11085866270993",
+        "stored": "20",
+        "klass": "availableUnchanged",
+        "live": "20.00",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-15T03:00:15.243Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "the-yakuza-and-his-omega-raw-desire-volume-3-733785",
+      "title": "The Yakuza and His Omega: Raw Desire Volume 3",
+      "isbn": "9798893733785",
+      "published": false,
+      "tm": {
+        "id": "ef0c3715-55ac-4f4b-ae60-3602c0a7365f",
+        "sku": "15302466404726",
+        "stored": "11.99",
+        "klass": "availableUnchanged",
+        "live": "11.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "1b511f6c-efe2-4331-b4f8-969a23a4e205",
+        "sku": "11085868171537",
+        "stored": "15.99",
+        "klass": "availableUnchanged",
+        "live": "15.99",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-15T03:00:15.243Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "lilia-s-pregnancy-spells-the-world-s-end-volume-1-618455",
+      "title": "Lilia's Pregnancy Spells the World's End Volume 1",
+      "isbn": "9798895618455",
+      "published": false,
+      "tm": {
+        "id": "8b6f08bb-aee1-40fa-9416-58d2519538a0",
+        "sku": "15627339989366",
+        "stored": "10.99",
+        "klass": "unavailable",
+        "live": "10.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "21d1c47b-5a41-4519-99b3-3a632448a4fd",
+        "sku": "11085869383953",
+        "stored": "14.99",
+        "klass": "availableUnchanged",
+        "live": "14.99",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-15T03:00:15.243Z",
+        "written": false
+      },
+      "skipReason": "travellingman.com is sold out live — pair abandoned, neither side published"
+    },
+    {
+      "slug": "asumi-chan-is-interested-in-lesbian-brothels-volume-6-619186",
+      "title": "Asumi-chan is Interested in Lesbian Brothels! Volume 6",
+      "isbn": "9798895619186",
+      "published": false,
+      "tm": {
+        "id": "89f2eae6-f342-4059-81bf-b976bacb1bea",
+        "sku": "15633297637750",
+        "stored": "10.99",
+        "klass": "unavailable",
+        "live": "10.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "c38fdd31-be7a-4932-9ba8-2e34126d6d75",
+        "sku": "11085870137617",
+        "stored": "14.99",
+        "klass": "availableUnchanged",
+        "live": "14.99",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-15T03:00:15.243Z",
+        "written": false
+      },
+      "skipReason": "travellingman.com is sold out live — pair abandoned, neither side published"
+    },
+    {
+      "slug": "the-fragrant-flower-blooms-with-dignity-volume-11-773031",
+      "title": "The Fragrant Flower Blooms With Dignity Volume 11",
+      "isbn": "9798888773031",
+      "published": false,
+      "tm": {
+        "id": "d32d8465-a1f6-4f40-a8cf-5c088a3da80a",
+        "sku": "15580486009206",
+        "stored": "10.99",
+        "klass": "unavailable",
+        "live": "10.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "f8936dba-779a-4994-b7bc-0348f1f27c16",
+        "sku": "11085867680017",
+        "stored": "13.99",
+        "klass": "availableUnchanged",
+        "live": "13.99",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-15T03:00:15.243Z",
+        "written": false
+      },
+      "skipReason": "travellingman.com is sold out live — pair abandoned, neither side published"
+    },
+    {
+      "slug": "wistoria-wand-sword-volume-11-775516",
+      "title": "Wistoria Wand & Sword Volume 11",
+      "isbn": "9798888775516",
+      "published": false,
+      "tm": {
+        "id": "66c682fe-46e9-40aa-a6e1-47ffb3af2f25",
+        "sku": "15609756909942",
+        "stored": "9.99",
+        "klass": "availableUnchanged",
+        "live": "9.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "0c7aa851-fc5c-44fc-aeb7-2c4723773a12",
+        "sku": "11085867876625",
+        "stored": "12.99",
+        "klass": "availableUnchanged",
+        "live": "12.99",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-15T03:00:15.243Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "witch-hat-atelier-colouring-book-777022",
+      "title": "Witch Hat Atelier Colouring Book",
+      "isbn": "9798888777022",
+      "published": false,
+      "tm": {
+        "id": "9c50637a-4cb6-4edb-b85c-3a932e60cc90",
+        "sku": "15720221737334",
+        "stored": "13.99",
+        "klass": "availablePriceChanged",
+        "live": "12.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "815b746f-88b3-42ed-a330-b786ca14532f",
+        "sku": "11084660736273",
+        "stored": "20.99",
+        "klass": "availablePriceChanged",
+        "live": "20.69",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-13T03:00:29.605Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "gap-papa-daddy-at-work-and-at-home-volume-6-653355",
+      "title": "Gap Papa: Daddy at Work and at Home Volume 6",
+      "isbn": "9798897653355",
+      "published": false,
+      "tm": {
+        "id": "b7f053e2-0afc-4d94-9dad-0fc64ec537b9",
+        "sku": "15751464354166",
+        "stored": "11.99",
+        "klass": "availableUnchanged",
+        "live": "11.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "4ba889a5-3703-4ce1-8b1f-bc09dcad2acc",
+        "sku": "11076921688337",
+        "stored": "20.79",
+        "klass": "availablePriceChanged",
+        "live": "20.49",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-10T03:01:17.287Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "kitayama-and-minamiya-volume-2-617687",
+      "title": "Kitayama and Minamiya Volume 2",
+      "isbn": "9798895617687",
+      "published": false,
+      "tm": {
+        "id": "d2fb2c1b-454a-4803-bdb5-d86043f2e483",
+        "sku": "15751457079670",
+        "stored": "10.99",
+        "klass": "availableUnchanged",
+        "live": "10.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "201fb3c1-b94b-4560-b578-98545444d3e0",
+        "sku": "11076921491729",
+        "stored": "20.69",
+        "klass": "notFound",
+        "live": null,
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-10T03:01:17.287Z",
+        "written": false,
+        "failure": {
+          "endpoint": "https://worldofbooks.com/products/<handle>.js",
+          "klass": "notFound",
+          "effect": "pair abandoned — identity or availability could not be proven"
+        }
+      },
+      "skipReason": "worldofbooks.com unverified (notFound) — pair abandoned, neither side published"
+    },
+    {
+      "slug": "my-goddess-is-precious-today-too-volume-1-613214",
+      "title": "My Goddess is Precious Today, Too Volume 1",
+      "isbn": "9798895613214",
+      "published": false,
+      "tm": {
+        "id": "f82e5d2e-1a7b-4e56-a86d-15b5a8102d99",
+        "sku": "15437737951606",
+        "stored": "9.99",
+        "klass": "availableUnchanged",
+        "live": "9.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "b129454a-88db-41ad-b18c-90dd07ab7551",
+        "sku": "11074384822545",
+        "stored": "18.19",
+        "klass": "availablePriceChanged",
+        "live": "13.99",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-07T03:00:06.407Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "skull-face-bookseller-honda-san-the-complete-omnibus-9798855426847",
+      "title": "Skull-face Bookseller Honda-san: The Complete Omnibus",
+      "isbn": "9798855426847",
+      "published": false,
+      "tm": {
+        "id": "315957f7-7cde-48bf-990a-5ecf3b849cdb",
+        "sku": "15802416890230",
+        "stored": "20.99",
+        "klass": "availableUnchanged",
+        "live": "20.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "0b7a7cff-2e6a-4bc9-afc8-717af8522aca",
+        "sku": "11070847287569",
+        "stored": "44.09",
+        "klass": "availablePriceChanged",
+        "live": "39.29",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "bastard-volume-3-735338",
+      "title": "Bastard Volume 3",
+      "isbn": "9798893735338",
+      "published": false,
+      "tm": {
+        "id": "108873bf-957b-4839-ae2c-da7d8bf48e2a",
+        "sku": "15516848652662",
+        "stored": "19.99",
+        "klass": "unavailable",
+        "live": "19.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "2e04c353-8a1c-4f57-b0a6-40261a05e965",
+        "sku": "11070748885265",
+        "stored": "37.09",
+        "klass": "availablePriceChanged",
+        "live": "36.59",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "travellingman.com is sold out live — pair abandoned, neither side published"
+    },
+    {
+      "slug": "rozen-maiden-collector-s-edition-vol-6-613979",
+      "title": "Rozen Maiden Collector's Edition Vol. 6",
+      "isbn": "9798895613979",
+      "published": false,
+      "tm": {
+        "id": "5d7e8d33-21df-4f05-b5dc-4763628c0a13",
+        "sku": "15828989411702",
+        "stored": "18.99",
+        "klass": "availableUnchanged",
+        "live": "18.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "99962b0d-e310-43de-8c86-2065a5b639c5",
+        "sku": "11070909120785",
+        "stored": "30.69",
+        "klass": "availablePriceChanged",
+        "live": "26.79",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "hokkaido-gals-are-super-adorable-omnibus-vol-5-6-618646",
+      "title": "Hokkaido Gals Are Super Adorable! (Omnibus) Vol. 5-6",
+      "isbn": "9798895618646",
+      "published": false,
+      "tm": {
+        "id": "fff3b004-0d75-4997-ae07-f8b84a5aeb02",
+        "sku": "15812390977910",
+        "stored": "18.99",
+        "klass": "unavailable",
+        "live": "18.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "c95d4f19-76bd-472e-b2f7-fd725794d800",
+        "sku": "11070859673873",
+        "stored": "27.89",
+        "klass": "availablePriceChanged",
+        "live": "27.39",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "travellingman.com is sold out live — pair abandoned, neither side published"
+    },
+    {
+      "slug": "it-s-just-a-dream-right-comic-vol-3-612132",
+      "title": "It's Just a Dream... Right?! (Comic) Vol. 3",
+      "isbn": "9798895612132",
+      "published": false,
+      "tm": {
+        "id": "245d2940-33ff-4965-b170-db9a0a6aa0d6",
+        "sku": "15812402643318",
+        "stored": "16.99",
+        "klass": "availableUnchanged",
+        "live": "16.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "f812bcb0-e4ca-4977-a522-bad5abdcb719",
+        "sku": "11070861541649",
+        "stored": "26.89",
+        "klass": "availablePriceChanged",
+        "live": "26.49",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "mistress-kanan-is-devilishly-easy-omnibus-vol-1-2-657612",
+      "title": "Mistress Kanan is Devilishly Easy (Omnibus) Vol. 1-2",
+      "isbn": "9798897657612",
+      "published": false,
+      "tm": {
+        "id": "9ab5b3a7-50d5-40d3-b456-cf9e86f9ca87",
+        "sku": "15826439766390",
+        "stored": "15.99",
+        "klass": "unavailable",
+        "live": "15.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "1987d162-3480-418b-bc4f-6b2896a1396a",
+        "sku": "11070869242129",
+        "stored": "27.89",
+        "klass": "availablePriceChanged",
+        "live": "23.99",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "travellingman.com is sold out live — pair abandoned, neither side published"
+    },
+    {
+      "slug": "the-dangerous-convenience-store-vol-7-9798897659425",
+      "title": "The Dangerous Convenience Store Vol. 7",
+      "isbn": "9798897659425",
+      "published": false,
+      "tm": {
+        "id": "14588338-4923-4f0d-b161-6ec3b921dfde",
+        "sku": "15771035042166",
+        "stored": "15.99",
+        "klass": "availableUnchanged",
+        "live": "15.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "a8499ef3-64ff-4303-b9a9-41901fc09184",
+        "sku": "11070833033489",
+        "stored": "26.19",
+        "klass": "availablePriceChanged",
+        "live": "21.79",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "teenage-mutant-ninja-turtles-shredder-vol-1-244617",
+      "title": "Teenage Mutant Ninja Turtles: Shredder, Vol. 1",
+      "isbn": "9798887244617",
+      "published": false,
+      "tm": {
+        "id": "c0300a9a-58dd-4be8-9454-5b5af4371aee",
+        "sku": "15821961658742",
+        "stored": "15.99",
+        "klass": "availableUnchanged",
+        "live": "15.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "f7dab12a-7317-49b3-8596-3457e4b56765",
+        "sku": "11070874386705",
+        "stored": "27.09",
+        "klass": "availablePriceChanged",
+        "live": "25.79",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "issak-omnibus-volume-6-775004",
+      "title": "Issak Omnibus Volume 6",
+      "isbn": "9798888775004",
+      "published": false,
+      "tm": {
+        "id": "b185c038-8911-47dc-97e3-aa20e41c1003",
+        "sku": "15692838273398",
+        "stored": "14.99",
+        "klass": "availableUnchanged",
+        "live": "14.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "0b9228e8-fd81-41a8-a10f-cccbc30a023d",
+        "sku": "11070777295121",
+        "stored": "29.29",
+        "klass": "availablePriceChanged",
+        "live": "28.89",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "murderous-lewellyn-s-candlelit-dinner-vol-5-903465",
+      "title": "Murderous Lewellyn’s Candlelit Dinner, Vol. 5",
+      "isbn": "9798400903465",
+      "published": false,
+      "tm": {
+        "id": "a9c8fb07-4f36-4fca-8ad9-e1fa935b1d10",
+        "sku": "15797887041910",
+        "stored": "14.99",
+        "klass": "availableUnchanged",
+        "live": "14.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "bf18dcf3-6b06-4d52-9f49-e0d2d8e649b8",
+        "sku": "11070846828817",
+        "stored": "31.69",
+        "klass": "availablePriceChanged",
+        "live": "24.00",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "beneath-the-trees-where-nobody-sees-rite-of-spring-243849",
+      "title": "Beneath the Trees Where Nobody Sees: Rite of Spring",
+      "isbn": "9798887243849",
+      "published": false,
+      "tm": {
+        "id": "66a089e2-8fa7-4450-a615-d4feac4dcd2c",
+        "sku": "15788075090294",
+        "stored": "14.99",
+        "klass": "unavailable",
+        "live": "14.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "4508fce8-efea-4747-8102-6b2732faa254",
+        "sku": "11070872027409",
+        "stored": "24.89",
+        "klass": "availablePriceChanged",
+        "live": "23.69",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "travellingman.com is sold out live — pair abandoned, neither side published"
+    },
+    {
+      "slug": "my-bias-is-showing-vol-3-615775",
+      "title": "My Bias is Showing?! Vol. 3",
+      "isbn": "9798895615775",
+      "published": false,
+      "tm": {
+        "id": "90d4b768-32ff-4a00-b500-c2c8b84f652f",
+        "sku": "15839624528246",
+        "stored": "13.99",
+        "klass": "availablePriceChanged",
+        "live": "16.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "aa4c4b89-8287-49da-897d-0ae538c61b38",
+        "sku": "11070901616913",
+        "stored": "26.89",
+        "klass": "availablePriceChanged",
+        "live": "22.99",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "our-sunny-days-vol-2-651214",
+      "title": "Our Sunny Days Vol. 2",
+      "isbn": "9798897651214",
+      "published": false,
+      "tm": {
+        "id": "11c94ec1-78b5-4061-b102-663ddf12daa9",
+        "sku": "15839629115766",
+        "stored": "13.99",
+        "klass": "unavailable",
+        "live": "15.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "75c044d0-4131-440d-a2bd-579dcc364a62",
+        "sku": "11070885921041",
+        "stored": "26.89",
+        "klass": "availablePriceChanged",
+        "live": "22.19",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "travellingman.com is sold out live — pair abandoned, neither side published"
+    },
+    {
+      "slug": "cult-of-the-lamb-vol-2-last-sacrament-881119",
+      "title": "Cult of the Lamb Vol. 2: Last Sacrament",
+      "isbn": "9798894881119",
+      "published": false,
+      "tm": {
+        "id": "a0291f84-1e26-40b5-bd93-dcb0f0f14abb",
+        "sku": "15836726231414",
+        "stored": "13.99",
+        "klass": "availableUnchanged",
+        "live": "13.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "4c1f92d8-cf9f-4cfc-bd97-7037eb60e752",
+        "sku": "11070860493073",
+        "stored": "23.49",
+        "klass": "availablePriceChanged",
+        "live": "23.29",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "aharen-san-is-indecipherable-omnibus-vol-3-4-9798897651115",
+      "title": "Aharen-san is Indecipherable (Omnibus) Vol. 3-4",
+      "isbn": "9798897651115",
+      "published": false,
+      "tm": {
+        "id": "0a4d4710-d6e5-4912-9be0-fa62bcd55659",
+        "sku": "15781117100406",
+        "stored": "13.99",
+        "klass": "availablePriceChanged",
+        "live": "14.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "f7e2baf5-52f3-4b09-bf45-8abe8723a514",
+        "sku": "11070807998737",
+        "stored": "24.69",
+        "klass": "availablePriceChanged",
+        "live": "24.29",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "marrying-the-dark-knight-for-her-money-2-779231",
+      "title": "Marrying the Dark Knight (For Her Money) 2",
+      "isbn": "9798888779231",
+      "published": false,
+      "tm": {
+        "id": "e41f511c-cf7b-445d-9dd0-b6101e26a38b",
+        "sku": "15826268684662",
+        "stored": "12.99",
+        "klass": "unavailable",
+        "live": "10.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "58bc5269-724c-47c0-8469-1874b89f93d5",
+        "sku": "11070859280657",
+        "stored": "19.69",
+        "klass": "availablePriceChanged",
+        "live": "19.29",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "travellingman.com is sold out live — pair abandoned, neither side published"
+    },
+    {
+      "slug": "revenge-of-the-baskerville-bloodhound-volume-2-904554",
+      "title": "Revenge of the Baskerville Bloodhound Volume 2",
+      "isbn": "9798400904554",
+      "published": false,
+      "tm": {
+        "id": "0ca22cd6-7b7c-4371-aa72-514221d49f37",
+        "sku": "15757454082422",
+        "stored": "12.99",
+        "klass": "availableUnchanged",
+        "live": "12.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "1ac43049-2183-49e6-af28-b72d57961423",
+        "sku": "11070821859601",
+        "stored": "24.09",
+        "klass": "availablePriceChanged",
+        "live": "23.79",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "the-fragrant-flower-blooms-with-dignity-13-774052",
+      "title": "The Fragrant Flower Blooms With Dignity 13",
+      "isbn": "9798888774052",
+      "published": false,
+      "tm": {
+        "id": "5fe05c9a-0b20-468e-ad60-295122270f4e",
+        "sku": "15772185592182",
+        "stored": "12.99",
+        "klass": "availablePriceChanged",
+        "live": "10.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "a303bdea-94ac-4e27-b79d-5e6e7d63f84a",
+        "sku": "11070845747473",
+        "stored": "19.49",
+        "klass": "availablePriceChanged",
+        "live": "13.99",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "honey-bee-lemon-balm-2-777619",
+      "title": "Honey Bee & Lemon Balm 2",
+      "isbn": "9798888777619",
+      "published": false,
+      "tm": {
+        "id": "e3a3c2a7-050b-4ad9-8d70-bbfd00448478",
+        "sku": "15812385669494",
+        "stored": "12.99",
+        "klass": "availableUnchanged",
+        "live": "12.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "6dbaa8e5-a619-413f-acbb-27b9492b606a",
+        "sku": "11070827528465",
+        "stored": "19.49",
+        "klass": "availablePriceChanged",
+        "live": "19.19",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "perfect-addiction-vol-2-618516",
+      "title": "Perfect Addiction Vol. 2",
+      "isbn": "9798895618516",
+      "published": false,
+      "tm": {
+        "id": "068f520f-bfb8-4da7-868c-193240f5a12f",
+        "sku": "15808345014646",
+        "stored": "12.99",
+        "klass": "availablePriceChanged",
+        "live": "11.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "e26abb3e-f44d-41d1-b3f3-06919f12457a",
+        "sku": "11070862262545",
+        "stored": "21.29",
+        "klass": "availablePriceChanged",
+        "live": "15.99",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "the-greatest-wolf-of-my-life-volume-1-612194",
+      "title": "The Greatest Wolf of My Life Volume 1",
+      "isbn": "9798895612194",
+      "published": false,
+      "tm": {
+        "id": "e9d57690-92c6-425e-aac0-5315dc432fba",
+        "sku": "15448797708662",
+        "stored": "12.99",
+        "klass": "availableUnchanged",
+        "live": "12.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "31fa08de-7267-4cb8-8d71-b9b784f3d1da",
+        "sku": "11070728536337",
+        "stored": "29.19",
+        "klass": "availableUnchanged",
+        "live": "29.19",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "stella-must-die-2-777510",
+      "title": "Stella Must Die 2",
+      "isbn": "9798888777510",
+      "published": false,
+      "tm": {
+        "id": "23cbbc7e-652e-44c9-be08-6f11b3cd119d",
+        "sku": "15826298896758",
+        "stored": "12.99",
+        "klass": "availableUnchanged",
+        "live": "12.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "8f89604b-02ae-4203-93fa-88104683ff92",
+        "sku": "11070881366289",
+        "stored": "19.49",
+        "klass": "availablePriceChanged",
+        "live": "19.09",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "ghost-witch-volume-1-619926",
+      "title": "Ghost & Witch Volume 1",
+      "isbn": "9798895619926",
+      "published": false,
+      "tm": {
+        "id": "8b59e999-5eb6-4649-b412-81a29cc810c8",
+        "sku": "15610814759286",
+        "stored": "11.99",
+        "klass": "availableUnchanged",
+        "live": "11.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "66dd4000-f278-4d37-9f95-94de49da7df7",
+        "sku": "11070775230737",
+        "stored": "18.29",
+        "klass": "availablePriceChanged",
+        "live": "18.09",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "parasyte-paperback-collection-volume-2-776643",
+      "title": "Parasyte Paperback Collection Volume 2",
+      "isbn": "9798888776643",
+      "published": false,
+      "tm": {
+        "id": "b91dbf84-3a95-48d8-a0e0-b837b368eca3",
+        "sku": "15549818175862",
+        "stored": "11.99",
+        "klass": "availableUnchanged",
+        "live": "11.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "ad97d7e4-1985-49db-97cc-8594b151bf22",
+        "sku": "11070745051409",
+        "stored": "20.99",
+        "klass": "availablePriceChanged",
+        "live": "20.69",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "not-sew-wicked-stepmom-vol-9-905230",
+      "title": "Not-Sew-Wicked Stepmom, Vol. 9",
+      "isbn": "9798400905230",
+      "published": false,
+      "tm": {
+        "id": "af15b6c8-8b30-48a6-aec7-b6ab712c8cf5",
+        "sku": "15797888319862",
+        "stored": "11.99",
+        "klass": "unavailable",
+        "live": "11.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "dca7d504-a735-4c38-8492-a71041f09dec",
+        "sku": "11070852137233",
+        "stored": "27.79",
+        "klass": "availablePriceChanged",
+        "live": "23.99",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "travellingman.com is sold out live — pair abandoned, neither side published"
+    },
+    {
+      "slug": "the-demon-king-is-way-too-overprotective-volume-3-619254",
+      "title": "The Demon King is Way Too Overprotective! Volume 3",
+      "isbn": "9798895619254",
+      "published": false,
+      "tm": {
+        "id": "382c53b8-619d-4b7c-a560-19221e8c7963",
+        "sku": "15756863373686",
+        "stored": "11.99",
+        "klass": "availableUnchanged",
+        "live": "11.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "efa96644-ddd3-4680-b96e-bcd3c71441a7",
+        "sku": "11070819303697",
+        "stored": "19.19",
+        "klass": "availableUnchanged",
+        "live": "19.19",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "tales-of-the-hundred-monsters-next-door-vol-3-613382",
+      "title": "Tales of the Hundred Monsters Next Door Vol. 3",
+      "isbn": "9798895613382",
+      "published": false,
+      "tm": {
+        "id": "96d66e7e-d2ff-4c24-a080-c86c001e6b33",
+        "sku": "15808348127606",
+        "stored": "11.99",
+        "klass": "availableUnchanged",
+        "live": "11.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "192f448d-8ab1-4aaa-a0c5-4bd322fbac99",
+        "sku": "11070837096721",
+        "stored": "20.29",
+        "klass": "availablePriceChanged",
+        "live": "19.09",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "dear-sister-i-ve-become-a-blessed-maiden-vol-2-652624",
+      "title": "Dear Sister, I've Become a Blessed Maiden Vol. 2",
+      "isbn": "9798897652624",
+      "published": false,
+      "tm": {
+        "id": "1432d2d3-0e0b-4292-a0d3-a4ea1b578116",
+        "sku": "15839644418422",
+        "stored": "11.99",
+        "klass": "availableUnchanged",
+        "live": "11.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "b329562a-bdea-4c11-86db-f387571c2428",
+        "sku": "11070908137745",
+        "stored": "21.29",
+        "klass": "availablePriceChanged",
+        "live": "15.99",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "koharu-and-minato-happy-life-with-my-girlfriend-vol-2-652235",
+      "title": "Koharu and Minato: Happy Life with My Girlfriend Vol. 2",
+      "isbn": "9798897652235",
+      "published": false,
+      "tm": {
+        "id": "26f7f480-534c-4135-8763-ad2208470a74",
+        "sku": "15835887272310",
+        "stored": "11.99",
+        "klass": "unavailable",
+        "live": "11.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "5527185a-2516-4f0b-8163-eb48b1fe989f",
+        "sku": "11070880547089",
+        "stored": "21.29",
+        "klass": "availablePriceChanged",
+        "live": "15.99",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "travellingman.com is sold out live — pair abandoned, neither side published"
+    },
+    {
+      "slug": "redeem-only-one-forever-vol-1-423433",
+      "title": "Redeem: Only One Forever, Vol. 1",
+      "isbn": "9798855423433",
+      "published": false,
+      "tm": {
+        "id": "a963c759-54a2-4546-a990-b8077a654fdf",
+        "sku": "15770713817462",
+        "stored": "11.99",
+        "klass": "availableUnchanged",
+        "live": "11.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "eb55f0c4-bb58-4d92-8047-89a2d73bf41a",
+        "sku": "11070847942929",
+        "stored": "25.49",
+        "klass": "availablePriceChanged",
+        "live": "22.99",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "wind-breaker-volume-20-776193",
+      "title": "Wind Breaker Volume 20",
+      "isbn": "9798888776193",
+      "published": false,
+      "tm": {
+        "id": "3260cd5e-9a6f-4a41-bd9c-0ec20dbff8b5",
+        "sku": "15635014189430",
+        "stored": "10.99",
+        "klass": "availableUnchanged",
+        "live": "10.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "53d3225c-7d67-4428-b9c9-9ef08d86c79c",
+        "sku": "11070765302033",
+        "stored": "18.59",
+        "klass": "availablePriceChanged",
+        "live": "18.29",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "fall-in-love-you-false-angels-volume-4-775783",
+      "title": "Fall In Love, You False Angels Volume 4",
+      "isbn": "9798888775783",
+      "published": false,
+      "tm": {
+        "id": "a17fc0a0-458f-4c28-b94f-ed45a2c13c48",
+        "sku": "15507176358262",
+        "stored": "10.99",
+        "klass": "availableUnchanged",
+        "live": "10.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "51f367dc-8657-4b6a-9b0d-be03017563e3",
+        "sku": "11070733844753",
+        "stored": "19.59",
+        "klass": "availablePriceChanged",
+        "live": "19.29",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "i-want-to-love-you-till-your-dying-day-volume-8-776612",
+      "title": "I Want to Love You Till Your Dying Day Volume 8",
+      "isbn": "9798888776612",
+      "published": false,
+      "tm": {
+        "id": "906f3450-e566-4efb-bff9-9d18b8a9c928",
+        "sku": "15724207800694",
+        "stored": "10.99",
+        "klass": "availableUnchanged",
+        "live": "10.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "072bdd13-6863-40db-9d3a-dbf8742d6e20",
+        "sku": "11070781391121",
+        "stored": "19.39",
+        "klass": "availablePriceChanged",
+        "live": "19.19",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    },
+    {
+      "slug": "hitting-rewind-with-you-3-777015",
+      "title": "Hitting Rewind With You 3",
+      "isbn": "9798888777015",
+      "published": false,
+      "tm": {
+        "id": "9af01941-5698-4ad9-8f69-9a9c2d6944eb",
+        "sku": "15785586393462",
+        "stored": "10.99",
+        "klass": "availableUnchanged",
+        "live": "10.99",
+        "domain": "travellingman.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-10-27T03:00:46.263Z",
+        "written": false
+      },
+      "wob": {
+        "id": "01b43c86-a80c-4c48-98bc-fddf8ee4ca94",
+        "sku": "11070856134929",
+        "stored": "19.49",
+        "klass": "availablePriceChanged",
+        "live": "19.19",
+        "domain": "worldofbooks.com",
+        "state": "revivable",
+        "scopedDeletedAt": "2026-07-03T03:00:10.150Z",
+        "written": false
+      },
+      "skipReason": "eligible — both sides verified available; would be published with --write"
+    }
+  ]
+}
