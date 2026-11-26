@@ -31,6 +31,8 @@ import {
   onFailure,
   bookshopLookup,
   bookshopRefresh,
+  offerRefresh,
+  offerHealthCheck,
 }                          from '@/lib/inngest'
 
 export const { GET, POST, PUT } = serve({
@@ -44,5 +46,7 @@ export const { GET, POST, PUT } = serve({
     onFailure,
     bookshopLookup,
     bookshopRefresh,
+    offerRefresh,
+    offerHealthCheck,
   ],
 })

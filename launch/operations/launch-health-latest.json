@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-11-22T16:36:52.206Z",
+  "generatedAt": "2026-11-26T14:00:04.569Z",
   "source": "read-only Postgres queries (scripts/launch-health.ts)",
   "catalogue": {
     "liveProducts": 136277,
@@ -8,38 +8,58 @@
     "coverNone": 94140,
     "coverR2Pct": 20.3,
     "formatKnownPct": 10.4,
-    "cvMatched": 10685,
-    "cvMatchedPct": 7.8,
+    "cvMatched": 10730,
+    "cvMatchedPct": 7.9,
     "described": 34900,
     "withCreators": 9087,
     "suspectFlagged": 4
   },
   "pricing": {
-    "pricedListings": 0,
-    "fresh7d": 0,
+    "pricedListings": 10,
+    "fresh7d": 10,
     "aged7to30d": 0,
     "stale30dPlus": 0,
     "stalePct": 0,
-    "inStock": 0,
+    "inStock": 10,
     "outOfStock": 0,
-    "productsPriced": 0,
+    "productsPriced": 10,
     "comparisonDepth": {
-      "oneRetailer": 0,
+      "oneRetailer": 10,
       "twoPlusRetailers": 0
     },
+    "alert": {
+      "level": "WARN",
+      "reasons": [
+        "0 products priced at 2+ retailers — no genuine comparison is possible."
+      ],
+      "lastSuccessfulWriteAt": "2026-11-26 13:48:25.814",
+      "lastSuccessfulWriteAgeDays": 0,
+      "oldestLiveSeenAt": "2026-11-26 13:48:11.683",
+      "nextExpiryAt": "2026-12-26T13:48:11.683Z",
+      "daysUntilNextExpiry": 30,
+      "expiringWithin7d": 0,
+      "retentionDays": 30
+    },
     "comparisonOverlapPct": 0,
-    "retailers": []
+    "retailers": [
+      {
+        "name": "Travelling Man",
+        "listings": 10,
+        "fresh30d": 10,
+        "lastSeen": "2026-11-26"
+      }
+    ]
   },
   "wave4": {
     "priceHistory": {
-      "totalObservations": 624421,
+      "totalObservations": 624431,
       "oldest": "2026-05-11",
-      "newest": "2026-09-26",
+      "newest": "2026-11-26",
       "productsEligibleForChart": 0
     },
     "metadata": {
       "distributorAsPublisher": 179,
-      "cvMatchedNoCreators": 1598,
+      "cvMatchedNoCreators": 1643,
       "note": "distributorAsPublisher rows are omitted at display via lib/identity/publisher.displayPublisher — DB unchanged. Full breakdown: npm run audit:metadata"
     },
     "issueCovers": {
@@ -60,13 +80,13 @@
     "allVisibleRowsGoStaleBy": null,
     "note": "No action required. Amazon data coverage will decline as stored listings expire. This is intentional and honest until a compliant replacement (Amazon Creators API when eligible) is approved. See launch/operations/amazon-post-rainforest-plan.md."
   },
-  "previousSnapshotAt": "2026-09-26T17:32:42.254Z",
+  "previousSnapshotAt": "2026-11-22T16:36:52.206Z",
   "deltas": {
     "liveProducts": 0,
     "coverR2": 0,
-    "cvMatched": 521,
-    "pricedListings": -2280,
+    "cvMatched": 45,
+    "pricedListings": 10,
     "stale30dPlus": 0,
-    "productsPriced": -2182
+    "productsPriced": 10
   }
 }
