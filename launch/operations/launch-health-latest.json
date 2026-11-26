@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-11-26T17:26:12.848Z",
+  "generatedAt": "2026-11-26T20:51:52.656Z",
   "source": "read-only Postgres queries (scripts/launch-health.ts)",
   "catalogue": {
     "liveProducts": 136277,
@@ -8,38 +8,44 @@
     "coverNone": 94140,
     "coverR2Pct": 20.3,
     "formatKnownPct": 10.4,
-    "cvMatched": 10732,
+    "cvMatched": 10740,
     "cvMatchedPct": 7.9,
     "described": 34900,
     "withCreators": 9087,
     "suspectFlagged": 4
   },
   "pricing": {
-    "pricedListings": 89,
-    "fresh7d": 89,
+    "pricedListings": 3833,
+    "fresh7d": 3833,
     "aged7to30d": 0,
     "stale30dPlus": 0,
     "stalePct": 0,
-    "inStock": 89,
-    "outOfStock": 0,
-    "productsPriced": 49,
+    "inStock": 3830,
+    "outOfStock": 3,
+    "productsPriced": 3760,
     "comparisonDepth": {
-      "oneRetailer": 9,
-      "twoPlusRetailers": 40
+      "oneRetailer": 3702,
+      "twoPlusRetailers": 58
     },
     "alert": {
       "level": "OK",
       "reasons": [],
-      "lastSuccessfulWriteAt": "2026-11-26 17:22:23.692",
-      "lastSuccessfulWriteAgeDays": 0,
-      "oldestLiveSeenAt": "2026-11-26 13:48:11.683",
-      "nextExpiryAt": "2026-12-26T13:48:11.683Z",
-      "daysUntilNextExpiry": 29.8,
+      "lastSuccessfulWriteAt": "2026-11-26 19:12:19",
+      "lastSuccessfulWriteAgeDays": 0.1,
+      "oldestLiveSeenAt": "2026-11-26 00:03:55",
+      "nextExpiryAt": "2026-12-26T00:03:55.000Z",
+      "daysUntilNextExpiry": 29.1,
       "expiringWithin7d": 0,
       "retentionDays": 30
     },
-    "comparisonOverlapPct": 81.63,
+    "comparisonOverlapPct": 1.54,
     "retailers": [
+      {
+        "name": "Waterstones",
+        "listings": 3715,
+        "fresh30d": 3715,
+        "lastSeen": "2026-11-26"
+      },
       {
         "name": "Travelling Man",
         "listings": 49,
@@ -51,19 +57,31 @@
         "listings": 40,
         "fresh30d": 40,
         "lastSeen": "2026-11-26"
+      },
+      {
+        "name": "Scholastic",
+        "listings": 16,
+        "fresh30d": 16,
+        "lastSeen": "2026-11-26"
+      },
+      {
+        "name": "Lets Buy Books",
+        "listings": 13,
+        "fresh30d": 13,
+        "lastSeen": "2026-11-26"
       }
     ]
   },
   "wave4": {
     "priceHistory": {
-      "totalObservations": 624510,
+      "totalObservations": 624982,
       "oldest": "2026-05-11",
       "newest": "2026-11-26",
       "productsEligibleForChart": 0
     },
     "metadata": {
       "distributorAsPublisher": 179,
-      "cvMatchedNoCreators": 1645,
+      "cvMatchedNoCreators": 1653,
       "note": "distributorAsPublisher rows are omitted at display via lib/identity/publisher.displayPublisher — DB unchanged. Full breakdown: npm run audit:metadata"
     },
     "issueCovers": {
@@ -84,13 +102,13 @@
     "allVisibleRowsGoStaleBy": null,
     "note": "No action required. Amazon data coverage will decline as stored listings expire. This is intentional and honest until a compliant replacement (Amazon Creators API when eligible) is approved. See launch/operations/amazon-post-rainforest-plan.md."
   },
-  "previousSnapshotAt": "2026-11-26T14:00:04.569Z",
+  "previousSnapshotAt": "2026-11-26T17:26:12.848Z",
   "deltas": {
     "liveProducts": 0,
     "coverR2": 0,
-    "cvMatched": 2,
-    "pricedListings": 79,
+    "cvMatched": 8,
+    "pricedListings": 3744,
     "stale30dPlus": 0,
-    "productsPriced": 39
+    "productsPriced": 3711
   }
 }

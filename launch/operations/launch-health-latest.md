@@ -1,24 +1,27 @@
-# Launch Health — 2026-11-26 17:26 UTC
+# Launch Health — 2026-11-26 20:51 UTC
 
 Source: read-only Postgres queries (scripts/launch-health.ts). Deltas vs 2026-11-26.
 
 ## Catalogue
 - Live products: **136,277** (+0 since 2026-11-26)
 - R2 covers: **27,730 (20.3%)** (+0 since 2026-11-26) · no cover: 94,140
-- Format known: 10.4% · CV-matched: 10,732 (7.9%) (+2 since 2026-11-26)
+- Format known: 10.4% · CV-matched: 10,740 (7.9%) (+8 since 2026-11-26)
 - Descriptions: 34,900 · creators: 9,087 · **suspect-flagged: 4**
 
 ## Pricing
 
-- Priced listings: **89** (+79 since 2026-11-26) · products priced: 49 (+39 since 2026-11-26)
-- Freshness: 89 <7d · 0 7–30d · **0 stale (0%)** (+0 since 2026-11-26)
-- Comparison depth: 9 products @ 1 retailer · **40 @ 2+** (overlap 81.63%)
+- Priced listings: **3,833** (+3744 since 2026-11-26) · products priced: 3,760 (+3711 since 2026-11-26)
+- Freshness: 3,833 <7d · 0 7–30d · **0 stale (0%)** (+0 since 2026-11-26)
+- Comparison depth: 3,702 products @ 1 retailer · **58 @ 2+** (overlap 1.54%)
+- Waterstones: 3,715 listings, 3,715 fresh, last seen 2026-11-26
 - Travelling Man: 49 listings, 49 fresh, last seen 2026-11-26
 - World of Books: 40 listings, 40 fresh, last seen 2026-11-26
+- Scholastic: 16 listings, 16 fresh, last seen 2026-11-26
+- Lets Buy Books: 13 listings, 13 fresh, last seen 2026-11-26
 
 ## Wave 4 — catalogue trust
-- Price history: **624,510** observations (2026-05-11 → 2026-11-26) · **0 products eligible** for the Price History chart (7+ distinct-day observations — matches the UI MIN_POINTS gate)
-- Suspect metadata: **179** distributor-as-publisher (omitted at display) · 1,645 CV-matched w/o creators
+- Price history: **624,982** observations (2026-05-11 → 2026-11-26) · **0 products eligible** for the Price History chart (7+ distinct-day observations — matches the UI MIN_POINTS gate)
+- Suspect metadata: **179** distributor-as-publisher (omitted at display) · 1,653 CV-matched w/o creators
 - Issue covers on R2 (sampled): **22** across 1 volume(s)
 
 ## Amazon — AFFILIATE-ONLY / STORED OFFERS (informational, not a failure)
