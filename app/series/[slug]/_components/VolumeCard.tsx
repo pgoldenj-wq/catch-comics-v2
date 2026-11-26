@@ -145,10 +145,12 @@ export default function VolumeCard({ volume }: Props) {
         {/* Format */}
         <p style={{ fontSize: '10px', color: '#6B7280', fontWeight: 500 }}>
           {fmtLabel}
-          {/* W2-4: honest missing-price state — we don't have a live price,
-              say so; the card still links through to the product page. */}
+          {/* W2-4 said "No live price yet" when there was no stored price AND
+              no live one. The product page this card links to now fetches eBay
+              by ISBN at request time, so the price is on the other side — see
+              EditionComparison.tsx for the full note. */}
           {!priceText && (
-            <span style={{ color: '#6B7280', marginLeft: fmtLabel ? '6px' : 0 }}>No live price yet →</span>
+            <span style={{ color: '#6B7280', marginLeft: fmtLabel ? '6px' : 0 }}>See prices →</span>
           )}
         </p>
       </div>
