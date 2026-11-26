@@ -164,3 +164,11 @@ launch/reviews/
 /blob-report/
 /playwright/.cache/
 /scripts/.cover-lowres/
+
+# Awin ingest checkpoints — local run state, not source code
+/scripts/.awin-ingest-*.json
+
+# Awin overlap measurement dumps — regenerable with `npm run awin:overlap`.
+# The Waterstones one is 1.7MB of feed rows; the funnel numbers that matter
+# are recorded in launch/operations/retailer-access-2026-11-26.md.
+/launch/operations/awin-overlap-*.json

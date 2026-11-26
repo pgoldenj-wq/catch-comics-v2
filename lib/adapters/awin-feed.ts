@@ -48,7 +48,7 @@ export type { SyncResult, SyncError }
 
 // ── Awin product record (normalised from XML or CSV) ──────────────────────────
 
-interface AwinProduct {
+export interface AwinProduct {
   merchant_product_id : string
   aw_product_id       : string
   product_name        : string
@@ -73,6 +73,17 @@ interface AwinSyncConfig {
   feed_id     ?: string
   api_key     ?: string
   feed_format ?: 'xml' | 'csv'
+  /**
+   * Opt-in catalogue gate, mirroring sync_config.comic_filter on the Shopify
+   * adapter. When true, a feed row is ingested ONLY if its ISBN already
+   * matches a live, comic-eligible canonical product.
+   *
+   * General book feeds are enormous — Waterstones is 154k rows, of which 9,572
+   * match our catalogue at all and 3,715 are comics. Without this gate a single
+   * sync would create ~150,000 listings for books we do not carry. Appearing in
+   * an entitled feed is not a reason to carry a title.
+   */
+  comic_filter ?: boolean
   [key: string]: unknown
 }
 
@@ -81,6 +92,86 @@ interface AwinSyncConfig {
 const CHUNK_SIZE   = 500
 const LOG_EVERY    = 5_000
 const USER_AGENT   = 'CatchComics/1.0 (+https://catchcomics.com/bot)'
+
+/**
+ * The comic-confidence predicate, identical to the one in
+ * scripts/price-verify-dryrun.ts. Deliberately NOT broadened.
+ */
+const COMIC_PUBLISHERS = [
+  '%marvel%', '%dc comic%', '%image comic%', '%dark horse%', '%idw%', '%viz%',
+  '%kodansha%', '%boom%', '%titan%', '%rebellion%', '%yen press%', '%seven seas%',
+  '%dynamite%', '%vertigo%', '%oni press%', '%fantagraphics%', '%tokyopop%', '%square enix%',
+]
+
+/**
+ * An automated soft-delete lands in cleanup-stale's 03:00 UTC cron window.
+ * Anything deleted outside it is presumed a deliberate suppression and is
+ * never revived by a feed sync — a feed is evidence about the retailer's
+ * stock, not permission to overturn a human decision.
+ */
+const CRON_WINDOW_START_MIN = 3 * 60
+const CRON_WINDOW_END_MIN   = 4 * 60 + 1
+
+export function isAutomatedDeletion(d: Date | null): boolean {
+  if (d === null) return false
+  const min = d.getUTCHours() * 60 + d.getUTCMinutes()
+  return min >= CRON_WINDOW_START_MIN && min <= CRON_WINDOW_END_MIN
+}
+
+/**
+ * When Awin last BUILT a given feed, from the publisher's datafeed index.
+ *
+ * This is looked up by the adapter itself rather than taken from the caller,
+ * because the hosted path (lib/sync/dispatch.ts) calls syncFeed(retailerId)
+ * with no options. A protection that only works when the caller remembers to
+ * pass something is not a protection.
+ *
+ * Cached in-process for the lifetime of the run: the index is ~500KB and one
+ * sync must not download it per chunk.
+ */
+let feedIndexCache: { at: number; map: Map<string, Date> } | null = null
+const FEED_INDEX_TTL_MS = 30 * 60_000
+
+export async function fetchFeedImportedAt(feedId: string, apiKey: string): Promise<Date | null> {
+  try {
+    if (!feedIndexCache || Date.now() - feedIndexCache.at > FEED_INDEX_TTL_MS) {
+      const res = await fetch(`https://productdata.awin.com/datafeed/list/apikey/${apiKey}/`, {
+        headers: { 'User-Agent': USER_AGENT, Accept: 'text/csv,*/*' },
+        signal : AbortSignal.timeout(60_000),
+      })
+      if (!res.ok) return null
+      const text = await res.text()
+      const lines = text.split(/\r?\n/).filter(l => l.trim())
+      const header = lines[0].split(',').map(h => h.replace(/"/g, '').trim().toLowerCase())
+      const iFeed = header.findIndex(h => h.replace(/[^a-z]/g, '') === 'feedid')
+      const iWhen = header.findIndex(h => h.replace(/[^a-z]/g, '') === 'lastimported')
+      const map = new Map<string, Date>()
+      if (iFeed >= 0 && iWhen >= 0) {
+        for (const line of lines.slice(1)) {
+          const c = line.split(',').map(x => x.replace(/^"|"$/g, '').trim())
+          const when = new Date((c[iWhen] ?? '').replace(' ', 'T') + 'Z')
+          if (c[iFeed] && !Number.isNaN(when.getTime())) map.set(c[iFeed], when)
+        }
+      }
+      feedIndexCache = { at: Date.now(), map }
+    }
+    return feedIndexCache.map.get(String(feedId)) ?? null
+  } catch {
+    // Never fail a sync because the index was unreachable — fall back to the
+    // caller's value, and let the freshness gate stay inert rather than block.
+    return null
+  }
+}
+
+/** Live, comic-eligible catalogue ISBNs — the allow-list for comic_filter. */
+export async function loadEligibleComicIsbns(): Promise<Set<string>> {
+  const rows = await prisma.$queryRaw<{ isbn_13: string }[]>`
+    SELECT DISTINCT isbn_13 FROM canonical_products
+    WHERE deleted_at IS NULL AND isbn_13 IS NOT NULL
+      AND (comicvine_id IS NOT NULL OR cv_metadata IS NOT NULL
+           OR publisher ILIKE ANY(${COMIC_PUBLISHERS}::text[]))`
+  return new Set(rows.map(r => r.isbn_13))
+}
 
 // ── Condition mapping ─────────────────────────────────────────────────────────
 
@@ -110,7 +201,7 @@ function parsePrice(raw: string): string {
 
 // ── Identifier extraction ─────────────────────────────────────────────────────
 
-function extractAwinIdentifiers(product: AwinProduct): { isbn13: string | null; ean: string | null } {
+export function extractAwinIdentifiers(product: AwinProduct): { isbn13: string | null; ean: string | null } {
   // ISBN field takes priority (Awin maps it directly from merchant data)
   const fromIsbn = extractIdentifiers(product.isbn)
   if (fromIsbn.isbn13) return fromIsbn
@@ -139,7 +230,8 @@ async function upsertListing(
   canonicalProductId: string | null,
   matchMethod       : MatchMethod,
   matchConfidence   : number,
-  syncStart         : Date,
+  /** Feed build time — see the note on processChunk. Never wall-clock now. */
+  observedAt        : Date,
 ): Promise<'created' | 'updated' | 'price_changed'> {
   const priceAmount = parsePrice(product.search_price)
   const existing    = await prisma.retailerListing.findUnique({
@@ -163,14 +255,14 @@ async function upsertListing(
         canonicalProductId,
         matchMethod,
         matchConfidence,
-        firstSeenAt       : syncStart,
-        lastSeenAt        : syncStart,
+        firstSeenAt       : observedAt,
+        lastSeenAt        : observedAt,
         priceHistory: {
           create: {
             priceAmount,
             priceCurrency: product.currency || 'GBP',
             stockStatus  : mapAwinStock(product.in_stock),
-            recordedAt   : syncStart,
+            recordedAt   : observedAt,
           },
         },
       },
@@ -187,15 +279,21 @@ async function upsertListing(
   await prisma.retailerListing.update({
     where: { id: existing.id },
     data: {
-      lastSeenAt  : syncStart,
+      lastSeenAt  : observedAt,
       stockStatus : mapAwinStock(product.in_stock),
       priceAmount,
       title       : product.product_name,
       imageUrl    : product.merchant_image_url || null,
       rawData     : product as unknown as Prisma.InputJsonValue,
       retailerUrl : product.merchant_deep_link || product.aw_deep_link,
-      deletedAt   : null,
-      ...(priceChanged ? { lastPriceChangeAt: syncStart } : {}),
+      // A feed row is evidence the merchant still sells this, so an AUTOMATED
+      // expiry (cleanup-stale's 03:00 sweep) may be reversed. A deliberate
+      // suppression may not: a feed is evidence about stock, not permission to
+      // overturn a human decision. Previously this cleared deletedAt
+      // unconditionally, which made every sync a blanket undelete.
+      ...(existing.deletedAt === null || isAutomatedDeletion(existing.deletedAt)
+            ? { deletedAt: null } : {}),
+      ...(priceChanged ? { lastPriceChangeAt: observedAt } : {}),
       ...matchUpdate,
     },
   })
@@ -207,7 +305,7 @@ async function upsertListing(
         priceAmount,
         priceCurrency    : product.currency || 'GBP',
         stockStatus      : mapAwinStock(product.in_stock),
-        recordedAt       : syncStart,
+        recordedAt       : observedAt,
       },
     })
     return 'price_changed'
@@ -221,7 +319,13 @@ async function upsertListing(
 async function processChunk(
   retailerId : string,
   chunk      : AwinProduct[],
-  syncStart  : Date,
+  /**
+   * When the price was OBSERVED — the feed's own Awin import timestamp, not
+   * wall-clock now. Re-reading a feed Awin last built in September must not
+   * stamp September prices with today's date; that is how a stale price
+   * acquires false freshness and escapes the expiry sweep it deserves.
+   */
+  observedAt : Date,
   errors     : SyncError[],
   counters   : { created: number; updated: number; priceChanges: number },
 ): Promise<void> {
@@ -246,7 +350,7 @@ async function processChunk(
     }
 
     try {
-      const result = await upsertListing(retailerId, product, canonicalProductId, mMethod, mConf, syncStart)
+      const result = await upsertListing(retailerId, product, canonicalProductId, mMethod, mConf, observedAt)
       if (result === 'created')            counters.created++
       else if (result === 'price_changed') { counters.updated++; counters.priceChanges++ }
       else                                 counters.updated++
@@ -260,13 +364,43 @@ async function processChunk(
   }
 }
 
+// ── Secret redaction ──────────────────────────────────────────────────────────
+
+/**
+ * Strip the Awin datafeed key out of anything on its way to a log, an error
+ * record, or the database.
+ *
+ * The key is a path segment of the download URL, so a failed fetch used to
+ * write the live credential into sync_logs.error_summary. This redacts by URL
+ * SHAPE rather than by comparing against process.env.AWIN_DATAFEED_KEY, so it
+ * also covers per-retailer `api_key` values held in sync_config, which never
+ * appear in the environment at all.
+ */
+export function redactFeedSecrets(s: string): string {
+  if (!s) return s
+  return s.replace(/\/apikey\/[^/\s"']+/gi, '/apikey/<redacted>')
+}
+
+/** The download URL, and a version of it that is safe to log. */
+function feedUrls(apiKey: string, feedId: string, feedFormat: 'xml' | 'csv') {
+  const url = `https://productdata.awin.com/datafeed/download/apikey/${apiKey}/fid/${feedId}/format/${feedFormat}/language/en/delimiter/%2C/compression/gzip/`
+  return { url, safe: redactFeedSecrets(url) }
+}
+
 // ── Feed download ─────────────────────────────────────────────────────────────
 
-async function downloadFeed(url: string): Promise<ReadableStream<Uint8Array>> {
-  const res = await fetch(url, {
-    headers: { 'User-Agent': USER_AGENT, Accept: '*/*' },
-    signal : AbortSignal.timeout(300_000),  // 5-minute timeout for large feeds
-  })
+export async function downloadFeed(url: string): Promise<ReadableStream<Uint8Array>> {
+  let res: Response
+  try {
+    res = await fetch(url, {
+      headers: { 'User-Agent': USER_AGENT, Accept: '*/*' },
+      signal : AbortSignal.timeout(300_000),  // 5-minute timeout for large feeds
+    })
+  } catch (err) {
+    // Node embeds the request URL in some network errors, and that URL carries
+    // the datafeed key. Redact before it can propagate to a caller that logs it.
+    throw new Error(redactFeedSecrets(err instanceof Error ? err.message : String(err)))
+  }
   if (!res.ok) throw new Error(`Feed download failed: HTTP ${res.status} ${res.statusText}`)
   if (!res.body) throw new Error('Feed response has no body')
   // AWIN feeds are always gzip-compressed — decompress before parsing
@@ -277,7 +411,7 @@ async function downloadFeed(url: string): Promise<ReadableStream<Uint8Array>> {
 
 // ── XML feed parser (streaming) ───────────────────────────────────────────────
 
-async function* parseXmlFeed(stream: ReadableStream<Uint8Array>): AsyncGenerator<AwinProduct> {
+export async function* parseXmlFeed(stream: ReadableStream<Uint8Array>): AsyncGenerator<AwinProduct> {
   // Dynamically import fast-xml-parser to avoid bundling in edge runtime
   // @ts-ignore -- fast-xml-parser installed at runtime; types resolve after npm install
   const { XMLParser } = require('fast-xml-parser') as { XMLParser: new (opts: object) => { parse(xml: string): Record<string, unknown> } }
@@ -345,7 +479,7 @@ function mapXmlProduct(p: Record<string, unknown>): AwinProduct {
 
 // ── CSV feed parser (streaming) ───────────────────────────────────────────────
 
-async function* parseCsvFeed(stream: ReadableStream<Uint8Array>): AsyncGenerator<AwinProduct> {
+export async function* parseCsvFeed(stream: ReadableStream<Uint8Array>): AsyncGenerator<AwinProduct> {
   // @ts-ignore -- csv-parse installed at runtime; types resolve after npm install
   const { parse } = require('csv-parse') as { parse: (opts: object) => NodeJS.ReadWriteStream }
 
@@ -398,6 +532,20 @@ function mapCsvRow(row: Record<string, string>): AwinProduct {
 
 // ── Main adapter class ────────────────────────────────────────────────────────
 
+/** Per-run options. All optional, so existing call sites are unaffected. */
+export interface AwinSyncOptions {
+  /** When Awin last BUILT the feed. Used as the observation time. */
+  observedAt     ?: Date
+  /** Refuse the sync if the feed is older than this many days. */
+  maxFeedAgeDays ?: number
+  /** Stop after this many feed rows have been INGESTED (not read). */
+  maxListings    ?: number
+  /** Called after each committed chunk, for checkpointing. */
+  onProgress     ?: (p: { rowsRead: number; ingested: number; skipped: number }) => void | Promise<void>
+}
+
+const DEFAULT_MAX_FEED_AGE_DAYS = 7
+
 export class AwinFeedAdapter {
 
   /**
@@ -407,9 +555,12 @@ export class AwinFeedAdapter {
    *                    The retailer's sync_config must contain feed_id and
    *                    optionally api_key and feed_format ("xml" | "csv").
    */
-  async syncFeed(retailerId: string): Promise<SyncResult> {
+  async syncFeed(retailerId: string, opts: AwinSyncOptions = {}): Promise<SyncResult> {
     const startedAt = Date.now()
     const syncStart = new Date()
+    // The honest observation time: when Awin last BUILT this feed, falling back
+    // to now only when the caller could not establish it.
+    let observedAt = opts.observedAt ?? syncStart
     const errors    : SyncError[] = []
     let pagesFetched    = 0
     let productsFetched = 0
@@ -434,7 +585,39 @@ export class AwinFeedAdapter {
     if (!feedId) throw new Error(`retailer ${retailer.domain} has no feed_id in sync_config`)
     if (!apiKey) throw new Error(`no datafeed key for retailer ${retailer.domain} — set AWIN_DATAFEED_KEY env var (distinct from AWIN_API_KEY)`)
 
-    const feedUrl = `https://productdata.awin.com/datafeed/download/apikey/${apiKey}/fid/${feedId}/format/${feedFormat}/language/en/delimiter/%2C/compression/gzip/`
+    // ── Freshness gate ────────────────────────────────────────────────────
+    // Publishing a price is a claim that it is current. If Awin last rebuilt
+    // this feed months ago, ingesting it would dress stale prices as today's.
+    const builtAt = opts.observedAt ?? await fetchFeedImportedAt(feedId, apiKey)
+    if (builtAt) observedAt = builtAt
+    const feedAgeDays = builtAt
+      ? (syncStart.getTime() - builtAt.getTime()) / 86_400_000
+      : null
+    console.log(`[awin] ${retailer.domain}: feed built ${builtAt ? builtAt.toISOString() : 'UNKNOWN'}${feedAgeDays !== null ? ` (${feedAgeDays.toFixed(1)}d ago)` : ''}`)
+    const maxAge = opts.maxFeedAgeDays ?? DEFAULT_MAX_FEED_AGE_DAYS
+    if (feedAgeDays !== null && feedAgeDays > maxAge) {
+      errors.push({
+        type   : 'fetch',
+        message: `feed last built by Awin ${feedAgeDays.toFixed(1)} days ago, over the ${maxAge}-day freshness limit — refusing to publish stale prices as current`,
+        context: `feed ${feedId}`,
+      })
+      return {
+        retailerId, domain: retailer.domain, pagesFetched: 0, productsFetched: 0,
+        listingsCreated: 0, listingsUpdated: 0, priceChanges: 0, errors,
+        durationMs: Date.now() - startedAt,
+      }
+    }
+
+    // ── Catalogue gate ────────────────────────────────────────────────────
+    const comicFilter = cfg.comic_filter === true
+    let allowIsbns: Set<string> | null = null
+    if (comicFilter) {
+      allowIsbns = await loadEligibleComicIsbns()
+      console.log(`[awin] comic_filter=true — ${allowIsbns.size.toLocaleString()} eligible catalogue ISBNs loaded`)
+    }
+    let skippedNotEligible = 0
+
+    const { url: feedUrl, safe: safeFeedUrl } = feedUrls(apiKey, feedId, feedFormat)
 
     console.log(`[awin] starting feed sync for ${retailer.domain} (feed ${feedId}, format ${feedFormat})`)
 
@@ -442,7 +625,13 @@ export class AwinFeedAdapter {
     try {
       feedStream = await downloadFeed(feedUrl)
     } catch (err) {
-      errors.push({ type: 'fetch', message: err instanceof Error ? err.message : String(err), context: feedUrl })
+      // NEVER the raw feedUrl: it contains the datafeed key and this record is
+      // persisted to sync_logs.error_summary.
+      errors.push({
+        type   : 'fetch',
+        message: redactFeedSecrets(err instanceof Error ? err.message : String(err)),
+        context: safeFeedUrl,
+      })
       return {
         retailerId, domain: retailer.domain, pagesFetched: 0, productsFetched: 0,
         listingsCreated: 0, listingsUpdated: 0, priceChanges: 0, errors,
@@ -459,16 +648,31 @@ export class AwinFeedAdapter {
     const counters = { created: listingsCreated, updated: listingsUpdated, priceChanges }
 
     try {
+      let rowsRead = 0
       for await (const product of productGen) {
+        rowsRead++
         if (!product.merchant_product_id || !product.product_name) continue  // skip malformed rows
         if (!product.aw_deep_link && !product.merchant_deep_link) continue   // skip rows with no usable URL
+
+        // Catalogue gate: ingest only editions we already carry as comics.
+        if (allowIsbns) {
+          const { isbn13 } = extractAwinIdentifiers(product)
+          if (!isbn13 || !allowIsbns.has(isbn13)) { skippedNotEligible++; continue }
+        }
+
         chunk.push(product)
         productsFetched++
 
         if (chunk.length >= CHUNK_SIZE) {
-          await processChunk(retailerId, chunk, syncStart, errors, counters)
+          await processChunk(retailerId, chunk, observedAt, errors, counters)
           pagesFetched++   // each chunk ≈ one "page" for reporting
           chunk = []
+          await opts.onProgress?.({ rowsRead, ingested: productsFetched, skipped: skippedNotEligible })
+        }
+
+        if (opts.maxListings && productsFetched >= opts.maxListings) {
+          console.log(`[awin] ${retailer.domain}: reached maxListings ${opts.maxListings} — stopping early`)
+          break
         }
 
         if (productsFetched % LOG_EVERY === 0) {
@@ -482,9 +686,13 @@ export class AwinFeedAdapter {
 
       // Process the final partial chunk
       if (chunk.length > 0) {
-        await processChunk(retailerId, chunk, syncStart, errors, counters)
+        await processChunk(retailerId, chunk, observedAt, errors, counters)
         pagesFetched++
       }
+      if (allowIsbns) {
+        console.log(`[awin] ${retailer.domain}: read ${rowsRead.toLocaleString()} rows, ingested ${productsFetched.toLocaleString()}, skipped ${skippedNotEligible.toLocaleString()} not in the comic catalogue`)
+      }
+      await opts.onProgress?.({ rowsRead, ingested: productsFetched, skipped: skippedNotEligible })
     } catch (err) {
       errors.push({ type: 'fetch', message: `feed parse error: ${err instanceof Error ? err.message : err}` })
     }
@@ -541,8 +749,15 @@ export class AwinFeedAdapter {
     withEan    : number
     unmatched  : number
   }> {
-    const feedUrl = `https://productdata.awin.com/datafeed/download/apikey/${apiKey}/fid/${feedId}/format/${feedFormat}/language/en/delimiter/%2C/compression/gzip/`
-    const feedStream = await downloadFeed(feedUrl)
+    const { url: feedUrl } = feedUrls(apiKey, feedId, feedFormat)
+    let feedStream: ReadableStream<Uint8Array>
+    try {
+      feedStream = await downloadFeed(feedUrl)
+    } catch (err) {
+      // previewFeed is called straight from the admin test-connection route,
+      // which returns err.message to the browser. Redact at the source.
+      throw new Error(redactFeedSecrets(err instanceof Error ? err.message : String(err)))
+    }
 
     const productGen = feedFormat === 'xml'
       ? parseXmlFeed(feedStream)
