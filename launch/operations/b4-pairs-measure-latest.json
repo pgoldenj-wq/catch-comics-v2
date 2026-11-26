@@ -1,0 +1,134 @@
+{
+  "version": 1,
+  "runAt": "2026-11-26T17:16:51.288Z",
+  "mode": "MEASURE-ONLY (no HTTP, zero writes)",
+  "unitOfWork": "pair — both sides verified live and available in this run, or neither side published",
+  "scope": {
+    "travellingMan": "deleted_at = 2026-10-27T03:00:46.263Z or already active",
+    "worldOfBooks": "deleted_at inside 3:00-04:01 UTC cron window, or already active",
+    "perRowScoping": "every UPDATE scoped to id AND the exact deleted_at read in this run"
+  },
+  "breakerTripped": null,
+  "bounds": {
+    "MAX_PAIR_CANDIDATES": 60,
+    "MAX_PAIRS": 40,
+    "BETWEEN_PRODUCT_MS": 1000,
+    "MAX_RUNTIME_MS": 480000,
+    "MAX_RETRIES": 3,
+    "MAX_PRICE_RATIO": 10
+  },
+  "evidenceRule": "fresh /products/<handle>.js response in this run, for BOTH sides; exact product id and stored variant; available:true; plausible price. Sitemap never used as price evidence.",
+  "pairCandidates": 60,
+  "refusedOutsideCronWindow": [],
+  "worldOfBooksCohorts": [
+    {
+      "deletedAt": "2026-07-03T03:00:10.150Z",
+      "rows": 39,
+      "inCronWindow": true
+    },
+    {
+      "deletedAt": "2026-08-21T03:01:05.782Z",
+      "rows": 1,
+      "inCronWindow": true
+    },
+    {
+      "deletedAt": "2026-08-17T03:00:21.659Z",
+      "rows": 1,
+      "inCronWindow": true
+    },
+    {
+      "deletedAt": "2026-08-15T03:00:45.335Z",
+      "rows": 1,
+      "inCronWindow": true
+    },
+    {
+      "deletedAt": "2026-07-29T03:00:18.894Z",
+      "rows": 1,
+      "inCronWindow": true
+    },
+    {
+      "deletedAt": "2026-07-15T03:00:15.243Z",
+      "rows": 13,
+      "inCronWindow": true
+    },
+    {
+      "deletedAt": "2026-07-13T03:00:29.605Z",
+      "rows": 1,
+      "inCronWindow": true
+    },
+    {
+      "deletedAt": "2026-07-10T03:01:17.287Z",
+      "rows": 2,
+      "inCronWindow": true
+    },
+    {
+      "deletedAt": "2026-07-07T03:00:06.407Z",
+      "rows": 1,
+      "inCronWindow": true
+    }
+  ],
+  "eligibleAfterGuard": 60,
+  "travellingManAlreadyLive": 1,
+  "verification": {
+    "availableUnchanged": 0,
+    "availablePriceChanged": 0,
+    "unavailableLeftDeleted": 0,
+    "variantMissing": 0,
+    "productIdMismatch": 0,
+    "notFound404": 0,
+    "transientFailures": 0,
+    "otherErrors": 0
+  },
+  "pairsPublished": 0,
+  "pairsAtDifferentLivePrice": 0,
+  "pairsAtIdenticalLivePrice": 0,
+  "writeTotals": {
+    "pairsPublished": 0,
+    "rowsRevived": 0,
+    "priceHistoryRowsCreated": 0,
+    "alreadyActiveRowsWritten": 0,
+    "priceDriftLeftForRefresh": 0,
+    "listingsCreated": 0,
+    "canonicalProductsCreated": 0,
+    "matcherCalls": 0,
+    "inngestExecutions": 0,
+    "retailerLastSyncedAtTouched": 0,
+    "rowsTouchedOutsideCronWindow": 0
+  },
+  "productionState": {
+    "before": {
+      "pricedListings": 10,
+      "pricedProducts": 10,
+      "productsAtTwoRetailers": 0,
+      "priceHistoryRows": 624431,
+      "retailerListings": 808344,
+      "canonicalProducts": 150694,
+      "tmSweepCohortStillDeleted": 2236,
+      "tmActiveRows": 10,
+      "wobActiveRows": 0,
+      "unrelatedDeletedRows": 274571
+    },
+    "after": {
+      "pricedListings": 10,
+      "pricedProducts": 10,
+      "productsAtTwoRetailers": 0,
+      "priceHistoryRows": 624431,
+      "retailerListings": 808344,
+      "canonicalProducts": 150694,
+      "tmSweepCohortStillDeleted": 2236,
+      "tmActiveRows": 10,
+      "wobActiveRows": 0,
+      "unrelatedDeletedRows": 274571
+    }
+  },
+  "cost": {
+    "productRequests": 0,
+    "retryRequests": 0,
+    "totalHttpRequests": 0,
+    "inboundMiB": 0,
+    "wallClockMs": 4531,
+    "wallClockMin": 0.1,
+    "externalApiCostGBP": 0
+  },
+  "outcomes": []
+}
