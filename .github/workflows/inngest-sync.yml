@@ -1,0 +1,73 @@
+# Register the deployed Inngest functions, every time production deploys.
+#
+# WHY THIS EXISTS
+# ───────────────
+# PR #54 added offer-refresh-verified-offers and offer-health-check on
+# 2026-11-26. They never fired. Nine merges to main landed afterwards and they
+# were still absent from Inngest Cloud until the founder re-synced the app by
+# hand on 2026-11-27 at 12:06. So whatever the Vercel-Inngest integration is
+# doing, it did not register new functions on deploy — and a new function that
+# silently never runs is the single most expensive failure mode this project
+# has had.
+#
+# Rather than depend on that integration behaving, this makes registration
+# deterministic: Inngest's serve handler treats PUT as "register what this
+# deployment serves", so after every successful production deployment we ask
+# the deployment to register itself. It is idempotent — re-registering the same
+# manifest is a no-op in effect — and it CANNOT resume a paused function, so a
+# deliberate pause stays paused.
+#
+# Triggered by deployment_status rather than push, because a push fires while
+# Vercel is still building: PUTting then would register the PREVIOUS build.
+name: Inngest sync on deploy
+
+on:
+  deployment_status:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    # Only a successful PRODUCTION deployment. Preview deployments have their
+    # own Inngest apps and must not be registered against production.
+    if: >-
+      github.event.deployment_status.state == 'success' &&
+      github.event.deployment_status.environment == 'Production'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Register functions with Inngest
+        run: |
+          set -u
+          URL="https://www.catchcomics.com/api/inngest"
+          HTTP=""
+          for attempt in 1 2 3; do
+            HTTP=$(curl -sS -m 45 -X PUT -o /tmp/sync.json -w '%{http_code}' "$URL") && break
+            echo "attempt $attempt failed; retrying in 15s"; sleep 15
+          done
+          BODY=$(cat /tmp/sync.json 2>/dev/null || echo '')
+          echo "HTTP $HTTP — $BODY"
+
+          if [ "$HTTP" != "200" ]; then
+            echo "::error::Inngest registration failed (HTTP $HTTP). Newly added functions may not run. Re-sync the app manually at app.inngest.com → production → Apps."
+            {
+              echo "### Inngest sync: FAILED :x:"
+              echo ""
+              echo "\`PUT $URL\` returned **HTTP $HTTP**."
+              echo "Any function added in this deployment may not be registered, and will not run."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          {
+            echo "### Inngest sync :white_check_mark:"
+            echo ""
+            echo "Registered the functions served by commit \`${{ github.event.deployment_status.deployment.sha }}\`."
+            echo ""
+            echo "\`\`\`json"
+            echo "$BODY"
+            echo "\`\`\`"
+            echo ""
+            echo "Registration cannot resume a paused function — deliberate pauses are preserved."
+          } >> "$GITHUB_STEP_SUMMARY"
