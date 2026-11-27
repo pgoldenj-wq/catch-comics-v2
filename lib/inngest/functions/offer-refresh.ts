@@ -60,7 +60,12 @@ import {
  * retailer_url must contain a /products/<handle> path on a Shopify store.
  * Adding a domain here requires that to be true of its rows.
  */
-const SHOPIFY_VERIFY_DOMAINS = ['travellingman.com', 'worldofbooks.com']
+/**
+ * Exported so health reporting can tell "deliberately excluded from the hourly
+ * cron because THIS job covers it" apart from "excluded and covered by nothing".
+ * Duplicating the list in a report would silently drift from the job.
+ */
+export const SHOPIFY_VERIFY_DOMAINS = ['travellingman.com', 'worldofbooks.com']
 
 /**
  * The one soft-delete cohort the recovery pass may reverse: the 27 October 2026

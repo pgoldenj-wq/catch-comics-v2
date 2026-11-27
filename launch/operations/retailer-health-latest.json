@@ -1,0 +1,160 @@
+{
+  "generatedAt": "2026-11-27T13:59:31.292Z",
+  "staleHours": 48,
+  "retailers": [
+    {
+      "domain": "waterstones.com",
+      "platform": "AWIN_FEED",
+      "state": "FRESH",
+      "priced": "3769",
+      "check": "2026-11-27 13:15",
+      "obs": "2026-11-27 13:15",
+      "due": "2026-11-28 13:39",
+      "expiry": "2026-12-26 19:12",
+      "note": ""
+    },
+    {
+      "domain": "travellingman.com",
+      "platform": "SHOPIFY",
+      "state": "VERIFIED_DAILY",
+      "priced": "49",
+      "check": "2026-11-26 17:22",
+      "obs": "2026-11-26 17:22",
+      "due": "2026-11-28 02:00",
+      "expiry": "2026-12-26 13:48",
+      "note": "excluded from the hourly cron — covered by offer_refresh, daily 02:00 UTC"
+    },
+    {
+      "domain": "worldofbooks.com",
+      "platform": "SHOPIFY",
+      "state": "VERIFIED_DAILY",
+      "priced": "40",
+      "check": "2026-11-26 17:22",
+      "obs": "2026-11-26 17:22",
+      "due": "2026-11-28 02:00",
+      "expiry": "2026-12-26 17:20",
+      "note": "excluded from the hourly cron — covered by offer_refresh, daily 02:00 UTC"
+    },
+    {
+      "domain": "scholastic.co.uk",
+      "platform": "AWIN_FEED",
+      "state": "NOTHING_DUE",
+      "priced": "18",
+      "check": "2026-11-27 00:03",
+      "obs": "2026-11-27 00:03",
+      "due": "2026-11-28 13:42",
+      "expiry": "2026-12-27 00:03",
+      "note": ""
+    },
+    {
+      "domain": "letsbuybooks.com",
+      "platform": "AWIN_FEED",
+      "state": "FRESH",
+      "priced": "14",
+      "check": "2026-11-27 07:40",
+      "obs": "2026-11-26 19:09",
+      "due": "2026-11-28 13:34",
+      "expiry": "2026-12-27 07:40",
+      "note": ""
+    },
+    {
+      "domain": "abebooks.co.uk",
+      "platform": "DIRECT_AFFILIATE",
+      "state": "BLOCKED",
+      "priced": "0",
+      "check": "—",
+      "obs": "—",
+      "due": "manual/CLI",
+      "expiry": "—",
+      "note": "DIRECT_AFFILIATE in SKIP_PLATFORMS — affiliate link only, no price feed"
+    },
+    {
+      "domain": "amazon.co.uk",
+      "platform": "EXTERNAL_API",
+      "state": "BLOCKED",
+      "priced": "0",
+      "check": "—",
+      "obs": "2026-06-26 17:36",
+      "due": "manual/CLI",
+      "expiry": "—",
+      "note": "scheduled_sync_disabled — NO automated cover"
+    },
+    {
+      "domain": "bookshop.org",
+      "platform": "DYNAMIC_LINK",
+      "state": "BLOCKED",
+      "priced": "0",
+      "check": "—",
+      "obs": "—",
+      "due": "manual/CLI",
+      "expiry": "—",
+      "note": "DYNAMIC_LINK in SKIP_PLATFORMS — affiliate link only, no price feed"
+    },
+    {
+      "domain": "ebay.co.uk",
+      "platform": "EBAY",
+      "state": "LIVE_LOOKUP",
+      "priced": "0",
+      "check": "—",
+      "obs": "—",
+      "due": "per request",
+      "expiry": "—",
+      "note": "live Browse API lookup per shopper request — no stored rows by design"
+    },
+    {
+      "domain": "ebay.com",
+      "platform": "EBAY",
+      "state": "LIVE_LOOKUP",
+      "priced": "0",
+      "check": "—",
+      "obs": "—",
+      "due": "per request",
+      "expiry": "—",
+      "note": "live Browse API lookup per shopper request — no stored rows by design"
+    },
+    {
+      "domain": "uk.bookshop.org",
+      "platform": "AWIN_FEED",
+      "state": "BLOCKED",
+      "priced": "0",
+      "check": "—",
+      "obs": "2026-08-18 20:54",
+      "due": "manual/CLI",
+      "expiry": "—",
+      "note": "scheduled_sync_disabled — NO automated cover"
+    },
+    {
+      "domain": "whsmith.co.uk",
+      "platform": "DIRECT_AFFILIATE",
+      "state": "BLOCKED",
+      "priced": "0",
+      "check": "—",
+      "obs": "—",
+      "due": "manual/CLI",
+      "expiry": "—",
+      "note": "DIRECT_AFFILIATE in SKIP_PLATFORMS — affiliate link only, no price feed"
+    },
+    {
+      "domain": "wordery.com",
+      "platform": "DYNAMIC_LINK",
+      "state": "BLOCKED",
+      "priced": "0",
+      "check": "—",
+      "obs": "2026-05-25 21:50",
+      "due": "manual/CLI",
+      "expiry": "—",
+      "note": "DYNAMIC_LINK in SKIP_PLATFORMS — affiliate link only, no price feed"
+    },
+    {
+      "domain": "zavvi.com",
+      "platform": "DIRECT_AFFILIATE",
+      "state": "BLOCKED",
+      "priced": "0",
+      "check": "—",
+      "obs": "—",
+      "due": "manual/CLI",
+      "expiry": "—",
+      "note": "DIRECT_AFFILIATE in SKIP_PLATFORMS — affiliate link only, no price feed"
+    }
+  ]
+}
