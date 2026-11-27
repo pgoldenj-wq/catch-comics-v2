@@ -135,6 +135,7 @@
     "retailers:interval": "dotenv -e .env.local -- tsx scripts/set-refresh-interval.ts",
     "pricing:evidence": "dotenv -e .env.local -- tsx scripts/pricing-evidence.ts",
     "retailers:health": "dotenv -e .env.local -- tsx scripts/retailer-health.ts",
+    "catalogue:gaps": "dotenv -e .env.local -- tsx scripts/catalogue-metadata-gaps.ts",
     "alerts:test": "dotenv -e .env.local -- tsx scripts/send-test-alert.ts",
     "retailers:cohorts": "dotenv -e .env.local -- tsx scripts/check-deletion-cohorts.ts",
     "b4:pairs:measure": "dotenv -e .env.local -- tsx scripts/b4-revive-paired-offers.ts --measure-only",
