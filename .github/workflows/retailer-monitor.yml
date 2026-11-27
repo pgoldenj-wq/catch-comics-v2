@@ -1,0 +1,112 @@
+# Retailer freshness monitor — deliberately NOT an Inngest function.
+#
+# offer-health-check already watches coverage, but it runs inside Inngest, so
+# it cannot report that Inngest is not running. That is the exact failure that
+# went unnoticed from 2026-08-09, and again from 2026-09-26 when a 30-day
+# sweep removed every price and nothing complained. This runs on GitHub's
+# infrastructure instead, so it survives Inngest being dark.
+#
+# Green  = checked, everything fresh or legitimately not due yet. Silent.
+# Red    = an incident is OPEN. GitHub emails the founder, and stays red until
+#          it clears, because a green tick while prices are stale is the whole
+#          bug we are fixing.
+#
+# Slack (when SLACK_WEBHOOK_URL is set in Vercel) gets exactly one message when
+# an incident opens and one when it recovers — the endpoint only alerts on a
+# transition, so a long-running incident never spams.
+#
+# Every 3 hours: GitHub throttles scheduled workflows hard, and the endpoint
+# allows generous grace for that, so a tighter schedule would buy nothing.
+name: Retailer monitor
+
+on:
+  schedule:
+    - cron: '35 */3 * * *'
+  workflow_dispatch:
+    inputs:
+      simulate:
+        description: 'Domain to force STALE for a delivery drill (no prices or state are touched), e.g. scholastic.co.uk'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check retailer freshness
+        env:
+          SECRET:   ${{ secrets.COSTGUARD_CRON_SECRET }}
+          SIMULATE: ${{ github.event.inputs.simulate }}
+        run: |
+          set -u
+          if [ -z "$SECRET" ]; then
+            echo "::error::NOT CONFIGURED — COSTGUARD_CRON_SECRET is missing, so no freshness check ran and nothing is watching prices."
+            echo "### Retailer monitor: NOT CONFIGURED :x:" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          URL="https://www.catchcomics.com/api/monitor/retailers"
+          if [ -n "${SIMULATE:-}" ]; then
+            URL="$URL?simulate=$SIMULATE"
+            echo "DRILL: forcing $SIMULATE to look stale. No prices and no incident state are written."
+          fi
+
+          HTTP=""
+          for attempt in 1 2 3; do
+            HTTP=$(curl -sS -m 55 -X POST \
+              -H "Authorization: Bearer $SECRET" \
+              -o /tmp/monitor.json -w '%{http_code}' "$URL") && break
+            echo "attempt $attempt failed; retrying in 20s"; sleep 20
+          done
+
+          if [ -z "$HTTP" ]; then
+            echo "::error::Monitor endpoint unreachable after 3 attempts — price freshness is unwatched this cycle."
+            echo "### Retailer monitor: UNREACHABLE :x:" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          if [ "$HTTP" = "503" ]; then
+            echo "::error::NOT CONFIGURED — production reports COSTGUARD_CRON_SECRET is missing from Vercel env, so no check ran."
+            exit 1
+          fi
+          if [ "$HTTP" != "200" ]; then
+            echo "::error::Monitor endpoint returned HTTP $HTTP."
+            cat /tmp/monitor.json || true
+            exit 1
+          fi
+
+          OPEN=$(jq -r '.openIncidents | length' /tmp/monitor.json)
+          OPENED=$(jq -r '.opened | length' /tmp/monitor.json)
+          RECOVERED=$(jq -r '.recovered | length' /tmp/monitor.json)
+          PRICED=$(jq -r '.totalPriced' /tmp/monitor.json)
+          SLACK=$(jq -r '.slackConfigured' /tmp/monitor.json)
+
+          {
+            echo "### Retailer monitor"
+            echo ""
+            echo "- priced offers visible: **$PRICED**"
+            echo "- open incidents: **$OPEN** (newly opened $OPENED, recovered $RECOVERED)"
+            echo "- Slack configured: \`$SLACK\`"
+            if [ "$OPEN" != "0" ]; then
+              echo ""
+              echo "| severity | what | action |"
+              echo "|---|---|---|"
+              jq -r '.openIncidents[] | "| \(.severity) | \(.title) | \(.action) |"' /tmp/monitor.json
+              echo ""
+              jq -r '.openIncidents[] | "**\(.title)**\n" + (.details | map("- " + .) | join("\n")) + "\n"' /tmp/monitor.json
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$SLACK" != "true" ]; then
+            echo "::warning::SLACK_WEBHOOK_URL is not set in Vercel, so alerts reached the logs only. This workflow's pass/fail is currently the only delivery channel."
+          fi
+
+          if [ "$OPEN" != "0" ]; then
+            jq -r '.openIncidents[] | "::error::" + .title + " — " + .action' /tmp/monitor.json
+            exit 1
+          fi
+
+          echo "All retailers fresh or legitimately not due. $PRICED priced offers visible."
