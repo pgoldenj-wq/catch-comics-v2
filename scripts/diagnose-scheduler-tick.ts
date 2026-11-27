@@ -181,7 +181,14 @@ async function main() {
       const meta = r.metadata && Object.keys(r.metadata as object).length
         ? ' · ' + JSON.stringify(r.metadata).slice(0, 70) : ''
       console.log(`  ${iso(r.started_at)}  ${r.job_name.padEnd(30)} ${String(r.status).padEnd(8)} ${String(r.items_processed).padStart(5)} items`)
-      console.log(`      run id: ${r.inngest_run_id ?? '(none — row predates the 2026-11-27 deploy)'}${meta}`)
+      // Three different reasons a run id can be absent, and saying the wrong
+      // one is worse than saying nothing: monitor.retailer_health is not an
+      // Inngest function at all (it runs on GitHub Actions and calls an API
+      // route), so "predates the deploy" would be a plain untruth about it.
+      const why = r.job_name === 'monitor.retailer_health'
+        ? '(n/a — not an Inngest function; runs on GitHub Actions)'
+        : '(none — row predates the 2026-11-27 deploy)'
+      console.log(`      run id: ${r.inngest_run_id ?? why}${meta}`)
     }
   }
 
