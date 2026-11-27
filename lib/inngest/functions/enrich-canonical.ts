@@ -24,7 +24,7 @@ export const enrichCanonical = inngest.createFunction(
     retries:  1,
     triggers: [{ cron: '0 2 * * *' }],   // 02:00 UTC daily
   },
-  async ({ step }) => {
+  async ({ step, runId }) => {
     // Cost Guard: catalogue enrichment is bulk external-API + DB write work.
     const costGate = await step.run('costguard-gate', () =>
       inngestCostGate({
@@ -43,7 +43,7 @@ export const enrichCanonical = inngest.createFunction(
     // ── Step 1: create job run ───────────────────────────────────────────────
     const jobRun = await step.run('create-job-run', () =>
       prisma.jobRun.create({
-        data: { jobName: 'enrich.canonical_products', status: 'running' },
+        data: { jobName: 'enrich.canonical_products', status: 'running', inngestRunId: runId },
         select: { id: true },
       }),
     )

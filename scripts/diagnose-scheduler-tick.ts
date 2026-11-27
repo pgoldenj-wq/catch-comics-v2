@@ -155,7 +155,11 @@ async function main() {
     FROM job_runs GROUP BY job_name ORDER BY job_name`
   console.log('\n## job_runs — which jobs record their own execution\n')
   for (const j of jr) console.log(`  ${j.job_name.padEnd(34)} ${String(Number(j.n)).padStart(5)} runs · newest ${iso(j.newest)}`)
-  console.log('  NOTE: sync-retailer-scheduled writes no job_runs row, so its absence here is not evidence either way.')
+  const sawScheduler = jr.some(j => j.job_name === 'sync_retailer.scheduled')
+  console.log(sawScheduler
+    ? '  NOTE: sync_retailer.scheduled records every tick, including quiet ones — a gap in it IS missed ticks.'
+    : '  NOTE: sync_retailer.scheduled rows begin only after the 2026-11-27 deploy. Before that the cron wrote\n'
+    + '        nothing at all, so its absence above is not evidence either way for any earlier period.')
 
   // ── 6. What a stalled refresh costs, and when ────────────────────────────
   // cleanup-stale (cron 0 3 * * *) runs both passes against last_seen_at at

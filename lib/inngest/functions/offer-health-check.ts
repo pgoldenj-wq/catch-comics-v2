@@ -33,7 +33,7 @@ export const offerHealthCheck = inngest.createFunction(
     retries:  1,
     triggers: [{ cron: '0 4 * * *' }],   // 04:00 UTC — after refresh and sweep
   },
-  async ({ step }) => {
+  async ({ step, runId }) => {
     // Tiny and read-only, but still gated so LOCKDOWN means lockdown.
     const costGate = await step.run('costguard-gate', () =>
       inngestCostGate({
@@ -107,6 +107,7 @@ export const offerHealthCheck = inngest.createFunction(
       prisma.jobRun.create({
         data: {
           jobName:        HEALTH_JOB,
+          inngestRunId:   runId,
           status:         'success',
           finishedAt:     new Date(),
           itemsProcessed: verdict.alerts.length,

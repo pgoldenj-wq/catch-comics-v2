@@ -23,7 +23,7 @@ export const bookshopRefresh = inngest.createFunction(
     retries : 2,
     triggers: [{ cron: '0 4 * * *' }],
   },
-  async ({ step }) => {
+  async ({ step, runId }) => {
     // Cost Guard: bulk listing refresh — refuse cleanly when state blocks it.
     const costGate = await step.run('costguard-gate', () =>
       inngestCostGate({
@@ -42,7 +42,7 @@ export const bookshopRefresh = inngest.createFunction(
     // ── Step 1: log job start ─────────────────────────────────────────────────
     const jobRun = await step.run('create-job-run', () =>
       prisma.jobRun.create({
-        data  : { jobName: 'bookshop.refresh', status: 'running' },
+        data  : { jobName: 'bookshop.refresh', status: 'running', inngestRunId: runId },
         select: { id: true },
       }),
     )
