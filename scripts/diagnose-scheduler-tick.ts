@@ -161,6 +161,30 @@ async function main() {
     : '  NOTE: sync_retailer.scheduled rows begin only after the 2026-11-27 deploy. Before that the cron wrote\n'
     + '        nothing at all, so its absence above is not evidence either way for any earlier period.')
 
+  // ── 5b. Recent runs WITH their Inngest run id ────────────────────────────
+  // inngest_run_id was NULL on every row until the 2026-11-27 deploy, so rows
+  // without one are simply older than that — not a failed run.
+  const recentRuns = await prisma.$queryRaw<{
+    job_name: string; started_at: Date; status: string
+    inngest_run_id: string | null; items_processed: number; metadata: unknown
+  }[]>`
+    SELECT job_name, started_at, status, inngest_run_id, items_processed, metadata
+    FROM job_runs
+    WHERE started_at > now() - interval '36 hours'
+    ORDER BY started_at DESC
+    LIMIT 40`
+  console.log('\n## Runs in the last 36h, with Inngest run ids\n')
+  if (recentRuns.length === 0) {
+    console.log('  (none — no job has recorded a run in 36 hours)')
+  } else {
+    for (const r of recentRuns) {
+      const meta = r.metadata && Object.keys(r.metadata as object).length
+        ? ' · ' + JSON.stringify(r.metadata).slice(0, 70) : ''
+      console.log(`  ${iso(r.started_at)}  ${r.job_name.padEnd(30)} ${String(r.status).padEnd(8)} ${String(r.items_processed).padStart(5)} items`)
+      console.log(`      run id: ${r.inngest_run_id ?? '(none — row predates the 2026-11-27 deploy)'}${meta}`)
+    }
+  }
+
   // ── 6. What a stalled refresh costs, and when ────────────────────────────
   // cleanup-stale (cron 0 3 * * *) runs both passes against last_seen_at at
   // 30 days: pass 1 flips to OUT_OF_STOCK, pass 2 soft-deletes. So every
