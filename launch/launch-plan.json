@@ -275,7 +275,7 @@
         {
           "kind": "link",
           "label": "Launch smoke runs",
-          "href": "https://github.com/pgoldenj-wq/catch-comics/actions/workflows/launch-smoke.yml"
+          "href": "https://github.com/pgoldenj-wq/catch-comics-v2/actions/workflows/launch-smoke.yml"
         }
       ]
     }
