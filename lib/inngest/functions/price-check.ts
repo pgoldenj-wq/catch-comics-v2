@@ -27,7 +27,7 @@ export const priceCheck = inngest.createFunction(
     retries:  1,
     triggers: [{ cron: '0 */4 * * *' }],   // every 4 hours
   },
-  async ({ step }) => {
+  async ({ step, runId }) => {
     // Cost Guard: price freshness matters to shoppers — deferrable, so it
     // keeps running in RED and stops only in LOCKDOWN.
     const costGate = await step.run('costguard-gate', () =>
@@ -47,7 +47,7 @@ export const priceCheck = inngest.createFunction(
     // ── Step 1: create job run ───────────────────────────────────────────────
     const jobRun = await step.run('create-job-run', () =>
       prisma.jobRun.create({
-        data: { jobName: 'price_check.canonical_products', status: 'running' },
+        data: { jobName: 'price_check.canonical_products', status: 'running', inngestRunId: runId },
         select: { id: true },
       }),
     )

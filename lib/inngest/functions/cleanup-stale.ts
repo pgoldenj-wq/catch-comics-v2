@@ -37,7 +37,7 @@ export const cleanupStale = inngest.createFunction(
     retries:  1,
     triggers: [{ cron: '0 3 * * *' }],   // 03:00 UTC daily
   },
-  async ({ step }) => {
+  async ({ step, runId }) => {
     // Cost Guard: soft-delete sweep — deferrable (data hygiene), blocked only
     // in LOCKDOWN.
     const costGate = await step.run('costguard-gate', () =>
@@ -57,7 +57,7 @@ export const cleanupStale = inngest.createFunction(
     // ── Step 1: create job run ───────────────────────────────────────────────
     const jobRun = await step.run('create-job-run', () =>
       prisma.jobRun.create({
-        data: { jobName: 'cleanup.stale_listings', status: 'running' },
+        data: { jobName: 'cleanup.stale_listings', status: 'running', inngestRunId: runId },
         select: { id: true },
       }),
     )

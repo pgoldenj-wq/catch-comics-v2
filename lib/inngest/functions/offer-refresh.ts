@@ -96,7 +96,7 @@ export const offerRefresh = inngest.createFunction(
     retries:  1,
     triggers: [{ cron: '0 2 * * *' }],   // 02:00 UTC — before the 03:00 sweep
   },
-  async ({ step }) => {
+  async ({ step, runId }) => {
     // Cost Guard: price freshness matters to shoppers, and this job is the only
     // thing standing between the catalogue and another silent expiry — so it is
     // deferrable (keeps running in RED, stops only in LOCKDOWN).
@@ -116,7 +116,7 @@ export const offerRefresh = inngest.createFunction(
 
     const jobRun = await step.run('create-job-run', () =>
       prisma.jobRun.create({
-        data: { jobName: 'offer_refresh.verified_offers', status: 'running' },
+        data: { jobName: 'offer_refresh.verified_offers', status: 'running', inngestRunId: runId },
         select: { id: true },
       }))
 

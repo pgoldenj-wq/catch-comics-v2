@@ -14,10 +14,14 @@
  * they are refreshed only via the gated CLI sync (see lib/sync/dispatch.ts).
  */
 
+import { Prisma }                from '@prisma/client'
 import { inngest }               from '@/lib/inngest/client'
 import { prisma }                from '@/lib/prisma'
 import { isDueForScheduledSync } from '@/lib/sync/dispatch'
 import { inngestCostGate }       from '@/lib/costguard/inngest'
+
+/** job_runs.job_name for this cron. */
+const JOB_NAME = 'sync_retailer.scheduled'
 
 export const syncScheduled = inngest.createFunction(
   {
@@ -25,7 +29,32 @@ export const syncScheduled = inngest.createFunction(
     name:     'Scheduled Retailer Sync',
     triggers: [{ cron: '0 * * * *' }],   // every hour, on the hour
   },
-  async ({ step }) => {
+  async ({ step, runId }) => {
+    // Until 2026-11-27 this function wrote no job_runs row, so a tick that
+    // enqueued nothing left no trace anywhere and "did the hourly cron run?"
+    // could not be answered until a retailer happened to fall due — up to 24h
+    // later. That is precisely the blind spot that let the schedule sit dead
+    // from 2026-08-09 without anyone being able to tell. One cheap row per
+    // tick makes this cron as observable as every other job, INCLUDING the
+    // quiet ticks, which are the informative ones.
+    const recordTick = (
+      stepId:   string,
+      enqueued: number,
+      metadata: Prisma.InputJsonObject,
+    ) => step.run(stepId, async () => {
+      await prisma.jobRun.create({
+        data: {
+          jobName:        JOB_NAME,
+          inngestRunId:   runId,
+          status:         'success',
+          finishedAt:     new Date(),
+          itemsProcessed: enqueued,
+          metadata,
+        },
+      })
+      return null
+    })
+
     // Cost Guard: skip cleanly (no retries) when the spend state blocks
     // nonessential work. Blocking THIS cron stops the whole hourly pipeline.
     const costGate = await step.run('costguard-gate', () =>
@@ -39,6 +68,9 @@ export const syncScheduled = inngest.createFunction(
       }))
     if (!costGate.allowed) {
       console.warn(`[costguard] sync-scheduled skipped: ${costGate.reason}`)
+      await recordTick('record-tick-costguard', 0, {
+        skipped: 'costguard', reason: costGate.reason ?? null,
+      })
       return { enqueued: 0, skipped: 'costguard', reason: costGate.reason }
     }
 
@@ -117,6 +149,9 @@ export const syncScheduled = inngest.createFunction(
 
     if (due.length === 0) {
       console.log('[sync-scheduled] no retailers due — nothing to enqueue')
+      // The quiet tick still gets a row: "ran, nothing was due" and "never ran"
+      // are completely different diagnoses and must not look identical.
+      await recordTick('record-tick-idle', 0, { due: 0 })
       return { enqueued: 0 }
     }
 
@@ -130,6 +165,10 @@ export const syncScheduled = inngest.createFunction(
         data: { retailerId: r.id },
       })),
     )
+
+    await recordTick('record-tick-enqueued', due.length, {
+      retailers: due.map((r: { id: string; domain: string }) => r.domain),
+    })
 
     return { enqueued: due.length, retailers: due.map((r: { id: string; domain: string }) => r.domain) }
   },
