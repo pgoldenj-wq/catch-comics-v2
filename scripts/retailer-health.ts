@@ -20,6 +20,8 @@
  */
 
 import { PrismaClient } from '@prisma/client'
+import { writeFileSync, mkdirSync } from 'node:fs'
+import { join } from 'node:path'
 import { SKIP_PLATFORMS, DEFAULT_REFRESH_HOURS } from '../lib/sync/dispatch'
 import { SHOPIFY_VERIFY_DOMAINS } from '../lib/inngest/functions/offer-refresh'
 
@@ -142,6 +144,17 @@ async function main() {
     )
     if (o.note) console.log(`        └─ ${o.note}`)
   }
+
+  // Feed the Command Centre. It reads this file the same way it reads the
+  // smoke and health snapshots, so the dashboard answers "has a retailer
+  // quietly stopped working?" without anyone running a script.
+  const outDir = join(process.cwd(), 'launch', 'operations')
+  mkdirSync(outDir, { recursive: true })
+  writeFileSync(
+    join(outDir, 'retailer-health-latest.json'),
+    JSON.stringify({ generatedAt: now.toISOString(), staleHours: STALE_HOURS, retailers: out }, null, 2) + '\n',
+    'utf8',
+  )
 
   const live = out.filter(o => ['FRESH', 'CHECKED', 'NOTHING_DUE', 'VERIFIED_DAILY'].includes(o.state))
   const bad  = out.filter(o => ['STALE', 'FAILED', 'NO DATA'].includes(o.state))

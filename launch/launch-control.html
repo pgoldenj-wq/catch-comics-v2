@@ -156,6 +156,27 @@
   }
   #toast.on{opacity:1; transform:translateX(-50%) translateY(0)}
 
+  /* retailer health — a dense status table, same tokens as everything else */
+  table.rh{width:100%; border-collapse:collapse; font-size:12.5px}
+  table.rh th{
+    text-align:left; font-weight:600; color:var(--ink-3); padding:6px 10px;
+    border-bottom:1px solid var(--line); white-space:nowrap;
+    font-size:11px; letter-spacing:.04em; text-transform:uppercase;
+  }
+  table.rh td{padding:8px 10px; border-bottom:1px solid var(--line-2); vertical-align:top; white-space:nowrap}
+  table.rh tr:last-child td{border-bottom:none}
+  .rh-num{text-align:right; font-variant-numeric:tabular-nums}
+  .rh-note{font-size:11px; color:var(--ink-3); white-space:normal; max-width:30ch; margin-top:2px}
+  .rh-pill{
+    display:inline-block; padding:2px 8px; border-radius:999px;
+    font-size:11px; font-weight:600; white-space:nowrap;
+  }
+  .rh-pill.rh-ok{color:var(--green); background:var(--green-bg)}
+  .rh-pill.rh-idle{color:var(--ink-2); background:var(--line-2)}
+  .rh-pill.rh-bad{color:var(--red); background:var(--red-bg)}
+  tr.rh-bad td{background:var(--red-bg)}
+  .rh-foot{margin:10px 2px 0; font-size:11.5px; color:var(--ink-3)}
+
   /* waiting — visibly not actionable */
   .waiting .item{background:transparent}
   .waiting .card{border-style:dashed; background:transparent}
@@ -400,7 +421,54 @@ function wireActions(plan){
   }
 }
 
-function render(plan, smoke, health, signal, verify){
+/* Retailer health — the panel that answers "has one quietly stopped working?"
+   A retailer with no recent write used to look identical whether it was fine,
+   idle, deliberately excluded or dead. These states are now distinct, and only
+   STALE / FAILED / NO DATA are faults. */
+const RSTATE = {
+  FRESH:          { cls:'ok',    label:'fresh data published' },
+  CHECKED:        { cls:'ok',    label:'checked, prices unchanged' },
+  NOTHING_DUE:    { cls:'idle',  label:'nothing due yet' },
+  VERIFIED_DAILY: { cls:'ok',    label:'daily verified-offer refresh' },
+  LIVE_LOOKUP:    { cls:'idle',  label:'live lookup per request' },
+  BLOCKED:        { cls:'idle',  label:'deliberately excluded' },
+  STALE:          { cls:'bad',   label:'STALE — no fresh observation' },
+  FAILED:         { cls:'bad',   label:'FAILED — last attempt errored' },
+  'NO DATA':      { cls:'bad',   label:'no data' },
+};
+function retailerHtml(rh){
+  if(!rh || !Array.isArray(rh.retailers)) return '';
+  const rows = rh.retailers.map(r => {
+    const st = RSTATE[r.state] || { cls:'idle', label:r.state };
+    return `<tr class="rh-${esc(st.cls)}">
+      <td><b>${esc(r.domain)}</b>${r.note ? `<div class="rh-note">${esc(r.note)}</div>` : ''}</td>
+      <td><span class="rh-pill rh-${esc(st.cls)}">${esc(st.label)}</span></td>
+      <td class="rh-num">${esc(r.priced)}</td>
+      <td>${esc(r.check)}</td>
+      <td>${esc(r.obs)}</td>
+      <td>${esc(r.due)}</td>
+      <td>${esc(r.expiry)}</td>
+    </tr>`;
+  }).join('');
+  const bad = rh.retailers.filter(r => ['STALE','FAILED','NO DATA'].includes(r.state));
+  return `
+    <section style="margin-bottom:20px">
+      <h3>Retailers <span class="n">${bad.length ? `${bad.length} need attention` : 'all sources accounted for'} · ${ago(rh.generatedAt)}</span></h3>
+      <div class="card" style="overflow-x:auto">
+        <table class="rh">
+          <thead><tr>
+            <th>retailer</th><th>state</th><th>priced</th>
+            <th>last source check</th><th>last observation</th><th>next due</th><th>earliest expiry</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <p class="rh-foot">Stale after ${esc(rh.staleHours)}h without a fresh observation.
+          “Checked, prices unchanged” is a healthy result, not a missed run.</p>
+      </div>
+    </section>`;
+}
+
+function render(plan, smoke, health, signal, verify, retailerHealth){
   if(!plan){
     document.getElementById('root').innerHTML =
       '<div class="err">Could not read <code>launch-plan.json</code>. ' +
@@ -658,6 +726,8 @@ function render(plan, smoke, health, signal, verify){
       </section>
     </div>
 
+    ${retailerHtml(retailerHealth)}
+
     <section class="waiting" style="margin-bottom:20px">
       <h3>Waiting on someone else</h3>
       <div class="card">${waitingItems}</div>
@@ -846,14 +916,15 @@ async function pollJobs(){
 }
 
 (async () => {
-  const [plan, smoke, health, signal, verify] = await Promise.all([
+  const [plan, smoke, health, signal, verify, retailers] = await Promise.all([
     load('launch-plan.json'),
     load('operations/launch-smoke-latest.json'),
     load('operations/launch-health-latest.json'),
     load('operations/launch-signal-latest.json'),
     load('operations/price-verify-status.json'),
+    load('operations/retailer-health-latest.json'),
   ]);
-  render(plan, smoke, health, signal, verify);
+  render(plan, smoke, health, signal, verify, retailers);
   wireActions(plan);
   // Quick-action buttons live outside the item cards, so they wire separately.
   for(const btn of document.querySelectorAll('.qside .act[data-run]')){
