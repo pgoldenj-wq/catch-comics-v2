@@ -182,10 +182,21 @@ async function run() {
 
     if (!listingId) {
       // Not proof the redirect is broken — proof that a shopper walking these
-      // pages has no retailer to click. Degraded price comparison, shown as
-      // such rather than quietly skipped.
-      add('go', 'Affiliate redirect returns 3xx to retailer', 'warn',
-        `not exercised — no retailer link on ${sampled} sampled product pages`)
+      // pages has no retailer to click. That IS the outage: it is exactly what
+      // the 2026-09-26→10-26 sweep looked like from the outside, and as a
+      // 'warn' it exited 0, so no email was ever sent and nothing noticed for
+      // thirty days. Promoted to 'fail' on 2026-11-27.
+      //
+      // This workflow is schedule + workflow_dispatch only, never a PR gate,
+      // so a failure here emails the founder and blocks nothing. It is also
+      // the ONLY price-outage alarm that survives Inngest being dark: the
+      // in-app watchdog (offer-health-check) cannot report its own absence.
+      //
+      // False positives are unlikely: the flagship fixture is sampled first
+      // and the rest come from live search results, so this fires only when
+      // all GO_DISCOVERY_PAGES sampled pages have no retailer link at all.
+      add('go', 'Affiliate redirect returns 3xx to retailer', 'fail',
+        `no retailer link on ${sampled} sampled product pages — price comparison is degraded`)
     } else {
       const res = await fetch(`${TARGET}/go/${listingId}`, {
         redirect: 'manual', headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(20_000),

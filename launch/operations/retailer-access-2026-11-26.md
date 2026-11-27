@@ -162,12 +162,179 @@ hourly scheduler reads retailers from the database and runs whatever adapter
 is deployed. The hardened adapter is not deployed yet, so all four feeds are
 held. Enable after the deploy, not before.
 
+## CORRECTION, 2026-11-27 — the hosted schedule is registered, not executing
+
+On 2026-11-26 I reported hosted scheduling as enabled for Waterstones,
+Scholastic and Lets Buy Books. **That was registration. It has not executed,
+and the cause is outside this repository.**
+
+How it was caught, rather than asserted: Scholastic's `refreshIntervalHours`
+was brought forward to 1 at 2026-11-26 23:41 specifically so a hosted run
+could be *observed* the same night. At the 01:00 UTC tick the cron's own SQL
+and predicate rate it DUE. No `sync_logs` row appeared.
+
+The evidence, from `npm run retailers:diagnose-tick`:
+
+- `sync_logs` holds **0 rows in the last 48 h, for every retailer**. The newest
+  row for any of the three feeds is `scholastic.co.uk · running ·
+  2026-08-09 10:01`.
+- **Two jobs stop dead on 2026-08-09, and only those two:**
+  `sync-retailer-scheduled` (last effect 10:01) and
+  `price_check.canonical_products` (last run 12:00). The three once-daily crons
+  in the same Inngest app ran through to 2026-11-26 — `bookshop.refresh` 04:00,
+  `cleanup.stale_listings` 03:00, `enrich.canonical_products` 02:00. The two
+  dead ones are exactly the two that enqueue `sync/retailer` events.
+- Every historical `sync_logs` row for these retailers is `running`, never
+  `success`: the function never reached its final step. That matches the
+  2026-08-09 Inngest quota incident which `lib/sync/dispatch.ts` already
+  documents as the reason the failure-backoff exists.
+
+Ruled out inside the repository:
+
+| candidate | ruled out by |
+|---|---|
+| function not served | `syncScheduled` is in the `functions` array of `app/api/inngest/route.ts` |
+| Cost Guard refusal | state is AMBER; `sync-retailer-scheduled` declares `estRows`/`estRequests`/`maxRuntimeMs`, which AMBER requires and accepts. Zero active restrictions on any sync operation; the refusal log stops at 2026-08-08 |
+| in-flight run lease | the stale `running` rows are from August, far past `RUN_LEASE_MS` (30 min) |
+| failure cooldown | 0 attempts postdate the last success, so `failureCooldownMs` is 0 |
+| `scheduled_sync_disabled` | false on all three since 2026-11-26 |
+| inside refresh interval | the predicate itself returns DUE |
+
+**Inference, stated as one:** the pause is Inngest-side. This machine holds no
+`INNGEST_*` credentials, so a function's enabled/paused state cannot be read
+from here — it has to be read in the Inngest dashboard. A deliberate pause of
+the two sync-driving crons during an August quota incident, never undone, fits
+every observation above; nothing in the repository does.
+
+### The 02:00 tick splits this into two separate faults
+
+Watched live at 2026-11-27 02:07. `enrich.canonical_products` (cron `0 2 * * *`)
+**ran at 02:00:24**, so the Inngest app is alive and firing crons at that exact
+minute. `offer_refresh.verified_offers` — same `0 2 * * *`, registered in
+PR #54, merged 2026-11-26 — produced **no `job_runs` row on its first scheduled
+fire**. Nor has `offer_health.check`.
+
+The Cost Guard cannot explain that one either: `offer-refresh` is classed
+`deferrable` with full `estRows`/`estRequests`/`maxRuntimeMs`, and `deferrable`
+runs in AMBER *and* RED. Only LOCKDOWN would stop it, and `lockdownLatched` is
+false. Its `job_runs` insert is the step straight after the gate.
+
+So there are two faults, not one:
+
+| fault | functions | shape |
+|---|---|---|
+| **A — paused** | `sync-retailer-scheduled`, `price-check` | registered long ago, fired hourly/4-hourly until 2026-08-09, then stopped dead while siblings kept running |
+| **B — never registered** | `offer-refresh-verified-offers`, `offer-health-check` | added in PR #54 on 2026-11-26, two deploys since, never fired once |
+
+Fault B means **the watchdog and the thing it watches are both dark**:
+`offer_health.check` exists precisely to alarm when `offer_refresh` has not
+succeeded. Neither runs.
+
+**Prediction, recorded before the fact:** if B is "the Inngest app was never
+re-synced after the PR #54 deploy, so new functions are absent from Inngest
+Cloud", then at 03:00 `cleanup.stale_listings` (old) fires and at 04:00
+`offer_health.check` (new) does not.
+
+**Result, measured 2026-11-27 03:00–04:06 — the prediction holds, and the
+tick turned it into a matched-pair test.** Two pre-existing jobs fired on
+schedule and two PR #54 jobs did not, at crons that are identical to the
+minute:
+
+| cron | pre-existing job | PR #54 job on the same cron |
+|---|---|---|
+| `0 2 * * *` | `enrich.canonical_products` — ran 02:00:24 | `offer_refresh.verified_offers` — no `job_runs` row, ever |
+| `0 4 * * *` | `bookshop.refresh` — ran 04:00:23 (171 → 172) | `offer_health.check` — no `job_runs` row, ever |
+
+`cleanup.stale_listings` (`0 3 * * *`) also ran, at 03:00:15 (199 → 200), and
+`price_check.canonical_products` stayed frozen at 2026-08-09 12:00:32 across
+all three ticks, so Fault A is unchanged too.
+
+Because each new function shares a cron expression with an old one that fired
+within ~25 s of the same minute, this additionally rules out a mistyped cron,
+timezone drift, and the app or the `/api/inngest` route being down. Cost Guard
+is out on its own evidence: every refusal path in `lib/costguard/gate.ts`
+calls `recordRefusal`, which persists to `costguard:events`; that log holds 11
+entries, all 2026-08-07/08, and is nowhere near the `MAX_EVENTS` cap, so
+nothing was evicted. A November refusal would be there. It is not.
+
+**What this evidence still cannot separate**, and the dashboard can: "absent
+from Inngest Cloud" versus "invoked and failing before the `job_runs` insert".
+Both new functions write that row after their gate step, so a crash on first
+invocation would look identical from the database. It would need both to fail
+identically on their first ever run, which is the less likely reading — but it
+is a reading, not a ruled-out one, and `on-failure` would have sent it only to
+Slack (see W5). So the owner action is unchanged: look for whether these two
+function IDs appear in the Inngest app at all. Their presence or absence
+settles it in one glance.
+
+**Why nothing shouted.** `on-failure` writes `console.error` and posts to Slack
+and persists nothing, `SLACK_WEBHOOK_URL` is unset, and no `VERCEL_*` token
+exists on this machine. A function that crashed before its `job_runs` insert
+and one that was never invoked are therefore indistinguishable from here. That
+is the real cost of the unset webhook: not a missed notification, but a whole
+class of silent failure with no local evidence.
+
+**Consequence for the verdict.** Every priced offer on the site carries real,
+honestly-dated prices, and nothing refreshes any of them automatically.
+`cleanup-stale` (cron `0 3 * * *`) runs both passes against `last_seen_at` at
+30 days — pass 1 to `OUT_OF_STOCK`, pass 2 soft-delete — so each offer has a
+dated expiry, measured 2026-11-27 01:20:
+
+| retailer | priced rows | first sweep |
+|---|---|---|
+| Scholastic | 17 | 2026-12-26 00:03 |
+| Travelling Man | 49 | 2026-12-26 13:48 |
+| World of Books | 40 | 2026-12-26 17:20 |
+| Lets Buy Books | 13 | 2026-12-26 19:09 |
+| Waterstones | 3,715 | 2026-12-26 19:12 |
+
+So this is not only the Awin feeds. **The 40 pairs that close B4 expire on the
+same day**, and their freshness depends on `offer_refresh.verified_offers`
+(02:00 UTC, PR #54), which has no `job_runs` row either. The site is sound
+today and goes dark on 2026-12-26 unless the Inngest functions resume.
+
+The CLI fallback is uneven, and worth knowing before relying on it:
+
+- **Awin feeds** (Waterstones, Scholastic, Lets Buy Books) — covered:
+  `npm run awin:ingest -- <domain> --write` re-reads the feed and re-dates the
+  rows it ingests.
+- **The 40 pairs** (Travelling Man, World of Books) — **not covered.**
+  `b4-revive-paired-offers.ts` verifies an already-active side but
+  deliberately never writes it, because its job is reviving swept rows, not
+  refreshing live ones. So there is no CLI path to re-date these 89 rows;
+  `offer_refresh.verified_offers` is the only mechanism, and it has never run.
+
+`npm run retailers:diagnose-tick` prints the expiry table with live dates.
+
+Scholastic's interval was put back to 24 h at 2026-11-27 01:10, as agreed,
+rather than left at 1 h to hide the gap behind frequent retries.
+
 ## Still to do
 
-1. Deploy, then enable hosted scheduling for the three live feeds.
-2. Prove a second hosted run either consumes a new feed build or correctly
-   recognises an unchanged one.
-3. Bookshop UK: hold until Awin rebuilds feed 99173 (last built 2026-09-23) or
+Two of these need the Inngest account and nothing else; the rest are ours.
+
+1. **Fault A — resume the paused crons.** In the Inngest dashboard, confirm
+   whether `sync-retailer-scheduled` and `price-check` are paused or disabled,
+   and resume them. Everything else on that path is deployed and permitted.
+2. **Fault B — re-sync the app so PR #54's functions register.** Check whether
+   `offer-refresh-verified-offers` and `offer-health-check` appear in Inngest
+   at all. If they do not, the app needs a sync (Inngest's Vercel integration,
+   or a manual sync of the production `/api/inngest` URL). Two deploys have
+   landed since they were added and neither registered them, so this will not
+   fix itself on the next deploy.
+3. **Set `SLACK_WEBHOOK_URL`.** Not cosmetic. `on-failure` and
+   `offer_health.check` both exist to shout about exactly this, and both are
+   currently shouting into Vercel logs that nobody reads. Had it been set, the
+   01:00 and 02:00 silences would have arrived as alerts rather than needing a
+   deliberate hunt.
+4. Once the crons run, prove a second hosted run either consumes a new feed
+   build or correctly recognises an unchanged one — the unchanged-feed case is
+   already proven on the CLI path (Scholastic re-run: 16 updated, 0 price
+   changes, newest observation and newest `last_seen` both unmoved).
+5. Give `sync-retailer-scheduled` a `job_runs` row of its own. It is the only
+   scheduled job that records nothing, which is why its silence had to be
+   inferred from `sync_logs` rather than read directly.
+6. Bookshop UK: hold until Awin rebuilds feed 99173 (last built 2026-09-23) or
    `BOOKSHOP_API_KEY` is set.
-4. Re-verify eBay through the customer journey and keep it measured separately
+7. Re-verify eBay through the customer journey and keep it measured separately
    from stored prices.

@@ -7,8 +7,19 @@
  * not a re-implementation of the rule, because a re-implementation would
  * agree with itself and prove nothing.
  *
+ * Importing the predicate is not enough on its own, though — it has to be fed
+ * the same INPUTS. As first written (2026-11-26) this counted
+ * `consecutiveFailures` as sync_logs rows at status='error', where the cron
+ * counts EVERY attempt since the last success. On the three Awin feeds both
+ * counts were 0, so the two agreed and the gap stayed hidden; on
+ * worldofbooks.com they are 1,634 and 36, i.e. a 24 h cooldown versus a 16 h
+ * one. The lateral joins below are now copied from
+ * lib/inngest/functions/sync-scheduled.ts verbatim. Keep them that way.
+ *
  * Being "due" is registration, not execution. A retailer shown as due here has
- * still never been synced by the hosted job until a sync_logs row says so.
+ * still never been synced by the hosted job until a sync_logs row says so —
+ * and on 2026-11-27 that distinction was the whole finding: scholastic.co.uk
+ * read DUE here while the hosted cron had not executed since 2026-08-09.
  *
  *   npx dotenv -e <main>/.env.local -- npx tsx scripts/check-sync-due.ts
  */
@@ -33,8 +44,8 @@ async function main() {
     ) la ON true
     LEFT JOIN LATERAL (
       SELECT COUNT(*)::int AS n FROM sync_logs s
-      WHERE s.retailer_id = r.id AND s.status = 'error'
-        AND s.started_at > COALESCE(r.last_synced_at, '1970-01-01'::timestamp)
+      WHERE s.retailer_id = r.id
+        AND s.started_at > COALESCE(r.last_synced_at, '-infinity'::timestamptz)
     ) cf ON true
     WHERE r.is_active = true
     ORDER BY r.domain`

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-11-26",
+  "updated": "2026-11-27",
   "mode": "LAUNCH",
   "note": "The single source of truth for what is left before Catch Comics launches. Edit this file, reload Launch Control. Re-verified against production and the production database on 2026-11-22; every gate and blocker below carries the date its claim was last checked. It replaces the 2026-09-26 readings, which had gone 57 days stale and several of which had become false.",
   "targets": {
@@ -84,7 +84,7 @@
       "status": "done",
       "why": "Resolved 2026-11-26. The cause was never a code bug. Travelling Man and World of Books carry scheduled_sync_disabled, so the hourly sync and the 4-hourly price-check skip them by design, and their freshness depended on a CLI script someone ran by hand. The last such run was 2026-09-26. Thirty days later cleanup-stale ran its two passes against the same lastSeenAt predicate in one 03:00 transaction — pass 1 flipped all 2,246 remaining rows to OUT_OF_STOCK, pass 2 soft-deleted them — and nothing was watching for the silence. Fixed in two bounded steps, each publishing only offers verified live in the same run: ten Travelling Man offers, then forty Travelling Man + World of Books PAIRS. A hosted daily refresh at 02:00 UTC — deliberately one hour before the 03:00 sweep — plus three alarms now watch for a repeat. The comparison is real but shallow: 40 products of 136,277, against a measured ceiling of 170 for this retailer pair. Breadth needs a legitimate wide feed (Waterstones 1,792 shared editions, or Wordery 1,479) through an approved AWIN feed — a commercial conversation, not a code task. See launch/operations/second-retailer-feed-plan-2026-11-26.md.",
       "done": "launch:health reports priced listings above zero and products at 2+ retailers above zero, and a real product page shows the same edition at two retailers.",
-      "evidence": "DONE 2026-11-26 17:26 UTC (launch:health). BEFORE: 0 priced listings, 0 priced products, 0 at 2+ retailers. AFTER: 89 priced listings, 49 priced products, 40 products at 2+ retailers (comparison depth 9 @ 1 retailer, 40 @ 2+, overlap 81.63%), 0 stale. Two bounded recoveries: npm run b4:revive (10 Travelling Man offers) and npm run b4:pairs (40 pairs, 79 rows, 112 product requests, 0 transient failures, £0 external cost). 16 pairs were abandoned because one side was genuinely sold out or 404 — neither side was published, because half a pair is a price, not a comparison. npm run b4:pairs:verify passes 18/18: every revived row active, priced and in stock; exactly one price observation each; no row outside the 03:00-04:01 UTC cron window touched; 274,571 unrelated deletions, 808,344 listings and 150,694 canonical products all unchanged. Live proof: https://www.catchcomics.com/product/skull-face-bookseller-honda-san-the-complete-omnibus-9798855426847 shows Travelling Man £20.99 (best price) against World of Books £39.29, with two distinct /go links resolving to the two retailers. The hosted jobs offer_refresh.verified_offers (02:00 UTC) and offer_health.check (04:00 UTC) are deployed in PR #54; registration is not execution — no cron run had been observed when this was written.",
+      "evidence": "DONE 2026-11-26 17:26 UTC (launch:health). BEFORE: 0 priced listings, 0 priced products, 0 at 2+ retailers. AFTER: 89 priced listings, 49 priced products, 40 products at 2+ retailers (comparison depth 9 @ 1 retailer, 40 @ 2+, overlap 81.63%), 0 stale. Two bounded recoveries: npm run b4:revive (10 Travelling Man offers) and npm run b4:pairs (40 pairs, 79 rows, 112 product requests, 0 transient failures, £0 external cost). 16 pairs were abandoned because one side was genuinely sold out or 404 — neither side was published, because half a pair is a price, not a comparison. npm run b4:pairs:verify passes 18/18: every revived row active, priced and in stock; exactly one price observation each; no row outside the 03:00-04:01 UTC cron window touched; 274,571 unrelated deletions, 808,344 listings and 150,694 canonical products all unchanged. Live proof: https://www.catchcomics.com/product/skull-face-bookseller-honda-san-the-complete-omnibus-9798855426847 shows Travelling Man £20.99 (best price) against World of Books £39.29, with two distinct /go links resolving to the two retailers. The hosted jobs offer_refresh.verified_offers (02:00 UTC) and offer_health.check (04:00 UTC) are deployed in PR #54; registration is not execution — and the check has now been run. At the 01:00 UTC tick on 2026-11-27, with scholastic.co.uk deliberately set to a 1-hour interval so a hosted run could be observed rather than asserted, the cron rated it DUE by its own SQL and predicate and produced no sync_logs row. sync_logs holds 0 rows in the last 48h for every retailer. sync-retailer-scheduled and price_check both stop dead on 2026-08-09, while the three once-daily crons in the same Inngest app ran through to 2026-11-26 — so the pause is Inngest-side, not in the code. See W4. The 40 pairs are live and correct today; without a resumed refresh they expire to the 30-day sweep around 2026-12-26.",
       "actions": [
         {
           "kind": "run",
@@ -234,6 +234,48 @@
             "This is a post-launch growth job, not a launch blocker — the site copy is already honest that it shows the cheapest tracked retailer.",
             "Diagnose why each feed stopped before proposing new integrations."
           ]
+        }
+      ]
+    },
+    {
+      "id": "W4",
+      "title": "Inngest: four scheduled jobs are not executing — the cause is now isolated to Inngest itself",
+      "state": "NEEDS THE ACCOUNT OWNER",
+      "detail": "Two faults, both Inngest-side. FAULT A (paused): sync-retailer-scheduled (hourly) and price-check (4-hourly) fired until the 2026-08-09 quota incident and have not run since. FAULT B (not registered): offer-refresh-verified-offers and offer-health-check were added in PR #54 and have never fired. VERIFIED 2026-11-27: the DEPLOYED branch is not at fault — origin/main serves all eight functions in app/api/inngest/route.ts including both new ones, both source files are present on main, and https://www.catchcomics.com/api/inngest answers (401, signing-key gated), so the route is live. A matched-pair test settles the rest: at 02:00 enrich-canonical-products ran (02:00:24) while offer-refresh on the same 0 2 * * * cron did not, and at 04:00 bookshop.refresh ran (04:00:23) while offer-health-check on the same 0 4 * * * cron did not. That rules out a mistyped cron, timezone drift and a dead route. Cost Guard is ruled out separately: refusals persist to costguard:events and the newest is 2026-08-08. Nothing in this repository can fix either fault. OWNER ACTION, app.inngest.com → env \"production\" → Apps: resume the two paused functions, and check whether offer-refresh-verified-offers and offer-health-check are listed at all — if not, re-sync the app. Evidence: launch/operations/retailer-access-2026-11-26.md.",
+      "recheck": "npm run retailers:diagnose-tick",
+      "actions": [
+        {
+          "kind": "link",
+          "label": "Open Inngest functions",
+          "href": "https://app.inngest.com"
+        }
+      ]
+    },
+    {
+      "id": "W5",
+      "title": "SLACK_WEBHOOK_URL is unset — and on its own it would still alert nothing",
+      "state": "ONE ENV VAR",
+      "detail": "Setting the webhook is necessary but NOT sufficient, which is the part worth knowing before it is set. raiseAlert() in lib/alerts/notify.ts has exactly two callers in the whole codebase: offer-refresh and offer-health-check. Both are the W4 functions that never run, so today nothing in production can raise an alert at all, webhook or no webhook. Two further facts: a new Vercel environment variable does not reach an existing deployment, so it needs a redeploy; and the alarm logic itself is already correct and firing — npm run test:offer-alerts passes every case and, on the real snapshot, raises \"Offer refresh has never completed successfully\". The alarm is right, it simply has no way out. Once the webhook exists, npm run alerts:test sends one labelled test through the genuine notifier; the first offer-health-check run after the W4 re-sync is what proves it inside Vercel.",
+      "recheck": "npm run retailers:diagnose-tick",
+      "actions": [
+        {
+          "kind": "link",
+          "label": "Slack incoming webhooks",
+          "href": "https://api.slack.com/apps"
+        }
+      ]
+    },
+    {
+      "id": "W6",
+      "title": "The only Inngest-independent alarm now fails on a price outage (was a warning)",
+      "state": "FIXED, NEEDS DEPLOY",
+      "detail": "A job that never starts cannot warn about itself, so the alarm that matters is the one outside Inngest. That is launch-smoke.yml on GitHub Actions — separate infrastructure, and a failure emails the founder. It ran green through the entire 30-day outage for a precise reason: \"no retailer link on any sampled product page\" was recorded as a WARNING, and warnings exit 0. The five scheduled failures from 2026-11-21 to 11-25 were a stale /go/ link returning 404 — a transitional symptom, not the outage itself; once every offer was swept it would have gone quiet again. Now promoted to a failure. Verified against production 2026-11-27: 21 passed, 0 warnings, 0 failed, with the affiliate redirect resolving 302 to travellingman.com. False positives are unlikely — the flagship fixture is sampled first and the rest come from live search. Note GitHub throttles schedules: the \"hourly\" Cost Guard actually runs 2-4x a day and the \"08:00\" smoke has run as late as 19:34, so treat it as a daily safety net, not a monitor.",
+      "recheck": "npm run launch:smoke",
+      "actions": [
+        {
+          "kind": "link",
+          "label": "Launch smoke runs",
+          "href": "https://github.com/pgoldenj-wq/catch-comics/actions/workflows/launch-smoke.yml"
         }
       ]
     }
